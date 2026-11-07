@@ -18,7 +18,12 @@ class DynamicDataListingSupportTest {
     final NamedQueryService queries=mock(NamedQueryService.class);
     final MetaModelMapper models=mock(MetaModelMapper.class);
     final DynamicDataListingSupport.EnrichAuditUserDisplayFieldsOperation audit=mock(DynamicDataListingSupport.EnrichAuditUserDisplayFieldsOperation.class);
-    final DynamicDataListingSupport support=new DynamicDataListingSupport(mock(QueryBuilderService.class),queries,mock(SecureSqlRewriter.class),mock(DynamicDataMapper.class),mock(DataPermissionEngine.class),mock(FieldMaskService.class),mock(DataDomainService.class),models,mock(ExecutorRegistry.class),(m,r,a)->r,(m,r)->r,audit,m -> null);
+    final DynamicDataListingSupport support=new DynamicDataListingSupport(mock(QueryBuilderService.class),queries,mock(SecureSqlRewriter.class),mock(DynamicDataMapper.class),mock(DataPermissionEngine.class),mock(FieldMaskService.class),mock(DataDomainService.class),models,mock(ExecutorRegistry.class),projection(),(m,r,a)->r,(m,r)->r,audit,m -> null);
+    private static NativeReadFieldProjection projection() {
+        var projection = mock(NativeReadFieldProjection.class);
+        org.mockito.Mockito.lenient().when(projection.project(any(), anyList())).thenAnswer(call -> call.getArgument(1));
+        return projection;
+    }
     @Test void namedQueryReceivesScalarSetAndRangeConditionsAndRequestedSort() {
         var request=DynamicQueryRequest.builder().pageNum(2).pageSize(15).auditUserDisplayFields(List.of("created_by"))
                 .conditions(List.of(QueryCondition.builder().fieldName("status").operator(QueryCondition.Operator.IN).values(List.of("open","paid")).build(),QueryCondition.builder().fieldName("amount").operator(QueryCondition.Operator.BETWEEN).values(List.of(10,100)).build(),QueryCondition.builder().fieldName("owner").operator(QueryCondition.Operator.EQ).value("u-42").build()))
@@ -56,7 +61,7 @@ class DynamicDataListingSupportTest {
     private DynamicDataListingSupport physicalListing(QueryBuilderService builder) {
         return new DynamicDataListingSupport(builder,queries,mock(SecureSqlRewriter.class),
                 mock(DynamicDataMapper.class),mock(DataPermissionEngine.class),mock(FieldMaskService.class),
-                mock(DataDomainService.class),models,mock(ExecutorRegistry.class),(m,r,a)->r,(m,r)->r,audit,m -> null);
+                mock(DataDomainService.class),models,mock(ExecutorRegistry.class),projection(),(m,r,a)->r,(m,r)->r,audit,m -> null);
     }
 
     private ModelDefinition physicalModel() {
@@ -97,7 +102,7 @@ class DynamicDataListingSupportTest {
         String allowed=RequiredReadReferencesTest.id(9),predicate="pid IN ('"+allowed+"')";
         when(policies.buildRequiredReadFilterForQuery(42L,"fixture_bundle",43L,null,null)).thenReturn("AND "+predicate);
         var listing=new DynamicDataListingSupport(builder,queries,new SecureSqlRewriter(),mapper,policies,
-                mock(FieldMaskService.class),mock(DataDomainService.class),models,mock(ExecutorRegistry.class),(m,r,a)->r,(m,r)->r,audit,m->model);
+                mock(FieldMaskService.class),mock(DataDomainService.class),models,mock(ExecutorRegistry.class),projection(),(m,r,a)->r,(m,r)->r,audit,m->model);
         when(mapper.selectByQuery(anyString(),anyMap())).thenAnswer(call->{
             assertThat((String)call.getArgument(0)).contains(predicate);
             return new ArrayList<>(List.of(new LinkedHashMap<>(Map.<String,Object>of("pid",allowed)))); });
@@ -118,7 +123,7 @@ class DynamicDataListingSupportTest {
         var masks=mock(FieldMaskService.class);when(masks.applyMaskingForList(anyString(),anyList(),any()))
                 .thenAnswer(call->call.getArgument(1));
         var listing=new DynamicDataListingSupport(builder,queries,new SecureSqlRewriter(),mapper,policies,
-                masks,mock(DataDomainService.class),models,mock(ExecutorRegistry.class),(m,r,a)->r,(m,r)->r,audit,m->model);
+                masks,mock(DataDomainService.class),models,mock(ExecutorRegistry.class),projection(),(m,r,a)->r,(m,r)->r,audit,m->model);
         var expected=new java.util.concurrent.atomic.AtomicReference<String>();
         when(policies.buildRowFilterForQuery(eq(42L),eq("fixture_bundle"),eq(43L),anyList(),anyString())).thenAnswer(call->{
             List<QueryCondition> conditions=call.getArgument(3);String pid=(String)conditions.get(0).getValue();

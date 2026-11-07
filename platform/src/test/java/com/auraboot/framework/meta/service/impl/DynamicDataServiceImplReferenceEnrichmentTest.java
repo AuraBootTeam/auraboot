@@ -82,6 +82,13 @@ class DynamicDataServiceImplReferenceEnrichmentTest {
     @Mock private ExecutorRegistry executorRegistry;
     @Mock private PermissionFacade permissionFacade;
 
+    @org.mockito.Mock private NativeReadFieldProjection nativeReadFields;
+    @org.junit.jupiter.api.BeforeEach
+    void stubIndependentNativeFieldBoundary() {
+        org.mockito.Mockito.lenient().when(nativeReadFields.project(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyList())).thenAnswer(call -> call.getArgument(1));
+    }
+
     @InjectMocks
     private DynamicDataServiceImpl service;
 

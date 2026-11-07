@@ -71,12 +71,11 @@ class DynamicDataServiceAtomicIncrementGuardTest {
 
     @BeforeEach
     void setUp() {
-        // DynamicDataServiceImpl is @RequiredArgsConstructor over 22 private final fields.
-        // Pass one null per constructor parameter — 22 nulls.
+        // Dependencies outside the atomic-increment boundary are replaced below as needed.
         service = new DynamicDataServiceImpl(
                 null, null, null, null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null, null, null,
-                new com.auraboot.framework.event.context.ThreadContextScopes(List.of()));
+                null, new com.auraboot.framework.event.context.ThreadContextScopes(List.of()));
         ReflectionTestUtils.setField(service, "metadataService", metadataService);
         ReflectionTestUtils.setField(service, "fieldMaskService", mock(com.auraboot.framework.meta.service.FieldMaskService.class));
         var fieldPermissions = mock(com.auraboot.framework.permission.service.FieldPermissionService.class);

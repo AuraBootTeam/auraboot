@@ -120,6 +120,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     private final ApplicationContext applicationContext;
     private final PayloadTemporalNormalizer payloadTemporalNormalizer;
     private final FieldPermissionService fieldPermissionService;
+    private final NativeReadFieldProjection nativeReadFields;
     private final ExecutorRegistry executorRegistry;
     private final ThreadContextScopes threadContexts;
     private static final Set<String> SYSTEM_COLUMNS = SystemFieldConstants.QUERY_TRANSPARENT;
@@ -853,6 +854,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 throw new MetaServiceException(
                         "Data permission evaluation failed for model: " + modelCode, e);
             }
+        }
+
+        if (!commandPermitInForce && !com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()) {
+            record = nativeReadFields.project(model, List.of(record)).get(0);
         }
 
         if (!commandPermitInForce) {
@@ -1929,6 +1934,6 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     private DynamicDataListingSupport dynamicDataListingSupport() {
-        return new DynamicDataListingSupport(queryBuilderService, namedQueryService, secureSqlRewriter, dynamicDataMapper, dataPermissionEngine, fieldMaskService, dataDomainService, metaModelMapper, executorRegistry, this::enrichAuditUsersBeforeFieldPermissionFilter, this::enrichListRecords, this::enrichAuditUserDisplayFields, this::getModelDefinition);
+        return new DynamicDataListingSupport(queryBuilderService, namedQueryService, secureSqlRewriter, dynamicDataMapper, dataPermissionEngine, fieldMaskService, dataDomainService, metaModelMapper, executorRegistry, nativeReadFields, this::enrichAuditUsersBeforeFieldPermissionFilter, this::enrichListRecords, this::enrichAuditUserDisplayFields, this::getModelDefinition);
     }
 }

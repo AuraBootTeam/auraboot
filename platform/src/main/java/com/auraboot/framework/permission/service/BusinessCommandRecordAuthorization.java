@@ -38,6 +38,7 @@ public class BusinessCommandRecordAuthorization {
     private final DataScopeEvaluator scopeEvaluator;
     private final PolicyEvaluator policyEvaluator;
     private final com.fasterxml.jackson.databind.ObjectMapper json;
+    private final com.auraboot.framework.permission.engine.evaluator.RecordShareEvaluator recordShares;
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public PermissionResult evaluate(Long memberId, List<String> declaredPermissions,
@@ -73,8 +74,22 @@ public class BusinessCommandRecordAuthorization {
         return resolveInternal(memberId, List.of("model." + model + ".read"), model, record, "read");
     }
 
+    /** Native model reads retain their existing permission aliases and record-share exceptions. */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public BusinessGrantDecision resolveOrdinaryRead(Long memberId, String model, Map<String,Object> record) {
+        return resolveInternal(memberId,
+                com.auraboot.framework.permission.engine.evaluator.PermissionCodeCandidates.forResourceAction(model, "read"),
+                model, record, "read", true);
+    }
+
     private BusinessGrantDecision resolveInternal(Long memberId, List<String> declaredPermissions,
                                                   String recordModel, Map<String, Object> record, String nativeAction) {
+        return resolveInternal(memberId, declaredPermissions, recordModel, record, nativeAction, false);
+    }
+
+    private BusinessGrantDecision resolveInternal(Long memberId, List<String> declaredPermissions,
+                                                  String recordModel, Map<String, Object> record, String nativeAction,
+                                                  boolean ordinaryRead) {
         if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
                 || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
                 || !MetaContext.exists() || memberId == null
@@ -99,20 +114,28 @@ public class BusinessCommandRecordAuthorization {
         }
         // The complete decision uses the same database snapshot, including membership and policy
         // rows. Shared caches must not splice a stale grant into a freshly changed scope.
-        return snapshots.withFreshReads(() -> evaluateSnapshot(memberId, declaredPermissions, recordModel, record, nativeAction));
+        return snapshots.withFreshReads(() -> evaluateSnapshot(memberId, declaredPermissions, recordModel, record, nativeAction, ordinaryRead));
     }
 
     private BusinessGrantDecision evaluateSnapshot(Long member, List<String> codes, String model, Map<String, Object> record,
-                                                  String nativeAction) {
+                                                  String nativeAction, boolean ordinaryRead) {
         var tenant = MetaContext.getCurrentTenantId();
         List<EvaluationStep> trace = new ArrayList<>();
         List<BusinessGrantDecision.Grant> matched = new ArrayList<>();
         Map<String, Map<Long, PermissionPolicyService.ConditionGuard>> guardsByCode = new HashMap<>();
+        boolean sharedRead = false;
+        if (ordinaryRead) {
+            var share = recordShares.evaluate(member, model, "read", record);
+            if (share == null || share.verdict() == null)
+                return decision(denied("Record share authorization is unavailable", trace), member, model, record, List.of());
+            trace.add(share);
+            sharedRead = share.verdict() == EvaluationVerdict.ALLOW;
+        }
         for (String code : new java.util.LinkedHashSet<>(codes)) {
             var permission = snapshots.resolvePermissionDefinition(tenant, code);
             boolean modelRead = "read".equals(nativeAction);
             if (nativeAction != null && ((!modelRead && code.startsWith("model."))
-                    || modelRead && !code.equals("model." + model + ".read") || permission == null
+                    || modelRead && !ordinaryRead && !code.equals("model." + model + ".read") || permission == null
                     || !model.equals(permission.getResourceCode())
                     || !(nativeAction.equals(permission.getAction()) || !modelRead && "manage".equals(permission.getAction())))) {
                 trace.add(step(EvaluationVerdict.DENY, "Native business permission does not own this root/action", code, null, null));
@@ -135,10 +158,12 @@ public class BusinessCommandRecordAuthorization {
                         || !(code.equals(grant.getPermissionCode()) || "*".equals(grant.getPermissionCode()))) continue;
                 var scope = scopes.resolveScopeForRole(member, grant.getRoleId(), permission.getResourceCode(),
                         permission.getAction(), model);
-                var scopeStep = scopeEvaluator.evaluateGrantScope(scope, member, model, permission.getAction(), record);
+                var scopeStep = ordinaryRead && scope != null && "not_configured".equals(scope.scopeType())
+                        ? step(EvaluationVerdict.NOT_APPLICABLE, "Legacy native-read scope is not configured", code, grant.getRoleId(), grant.getId())
+                        : scopeEvaluator.evaluateGrantScope(scope, member, model, permission.getAction(), record);
                 if (scopeStep == null || scopeStep.verdict() == null) continue;
                 trace.add(scopeStep);
-                if (scopeStep.verdict() == EvaluationVerdict.DENY) continue;
+                if (scopeStep.verdict() == EvaluationVerdict.DENY && !sharedRead) continue;
                 var guards = guardsByCode.computeIfAbsent(grant.getPermissionCode(), actual -> {
                     Map<Long, PermissionPolicyService.ConditionGuard> result = new LinkedHashMap<>();
                     for (var guard : policies.getConditionGuards(member, actual)) result.put(guard.grantId(), guard);

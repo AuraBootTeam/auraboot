@@ -286,6 +286,23 @@ class BusinessCommandGrantPostgresIT extends BaseIntegrationTest {
         assertThat(after.result().granted()).isTrue();assertThat(after.canWrite("cost")).isTrue();assertThat(after.canWrite("label")).isFalse();
     }
 
+    @Test void ordinaryModelReadFieldsFollowEachMatchingRoleWithoutCrossMultiplication() throws Exception {
+        code = "model." + model + ".read";
+        jdbc.update("UPDATE ab_permission SET code=?,resource_type='model',resource_code=?,action='read' WHERE id=?",code,model,permissionId);
+        jdbc.update("UPDATE ab_role_permission SET field_scope=?::jsonb WHERE id=?",fieldScope("label"),bindingA);
+        jdbc.update("UPDATE ab_role_permission SET field_scope=?::jsonb WHERE id=?",fieldScope("cost"),bindingB);
+        var ownBeijing = authorization.resolveOrdinaryRead(member(),model,record(true,"Beijing"));
+        assertThat(ownBeijing.canRead("label")).isTrue(); assertThat(ownBeijing.canRead("cost")).isFalse();
+        var foreignShanghai = authorization.resolveOrdinaryRead(member(),model,record(false,"Shanghai"));
+        assertThat(foreignShanghai.canRead("cost")).isTrue(); assertThat(foreignShanghai.canRead("label")).isFalse();
+        var both = authorization.resolveOrdinaryRead(member(),model,record(true,"Shanghai"));
+        assertThat(both.canRead("cost")).isTrue(); assertThat(both.canRead("label")).isTrue();
+        assertThat(both.canRead("unknown")).isFalse();
+        jdbc.update("UPDATE ab_user_role SET status='inactive' WHERE tenant_id=? AND role_id=?",tenant(),roleB);
+        var revoked = authorization.resolveOrdinaryRead(member(),model,record(true,"Shanghai"));
+        assertThat(revoked.canRead("label")).isTrue(); assertThat(revoked.canRead("cost")).isFalse();
+    }
+
     private String fieldScope(String field) throws Exception {
         return json.writeValueAsString(Map.of("modelCode",model,"readFields",List.of(field),"writeFields",List.of(field)));
     }

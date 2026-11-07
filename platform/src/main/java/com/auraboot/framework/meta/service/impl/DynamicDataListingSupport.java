@@ -50,6 +50,8 @@ final class DynamicDataListingSupport extends BaseMetaService {
 
     private final ExecutorRegistry executorRegistry;
 
+    private final NativeReadFieldProjection nativeReadFields;
+
     private final EnrichAuditUsersBeforeFieldPermissionFilterOperation enrichAuditUsersBeforeFieldPermissionFilterOperation;
 
     private final EnrichListRecordsOperation enrichListRecordsOperation;
@@ -231,6 +233,8 @@ final class DynamicDataListingSupport extends BaseMetaService {
 
         // Read-shape contract: json/jsonb fields leave as JSON strings, never PGobject.
         JsonbFieldHelper.normalizeJsonReadValues(model, records);
+        if (!commandPermitInForce && !com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active())
+            records = nativeReadFields.project(model, records);
 
         // Build count query with same filters (including row-level data permission)
         QueryBuilderService.QueryBuilder countBuilder = queryBuilderService.buildConditionQuery(
