@@ -41,7 +41,7 @@ dependencies {
     testImplementation 'org.springframework:spring-beans:7.0.10'  // DisposableBean
     testImplementation 'org.springframework.boot:spring-boot-autoconfigure:4.1.2'  // @ConditionalOnProperty
     testImplementation 'org.springframework:spring-context:7.0.10'  // @Component
-    testImplementation 'com.baomidou:mybatis-plus-annotation:3.5.18'  // @EnumValue
+    testImplementation 'com.baomidou:mybatis-plus-annotation:3.5.18.1'  // @EnumValue
     testImplementation 'com.fasterxml.jackson.core:jackson-annotations:2.22'  // @JsonValue
     testImplementation 'org.projectlombok:lombok:1.18.48'
     testAnnotationProcessor 'org.projectlombok:lombok:1.18.48'
