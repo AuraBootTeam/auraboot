@@ -177,4 +177,31 @@ class NativeReadFieldProjectionTest {
                 .isInstanceOf(AccessDeniedException.class);
     }
 
+
+    @Test void missingHumanMembershipCannotRunAReadOrReleaseRawFields() {
+        MetaContext.clearMemberId();
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        assertThatThrownBy(() -> projection.readWithinSnapshot("project", () -> {
+            calls.incrementAndGet(); return Map.of("secret", "private");
+        })).isInstanceOf(AccessDeniedException.class);
+        assertThat(calls).hasValue(0);
+        assertThatThrownBy(() -> projection.project(model, List.of(Map.of("pid", "record", "secret", "private"))))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> projection.publicWriteResult(model, Map.of("pid", "record", "secret", "private"), () -> Map.of("secret", "private")))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test void aCommandPermitCannotReplaceTheLostHumanMembership() {
+        MetaContext.clearMemberId();
+        assertThatThrownBy(() -> MetaContext.runWithCommandPermitScope("ALL", () ->
+                projection.publicWriteResult(model, Map.of("pid", "record", "secret", "private"), () -> Map.of())))
+                .isInstanceOf(AccessDeniedException.class).hasMessageContaining("NATIVE_ACTOR_INCOMPLETE");
+    }
+
+    @Test void partialHumanIdentityCannotRunEvenAnEmptyRead() {
+        MetaContext.setContext(100L, 1L, null, "actor");
+        MetaContext.setMemberId(5L);
+        assertThatThrownBy(() -> projection.project(model, List.of()))
+                .isInstanceOf(AccessDeniedException.class).hasMessageContaining("NATIVE_ACTOR_INCOMPLETE");
+    }
 }

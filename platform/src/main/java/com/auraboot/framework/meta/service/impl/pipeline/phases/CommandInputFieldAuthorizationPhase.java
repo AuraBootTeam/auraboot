@@ -28,7 +28,10 @@ public class CommandInputFieldAuthorizationPhase implements CommandPhase {
     @Override public String name() { return "input_field_authorization"; }
 
     @Override public void execute(CommandPipelineContext context) {
-        if (context.getCommand() == null || submittedKeys(context).isEmpty()) return;
+        if (context.getCommand() == null || submittedKeys(context).isEmpty()) {
+            com.auraboot.framework.meta.service.impl.NativeHumanActor.requireCompleteIdentity();
+            return;
+        }
         String rootModel = context.getCommand().getModelCode();
         var complete = context.getBusinessGrantDecision();
         if (context.getBusinessTargetAuthorization() != null && complete == null) deny();
@@ -38,6 +41,7 @@ public class CommandInputFieldAuthorizationPhase implements CommandPhase {
                 || !Objects.equals(complete.memberId(), MetaContext.getCurrentMemberId())
                 || !Objects.equals(complete.modelCode(), rootModel)
                 || !Objects.equals(complete.recordPid(), context.getRequest().getTargetRecordId()))) deny();
+        com.auraboot.framework.meta.service.impl.NativeHumanActor.requireCompleteIdentity();
         // Machine and installed invocations use their separately verified writable-field contracts.
         if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
                 || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()

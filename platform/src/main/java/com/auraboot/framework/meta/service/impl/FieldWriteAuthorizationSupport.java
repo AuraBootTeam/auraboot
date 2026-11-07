@@ -21,6 +21,7 @@ public final class FieldWriteAuthorizationSupport {
 
     /** Return submitted keys, including column aliases, without mutating the submitted input. */
     public Set<String> nonWritableInputKeys(String modelCode, Set<String> inputKeys) {
+        NativeHumanActor.requireCompleteIdentity();
         if (inputKeys == null || inputKeys.isEmpty()) return Set.of();
         var policyFields = policies.getNonWritableFields(
                 MetaContext.getCurrentTenantId(), modelCode, MetaContext.getCurrentUserId());

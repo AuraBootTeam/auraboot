@@ -133,4 +133,11 @@ class CommandInputFieldAuthorizationPhaseTest {
         assertThatThrownBy(()->phase.execute(context)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
     }
 
+
+    @Test void missingHumanMembershipCannotTurnCommandInputsIntoBackgroundExecution() {
+        MetaContext.clearMemberId();
+        context.setPayload(Map.of("cost", 99));
+        assertThatThrownBy(() -> phase.execute(context))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
 }

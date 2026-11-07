@@ -39,6 +39,10 @@ import static org.assertj.core.api.Assertions.*;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class NativeDslFieldWriteIT extends BaseIntegrationTest {
     @Autowired DynamicDataService data;
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+    com.auraboot.framework.meta.service.impl.NativeReadFieldProjection nativeProjection;
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+    com.auraboot.framework.meta.service.impl.NativeRecordFieldAuthorization nativeWrites;
     @Autowired SchemaManagementService schema;
     @Autowired MetaModelService metadata;
     @Autowired MetaModelMapper models;
@@ -117,6 +121,7 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
     private long count() { return jdbc.queryForObject("SELECT count(*) FROM "+table,Long.class); }
 
     @AfterEach void cleanup() {
+        org.mockito.Mockito.reset(nativeProjection, nativeWrites);
         applyTestMetaContext();
         org.mockito.Mockito.reset(extensions);
         jdbc.update("DELETE FROM ab_role_data_scope WHERE tenant_id=? AND role_id=? AND resource_code=?",testTenant.getId(),testRole.getId(),model);
@@ -816,5 +821,46 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
                         .isEqualTo(com.auraboot.framework.common.constant.ResponseCode.FORBIDDEN));
         assertThat(jdbc.queryForObject("SELECT "+secret+" FROM "+table+" WHERE "+label+"='cached-command'",Integer.class)).isEqualTo(11);
         assertThat(count()).isEqualTo(2);
+    }
+
+    @Test void missingHumanMembershipCannotExposeNativeFields() {
+        MetaContext.clearMemberId();
+        assertThatThrownBy(() -> data.getById(model, pid)).isInstanceOf(AccessDeniedException.class);
+        assertThat(stored(hidden, pid)).isEqualTo(17);
+    }
+
+    @Test void missingHumanMembershipCannotPersistNativeFields() {
+        MetaContext.clearMemberId();
+        assertThatThrownBy(() -> data.update(model, pid, Map.of(label, "forbidden-missing-member")))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThat(stored(label, pid)).isEqualTo("before");
+    }
+
+    @Test void lostHumanMembershipAtProjectionCannotReleaseFieldsFromTheRawRow() throws Exception {
+        String scope = json.writeValueAsString(Map.of("modelCode", model, "readFields", List.of(label), "writeFields", List.of()));
+        assertThat(jdbc.update("UPDATE ab_role_permission g SET field_scope=?::jsonb FROM ab_permission p WHERE g.permission_id=p.id AND g.role_id=? AND g.tenant_id=? AND p.code=? AND g.deleted_flag=FALSE",
+                scope, testRole.getId(), testTenant.getId(), "model."+model+".read")).isEqualTo(1);
+        org.mockito.Mockito.doAnswer(call -> {
+            MetaContext.clearMemberId();
+            return call.callRealMethod();
+        }).when(nativeProjection).project(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyList());
+        assertThatThrownBy(() -> {
+            var result = data.getById(model, pid);
+            assertThat(result).as("A lost member cannot reveal fields outside the finite read grant")
+                    .doesNotContainKeys(secret, quantity, hidden);
+        }).isInstanceOf(AccessDeniedException.class);
+        assertThat(stored(secret, pid)).isEqualTo(10);
+    }
+
+    @Test void lostHumanMembershipAtNativeWriterCannotSkipTheFiniteWriteGrant() throws Exception {
+        String scope = json.writeValueAsString(Map.of("modelCode", model, "readFields", List.of(), "writeFields", List.of(label)));
+        assertThat(jdbc.update("UPDATE ab_role_permission g SET field_scope=?::jsonb FROM ab_permission p WHERE g.permission_id=p.id AND g.role_id=? AND g.tenant_id=? AND p.code=? AND g.deleted_flag=FALSE",
+                scope, testRole.getId(), testTenant.getId(), "model."+model+".update")).isEqualTo(1);
+        org.mockito.Mockito.doAnswer(call -> {
+            MetaContext.clearMemberId();
+            return call.callRealMethod();
+        }).when(nativeWrites).requireUpdate(org.mockito.ArgumentMatchers.eq(model), org.mockito.ArgumentMatchers.eq(pid), org.mockito.ArgumentMatchers.anyMap());
+        assertThatThrownBy(() -> data.update(model, pid, Map.of(quantity, 99))).isInstanceOf(AccessDeniedException.class);
+        assertThat(stored(quantity, pid)).isEqualTo(1);
     }
 }

@@ -41,6 +41,7 @@ public class NativeRecordFieldAuthorization {
 
     private void require(String action, String modelCode, String recordId, Map<String,Object> submitted,
                          Set<String> observed) {
+        NativeHumanActor.requireCompleteIdentity();
         if (!MetaContext.exists() || MetaContext.getCurrentMemberId() == null
                 || com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
                 || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()

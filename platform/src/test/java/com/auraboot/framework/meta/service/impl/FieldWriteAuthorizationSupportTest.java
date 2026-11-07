@@ -58,12 +58,19 @@ class FieldWriteAuthorizationSupportTest {
         assertThatThrownBy(()->support.nonWritableInputKeys("orders",Set.of("name"))).isInstanceOf(MetaServiceException.class);
     }
     @Test void nonMemberAuthorityDoesNotBorrowHumanFieldRoles() {
-        MetaContext.setMemberId(null);
+        MetaContext.clear();
+        MetaContext.setSystemTenantContext(7L);
         assertThat(support.nonWritableInputKeys("orders",Set.of("name"))).isEmpty();
         verifyNoInteractions(metadata,fields);
     }
     @Test void emptyInputNeedsNoPermissionLookup() {
         assertThat(support.nonWritableInputKeys("orders",Set.of())).isEmpty();
         verifyNoInteractions(metadata,fields,policies);
+    }
+
+    @Test void missingHumanMembershipCannotDisableDslFieldRestrictions() {
+        MetaContext.clearMemberId();
+        assertThatThrownBy(() -> support.nonWritableInputKeys("orders", Set.of("cost_column")))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
     }
 }

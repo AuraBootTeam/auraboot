@@ -20,6 +20,7 @@ public class NativeReadFieldProjection {
     private final PlatformTransactionManager transactions;
 
     static void prepareQuery(ModelDefinition model, com.auraboot.framework.meta.service.QueryBuilderService.QueryBuilder query) {
+        NativeHumanActor.requireCompleteIdentity();
         if (MetaContext.exists() && MetaContext.getCurrentMemberId() != null
                 && !com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
                 && !com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
@@ -28,6 +29,7 @@ public class NativeReadFieldProjection {
 
     /** Keep physical rows and grants in one MVCC view, including the writer's own changes. */
     public <T> T readWithinSnapshot(String modelCode, java.util.function.Supplier<T> operation) {
+        NativeHumanActor.requireCompleteIdentity();
         if (!MetaContext.exists() || MetaContext.getCurrentMemberId() == null
                 || com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
                 || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
@@ -57,6 +59,7 @@ public class NativeReadFieldProjection {
     }
 
     public List<Map<String,Object>> project(ModelDefinition model, List<Map<String,Object>> records) {
+        NativeHumanActor.requireCompleteIdentity();
         if (records.isEmpty()) return records;
         if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
                 || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
@@ -72,6 +75,7 @@ public class NativeReadFieldProjection {
     /** Internal change snapshots never become ordinary public write results without a read check. */
     public Map<String,Object> publicWriteResult(ModelDefinition model, Map<String,Object> actualRecord,
                                                 java.util.function.Supplier<Map<String,Object>> publicReader) {
+        NativeHumanActor.requireCompleteIdentity();
         if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
                 || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
                 || MetaContext.hasCommandPermitScopeFor(model.getCode())

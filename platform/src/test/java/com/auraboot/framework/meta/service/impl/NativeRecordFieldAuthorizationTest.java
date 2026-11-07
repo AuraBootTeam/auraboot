@@ -153,4 +153,11 @@ class NativeRecordFieldAuthorizationTest {
                 argThat(target -> Boolean.FALSE.equals(target.get("deleted_flag"))));
     }
 
+
+    @Test void missingHumanMembershipCannotSkipTheCompleteWriteGrant() {
+        MetaContext.clearMemberId();
+        assertThatThrownBy(() -> boundary.requireUpdate("project", "record", Map.of("stored_name", "forbidden")))
+                .isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(rows, authorization);
+    }
 }
