@@ -2872,7 +2872,7 @@ im.agent.replyFailed: "The AI reply could not be completed. Please retry or cont
 "roleGrantFields.help": "Field lists apply to one authorization and its record scope. They do not grant business access. Hidden, read-only and shared restrictions still apply."
 "roleGrantFields.loading": "Checking the current draft…"
 "roleGrantFields.error": "Could not check field candidates. Your edits are preserved; field editing is disabled."
-"roleGrantFields.empty": "No directly editable native authorization is available for this object. Business and managed sources retain their own configuration."
+"roleGrantFields.empty": "No model-bound authorization is available for this object. Managed sources retain their original authoring rules."
 "roleGrantFields.pending": "New in this draft"
 "roleGrantFields.reset": "Discard field edits"
 "roleGrantFields.managed": "This authorization is managed by its source. It cannot be overwritten here."

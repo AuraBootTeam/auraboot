@@ -72,7 +72,7 @@ export default function RoleGrantFieldsEditor({
           {t(
             'roleGrantFields.empty',
             undefined,
-            'No directly editable native authorization is available for this object. Business and managed sources retain their own configuration.',
+            'No model-bound authorization is available for this object. Managed sources retain their original authoring rules.',
           )}
         </p>
       )}

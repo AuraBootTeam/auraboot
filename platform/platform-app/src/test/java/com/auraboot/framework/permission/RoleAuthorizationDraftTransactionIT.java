@@ -803,6 +803,59 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
         return drafts.apply(rolePid, new RoleAuthorizationDraftRequest(initial.revision(), Set.of(editCapability), Set.of(), false, null, false, List.of()));
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void businessGrantFieldsAreAuthoredWithTheSameBindingAndScope(boolean existing) throws Exception {
+        fieldPolicy();
+        String code = "business." + resource + ".manage";
+        String duty = resource + ".cap.business_fields";
+        jdbc.update("""
+                INSERT INTO ab_permission (pid,tenant_id,code,name,resource_type,resource_code,action,
+                                           source,status,deleted_flag,created_at,updated_at)
+                VALUES (?,?,?,?,'operation',?,'manage','test','active',false,now(),now())
+                """, UniqueIdGenerator.generate(), getTestTenant().getId(), code, "Manage business project", resource);
+        catalog.saveDefinition(CapabilityDefinitionDTO.builder().code(duty).group("Business fields")
+                .includes(List.of(code)).build());
+        var initial = drafts.snapshot(rolePid);
+        if (existing) {
+            drafts.apply(rolePid, new RoleAuthorizationDraftRequest(initial.revision(), Set.of(duty), Set.of(),
+                    true, "self", true, List.of()));
+        }
+        var baseline = drafts.snapshot(rolePid);
+        var selection = new RoleAuthorizationDraftRequest(baseline.revision(), Set.of(duty), Set.of(),
+                true, "self", true, List.of());
+        var candidate = drafts.preview(rolePid, selection).grantFieldCandidates().stream()
+                .filter(binding -> code.equals(binding.permissionCode())).findFirst().orElseThrow();
+        assertThat(candidate.editable()).isTrue();
+        assertThat(candidate.bindingPid() != null).isEqualTo(existing);
+        String before = migrationBindingBytes();
+        var change = existing
+                ? new com.auraboot.framework.permission.dto.RoleGrantFields.Change(candidate.bindingPid(), List.of(resource+"_secret"), List.of())
+                : newFieldChange(candidate, List.of(resource+"_secret"), List.of());
+        var request = new RoleAuthorizationDraftRequest(baseline.revision(), Set.of(duty), Set.of(),
+                true, "self", true, List.of(), null, null, null, List.of(change));
+        assertThat(drafts.preview(rolePid, request).grantFieldChanges()).hasSize(1);
+        assertThat(migrationBindingBytes()).isEqualTo(before);
+        var saved = drafts.apply(rolePid, request);
+        var binding = saved.grantFields().stream().filter(row -> code.equals(row.permissionCode())).findFirst().orElseThrow();
+        assertThat(binding.legacy()).isFalse();
+        assertThat(binding.readFields()).containsExactly(resource+"_secret");
+        assertThat(binding.writeFields()).isEmpty();
+        assertThat(persistedCodes()).containsExactly(code);
+        assertThat(defaultScope()).isEqualTo("self");
+        assertThat(roleAuthoring.assignRoleToMember(getTestTenantMember().getId(), roleId, getTestTenant().getId())).isTrue();
+        administrator.close(); administrator = null;
+        var record = new java.util.LinkedHashMap<String,Object>();
+        record.put("pid", UniqueIdGenerator.generate()); record.put("tenant_id", getTestTenant().getId());
+        record.put("created_by", getTestUser().getId()); record.put(resource+"_secret", "business-value");
+        var decision = applicationContext.getBean(com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization.class)
+                .resolve(getTestTenantMember().getId(), List.of(code), resource, record);
+        assertThat(decision.result().granted()).isTrue();
+        assertThat(decision.canRead(resource+"_secret")).isTrue();
+        assertThat(decision.canWrite(resource+"_secret")).isFalse();
+        assertThat(decision.canRead("another_field")).isFalse();
+    }
+
     @Test void positiveGrantFieldsPreviewAndSavePreserveAllOtherBindingFacts() {
         var baseline = grantFieldsBaseline();
         var binding = baseline.grantFields().stream().filter(b -> b.permissionCode().equals(readCode)).findFirst().orElseThrow();

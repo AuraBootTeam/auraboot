@@ -6691,8 +6691,8 @@
   },
   {
     "key": "roleGrantFields.empty",
-    "zh-CN": "此对象当前没有可直接配置的原生授权。业务与受管来源仍由各自的配置规则管理。",
-    "en-US": "No directly editable native authorization is available for this object. Business and managed sources retain their own configuration."
+    "zh-CN": "此对象当前没有绑定模型的授权。受管来源仍须按原授权来源的规则配置。",
+    "en-US": "No model-bound authorization is available for this object. Managed sources retain their original authoring rules."
   },
   {
     "key": "roleGrantFields.pending",

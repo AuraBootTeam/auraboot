@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.util.*;
 
-/** Draft-owned authoring of direct native grants; compiled sources keep their own publish boundary. */
+/** Draft-owned authoring of direct model-bound grants; compiled sources keep their own publish boundary. */
 @Service
 @RequiredArgsConstructor
 public class RoleGrantFieldScopeService {
@@ -33,7 +33,7 @@ public class RoleGrantFieldScopeService {
         for (var grant : grants.findByRole(role.getId())) {
             if (!Objects.equals(grant.getTenantId(), role.getTenantId()) || !Objects.equals(grant.getRoleId(), role.getId())) throw denied();
             var permission = definitions.get(grant.getPermissionId());
-            if (!nativePermission(permission)) continue;
+            if (!modelBoundPermission(permission)) continue;
             if (grant.getPid() == null || grant.getPid().isBlank() || !seen.add(grant.getPid())) throw denied();
             var binding = describe(permission, grant);
             if (binding != null) result.add(binding);
@@ -47,7 +47,7 @@ public class RoleGrantFieldScopeService {
         var definitions = definitions(role);
         var bound = grants.findByRole(role.getId()).stream().map(row -> definitions.get(row.getPermissionId()))
                 .filter(Objects::nonNull).map(p -> p.getCode()).collect(java.util.stream.Collectors.toSet());
-        var pending = definitions.values().stream().filter(RoleGrantFieldScopeService::nativePermission)
+        var pending = definitions.values().stream().filter(RoleGrantFieldScopeService::modelBoundPermission)
                 .map(p -> p.getCode()).filter(code -> resultingCodes.contains(code) && newlyGranted.contains(code) && !bound.contains(code)).distinct().sorted().toList();
         for (String code : pending) {
             var permission = definition(role, code, definitions);
@@ -99,7 +99,7 @@ public class RoleGrantFieldScopeService {
             var binding = matches.getFirst();
             if (!Objects.equals(binding.getTenantId(), role.getTenantId()) || !directlyEditable(binding)) throw denied();
             var permission = definitions.get(binding.getPermissionId());
-            if (!nativePermission(permission) || !change.before().modelCode().equals(permission.getResourceCode())) throw denied();
+            if (!modelBoundPermission(permission) || !change.before().modelCode().equals(permission.getResourceCode())) throw denied();
             var current = describe(permission, binding);
             if (current == null || !Objects.equals(change.before().metadataRevision(), current.metadataRevision())) throw conflict();
             var scope = Map.of("modelCode", change.before().modelCode(), "readFields", change.readFields(), "writeFields", change.writeFields());
@@ -116,7 +116,7 @@ public class RoleGrantFieldScopeService {
             Map<Long,com.auraboot.framework.permission.dto.PermissionDTO> definitions) {
         var local = definitions.values().stream().filter(p -> code.equals(p.getCode()) && Objects.equals(p.getTenantId(), role.getTenantId())).toList();
         var eligible = local.isEmpty() ? definitions.values().stream().filter(p -> code.equals(p.getCode()) && p.getTenantId() == null).toList() : local;
-        if (eligible.size() != 1 || !nativePermission(eligible.getFirst())) throw denied();
+        if (eligible.size() != 1 || !modelBoundPermission(eligible.getFirst())) throw denied();
         return eligible.getFirst();
     }
 
@@ -144,10 +144,18 @@ public class RoleGrantFieldScopeService {
                 parsed.readable().stream().sorted().toList(), parsed.writable().stream().sorted().toList(), fields, revision);
     }
 
-    private static boolean nativePermission(com.auraboot.framework.permission.dto.PermissionDTO permission) {
-        return permission != null && permission.getCode() != null && permission.getResourceCode() != null
-                && Set.of("read", "create", "update").contains(Objects.toString(permission.getAction(), ""))
-                && ("model." + permission.getResourceCode() + "." + permission.getAction()).equals(permission.getCode());
+    private static boolean modelBoundPermission(com.auraboot.framework.permission.dto.PermissionDTO permission) {
+        if (permission == null || permission.getCode() == null || permission.getCode().isBlank()
+                || "*".equals(permission.getCode()) || "meta.command.execute".equals(permission.getCode())
+                || permission.getResourceCode() == null
+                || !permission.getResourceCode().matches("[A-Za-z][A-Za-z0-9_]{0,127}")
+                || permission.getAction() == null || permission.getAction().isBlank()) return false;
+        if (("model." + permission.getResourceCode() + "." + permission.getAction()).equals(permission.getCode()))
+            return Set.of("read", "create", "update").contains(permission.getAction());
+        // Business grants already carry this exact model's fields at runtime. Authoring the
+        // same binding does not confer native CRUD, change its scope or replace its source.
+        return "operation".equalsIgnoreCase(permission.getResourceType())
+                || "data".equalsIgnoreCase(permission.getResourceType());
     }
 
     private static com.auraboot.framework.exception.BusinessException conflict() {
