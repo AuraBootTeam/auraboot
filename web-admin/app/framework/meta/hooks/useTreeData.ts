@@ -72,19 +72,17 @@ export function useTreeData(
     return map;
   }, [normalizedRows, parentField]);
 
-  // Expand state
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
-    if (!defaultExpanded) return new Set<string>();
-    // Default: all nodes with children expanded
+  // Defaults apply to asynchronously arriving nodes; only physical user choices override them.
+  const [expansionChoices, setExpansionChoices] = useState<Map<string, boolean>>(() => new Map());
+  const expandedIds = useMemo(() => {
     const ids = new Set<string>();
-    for (const row of normalizedRows) {
-      const pid = row.pid;
-      if (pid && childrenMap.has(pid)) {
+    for (const pid of childrenMap.keys()) {
+      if (pid && (expansionChoices.get(pid) ?? defaultExpanded)) {
         ids.add(pid);
       }
     }
     return ids;
-  });
+  }, [childrenMap, expansionChoices, defaultExpanded]);
 
   // Build flat tree (depth-first)
   const flatTree = useMemo(() => {
@@ -116,16 +114,12 @@ export function useTreeData(
   const visibleRows = flatTree;
 
   const toggleExpand = useCallback((id: string) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
+    setExpansionChoices((prev) => {
+      const next = new Map(prev);
+      next.set(id, !(prev.get(id) ?? defaultExpanded));
       return next;
     });
-  }, []);
+  }, [defaultExpanded]);
 
   const getChildren = useCallback(
     (parentId: string | null) => {
