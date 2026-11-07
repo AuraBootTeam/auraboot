@@ -25,6 +25,8 @@ Release tooling reference: [Core Web component inputs and explicit reuse](./syst
 
 ## Conventions
 
+- Command form metadata: [dynamic input sources and dispatcher boundaries](./system-reference/command-input-form-sources.md).
+
 - Scheduled command delegation: [deployment bindings and execution boundaries](./system-reference/scheduled-command-bindings.md).
 - Notification source delivery: [deployment descriptors and configuration boundaries](./system-reference/notification-source-bindings.md).
 - Module-owned command validation: [live module registration and import metadata](./system-reference/application-module-command-lifecycle.md).

@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: b87beb093826c50d4fcb28056861c099ffce61d68c94c81b211acaa9e2c67a17
+ * Contract SHA-256: ec8704be15abb8ab80b71fe30e07a19261caeacca567ef74a0a5c820d2be1235
  */
 export interface paths {
     "/api/activities": {
@@ -18358,6 +18358,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/permissions/matrix/{rolePid}/policy/{permissionPid}/snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read policy values and the grant revision required for saving */
+        get: operations["getPolicySnapshot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/permissions/matrix/{rolePid}/scope": {
         parameters: {
             query?: never;
@@ -27827,6 +27844,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["PolicyResponse"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponsePolicySnapshot: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["PolicySnapshot"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -37728,6 +37753,18 @@ export interface components {
             requireApproval?: boolean;
             /** Format: date-time */
             updatedAt?: string;
+        };
+        PolicySaveRequest: {
+            expectedRevision: string;
+            values: {
+                [key: string]: unknown;
+            };
+        };
+        PolicySnapshot: {
+            revision: string;
+            values: {
+                [key: string]: unknown;
+            };
         };
         PreferencesDTO: {
             dateFormat?: string;
@@ -72286,9 +72323,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["PolicySaveRequest"];
             };
         };
         responses: {
@@ -72299,6 +72334,29 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseVoid"];
+                };
+            };
+        };
+    };
+    getPolicySnapshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                permissionPid: string;
+                rolePid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePolicySnapshot"];
                 };
             };
         };

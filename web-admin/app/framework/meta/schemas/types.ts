@@ -482,6 +482,13 @@ export interface CommandInputPresentation {
   };
 }
 
+/** Remote input metadata for the explicit command.execute dispatchers. */
+export interface CommandInputSourceConfig {
+  endpoint: string;
+  /** Explicit response paths copied into the captured business payload, never the command envelope. */
+  payloadBindings?: Record<string, string>;
+}
+
 export interface CommandInputFormConfig {
   inputFields?: CommandInputFieldConfig[];
   inputFieldsTitle?: string | LocalizedText;

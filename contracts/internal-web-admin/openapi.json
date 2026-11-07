@@ -13962,6 +13962,32 @@
         },
         "type": "object"
       },
+      "ApiResponsePolicySnapshot": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PolicySnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponsePromotionResponse": {
         "properties": {
           "code": {
@@ -42196,6 +42222,38 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "PolicySaveRequest": {
+        "properties": {
+          "expectedRevision": {
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": {},
+            "type": "object"
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "values"
+        ],
+        "type": "object"
+      },
+      "PolicySnapshot": {
+        "properties": {
+          "revision": {
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": {},
+            "type": "object"
+          }
+        },
+        "required": [
+          "revision",
+          "values"
+        ],
         "type": "object"
       },
       "PreferencesDTO": {
@@ -97342,8 +97400,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": {},
-                "type": "object"
+                "$ref": "#/components/schemas/PolicySaveRequest"
               }
             }
           },
@@ -97362,6 +97419,45 @@
           }
         },
         "summary": "Set policy values for role+permission",
+        "tags": [
+          "Permission Matrix"
+        ]
+      }
+    },
+    "/api/permissions/matrix/{rolePid}/policy/{permissionPid}/snapshot": {
+      "get": {
+        "operationId": "getPolicySnapshot",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rolePid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "permissionPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePolicySnapshot"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Read policy values and the grant revision required for saving",
         "tags": [
           "Permission Matrix"
         ]

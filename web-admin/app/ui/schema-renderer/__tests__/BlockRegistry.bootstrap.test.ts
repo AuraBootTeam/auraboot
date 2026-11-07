@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { BlockRegistry, initBlockRegistry } from '../BlockRegistry';
 
@@ -51,6 +53,8 @@ describe('BlockRegistry bootstrap', () => {
       'conversation-panel',
       'prerequisite-table',
     ];
+    expect(existsSync(resolve(process.cwd(), 'app/ui/schema-renderer/BlockRegistry.ts'))).toBe(true);
+    expect(existsSync(resolve(process.cwd(), 'app/framework/meta/rendering/blocks/PrerequisiteTableBlockRenderer.tsx'))).toBe(true);
     expect(expected).toHaveLength(36);
     expect(BlockRegistry.list().map(([type]) => type).sort()).toEqual([...expected].sort());
     for (const type of expected) {

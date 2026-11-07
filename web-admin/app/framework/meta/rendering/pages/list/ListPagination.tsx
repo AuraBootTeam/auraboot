@@ -65,6 +65,7 @@ export function ListPagination({
           onChange={onPageChange}
           onPageSizeChange={onPageSizeChange}
           t={t}
+          locale={locale}
         />
       </div>
 

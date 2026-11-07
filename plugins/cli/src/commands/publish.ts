@@ -270,6 +270,7 @@ export function buildExtendedManifest(plugin: ReturnType<typeof loadPlugin>): an
     publicQueries: plugin.resourceFiles.get('publicQueries') || [],
     permissions: plugin.resourceFiles.get('permissions') || [],
     roles: plugin.resourceFiles.get('roles') || [],
+    capabilities: plugin.resourceFiles.get('capabilities') ?? [],
     menus: plugin.resourceFiles.get('menus') || [],
     dicts: plugin.resourceFiles.get('dicts') || [],
     i18nResources: plugin.resourceFiles.get('i18n') || [],
