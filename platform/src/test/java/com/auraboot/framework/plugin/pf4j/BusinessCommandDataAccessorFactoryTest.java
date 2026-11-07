@@ -210,6 +210,19 @@ class BusinessCommandDataAccessorFactoryTest {
         command(scope -> { assertThat(scope.projectResult(Map.of("status", "confirmed"))).containsEntry("status", "confirmed"); return null; });
     }
     @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void structuredOwnerCannotRunWithoutTheHostProjectionOrWeakenItInTheInvocation(boolean weaken) {
+        owner.resultProjection=Map.of("status",BusinessResultField.rootJsonPath("status","dryRun","quality"));
+        if(weaken) {
+            var invocation=mock(BusinessResourceAuthorization.class,org.mockito.AdditionalAnswers.delegatesTo(owner));
+            when(invocation.businessResultProjection()).thenReturn(Map.of("status",BusinessResultField.rootField("status")));
+            owner.invocation=invocation;
+        }
+        assertThatThrownBy(() -> command(scope -> null)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(data,never()).getByIdForAuthorization(anyString(),anyString());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(strings={"path","visibility","grant"})
     void structuredSourcePolicyCannotChangeInsideTheResourceFrame(String change) {
         owner.resultProjection=Map.of("status",BusinessResultField.rootJsonPath("status","dryRun","quality"));

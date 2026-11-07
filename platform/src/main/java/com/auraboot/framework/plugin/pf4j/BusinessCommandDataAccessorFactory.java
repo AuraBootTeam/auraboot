@@ -52,6 +52,9 @@ public class BusinessCommandDataAccessorFactory {
             throw new IllegalStateException("Cannot validate business resource transaction", failure);
         }
         var invocationOwner = Objects.requireNonNull(owner.newInvocationAuthorization());
+        if(owner.businessResultProjection().values().stream().anyMatch(field -> field.kind()==BusinessResultField.Kind.ROOT_JSON_PATH)
+                && (!owner.businessResultProjection().equals(invocationOwner.businessResultProjection())
+                    || !owner.businessResultFields().equals(invocationOwner.businessResultFields()))) throw denied();
         if (!Objects.equals(owner.businessDeletableResourceModels(), invocationOwner.businessDeletableResourceModels())
                 || !Objects.equals(owner.businessInputContract(), invocationOwner.businessInputContract())
                 || !Objects.equals(owner.resourceReadIsolation(), invocationOwner.resourceReadIsolation())
@@ -136,6 +139,8 @@ public class BusinessCommandDataAccessorFactory {
         }
 
         private void verify() {
+            if(jsonResultPlan==null && owner.businessResultProjection().values().stream()
+                    .anyMatch(field -> field.kind()==BusinessResultField.Kind.ROOT_JSON_PATH)) throw denied();
             if(jsonResultPlan!=null && (jsonResultPlan.grant()==null || jsonResultPlan.grant()!=context.getBusinessGrantDecision()
                     || !jsonResultPlan.samePolicy(context.getBusinessResultProjection())
                     || !jsonResultPlan.fields().equals(owner.businessResultProjection()))) throw denied();
