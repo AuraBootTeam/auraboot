@@ -124,6 +124,11 @@ jobs:
       - name: Optional plugin assembly contract
         run: node --test scripts/dev/plugin-assembly.test.mjs
 
+      - name: Dependency toolchain compatibility
+        env:
+          AURA_NPM_COMPAT_ARTIFACTS: ${{ runner.temp }}/npm-toolchain-compatibility
+        run: node --test scripts/ci/npm-toolchain-compat.test.mjs
+
       - name: Unit tests (vitest)
         working-directory: web-admin
         run: pnpm test:unit
@@ -141,3 +146,11 @@ jobs:
           name: internal-api-foundation
           path: ${{ runner.temp }}/internal-api-foundation
           if-no-files-found: ignore
+
+      - name: Retain dependency compatibility evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: npm-toolchain-compatibility
+          path: ${{ runner.temp }}/npm-toolchain-compatibility
+          if-no-files-found: error
