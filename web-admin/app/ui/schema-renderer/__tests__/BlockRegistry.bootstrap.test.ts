@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { BlockRegistry, initBlockRegistry } from '../BlockRegistry';
 
 describe('BlockRegistry bootstrap', () => {
-  it('initBlockRegistry registers the complete 35-type runtime block contract', () => {
+  it('initBlockRegistry registers the complete 36-type runtime block contract', () => {
     initBlockRegistry();
-    expect(BlockRegistry.size()).toBe(35);
+    expect(BlockRegistry.size()).toBe(36);
 
 
     // Must mirror the dispatch table in
@@ -49,8 +49,9 @@ describe('BlockRegistry bootstrap', () => {
       'card-grid',
       'code-snippet',
       'conversation-panel',
+      'prerequisite-table',
     ];
-    expect(expected).toHaveLength(35);
+    expect(expected).toHaveLength(36);
     expect(BlockRegistry.list().map(([type]) => type).sort()).toEqual([...expected].sort());
     for (const type of expected) {
       const spec = BlockRegistry.get(type);

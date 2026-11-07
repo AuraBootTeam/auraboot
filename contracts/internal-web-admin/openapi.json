@@ -96798,6 +96798,39 @@
         ]
       }
     },
+    "/api/permission-cache/evict": {
+      "post": {
+        "description": "Manual trigger for permission snapshot eviction after out-of-band changes",
+        "operationId": "evict",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "reason",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseString"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Evict permission caches",
+        "tags": [
+          "Permission cache administration"
+        ]
+      }
+    },
     "/api/permission/capabilities": {
       "get": {
         "operationId": "getForRole",
@@ -111352,6 +111385,10 @@
     {
       "description": "Execute multiple datasource queries in parallel",
       "name": "Batch Query"
+    },
+    {
+      "description": "Manual eviction of permission snapshot caches",
+      "name": "Permission cache administration"
     },
     {
       "description": "Record-level comments and activity history",
