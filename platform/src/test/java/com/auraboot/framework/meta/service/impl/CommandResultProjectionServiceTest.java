@@ -133,4 +133,40 @@ class CommandResultProjectionServiceTest {
         when(owner.businessResultProjection()).thenReturn(Map.of("success",BusinessResultField.constant(true),"amount",BusinessResultField.rootField("missing")));
         assertThatThrownBy(this::prepare).isInstanceOf(AccessDeniedException.class);
     }
+    private void derived() {
+        when(owner.businessResultFields()).thenReturn(Set.of("success","suggestionId","version"));
+        when(owner.businessResultProjection()).thenReturn(Map.of("success",BusinessResultField.constant(true),
+                "suggestionId",BusinessResultField.derivedRootField("cost"),"version",BusinessResultField.derivedRootField("cost")));
+    }
+    private Map<String,Object> derivedOutcome() {return Map.of("success",true,"suggestionId","suggestion-1","version",2);}
+    @Test void explicitlyDerivedScalarsShareASourceWithoutBeingConflictingRawAliases() {
+        derived();prepare();assertThat(service.project(context,derivedOutcome())).containsAllEntriesOf(derivedOutcome());
+    }
+    @Test void derivedScalarsCannotDiscloseAHiddenOrUnallowedSource() {
+        derived();grant(Set.of());prepare();
+        assertThat(service.project(context,derivedOutcome())).containsExactly(Map.entry("success",true));
+        grant(Set.of("cost"));when(fields.getFieldPermissions(30L,"orders")).thenReturn(new FieldPermissionSet(Set.of(),Set.of(),Set.of("cost")));
+        prepare();assertThat(service.project(context,derivedOutcome())).containsExactly(Map.entry("success",true));
+    }
+    @Test void derivedScalarsDoNotTransformPartiallyMaskedSourcesIntoUnmaskedTokens() {
+        derived();when(policies.getFieldMaskRules(7L,"orders",20L)).thenReturn(List.of(
+                FieldMaskRule.builder().fieldCode("cost_column").maskType("partial").build()));
+        prepare();assertThat(service.project(context,derivedOutcome())).containsExactly(Map.entry("success",true));
+        when(policies.getFieldMaskRules(7L,"orders",20L)).thenReturn(List.of());
+        var config=new com.auraboot.framework.meta.entity.FieldMaskConfig();config.setFieldCode("cost_column");config.setMaskType("FULL");
+        when(masks.getEffectiveConfigs("orders",20L,"detail")).thenReturn(List.of(config));
+        prepare();assertThat(service.project(context,derivedOutcome())).containsExactly(Map.entry("success",true));
+    }
+    @Test void rawAliasesStillCannotReturnConflictingValues() {
+        when(owner.businessResultFields()).thenReturn(Set.of("amount","alias"));
+        when(owner.businessResultProjection()).thenReturn(Map.of("amount",BusinessResultField.rootField("cost"),"alias",BusinessResultField.rootField("cost")));
+        prepare();assertThatThrownBy(()->service.project(context,Map.of("amount",17,"alias",18))).isInstanceOf(AccessDeniedException.class);
+    }
+    @Test void derivedOutputsRemainScalarAndMustReferenceRealMetadata() {
+        derived();prepare();assertThatThrownBy(()->service.project(context,Map.of("success",true,"version",List.of("secret"))))
+                .isInstanceOf(AccessDeniedException.class);
+        when(metadata.getModelFields("orders")).thenReturn(List.of());
+        assertThatThrownBy(this::prepare).isInstanceOf(AccessDeniedException.class);
+    }
+
 }

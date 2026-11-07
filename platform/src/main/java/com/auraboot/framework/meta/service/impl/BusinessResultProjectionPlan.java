@@ -46,7 +46,7 @@ public record BusinessResultProjectionPlan(BusinessTargetAuthorization target,
                         if(count<0 || count>field.maximum())throw denied();
                     } catch(ArithmeticException | NumberFormatException invalid) {throw denied();}
                 }
-                case ROOT_FIELD -> {
+                case ROOT_FIELD, DERIVED_ROOT_FIELD -> {
                     if (!(value==null || value instanceof String || value instanceof Boolean || value instanceof Number
                             || value instanceof java.time.temporal.TemporalAccessor || value instanceof java.util.Date))throw denied();
                 }

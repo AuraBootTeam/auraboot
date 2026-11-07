@@ -439,6 +439,25 @@ class RoleAuthorizationDraftServiceTest {
         verify(writes, never()).mutate();
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"input","deletion","result"})
+    void changedCompiledOwnerContractInvalidatesTheReviewedDraft(String changed) {
+        var owner=businessOwner(Set.of("sales.manage"));
+        when(owner.businessResourceModels()).thenReturn(Set.of("sales_order","sales_line"));
+        var baseline=service.snapshot("role-a");
+        switch(changed) {
+            case "input" -> when(owner.businessInputContract()).thenReturn(new com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.InputContract(
+                    Set.of("suggestionId"),Set.of("suggestionId"),Set.of("price"),Set.of("price")));
+            case "deletion" -> when(owner.businessDeletableResourceModels()).thenReturn(Set.of("sales_line"));
+            case "result" -> when(owner.businessResultProjection()).thenReturn(java.util.Map.of("version",
+                    com.auraboot.framework.plugin.extension.BusinessResultField.derivedRootField("price")));
+            default -> throw new AssertionError("Unknown fixture");
+        }
+        assertThatThrownBy(()->service.apply("role-a",request(baseline.revision(),false,null,List.of())))
+                .isInstanceOfSatisfying(RootUnCheckedException.class,error->assertThat(error.getResponseCode()).isEqualTo(ResponseCode.CasVersionConflict));
+        verify(writes,never()).mutate();
+    }
+
     @Test void publicSourcesOutsideTheOwnersResourceContractAreRejected() {
         var owner = businessOwner(Set.of("sales.manage"));
         when(owner.businessResourceModels()).thenReturn(Set.of("sales_order"));
