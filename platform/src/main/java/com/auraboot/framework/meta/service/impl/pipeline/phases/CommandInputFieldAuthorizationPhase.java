@@ -25,9 +25,15 @@ public class CommandInputFieldAuthorizationPhase implements CommandPhase {
     private final MetaModelService metadata;
     private final FieldPermissionService fields;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.plugin.pf4j.ExtensionRegistry extensions;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.meta.service.FieldMaskService masks;
+
     @Override public String name() { return "input_field_authorization"; }
 
     @Override public void execute(CommandPipelineContext context) {
+        if (authorizeControlInputs(context)) return;
         if (context.getCommand() == null || submittedKeys(context).isEmpty()) {
             com.auraboot.framework.meta.service.impl.NativeHumanActor.requireCompleteIdentity();
             return;
@@ -68,6 +74,41 @@ public class CommandInputFieldAuthorizationPhase implements CommandPhase {
                 }
             }
         }
+    }
+
+    private boolean authorizeControlInputs(CommandPipelineContext context) {
+        if (extensions == null || context.getCommand() == null) return false;
+        var handler = extensions.getBusinessResourceOwner(context.getCommandCode()).orElse(null);
+        if (!(handler instanceof com.auraboot.framework.plugin.extension.BusinessResourceAuthorization owner)
+                || owner.businessInputContract() == null) return false;
+        com.auraboot.framework.plugin.pf4j.BusinessResourcePermissionContract.require(context, owner);
+        com.auraboot.framework.meta.service.impl.NativeHumanActor.requireCompleteIdentity();
+        var input = owner.businessInputContract();
+        var submitted = submittedKeys(context);
+        if (!input.allowedParameters().containsAll(submitted) || !submitted.containsAll(input.requiredParameters())) deny();
+        for (String key : input.requiredParameters()) {
+            Object value = context.getPayload() == null ? null : context.getPayload().get(key);
+            if (value == null || value instanceof String text && text.isBlank()) deny();
+        }
+        var complete = context.getBusinessGrantDecision();
+        String model = context.getCommand().getModelCode();
+        if (complete == null || !complete.result().granted()
+                || !Objects.equals(complete.tenantId(), MetaContext.getCurrentTenantId())
+                || !Objects.equals(complete.userId(), MetaContext.getCurrentUserId())
+                || !Objects.equals(complete.memberId(), MetaContext.getCurrentMemberId())
+                || !Objects.equals(complete.modelCode(), model)
+                || !Objects.equals(complete.recordPid(), context.getRequest().getTargetRecordId())
+                || input.writableRootFields().stream().anyMatch(field -> !complete.canWrite(field))) deny();
+        var definitions = metadata.getModelFields(model);
+        if (definitions == null || masks == null) deny();
+        var canonical = definitions.stream().map(com.auraboot.framework.meta.dto.FieldDefinition::getCode).collect(java.util.stream.Collectors.toSet());
+        if (!canonical.containsAll(input.readableRootFields()) || !canonical.containsAll(input.writableRootFields())) deny();
+        if (!new FieldWriteAuthorizationSupport(metadata, fields, policies)
+                .nonWritablePolicyInputKeys(model, input.writableRootFields()).isEmpty()) deny();
+        var definition = com.auraboot.framework.meta.dto.ModelDefinition.builder().code(model).fields(definitions).build();
+        new com.auraboot.framework.meta.service.impl.FieldPredicateAuthorizationSupport(fields, policies, masks)
+                .requireBusinessReadable(definition, input.readableRootFields(), complete);
+        return true;
     }
 
     private Map<String, Set<String>> mappedInputs(CommandPipelineContext context) {

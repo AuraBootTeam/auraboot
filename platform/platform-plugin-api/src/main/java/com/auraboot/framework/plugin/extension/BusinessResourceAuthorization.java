@@ -15,6 +15,32 @@ public interface BusinessResourceAuthorization {
     /** A fresh policy may retain locked source facts for this invocation only. */
     default BusinessResourceAuthorization newInvocationAuthorization() { return this; }
 
+    /** Control parameters and their root field obligations; null retains legacy input checks. */
+    default InputContract businessInputContract() { return null; }
+
+    record InputContract(Set<String> allowedParameters, Set<String> requiredParameters,
+                         Set<String> readableRootFields, Set<String> writableRootFields) {
+        public InputContract {
+            allowedParameters = ordered(allowedParameters);
+            requiredParameters = ordered(requiredParameters);
+            readableRootFields = ordered(readableRootFields);
+            writableRootFields = ordered(writableRootFields);
+            if (!allowedParameters.containsAll(requiredParameters)
+                    || readableRootFields.isEmpty() && writableRootFields.isEmpty()
+                    || writableRootFields.stream().anyMatch(Set.of("pid", "id", "tenant_id", "row_version",
+                        "created_by", "updated_by", "created_at", "updated_at", "deleted_flag")::contains))
+                throw new IllegalArgumentException("Explicit control input field obligations required");
+        }
+        private static Set<String> ordered(Set<String> values) {
+            if (values == null || values.size() > 128) throw new IllegalArgumentException("Finite input contract required");
+            values.forEach(value -> {
+                identifier(value);
+                if (value.startsWith("__")) throw new IllegalArgumentException("Reserved input contract key");
+            });
+            return Collections.unmodifiableSet(new java.util.TreeSet<>(values));
+        }
+    }
+
     /** Optional owner lower bound for reading source facts after transaction-held locks. */
     default ReadIsolation resourceReadIsolation() { return null; }
 

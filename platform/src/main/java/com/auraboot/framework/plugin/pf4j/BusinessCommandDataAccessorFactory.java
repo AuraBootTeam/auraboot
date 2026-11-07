@@ -52,7 +52,8 @@ public class BusinessCommandDataAccessorFactory {
             throw new IllegalStateException("Cannot validate business resource transaction", failure);
         }
         var invocationOwner = Objects.requireNonNull(owner.newInvocationAuthorization());
-        if (!Objects.equals(owner.resourceReadIsolation(), invocationOwner.resourceReadIsolation())
+        if (!Objects.equals(owner.businessInputContract(), invocationOwner.businessInputContract())
+                || !Objects.equals(owner.resourceReadIsolation(), invocationOwner.resourceReadIsolation())
                 || !Objects.equals(owner.publicBusinessResourceFields(), invocationOwner.publicBusinessResourceFields())
                 || !Objects.equals(owner.businessArtifactFields(), invocationOwner.businessArtifactFields())
                 || !Objects.equals(owner.businessArtifactRootBindingFields(), invocationOwner.businessArtifactRootBindingFields())
@@ -82,6 +83,7 @@ public class BusinessCommandDataAccessorFactory {
         private final ConnectionHolder holder;
         private final Connection connection;
         private final BusinessResourceAuthorization.ReadIsolation readIsolation;
+        private final BusinessResourceAuthorization.InputContract inputContract;
         private final Thread thread = Thread.currentThread();
         private final Long tenant, user, member;
         private final String actor, command, rootModel, rootPid;
@@ -117,6 +119,7 @@ public class BusinessCommandDataAccessorFactory {
             this.context = Objects.requireNonNull(context);
             this.owner = owner; this.source = source; this.holder = holder; this.connection = connection;
             this.readIsolation = owner.resourceReadIsolation();
+            this.inputContract = owner.businessInputContract();
             witness = context.getBusinessTargetAuthorization();
             plan = context.getPermitPlan(); authorization = context.getAuthorizationVerdict();
             outputPlan = context.getPublicOutputProjection();
@@ -129,7 +132,8 @@ public class BusinessCommandDataAccessorFactory {
         }
 
         private void verify() {
-            if (!Objects.equals(readIsolation, owner.resourceReadIsolation())) throw denied();
+            if (!Objects.equals(inputContract, owner.businessInputContract())
+                    || !Objects.equals(readIsolation, owner.resourceReadIsolation())) throw denied();
             if (context.getPublicOutputProjection() != outputPlan
                     || artifactFields != null && !artifactFields.equals(owner.businessArtifactFields())
                     || artifactBindingFields != null && !artifactBindingFields.equals(owner.businessArtifactRootBindingFields())

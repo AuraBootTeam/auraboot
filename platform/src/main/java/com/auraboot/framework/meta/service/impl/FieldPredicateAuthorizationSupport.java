@@ -15,7 +15,7 @@ import java.util.Set;
 
 /** Prevent raw-value inference through conditional mutation outcomes. */
 @RequiredArgsConstructor
-final class FieldPredicateAuthorizationSupport {
+public final class FieldPredicateAuthorizationSupport {
     private final FieldPermissionService fields;
     private final DataPermissionEngine policies;
     private final FieldMaskService masks;
@@ -42,6 +42,23 @@ final class FieldPredicateAuthorizationSupport {
             if (!permission.viewableFields().containsAll(fieldCodes)
                     || fieldCodes.stream().anyMatch(permission.hiddenFields()::contains)) deny();
         }
+        requireUnmasked(model, fieldCodes);
+    }
+
+    /** Complete business grants supply positive field rights; mandatory masks still apply. */
+    public void requireBusinessReadable(ModelDefinition model, Set<String> fieldCodes,
+            com.auraboot.framework.permission.engine.model.BusinessGrantDecision decision) {
+        NativeHumanActor.requireCompleteIdentity();
+        if (decision == null || fieldCodes.stream().anyMatch(field -> !decision.canRead(field))) deny();
+        requireUnmasked(model, fieldCodes);
+    }
+
+    private void requireUnmasked(ModelDefinition model, Set<String> fieldCodes) {
+        Set<String> aliases = new LinkedHashSet<>(fieldCodes);
+        for (var field : model.getFields()) {
+            if (fieldCodes.contains(field.getCode()) && field.getColumnName() != null) aliases.add(field.getColumnName());
+        }
+        Long userId = MetaContext.getCurrentUserId();
         var rules = policies.getFieldMaskRules(MetaContext.getCurrentTenantId(), model.getCode(), userId);
         if (rules == null) throw new MetaServiceException("Field masks unavailable for conditional mutation");
         if (rules.stream().anyMatch(rule -> aliases.contains(rule.getFieldCode()))) deny();
