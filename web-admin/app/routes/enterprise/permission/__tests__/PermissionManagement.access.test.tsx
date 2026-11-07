@@ -68,9 +68,24 @@ beforeEach(() => {
   mocks.permissions.clear();
   mocks.roles.clear();
   mocks.fetchResult.mockReset();
-  mocks.fetchResult.mockResolvedValue({ code: '0', data: { records: [role] } });
+  mocks.fetchResult.mockResolvedValue({ code: '0', data: [role] });
 });
 describe('PermissionManagement access feedback', () => {
+  it('finds a role beyond the first one hundred entries through the complete tenant catalog', async () => {
+    mocks.permissions.add('org.role.read');
+    const firstPage = Array.from({ length: 100 }, (_, index) => ({
+      ...role, pid: `role-${index}`, code: `catalog_${index}`, name: `Catalog role ${index}`,
+    }));
+    const target = { ...role, pid: 'quote-role', code: 'qo_procurement', name: 'Quote buyer' };
+    mocks.fetchResult.mockImplementation((url: string) => Promise.resolve({
+      code: '0', data: url === '/api/roles/all' ? [...firstPage, target] : { records: firstPage, total: 101 },
+    }));
+    showPage();
+    await screen.findByTestId('role-row-catalog_0');
+    fireEvent.change(screen.getByTestId('role-search-input'), { target: { value: 'Quote buyer' } });
+    expect(await screen.findByTestId('role-row-qo_procurement')).toHaveTextContent('Quote buyer');
+    expect(mocks.fetchResult).toHaveBeenCalledWith('/api/roles/all', { method: 'get' });
+  });
   it('reenables a role reloaded with the backend inactive status', async () => {
     mocks.permissions.add('org.role.read');
     mocks.permissions.add('org.role.update');
@@ -79,7 +94,7 @@ describe('PermissionManagement access feedback', () => {
       Promise.resolve(
         url === '/api/roles/role-1/enable'
           ? { code: '0', data: true }
-          : { code: '0', data: { records: [{ ...role, status: 'inactive' }] } },
+          : { code: '0', data: [{ ...role, status: 'inactive' }] },
       ),
     );
     showPage();

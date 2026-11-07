@@ -161,11 +161,11 @@ function PermissionManagementContent() {
     setRolesLoading(true);
     setRolesError(null);
     try {
-      const result = await fetchResult<{ records: Role[] }>('/api/roles?pageSize=100', {
+      const result = await fetchResult<Role[]>('/api/roles/all', {
         method: 'get',
       });
-      if (ResultHelper.isSuccess(result)) {
-        setRoles(result.data?.records || []);
+      if (ResultHelper.isSuccess(result) && Array.isArray(result.data)) {
+        setRoles(result.data);
       } else {
         setRoles([]);
         setRolesError(String(result.code) === ERROR_CODES.FORBIDDEN ? 'denied' : 'failed');

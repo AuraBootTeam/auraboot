@@ -70,7 +70,7 @@ public class RoleController {
     public ApiResponse<List<RoleResponse>> getAllRoles() {
         Long tenantId = MetaContext.getCurrentTenantId();
         List<Role> roles = roleService.findByTenantId(tenantId);
-        return ApiResponse.success(roles.stream().map(RoleResponse::from).toList());
+        return ApiResponse.success(toResponses(roles));
     }
 
     /**
@@ -277,11 +277,16 @@ public class RoleController {
     private Page<RoleResponse> toResponsePage(Page<Role> roles) {
         Page<RoleResponse> response = new Page<>(roles.getCurrent(), roles.getSize(), roles.getTotal());
         response.setPages(roles.getPages());
+        response.setRecords(toResponses(roles.getRecords()));
+        return response;
+    }
+
+    private List<RoleResponse> toResponses(List<Role> roles) {
         var summaries = roleService.displaySummaries(MetaContext.getCurrentTenantId(),
-                roles.getRecords().stream().map(Role::getId).toList()).stream()
+                roles.stream().map(Role::getId).toList()).stream()
                 .collect(java.util.stream.Collectors.toMap(
                         com.auraboot.framework.rbac.dto.RoleDisplaySummary::getRoleId, value -> value));
-        response.setRecords(roles.getRecords().stream().map(role -> {
+        return roles.stream().map(role -> {
             RoleResponse value = RoleResponse.from(role);
             var summary = summaries.get(role.getId());
             if (summary != null) {
@@ -289,7 +294,6 @@ public class RoleController {
                 value.setManagementRole(summary.getManagementRole());
             }
             return value;
-        }).toList());
-        return response;
+        }).toList();
     }
 }
