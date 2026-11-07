@@ -36,6 +36,11 @@ public interface DataScopeService {
         return DataScopeCondition.none();
     }
 
+    /** Role-local ordinary update scope; does not use another role's scope or manufacture ALL. */
+    default DataScopeCondition resolveOrdinaryUpdateScopeForRole(Long memberId, Long roleId, String recordModel) {
+        return DataScopeCondition.none();
+    }
+
     /** Resolve current member-group scope without requiring a business-row team column. */
     default DataScopeCondition resolveAudienceScope(Long memberId, String resourceCode, String actionCode) {
         return resolveHistoricalScope(memberId, resourceCode, actionCode);

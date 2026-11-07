@@ -83,6 +83,11 @@ public class DataScopeServiceImpl implements DataScopeService {
         return resolveGrantScope(memberId,roleId,recordModel,"read",recordModel,true);
     }
 
+    @Override
+    public DataScopeCondition resolveOrdinaryUpdateScopeForRole(Long memberId, Long roleId, String recordModel) {
+        return resolveGrantScope(memberId,roleId,recordModel,"update",recordModel,true);
+    }
+
     private DataScopeCondition resolveGrantScope(Long memberId, Long roleId, String permissionResource,
                                                 String action, String recordModel, boolean ordinaryRead) {
         if (!MetaContext.exists() || memberId == null || roleId == null

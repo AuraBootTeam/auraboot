@@ -343,6 +343,42 @@ class BusinessCommandGrantPostgresIT extends BaseIntegrationTest {
         assertThat(allowed.getFirst()).containsEntry("warehouse","Shanghai").containsKey("pid");
     }
 
+    @Test void ordinaryModelUpdateFieldsDoNotBorrowAnotherRolesScopeOrCondition() throws Exception {
+        code = "model." + model + ".update";
+        jdbc.update("UPDATE ab_permission SET code=?,resource_type='model',resource_code=?,action='update' WHERE id=?",code,model,permissionId);
+        jdbc.update("UPDATE ab_role_permission SET field_scope=?::jsonb WHERE id=?",fieldScope("label"),bindingA);
+        jdbc.update("UPDATE ab_role_permission SET field_scope=?::jsonb WHERE id=?",fieldScope("cost"),bindingB);
+        var own = authorization.resolveOrdinaryUpdate(member(),model,record(true,"Beijing"));
+        assertThat(own.canWrite("label")).isTrue();assertThat(own.canWrite("cost")).isFalse();
+        var foreign = authorization.resolveOrdinaryUpdate(member(),model,record(false,"Shanghai"));
+        assertThat(foreign.canWrite("cost")).isTrue();assertThat(foreign.canWrite("label")).isFalse();
+        var both = authorization.resolveOrdinaryUpdate(member(),model,record(true,"Shanghai"));
+        assertThat(both.canWrite("label")).isTrue();assertThat(both.canWrite("cost")).isTrue();
+        assertThat(authorization.resolveNative(member(),List.of(code),model,record(true,"Shanghai"),"update").result().granted()).isFalse();
+        jdbc.update("UPDATE ab_role_permission SET status='inactive' WHERE id=?",bindingA);
+        var revoked = authorization.resolveOrdinaryUpdate(member(),model,record(true,"Shanghai"));
+        assertThat(revoked.canWrite("label")).isFalse();assertThat(revoked.canWrite("cost")).isTrue();
+    }
+
+    @Test void ordinaryUpdateUsesItsActionScopeAndOnlyQualifiedLegacyNullDefaults() throws Exception {
+        code = "model."+model+".update";
+        jdbc.update("UPDATE ab_permission SET code=?,resource_type='model',resource_code=?,action='update' WHERE id=?",code,model,permissionId);
+        jdbc.update("UPDATE ab_role_permission SET status='inactive' WHERE id=?",bindingA);
+        jdbc.update("UPDATE ab_role SET default_data_scope_type=NULL WHERE id=?",roleB);
+        jdbc.update("UPDATE ab_role_permission SET field_scope=?::jsonb WHERE id=?",fieldScope("cost"),bindingB);
+        scopes.setScope(tenant(),roleB,model,"read","all","MAX");
+        assertThat(authorization.resolveOrdinaryUpdate(member(),model,record(false,"Shanghai")).canWrite("cost")).isTrue();
+        scopes.setScope(tenant(),roleB,model,"update","none","MAX");
+        assertThat(authorization.resolveOrdinaryUpdate(member(),model,record(false,"Shanghai")).result().granted()).isFalse();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbc.update(
+                "UPDATE ab_role_data_scope SET scope_type=NULL WHERE tenant_id=? AND role_id=? AND resource_code=? AND action_code='update'",tenant(),roleB,model))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class).hasMessageContaining("scope_type");
+        assertThat(authorization.resolveOrdinaryUpdate(member(),model,record(false,"Shanghai")).result().granted()).isFalse();
+        scopes.removeScope(tenant(),roleB,model,"update");
+        assertThat(authorization.resolveOrdinaryUpdate(member(),model,record(false,"Shanghai")).canWrite("cost")).isTrue();
+        assertThat(jdbc.queryForObject("SELECT default_data_scope_type FROM ab_role WHERE id=?",String.class,roleB)).isNull();
+    }
+
     @Test void ordinaryModelReadFieldsFollowEachMatchingRoleWithoutCrossMultiplication() throws Exception {
         code = "model." + model + ".read";
         jdbc.update("UPDATE ab_permission SET code=?,resource_type='model',resource_code=?,action='read' WHERE id=?",code,model,permissionId);

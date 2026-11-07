@@ -131,6 +131,25 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
         metadata.clearAllCache();
     }
 
+    @Test void nativeUpdateUsesItsOwnCompleteGrantFieldsAndRejectsTheWholeMixedWrite() throws Exception {
+        String code = "model."+model+".update";
+        String scope = json.writeValueAsString(Map.of("modelCode",model,"readFields",List.of(),"writeFields",List.of(label)));
+        int changed = jdbc.update("UPDATE ab_role_permission g SET field_scope=?::jsonb FROM ab_permission p WHERE g.permission_id=p.id AND g.role_id=? AND g.tenant_id=? AND p.code=? AND g.deleted_flag=FALSE",
+                scope,testRole.getId(),testTenant.getId(),code);
+        assertThat(changed).isEqualTo(1);
+        String before = jdbc.queryForObject("SELECT to_jsonb(g)::text FROM ab_role_permission g JOIN ab_permission p ON p.id=g.permission_id WHERE g.tenant_id=? AND g.role_id=? AND p.code=? AND g.deleted_flag=FALSE",String.class,testTenant.getId(),testRole.getId(),code);
+        data.update(model,pid,Map.of(label,"allowed"));
+        assertThat(stored(label,pid)).isEqualTo("allowed");
+        assertThatThrownBy(() -> data.update(model,pid,Map.of(label,"must-rollback",quantity,9)))
+                .isInstanceOf(AccessDeniedException.class).hasMessageContaining("FIELD_WRITE_DENIED");
+        assertThat(stored(label,pid)).isEqualTo("allowed");assertThat(stored(quantity,pid)).isEqualTo(1);
+        var batch = data.batchUpdate(model,List.of(new LinkedHashMap<>(Map.of("pid",pid,label,"mixed-batch-must-rollback",quantity,9)),
+                new LinkedHashMap<>(Map.of("pid",pid,label,"batch-allowed"))));
+        assertThat(batch.getFailed()).isEqualTo(1);assertThat(batch.getSuccess()).isEqualTo(1);
+        assertThat(stored(label,pid)).isEqualTo("batch-allowed");assertThat(stored(quantity,pid)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT to_jsonb(g)::text FROM ab_role_permission g JOIN ab_permission p ON p.id=g.permission_id WHERE g.tenant_id=? AND g.role_id=? AND p.code=? AND g.deleted_flag=FALSE",String.class,testTenant.getId(),testRole.getId(),code)).isEqualTo(before);
+    }
+
     @Test void createRejectsReadonlyValuesAndNullWithoutInserting() {
         Map<String,Object> attempt = new LinkedHashMap<>(); attempt.put(label,"denied"); attempt.put(secret,null);
         assertThatThrownBy(()->data.create(model,attempt)).isInstanceOf(AccessDeniedException.class);

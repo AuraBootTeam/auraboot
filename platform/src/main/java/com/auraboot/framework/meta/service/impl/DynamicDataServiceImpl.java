@@ -1226,7 +1226,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public Map<String, Object> update(String modelCode, String recordId, Map<String, Object> inputData) {
         BusinessResourceDataScope.update(modelCode, recordId, inputData);
         validateModelCode(modelCode);
@@ -1246,6 +1246,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         // Field-level write permission (gap #1): strip fields the current user may not write
         Set<String> strippedNonWritable = stripNonWritableFields(modelCode, data);
+        applicationContext.getBean(NativeUpdateFieldAuthorization.class).require(modelCode, recordId, data);
 
         logOperation("update", modelCode, recordId, data.keySet());
 
@@ -1640,7 +1641,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public DynamicBatchResponse batchUpdate(String modelCode, List<Map<String, Object>> dataList) {
         BusinessResourceDataScope.unsupported();
         return dynamicDataBatchSupport().batchUpdate(modelCode,dataList);
@@ -1775,7 +1776,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     // ==================== Import ====================
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public ImportResult importData(String modelCode, DataImportRequest importRequest) {
         BusinessResourceDataScope.unsupported();
         return dynamicDataTransferSupport().importData(modelCode,importRequest);
