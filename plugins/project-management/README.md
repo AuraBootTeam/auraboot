@@ -1,3 +1,8 @@
+---
+type: system-reference
+status: active
+---
+
 # Project Management Template
 
 Customer delivery planning and milestone tracking, built with shared DSL pages and commands.

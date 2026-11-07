@@ -50,7 +50,8 @@ def main():
     secret_file = private / 'verification-environment.json'
     secret_file.write_text(json.dumps({key: env[key] for key in ['PGPASSWORD', 'ADMIN_PASSWORD', 'SESSION_SECRET', 'JWT_SECRET', 'OPEN_PLATFORM_PROTOCOL_SIGNING_KEY', 'FIELD_ENCRYPTION_KEY']}))
     secret_file.chmod(0o600)
-    checks, active, pg_started = [], None, False
+    checks, active, pg_started, image_started = [], None, False, False
+    image_container = container + "-runtime"
     def run(args, name, settings=None, accepted=0):
         with (private / (name + '.log')).open('ab') as log:
             result = subprocess.run(list(map(str, args)), env=settings or env, stdout=log, stderr=subprocess.STDOUT, timeout=900)
@@ -286,12 +287,70 @@ def main():
         record_probe(token, code, pid, 68000)
         check('corrupt-candidate-rejected-current-business-continues', amount=68000)
         stop()
+        # Exercise the delivered OCI bytes as well as the host JAR. A base-image
+        # change must preserve real database reads, authentication and attachments.
+        receipt = json.loads((current / 'release-receipt.json').read_text())
+        image_layout = current / receipt['image']['layout']
+        oci_archive = private / 'runtime.oci.tar'
+        run(['tar', '-C', image_layout, '-cf', oci_archive, '.'], 'oci-archive')
+        loaded = subprocess.check_output(['docker', 'load', '--input', oci_archive], text=True)
+        (private / 'oci-load.log').write_text(loaded)
+        references = [line.split(': ', 1)[1] for line in loaded.splitlines()
+                      if line.startswith(('Loaded image: ', 'Loaded image ID: '))]
+        require(len(references) == 1, 'one loaded OCI reference required')
+        image = json.loads(subprocess.check_output(['docker', 'image', 'inspect', references[0]], text=True))[0]
+        require(image['Config']['Labels']['org.opencontainers.image.revision'] == receipt['source']['commit'],
+                'loaded OCI source differs from candidate')
+        run(['node', '--input-type=module', '-e',
+             "import{verifyOciLayout}from './scripts/application/export-product-image.mjs';"
+             "await verifyOciLayout(...process.argv.slice(1));", image_layout, receipt['image']['digest'], image['Id']],
+            'oci-identity')
+        image_env = private / 'oci-runtime.env'
+        values = {key: env[key] for key in ['JWT_SECRET', 'FIELD_ENCRYPTION_KEY',
+                  'OPEN_PLATFORM_PROTOCOL_SIGNING_KEY']}
+        values.update(SPRING_PROFILES_ACTIVE='community', AURA_APPLICATION_MODE='core-only',
+                      AURABOOT_BOOTSTRAP_ENABLED='false', AURABOOT_DEMO_SEED='false',
+                      SPRING_DATASOURCE_URL=f'jdbc:postgresql://127.0.0.1:{port}/aura_candidate_restore',
+                      SPRING_DATASOURCE_USERNAME='auraboot', SPRING_DATASOURCE_PASSWORD=env['PGPASSWORD'],
+                      AURA_FILE_STORAGE_PATH=str(private / 'persistent-files'), SERVER_PORT=str(backend_port))
+        image_env.write_text(''.join(key + '=' + value + '\n' for key, value in values.items()))
+        image_env.chmod(0o600)
+        run(['docker', 'run', '-d', '--name', image_container, '--network', 'host',
+             '--label', 'aura.ci.job=' + job, '--env-file', image_env,
+             '--mount', f'type=bind,src={private / "persistent-files"},dst={private / "persistent-files"}',
+             '--entrypoint', 'java', image['Id'], '-Daura.plugins.dir=/tmp/empty-plugins',
+             '-jar', '/opt/auraboot/runtime/application.jar'], 'oci-start')
+        image_started = True
+        for _ in range(90):
+            try:
+                if request('/actuator/health').get('status') == 'UP':
+                    break
+            except (urllib.error.URLError, TimeoutError):
+                pass
+            time.sleep(1)
+        else:
+            raise RuntimeError('delivered OCI did not become ready; owned container retained')
+        token = login()
+        record_probe(token, code, pid, 68000)
+        assert_attachment()
+        check('delivered-oci-authentication-business-and-attachment', source=receipt['source']['commit'],
+              loadedImageId=image['Id'], amount=68000, attachmentSha256=hashlib.sha256(attachment_bytes).hexdigest())
+        labels = json.loads(subprocess.check_output(['docker', 'inspect', image_container], text=True))[0]['Config']['Labels']
+        require(labels.get('aura.ci.job') == job, 'runtime OCI ownership changed; retained')
+        run(['docker', 'stop', image_container], 'oci-stop')
+        image_started = False
         check('owned-process-stop', backendPort=backend_port, webPort=web_port)
         (output / 'result.json').write_text(json.dumps({'status': 'passed', 'releaseQualification': False, 'checks': checks, 'databaseScope': 'new attempt-owned PostgreSQL container; four databases retained, including separate supported MULTI security bootstrap', 'previousLifecycle': 'current packaged installer operates the original previous artifact without relabelling its source', 'prerequisites': {'postgres': pg_image, 'node': subprocess.check_output(['node', '--version'], text=True).strip()}}, indent=2))
     finally:
         # A failed ownership check preserves resources instead of stopping others.
         if active:
             stop()
+        if image_started:
+            labels = json.loads(subprocess.check_output(['docker', 'inspect', image_container], text=True))[0]['Config']['Labels']
+            require(labels.get('aura.ci.job') == job, 'runtime OCI ownership changed; retained')
+            with (private / 'oci-runtime.log').open('wb') as log:
+                subprocess.run(['docker', 'logs', image_container], stdout=log, stderr=subprocess.STDOUT, timeout=30)
+            run(['docker', 'stop', image_container], 'oci-stop-after-failure')
         if pg_started:
             labels = json.loads(subprocess.check_output(['docker', 'inspect', container], text=True))[0]['Config']['Labels']
             require(labels.get('aura.ci.job') == job, 'PostgreSQL ownership changed; retained')

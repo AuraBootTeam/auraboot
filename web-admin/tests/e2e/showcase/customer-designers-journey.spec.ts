@@ -134,6 +134,16 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   expect(metadata.data.filter((field: { code: string }) => !field.code.startsWith(`${code}_`))
     .map((field: { code: string }) => field.code).sort()).toEqual(['created_at', 'updated_at']);
   expect(JSON.stringify(metadata.data)).toContain(`${code}_opportunity_amount`);
+  const customerCodeCell = page.getByTestId('model-field-code').filter({ hasText: `${code}_customer_name` });
+  await expect(customerCodeCell).toHaveAttribute('title', `${code}_customer_name`);
+  const codeLayout = await customerCodeCell.evaluate((element) => ({
+    whiteSpace: getComputedStyle(element).whiteSpace,
+    textOverflow: getComputedStyle(element).textOverflow,
+    height: element.getBoundingClientRect().height,
+  }));
+  expect(codeLayout.whiteSpace).toBe('nowrap');
+  expect(codeLayout.textOverflow).toBe('ellipsis');
+  expect(codeLayout.height).toBeLessThan(24);
   await screenshot(page, info, 'SC02-model-fields-ready');
   await page.getByTestId('model-more-actions').click();
   await page.getByTestId('model-publish-action').click();
@@ -339,6 +349,9 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   await page.getByTestId(`outline-item-block_${code}_form`).click();
   const sectionTitle = page.getByTestId('inspector-field-title');
   await sectionTitle.fill('客户商机与跟进信息');
+  await page.getByRole('checkbox', { name: '可折叠', exact: true }).check();
+  await page.getByRole('checkbox', { name: '默认折叠', exact: true }).check();
+  await expect(page.getByText('Default collapsed', { exact: true })).toHaveCount(0);
   await screenshot(page, info, 'SC02-schema-title-adjustment');
   const saveGeneratedForm = page.waitForResponse(
     (response) => new URL(response.url()).pathname === `/api/pages/${formResource.pid}`
@@ -349,14 +362,20 @@ test('SC02: create a model, bind fields, publish and generate CRUD from the real
   await page.reload();
   await page.getByTestId(`outline-item-block_${code}_form`).click();
   await expect(sectionTitle).toHaveValue('客户商机与跟进信息');
+  await expect(page.getByRole('checkbox', { name: '可折叠', exact: true })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: '默认折叠', exact: true })).toBeChecked();
   await screenshot(page, info, 'SC02-schema-saved-reopened');
   const savedForm = (await (await page.request.get(`/api/pages/${formResource.pid}`)).json()).data;
   expect(savedForm.schemaVersion).toBe(4);
   expect(savedForm.blocks.find((block: { id: string }) => block.id === `block_${code}_form`).title)
     .toMatchObject({ 'zh-CN': '客户商机与跟进信息' });
+  expect(savedForm.blocks.find((block: { id: string }) => block.id === `block_${code}_form`))
+    .toMatchObject({ collapsible: true, defaultCollapsed: true });
   const designerUrl = page.url();
   await page.goto(`${listUrl}/edit/${recordPid}`);
   await expect(page.getByText('客户商机与跟进信息', { exact: true })).toBeVisible();
+  await expect(page.getByTestId(`form-field-${customerField}`).locator('input')).toBeHidden();
+  await page.locator('summary').filter({ hasText: '客户商机与跟进信息' }).click();
   await expect(page.getByTestId(`form-field-${customerField}`).locator('input')).toHaveValue(customerName);
   await expect(page.getByTestId(`form-field-${amountField}`).locator('input')).toHaveValue('68000');
   await screenshot(page, info, 'SC02-schema-adjusted-runtime');

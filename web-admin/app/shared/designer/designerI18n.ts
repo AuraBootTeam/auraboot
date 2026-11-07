@@ -959,6 +959,7 @@ export const DESIGNER_I18N = {
       'Picker source': { 'zh-CN': '选择器来源', 'en-US': 'Picker source' } as L,
       'Picker data source': { 'zh-CN': '选择器数据源', 'en-US': 'Picker data source' } as L,
       Collapsible: { 'zh-CN': '可折叠', 'en-US': 'Collapsible' } as L,
+      'Default collapsed': { 'zh-CN': '默认折叠', 'en-US': 'Default collapsed' } as L,
       'Confirm first': { 'zh-CN': '需先确认', 'en-US': 'Confirm first' } as L,
       'New tab': { 'zh-CN': '新标签页打开', 'en-US': 'New tab' } as L,
       'Max files': { 'zh-CN': '最大文件数', 'en-US': 'Max files' } as L,

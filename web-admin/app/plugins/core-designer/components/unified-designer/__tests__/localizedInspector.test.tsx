@@ -13,6 +13,7 @@ vi.mock('../inspector/schemas', () => ({
   getInspectorFields: () => [
     { key: 'title', label: 'Title', type: state.titleType },
     { key: 'description', label: 'Description', type: 'textarea' },
+    { key: 'props.defaultCollapsed', label: 'Default collapsed', type: 'boolean' },
   ],
 }));
 
@@ -30,6 +31,15 @@ function Harness({ initial, onUpdate }: { initial: Record<string, unknown>; onUp
 
 describe('localized inspector authoring', () => {
   beforeEach(() => { state.locale = 'zh-CN'; state.titleType = 'text'; });
+
+  it.each([['zh-CN', '默认折叠'], ['en', 'Default collapsed']])('localizes Schema boolean labels for %s and retains the property path', (locale, label) => {
+    state.locale = locale;
+    const onUpdate = vi.fn();
+    render(<Harness initial={{ props: { defaultCollapsed: false } }} onUpdate={onUpdate} />);
+    fireEvent.click(screen.getByRole('checkbox', { name: label }));
+    expect(onUpdate).toHaveBeenCalledWith('props.defaultCollapsed', true);
+    if (locale === 'zh-CN') expect(screen.queryByText('Default collapsed')).toBeNull();
+  });
 
   it('declares generated section titles as localized text in the real schema registry', () => {
     const registry = createDefaultInspectorSchemaRegistry();
