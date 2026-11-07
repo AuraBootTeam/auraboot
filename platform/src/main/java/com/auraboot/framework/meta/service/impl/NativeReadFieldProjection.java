@@ -65,11 +65,11 @@ public class NativeReadFieldProjection {
                     String fieldCode = model.getFields().stream()
                             .filter(field -> entry.getKey().equals(field.getColumnName()))
                             .map(field -> field.getCode()).findFirst().orElse(entry.getKey());
-                    // PID is the record envelope identity. All data and audit fields remain scoped.
+                    // Record identity and optimistic concurrency tokens are envelope fields, not business data.
                     boolean declared = model.getFields().stream().anyMatch(field -> fieldCode.equals(field.getCode()))
                             || com.auraboot.framework.meta.constant.SystemFieldConstants.isSystemField(fieldCode);
                     boolean legacy = grant.grants().stream().anyMatch(binding -> binding.fields().unrestricted());
-                    if ("pid".equals(entry.getKey()) || (declared || legacy) && grant.canRead(fieldCode))
+                    if (Set.of("pid", "row_version").contains(entry.getKey()) || (declared || legacy) && grant.canRead(fieldCode))
                         projected.put(entry.getKey(), entry.getValue());
                 }
                 projected.put("pid", pid);

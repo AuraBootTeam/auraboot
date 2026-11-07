@@ -143,7 +143,8 @@ final class PluginAccessPolicyImporter {
 
             permissionMapper.updateForPluginImport(
                     dto.getEffectiveName(), dto.getDescription(), dto.getCategory(),
-                    dto.getResourceType(), dto.getResourceCode(), dto.getAction(),
+                    dto.getResourceType() != null ? dto.getResourceType() : existingPerm.getResourceType(),
+                    dto.getResourceCode(), dto.getAction(),
                     dto.getDataScopeType(), dataScopeConfigJson, extensionJson, tagsArray,
                     policySchemaJson,
                     pluginPid, tenantId, dto.getCode());

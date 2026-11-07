@@ -94,4 +94,10 @@ class NativeReadFieldProjectionTest {
         assertThat(builder.getSelectFields()).containsAll(original).hasSize(original.size()+3);
     }
 
+    @Test void envelopeKeepsOptimisticVersionWithoutGrantingAuditOrBusinessSecrets() {
+        var value=row(Map.<String,Object>of("pid","record","name","Board","secret","PRIVATE","created_by",99L,"row_version",7L));
+        when(authorization.resolveOrdinaryRead(eq(5L),eq("project"),anyMap())).thenReturn(allow("record","name"));
+        assertThat(projection.project(model,List.of(value))).containsExactly(Map.of("pid","record","name","Board","row_version",7L));
+    }
+
 }

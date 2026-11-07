@@ -116,6 +116,27 @@ class PluginRoleModelPermissionReconciliationIT extends BaseIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_role_navigation_state WHERE tenant_id=? AND role_id=?",Integer.class,getTestTenant().getId(),roleId)).isEqualTo(1);
     }
 
+    @Test void explicitModelClassificationUpgradesLegacyDefinitionWithoutRegrantingTheRole() throws Exception {
+        install(); Long tenant=getTestTenant().getId(); String code="model."+model+".read";
+        String identity=jdbc.queryForObject("SELECT jsonb_build_object('id',id,'pid',pid,'code',code,'resource',resource_code,'action',action,'status',status,'deleted',deleted_flag)::text FROM ab_permission WHERE tenant_id=? AND code=?",String.class,tenant,code);
+        jdbc.update("UPDATE ab_permission SET resource_type=NULL WHERE tenant_id=? AND code=?",tenant,code);
+        jdbc.update("UPDATE ab_role SET default_data_scope_type=NULL WHERE tenant_id=? AND id=?",tenant,roleId);
+        jdbc.update("UPDATE ab_role_permission SET status='inactive',priority=37,effective_date=CURRENT_DATE+2,expiry_date=CURRENT_DATE+30,field_scope=?::jsonb WHERE tenant_id=? AND role_id=?",
+                new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(Map.of("modelCode",model,"readFields",List.of(model+"_name"),"writeFields",List.of())),tenant,roleId);
+        jdbc.update("UPDATE ab_user_role SET expiry_date=CURRENT_DATE-1 WHERE tenant_id=? AND role_id=?",tenant,roleId);
+        var before=snapshot();
+        assertThat(execute().isSuccess()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT resource_type FROM ab_permission WHERE tenant_id=? AND code=?",String.class,tenant,code)).isEqualTo("model");
+        assertThat(jdbc.queryForObject("SELECT jsonb_build_object('id',id,'pid',pid,'code',code,'resource',resource_code,'action',action,'status',status,'deleted',deleted_flag)::text FROM ab_permission WHERE tenant_id=? AND code=?",String.class,tenant,code)).isEqualTo(identity);
+        assertThat(snapshot()).isEqualTo(before);
+        write("config/permissions.json","""
+            [{"code":"model.%s.read","name:en":"Read widgets","resourceCode":"%s","action":"read"}]
+            """.formatted(model,model));
+        assertThat(execute().isSuccess()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT resource_type FROM ab_permission WHERE tenant_id=? AND code=?",String.class,tenant,code)).isEqualTo("model");
+        assertThat(snapshot()).isEqualTo(before);
+    }
+
     @Test void repeatedImportPreservesAllPhysicalRoleConfiguration() {
         install();var before=snapshot();
         assertThat(execute().isSuccess()).isTrue();assertThat(snapshot()).isEqualTo(before);
