@@ -73,6 +73,9 @@ public interface BusinessResourceAuthorization {
     /** Finite root file fields and maximum artifact bytes; no arbitrary file capability by default. */
     default Map<String, Integer> businessArtifactFields() { return Map.of(); }
 
+    /** Exact root attachment fields whose original uploaded bytes this use case must consume. */
+    default Map<String, Integer> businessSourceFileFields() { return Map.of(); }
+
     /** Finite root relationship/state facts whose changes invalidate generated artifacts. */
     default Set<String> businessArtifactRootBindingFields() { return Set.of(); }
 

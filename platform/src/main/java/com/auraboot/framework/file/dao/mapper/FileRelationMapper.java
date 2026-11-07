@@ -14,6 +14,16 @@ import java.util.List;
 @Mapper
 public interface FileRelationMapper extends BaseMapper<FileRelationEntity> {
     
+    /** Lock the exact tenant/root/field/file attachment; never infer ownership from a file PID alone. */
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    @org.apache.ibatis.annotations.Options(useCache = false, flushCache = org.apache.ibatis.annotations.Options.FlushCachePolicy.TRUE)
+    @Select("SELECT * FROM ab_file_relation WHERE tenant_id = #{tenantId} AND entity_type = #{model} "
+            + "AND entity_id = #{pid} AND field_name = #{field} AND file_id = #{fileId} "
+            + "AND deleted_flag = false FOR UPDATE")
+    List<FileRelationEntity> lockBusinessSourceAttachment(@Param("tenantId") Long tenantId,
+            @Param("model") String model, @Param("pid") String pid, @Param("field") String field,
+            @Param("fileId") String fileId);
+
     /**
      * 根据实体信息查询关联的文件ID列表
      */

@@ -40,6 +40,11 @@ public class BusinessCommandDataAccessorFactory {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.auraboot.framework.file.dao.mapper.FileRelationMapper artifactRelations;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.file.dao.mapper.FileMapper sourceFiles;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.infrastructure.storage.StorageProvider sourceStorage;
+
     public Scope open(CommandPipelineContext context, CommandHandlerExtension handler) {
         if (!(handler instanceof BusinessResourceAuthorization owner)) throw denied();
         var source = sessions.getConfiguration().getEnvironment().getDataSource();
@@ -60,6 +65,7 @@ public class BusinessCommandDataAccessorFactory {
                 || !Objects.equals(owner.resourceReadIsolation(), invocationOwner.resourceReadIsolation())
                 || !Objects.equals(owner.publicBusinessResourceFields(), invocationOwner.publicBusinessResourceFields())
                 || !Objects.equals(owner.businessArtifactFields(), invocationOwner.businessArtifactFields())
+                || !Objects.equals(owner.businessSourceFileFields(), invocationOwner.businessSourceFileFields())
                 || !Objects.equals(owner.businessArtifactRootBindingFields(), invocationOwner.businessArtifactRootBindingFields())
                 || !Objects.equals(owner.businessArtifactIntentBindingFields(), invocationOwner.businessArtifactIntentBindingFields())
                 || !Objects.equals(owner.pagedBusinessResourceRowLimits(), invocationOwner.pagedBusinessResourceRowLimits())) throw denied();
@@ -106,6 +112,9 @@ public class BusinessCommandDataAccessorFactory {
         private final Map<SourceKey,OutputSource> outputSources = new HashMap<>();
         private Map<String,Set<String>> publicDeclarations;
         private Map<String,Integer> artifactFields;
+        private Map<String,Integer> sourceFileFields;
+        private final Map<String,byte[]> sourceBytes = new HashMap<>();
+        private final Map<String,String> sourcePids = new HashMap<>();
         private Set<String> artifactBindingFields;
         private Set<String> artifactIntentFields;
         private Map<String,String> artifactBinding;
@@ -148,6 +157,7 @@ public class BusinessCommandDataAccessorFactory {
             if (!Objects.equals(inputContract, owner.businessInputContract())
                     || !Objects.equals(readIsolation, owner.resourceReadIsolation())) throw denied();
             if (context.getPublicOutputProjection() != outputPlan
+                    || sourceFileFields != null && !sourceFileFields.equals(owner.businessSourceFileFields())
                     || artifactFields != null && !artifactFields.equals(owner.businessArtifactFields())
                     || artifactBindingFields != null && !artifactBindingFields.equals(owner.businessArtifactRootBindingFields())
                     || artifactIntentFields != null && !artifactIntentFields.equals(owner.businessArtifactIntentBindingFields())
@@ -208,6 +218,11 @@ public class BusinessCommandDataAccessorFactory {
             publicDeclarations = owner.publicBusinessResourceFields().entrySet().stream().collect(
                     java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey, entry -> Set.copyOf(entry.getValue())));
             artifactFields = Map.copyOf(owner.businessArtifactFields());
+            sourceFileFields = Map.copyOf(owner.businessSourceFileFields());
+            if (sourceFileFields.size() > 8 || sourceFileFields.values().stream().anyMatch(limit -> limit < 1 || limit > 67_108_864)
+                    || sourceFileFields.values().stream().mapToLong(Integer::longValue).sum() > 67_108_864
+                    || !sourceFileFields.isEmpty() && !"update".equals(witness.action())) throw denied();
+            sourceFileFields.keySet().forEach(BusinessResourceAuthorization::identifier);
             artifactBindingFields = Set.copyOf(owner.businessArtifactRootBindingFields());
             artifactIntentFields = Set.copyOf(owner.businessArtifactIntentBindingFields());
             artifactBinding = Map.copyOf(context.getArtifactRootBinding());
@@ -265,7 +280,11 @@ public class BusinessCommandDataAccessorFactory {
         }
 
         private void reject() { poisoned = true; holder.setRollbackOnly(); }
-        @Override public void close() { active = false; pagedSnapshots.clear(); outputSources.clear(); }
+        @Override public void close() {
+            active = false; pagedSnapshots.clear(); outputSources.clear();
+            sourceBytes.values().forEach(bytes -> Arrays.fill(bytes, (byte) 0));
+            sourceBytes.clear(); sourcePids.clear();
+        }
 
         private <T> T operation(Supplier<T> body) {
             try {
@@ -549,6 +568,56 @@ public class BusinessCommandDataAccessorFactory {
                     }
                     projectedModels.add(model);
                     return Collections.unmodifiableMap(result);
+                });
+            }
+            @Override public byte[] readBusinessSourceFile(String field) {
+                return operation(() -> {
+                    try {
+                        if (field == null || !sourceFileFields.containsKey(field)) throw denied();
+                        Integer budget = sourceFileFields.get(field);
+                        if (budget == null || sourceFiles == null || artifactRelations == null || sourceStorage == null) throw denied();
+                        var definition = models.getModelDefinition(rootModel).orElseThrow(BusinessCommandDataAccessorFactory::denied);
+                        var fields = models.getModelFields(rootModel);
+                        if (!"published".equalsIgnoreCase(definition.getStatus()) || fields == null) throw denied();
+                        var metadata = fields.stream().filter(candidate -> candidate != null && field.equals(candidate.getCode()))
+                                .findFirst().orElseThrow(BusinessCommandDataAccessorFactory::denied);
+                        if (!"file".equalsIgnoreCase(metadata.getDataType()) || metadata.isVirtual() || metadata.isJsonbVirtual()
+                                || metadata.getExtraProps() != null && Boolean.TRUE.equals(metadata.getExtraProps().get("multiple"))) throw denied();
+                        Object value = load(rootModel, rootPid).get(field);
+                        if (!(value instanceof String pid) || !pid.matches("[0-9A-HJKMNP-TV-Z]{26}")) throw denied();
+                        if (sourcePids.containsKey(field)) {
+                            if (!pid.equals(sourcePids.get(field))) throw denied();
+                            return sourceBytes.get(field).clone();
+                        }
+                        var file = sourceFiles.selectActiveByPidForUpdate(tenant, pid);
+                        if (file == null || file.getId() == null || !pid.equals(file.getPid()) || !tenant.equals(file.getTenantId())
+                                || !Boolean.FALSE.equals(file.getDeletedFlag()) || !"success".equals(file.getStatus())
+                                || file.getArtifactAuthorization() != null || file.getFileSize() == null
+                                || file.getFileSize() < 1 || file.getFileSize() > budget
+                                || sourceStorage.type() != file.getStorageType()) throw denied();
+                        String fileId = String.valueOf(file.getId());
+                        var relations = artifactRelations.lockBusinessSourceAttachment(tenant, rootModel, rootPid, field, fileId);
+                        if (relations == null || relations.size() != 1) throw denied();
+                        var relation = relations.getFirst();
+                        if (!tenant.equals(relation.getTenantId()) || !rootModel.equals(relation.getEntityType())
+                                || !rootPid.equals(relation.getEntityId()) || !field.equals(relation.getFieldName())
+                                || !fileId.equals(relation.getFileId()) || !Boolean.FALSE.equals(relation.getDeletedFlag())) throw denied();
+                        String key = file.getFileName();
+                        if (key == null || key.isBlank()) key = file.getLocalPath();
+                        if (key == null || key.isBlank()) throw denied();
+                        try (var input = sourceStorage.download(key)) {
+                            if (input == null) throw denied();
+                            byte[] bytes = input.readNBytes(budget + 1);
+                            if (bytes.length != file.getFileSize() || bytes.length > budget) throw denied();
+                            sourceBytes.put(field, bytes); sourcePids.put(field, pid);
+                            return bytes.clone();
+                        } catch (java.io.IOException failure) {
+                            throw new IllegalStateException("Cannot read the authorized business source attachment", failure);
+                        }
+                    } catch (RuntimeException failure) {
+                        reject();
+                        throw failure;
+                    }
                 });
             }
             @Override public FileAccessor.SavedFile savePublicArtifact(String field, String filename, String contentType,

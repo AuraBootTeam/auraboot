@@ -88,6 +88,15 @@ public interface DataAccessor extends RecordReadAccessor {
     }
 
     /**
+     * Read original uploaded bytes from one owner-declared attachment field on the authorized root.
+     * No caller-selected file identity, URL, storage key or reusable stream is exposed.
+     * Available only within the original invocation and transaction; returned bytes are a private copy.
+     */
+    default byte[] readBusinessSourceFile(String fieldCode) {
+        throw new UnsupportedOperationException("Business source file reading is unavailable");
+    }
+
+    /**
      * Save one generated artifact to an owner-declared file field of this command's exact root.
      * Atomically updates that field together with the supplied root changes, retains the bytes,
      * and establishes their relation. Requires prior public projection of every declared source.

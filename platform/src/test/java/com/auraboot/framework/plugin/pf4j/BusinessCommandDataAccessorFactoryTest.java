@@ -567,6 +567,117 @@ class BusinessCommandDataAccessorFactoryTest {
         verify(data,never()).delete(anyString(),anyString());
     }
 
+    private static final String FILE_PID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+    private final com.auraboot.framework.file.dao.mapper.FileMapper files = mock(com.auraboot.framework.file.dao.mapper.FileMapper.class);
+    private final com.auraboot.framework.file.dao.mapper.FileRelationMapper relations = mock(com.auraboot.framework.file.dao.mapper.FileRelationMapper.class);
+    private final com.auraboot.framework.infrastructure.storage.StorageProvider storage = mock(com.auraboot.framework.infrastructure.storage.StorageProvider.class);
+    private com.auraboot.framework.file.entity.FileEntity uploaded;
+    private com.auraboot.framework.file.entity.FileRelationEntity attachment;
+    private void sourceFile() {
+        owner.sourceFileFields = Map.of("raw_file", 16);
+        root = row("root-1", Map.of("status", "draft", "raw_file", FILE_PID));
+        when(models.getModelDefinition("receipt")).thenReturn(Optional.of(ModelDefinition.builder()
+                .code("receipt").sourceType("physical").tableName("mt_receipt").modelType("entity").status("published").build()));
+        when(models.getModelFields("receipt")).thenReturn(List.of(FieldDefinition.builder().code("raw_file").dataType("file").build()));
+        uploaded = new com.auraboot.framework.file.entity.FileEntity(); uploaded.setId(55L);uploaded.setPid(FILE_PID);uploaded.setTenantId(7L);
+        uploaded.setFileName("owned.xlsx");uploaded.setFileSize(3L);uploaded.setStatus("success");uploaded.setDeletedFlag(false);
+        uploaded.setStorageType(com.auraboot.framework.file.constant.StorageType.LOCAL);
+        attachment = new com.auraboot.framework.file.entity.FileRelationEntity().setTenantId(7L).setEntityType("receipt")
+                .setEntityId("root-1").setFieldName("raw_file").setFileId("55").setDeletedFlag(false);
+        when(files.selectActiveByPidForUpdate(7L, FILE_PID)).thenReturn(uploaded);
+        when(relations.lockBusinessSourceAttachment(7L, "receipt", "root-1", "raw_file", "55")).thenReturn(List.of(attachment));
+        when(storage.type()).thenReturn(com.auraboot.framework.file.constant.StorageType.LOCAL);
+        when(storage.download("owned.xlsx")).thenAnswer(call -> new java.io.ByteArrayInputStream(new byte[]{1,2,3}));
+        org.springframework.test.util.ReflectionTestUtils.setField(factory, "sourceFiles", files);
+        org.springframework.test.util.ReflectionTestUtils.setField(factory, "artifactRelations", relations);
+        org.springframework.test.util.ReflectionTestUtils.setField(factory, "sourceStorage", storage);
+    }
+    @Test void sourceFileIsExactRootAttachmentReadOnceAndPrivateBytesNeverBecomeAReusableCapability() {
+        sourceFile();
+        DataAccessor[] loan = new DataAccessor[1];
+        command(scope -> {
+            loan[0] = scope.accessor();
+            byte[] first = loan[0].readBusinessSourceFile("raw_file");
+            assertThat(first).containsExactly(1,2,3); first[0]=99;
+            assertThat(loan[0].readBusinessSourceFile("raw_file")).containsExactly(1,2,3);
+            return null;
+        });
+        verify(storage, times(1)).download("owned.xlsx");
+        verify(files).selectActiveByPidForUpdate(7L, FILE_PID);
+        denied(() -> loan[0].readBusinessSourceFile("raw_file"));
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"foreign_tenant", "generated", "deleted", "pending", "oversize", "zero", "wrong_storage", "wrong_pid", "missing", "missing_relation", "duplicate_relation", "foreign_relation", "wrong_root", "wrong_field", "wrong_file", "deleted_relation", "short_bytes", "long_bytes", "virtual", "multiple", "non_file", "unpublished"})
+    void invalidSourceAttachmentIsRejectedBeforeBytesCanEscape(String defect) {
+        sourceFile();
+        switch (defect) {
+            case "foreign_tenant" -> uploaded.setTenantId(8L);
+            case "generated" -> uploaded.setArtifactAuthorization("{}");
+            case "deleted" -> uploaded.setDeletedFlag(true);
+            case "pending" -> uploaded.setStatus("pending");
+            case "oversize" -> uploaded.setFileSize(17L);
+            case "zero" -> uploaded.setFileSize(0L);
+            case "wrong_storage" -> uploaded.setStorageType(com.auraboot.framework.file.constant.StorageType.S3);
+            case "wrong_pid" -> uploaded.setPid("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+            case "missing" -> when(files.selectActiveByPidForUpdate(7L, FILE_PID)).thenReturn(null);
+            case "missing_relation" -> when(relations.lockBusinessSourceAttachment(7L,"receipt","root-1","raw_file","55")).thenReturn(List.of());
+            case "duplicate_relation" -> when(relations.lockBusinessSourceAttachment(7L,"receipt","root-1","raw_file","55")).thenReturn(List.of(attachment,attachment));
+            case "foreign_relation" -> attachment.setTenantId(8L);
+            case "wrong_root" -> attachment.setEntityId("other");
+            case "wrong_field" -> attachment.setFieldName("other");
+            case "wrong_file" -> attachment.setFileId("56");
+            case "deleted_relation" -> attachment.setDeletedFlag(true);
+            case "short_bytes" -> when(storage.download("owned.xlsx")).thenReturn(new java.io.ByteArrayInputStream(new byte[]{1,2}));
+            case "long_bytes" -> when(storage.download("owned.xlsx")).thenReturn(new java.io.ByteArrayInputStream(new byte[17]));
+            case "virtual" -> when(models.getModelFields("receipt")).thenReturn(List.of(FieldDefinition.builder().code("raw_file").dataType("file").virtualType("transient").build()));
+            case "multiple" -> when(models.getModelFields("receipt")).thenReturn(List.of(FieldDefinition.builder().code("raw_file").dataType("file").extraProps(Map.of("multiple",true)).build()));
+            case "non_file" -> when(models.getModelFields("receipt")).thenReturn(List.of(FieldDefinition.builder().code("raw_file").dataType("text").build()));
+            case "unpublished" -> when(models.getModelDefinition("receipt")).thenReturn(Optional.of(ModelDefinition.builder().code("receipt").tableName("mt_receipt").status("draft").build()));
+            default -> throw new AssertionError(defect);
+        }
+        command(scope -> { denied(() -> scope.accessor().readBusinessSourceFile("raw_file")); return null; });
+        assertThat(holder.isRollbackOnly()).isTrue();
+        if (!Set.of("short_bytes","long_bytes").contains(defect)) verify(storage,never()).download(anyString());
+    }
+    @Test void oldOwnerCannotReadAnAttachmentWithoutAnExplicitSourceDeclaration() {
+        sourceFile(); owner.sourceFileFields=Map.of();
+        command(scope -> { denied(() -> scope.accessor().readBusinessSourceFile("raw_file")); return null; });
+        verifyNoInteractions(files, relations); verify(storage,never()).download(anyString());
+    }
+    @Test void nullSourceFieldIsDeniedAndPoisonsTheOriginalTransaction() {
+        sourceFile();
+        command(scope -> { denied(() -> scope.accessor().readBusinessSourceFile(null)); return null; });
+        assertThat(holder.isRollbackOnly()).isTrue();
+        verifyNoInteractions(files, relations); verify(storage,never()).download(anyString());
+    }
+    @Test void undeclaredSourceFieldDoesNotReachFileMetadataOrStorage() {
+        sourceFile();
+        command(scope -> { denied(() -> scope.accessor().readBusinessSourceFile("another_file")); return null; });
+        verifyNoInteractions(files, relations); verify(storage,never()).download(anyString());
+    }
+    @Test void sourceFileBindingAndOwnerDeclarationCannotChangeDuringTheInvocation() {
+        sourceFile();
+        command(scope -> {
+            scope.accessor().readBusinessSourceFile("raw_file");
+            root = row("root-1", Map.of("status","draft","raw_file","01ARZ3NDEKTSV4RRFFQ69G5FAW"));
+            denied(() -> scope.accessor().readBusinessSourceFile("raw_file")); return null;
+        });
+        verify(storage,times(1)).download(anyString());
+    }
+    @Test void sourceFileDeclarationCannotChangeBetweenRegisteredAndInvocationOwner() {
+        sourceFile();
+        var replacement = new Owner(); replacement.sourceFileFields=Map.of("raw_file",32);owner.invocation=replacement;
+        assertThatThrownBy(() -> command(scope -> null)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(storage,never()).download(anyString());
+    }
+    @Test void sourceFileDeclarationCannotChangeAfterOpeningEvenWhenTheFileWasAlreadyRead() {
+        sourceFile();
+        command(scope -> {
+            scope.accessor().readBusinessSourceFile("raw_file"); owner.sourceFileFields=Map.of("raw_file",32);
+            denied(() -> scope.accessor().readBusinessSourceFile("raw_file")); return null;
+        });
+    }
+
     static final class Owner implements CommandHandlerExtension, BusinessResourceAuthorization {
         RecordReadAccessor captured;
         String extraWrite;
@@ -576,6 +687,7 @@ class BusinessCommandDataAccessorFactoryTest {
         Map<String,Integer> pagedLimits = Map.of();
         Map<String,Set<String>> publicFields = Map.of();
         Map<String,Integer> artifactFields = Map.of();
+        Map<String,Integer> sourceFileFields = Map.of();
         Map<String,BusinessResultField> resultProjection = Map.of();
         boolean denyLineRead;
         BusinessResourceAuthorization invocation;
@@ -583,6 +695,7 @@ class BusinessCommandDataAccessorFactoryTest {
         public Map<String,Integer> pagedBusinessResourceRowLimits() { return pagedLimits; }
         public Map<String,Set<String>> publicBusinessResourceFields() { return publicFields; }
         public Map<String,Integer> businessArtifactFields() { return artifactFields; }
+        public Map<String,Integer> businessSourceFileFields() { return sourceFileFields; }
         public ReadIsolation resourceReadIsolation() { return readIsolation; }
         public Set<String> optionalBusinessResourceModels() { return optionalReference ? Set.of("reference") : Set.of(); }
         public String getCommandType() { return "receipt.confirm"; }

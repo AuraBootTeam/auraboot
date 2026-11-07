@@ -45,6 +45,10 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
     @Autowired com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionService publicProjection;
     @Autowired com.auraboot.framework.meta.service.impl.CommandResultProjectionService resultProjection;
     @Autowired FieldMaskService masks;
+    @Autowired com.auraboot.framework.file.dao.mapper.FileMapper sourceFiles;
+    @Autowired com.auraboot.framework.file.dao.mapper.FileRelationMapper sourceRelations;
+    @Autowired com.auraboot.framework.infrastructure.storage.StorageProvider sourceStorage;
+    final List<com.auraboot.framework.file.entity.FileEntity> ownedSourceFiles = new ArrayList<>();
     final List<Long> maskIds = new ArrayList<>();
     final List<Model> ownedModels = new ArrayList<>();
     final List<Long> ownedFields = new ArrayList<>();
@@ -81,6 +85,11 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
     }
     @AfterEach void cleanup() {
         nestedEffect.set(null);
+        for (var file : ownedSourceFiles) {
+            jdbc.update("DELETE FROM ab_file_relation WHERE tenant_id=? AND file_id=?",getTestTenant().getId(),file.getId().toString());
+            jdbc.update("DELETE FROM ab_file WHERE tenant_id=? AND id=?",getTestTenant().getId(),file.getId());
+            sourceStorage.delete(file.getFileName());
+        }
         maskIds.forEach(masks::deleteConfig);
         for (var model:ownedModels) {
             assertThat(model.getCode()).matches("br_(root|line|ledger)_[0-9]+");
@@ -440,12 +449,64 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
         assertThat(deleted(lineModel,linePid)).isFalse(); assertThat(deleted(lineModel,foreignLinePid)).isFalse();
     }
 
+    private com.auraboot.framework.file.entity.FileEntity sourceAttachment() {
+        owner.sourceRead=true;
+        var field=fields.selectById(ownedFields.getFirst());field.setDataType("file");fields.updateById(field);metadata.clearAllCache();
+        var file=new com.auraboot.framework.file.entity.FileEntity();file.setId(com.baomidou.mybatisplus.core.toolkit.IdWorker.getId());
+        file.setPid(UniqueIdGenerator.generate());file.setTenantId(getTestTenant().getId());
+        file.setFileName("business-source-"+file.getPid()+".xlsx");file.setOriginalName("original-bom.xlsx");file.setFileSize(3L);
+        file.setStatus("success");file.setStorageType(sourceStorage.type());file.setDeletedFlag(false);file.setRetentionLocked(false);
+        file.setCreatedBy(getTestUser().getId());file.setCreatedTime(Instant.now());file.setUpdatedTime(Instant.now());file.setUploadTime(Instant.now());
+        sourceStorage.upload(file.getFileName(),new java.io.ByteArrayInputStream(new byte[]{1,2,3}),3,"application/octet-stream");
+        assertThat(sourceFiles.insert(file)).isEqualTo(1);ownedSourceFiles.add(file);
+        var relation=new com.auraboot.framework.file.entity.FileRelationEntity().setId(UUID.randomUUID().toString())
+                .setTenantId(getTestTenant().getId()).setFileId(file.getId().toString()).setEntityType(rootModel).setEntityId(rootPid)
+                .setFieldName(rootLabel).setSortOrder(0).setDeletedFlag(false);
+        assertThat(sourceRelations.insert(relation)).isEqualTo(1);
+        jdbc.update("UPDATE "+physicalTables.get(rootModel)+" SET "+rootLabel+"=? WHERE tenant_id=? AND pid=?",file.getPid(),getTestTenant().getId(),rootPid);
+        return file;
+    }
+    @Test void exactOriginalSourceAttachmentReadsRealStorageWithoutNativeModelReadPermission() {
+        sourceAttachment();
+        assertThat(permissions.canAction(getTestTenantMember().getId(),rootModel,"read")).isFalse();
+        byte[] bytes=command(scope -> scope.accessor().readBusinessSourceFile(rootLabel));
+        assertThat(bytes).containsExactly(1,2,3);
+    }
+    @Test void anotherRootRelationDoesNotAuthorizeTheSameTenantFile() {
+        var file=sourceAttachment();
+        jdbc.update("UPDATE ab_file_relation SET entity_id=? WHERE tenant_id=? AND file_id=?",UniqueIdGenerator.generate(),getTestTenant().getId(),file.getId().toString());
+        assertThatThrownBy(() -> command(scope -> scope.accessor().readBusinessSourceFile(rootLabel))).isInstanceOf(DataAccessorException.class);
+    }
+    @Test void generatedArtifactCannotBeReinterpretedAsAnOriginalSourceAttachment() {
+        var file=sourceAttachment();
+        jdbc.update("UPDATE ab_file SET artifact_authorization='{}' WHERE tenant_id=? AND id=?",getTestTenant().getId(),file.getId());
+        assertThatThrownBy(() -> command(scope -> scope.accessor().readBusinessSourceFile(rootLabel))).isInstanceOf(DataAccessorException.class);
+    }
+    @Test void missingSourceRelationPoisonsAndRollsBackEarlierApprovedInternalWritesEvenIfCaught() {
+        var file=sourceAttachment();
+        jdbc.update("UPDATE ab_file_relation SET deleted_flag=true WHERE tenant_id=? AND file_id=?",getTestTenant().getId(),file.getId().toString());
+        assertThatThrownBy(() -> command(scope -> {
+            scope.accessor().create(ledgerModel,Map.of(ledgerParent,rootPid,ledgerQty,"1"));
+            assertThatThrownBy(() -> scope.accessor().readBusinessSourceFile(rootLabel)).isInstanceOf(DataAccessorException.class);
+            return null;
+        })).isInstanceOf(org.springframework.transaction.UnexpectedRollbackException.class);
+        assertThat(ledgerCount()).isZero();
+    }
+    @Test void realStorageLengthMustMatchTheLockedSourceMetadata() {
+        var file=sourceAttachment();
+        sourceStorage.delete(file.getFileName());
+        sourceStorage.upload(file.getFileName(),new java.io.ByteArrayInputStream(new byte[]{1,2}),2,"application/octet-stream");
+        assertThatThrownBy(() -> command(scope -> scope.accessor().readBusinessSourceFile(rootLabel))).isInstanceOf(DataAccessorException.class);
+    }
+
     class Owner implements CommandHandlerExtension,BusinessResourceAuthorization {
         Runnable onUpdate;
         boolean paged;
         boolean publicOutput;
         boolean allowDelete;
         boolean jsonResult;
+        boolean sourceRead;
+        public Map<String,Integer> businessSourceFileFields(){return sourceRead ? Map.of(rootLabel,16) : Map.of();}
         int pagedLimit = 2000;
         String deniedLine;
         public ReadIsolation resourceReadIsolation(){return paged || publicOutput || jsonResult ? ReadIsolation.REPEATABLE_READ : null;}

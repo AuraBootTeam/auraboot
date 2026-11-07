@@ -389,6 +389,16 @@ class RoleAuthorizationDraftServiceTest {
         verify(writes, never()).mutate();
     }
 
+    @Test void changingTheCodeOwnedSourceFileContractInvalidatesTheReviewedDraft() {
+        var owner = businessOwner(Set.of("sales.manage"));
+        var baseline = service.snapshot("role-a");
+        when(owner.businessSourceFileFields()).thenReturn(java.util.Map.of("raw_file", 1024));
+        assertThatThrownBy(() -> service.apply("role-a", request(baseline.revision(), false, null, List.of())))
+                .isInstanceOfSatisfying(RootUnCheckedException.class,
+                        error -> assertThat(error.getResponseCode()).isEqualTo(ResponseCode.CasVersionConflict));
+        verify(writes, never()).mutate();
+    }
+
     @Test void changingTheCodeOwnedRootInvalidatesTheReviewedDraft() {
         var owner = businessOwner(Set.of("sales.manage"));
         var baseline = service.snapshot("role-a");
