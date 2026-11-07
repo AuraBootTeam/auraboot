@@ -46903,6 +46903,12 @@
           "fieldPolicies": {
             "$ref": "#/components/schemas/RoleFieldPolicyPreview"
           },
+          "grantFieldChanges": {
+            "items": {
+              "$ref": "#/components/schemas/RoleGrantFieldsReviewed"
+            },
+            "type": "array"
+          },
           "navigation": {
             "$ref": "#/components/schemas/RoleNavigationSelection"
           },
@@ -46961,6 +46967,14 @@
             "minItems": 0,
             "type": "array",
             "uniqueItems": true
+          },
+          "grantFieldChanges": {
+            "items": {
+              "$ref": "#/components/schemas/RoleGrantFieldsChange"
+            },
+            "maxItems": 1000,
+            "minItems": 0,
+            "type": "array"
           },
           "menuPids": {
             "items": {
@@ -47023,6 +47037,12 @@
           "fieldPolicies": {
             "items": {
               "$ref": "#/components/schemas/RoleFieldPolicyView"
+            },
+            "type": "array"
+          },
+          "grantFields": {
+            "items": {
+              "$ref": "#/components/schemas/RoleGrantFieldsBinding"
             },
             "type": "array"
           },
@@ -47695,6 +47715,115 @@
           },
           "policyType": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RoleGrantFieldsBinding": {
+        "properties": {
+          "bindingPid": {
+            "type": "string"
+          },
+          "editable": {
+            "type": "boolean"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/RoleGrantFieldsField"
+            },
+            "type": "array"
+          },
+          "legacy": {
+            "type": "boolean"
+          },
+          "modelCode": {
+            "type": "string"
+          },
+          "modelLabel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permissionCode": {
+            "type": "string"
+          },
+          "readFields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "writeFields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "RoleGrantFieldsChange": {
+        "properties": {
+          "bindingPid": {
+            "maxLength": 32,
+            "minLength": 0,
+            "type": "string"
+          },
+          "readFields": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "minItems": 0,
+            "type": "array"
+          },
+          "writeFields": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "minItems": 0,
+            "type": "array"
+          }
+        },
+        "required": [
+          "bindingPid",
+          "readFields",
+          "writeFields"
+        ],
+        "type": "object"
+      },
+      "RoleGrantFieldsField": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "RoleGrantFieldsReviewed": {
+        "properties": {
+          "before": {
+            "$ref": "#/components/schemas/RoleGrantFieldsBinding"
+          },
+          "readFields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "writeFields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           }
         },
         "type": "object"

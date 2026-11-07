@@ -794,6 +794,23 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT "+resource+"_secret FROM "+table+" WHERE pid=?",String.class,record)).isEqualTo("private-value");
     }
 
+    @Test void positiveGrantFieldsKeepDetachedCopyProvenanceEditable() {
+        var baseline = grantFieldsBaseline();
+        var binding = baseline.grantFields().getFirst();
+        String source = "copy:" + UniqueIdGenerator.generate() + ":" + UniqueIdGenerator.generate();
+        jdbc.update("UPDATE ab_role_permission SET source_ref=? WHERE tenant_id=? AND pid=?",source,getTestTenant().getId(),binding.bindingPid());
+        var copied = drafts.snapshot(rolePid);
+        assertThat(copied.grantFields().stream().filter(b -> b.bindingPid().equals(binding.bindingPid())).findFirst().orElseThrow().editable()).isTrue();
+        drafts.apply(rolePid, grantFieldsRequest(copied, new com.auraboot.framework.permission.dto.RoleGrantFields.Change(binding.bindingPid(), List.of(), List.of())));
+        assertThat(jdbc.queryForObject("SELECT source_ref FROM ab_role_permission WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),binding.bindingPid())).isEqualTo(source);
+        assertThat(jdbc.queryForObject("SELECT field_scope->'readFields' FROM ab_role_permission WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),binding.bindingPid())).isEqualTo("[]");
+        jdbc.update("UPDATE ab_role_permission SET source_ref='copy:not-a-host-reference' WHERE tenant_id=? AND pid=?",getTestTenant().getId(),binding.bindingPid());
+        var malformed = drafts.snapshot(rolePid);
+        assertThatThrownBy(() -> drafts.preview(rolePid, grantFieldsRequest(malformed,
+                new com.auraboot.framework.permission.dto.RoleGrantFields.Change(binding.bindingPid(), List.of(resource+"_secret"), List.of()))))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+
     private RoleAuthorizationDraftRequest fieldsRequest(RoleAuthorizationDraftSnapshot baseline, Set<String> selected) {
         return new RoleAuthorizationDraftRequest(baseline.revision(), Set.of(editCapability), Set.of(), true,
                 "self", true, List.of(new DataScopeUpdateRequest(resource, "update", "none", "MAX")), selected);

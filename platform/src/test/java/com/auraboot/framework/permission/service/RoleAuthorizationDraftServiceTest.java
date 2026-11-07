@@ -74,6 +74,23 @@ class RoleAuthorizationDraftServiceTest {
                 .thenReturn(new CapabilitySelectionPreview(List.of(), List.of(), List.of("model.order.read"), List.of(), List.of()));
     }
 
+    @Test void positiveGrantFieldsRejectUnrepresentableMetadataCodes() {
+        grant.setTenantId(100L); grant.setPid("binding-native");
+        var definition = permission("model.order.read", "order", "read"); definition.setId(3L);
+        when(permissions.findAllActive()).thenReturn(List.of(definition));
+        var metadata = mock(com.auraboot.framework.meta.service.MetaModelService.class);
+        when(metadata.getModelDefinition("order")).thenReturn(java.util.Optional.of(
+                com.auraboot.framework.meta.dto.ModelDefinition.builder().code("order").build()));
+        when(metadata.getModelFields("order")).thenReturn(List.of(
+                com.auraboot.framework.meta.dto.FieldDefinition.builder().code("_invalid").name("Unsupported metadata").build()));
+        var editor = new RoleGrantFieldScopeService(grants, permissions, metadata,
+                mock(DataPermissionAuthoringAccess.class), authoringAccess, JsonMapper.builder().build());
+        assertThat(editor.catalog(role)).singleElement().satisfies(binding -> assertThat(binding.bindingPid()).isEqualTo("binding-native"));
+        assertThatThrownBy(() -> editor.preview(role, List.of(
+                new com.auraboot.framework.permission.dto.RoleGrantFields.Change("binding-native", List.of("_invalid"), List.of())),
+                Set.of("model.order.read"))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+
     @AfterEach void cleanup() { MetaContext.clear(); org.springframework.transaction.support.TransactionSynchronizationManager.clear(); }
 
     private void migrationFixture() {

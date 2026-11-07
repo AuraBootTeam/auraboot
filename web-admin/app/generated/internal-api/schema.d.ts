@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 91dee3c6a2671ebdf2b7dbecb6078a2ca9fa96755ce3c65b48b4762357ff9b65
+ * Contract SHA-256: cc3c521c9aa564ad604511562c5c70d98a6d47304b5292d6451200d6b7adcf77
  */
 export interface paths {
     "/api/activities": {
@@ -39753,6 +39753,7 @@ export interface components {
             defaultScopeType: string | null;
             fieldAccessChanges?: components["schemas"]["RoleFieldAccessReviewed"][];
             fieldPolicies?: components["schemas"]["RoleFieldPolicyPreview"];
+            grantFieldChanges?: components["schemas"]["RoleGrantFieldsReviewed"][];
             navigation?: components["schemas"]["RoleNavigationSelection"];
             revision: string;
             scopeChanges: components["schemas"]["DataScopeUpdateRequest"][];
@@ -39764,6 +39765,7 @@ export interface components {
             expectedRevision: string;
             fieldChanges?: components["schemas"]["RoleFieldAccessChange"][];
             fieldPolicyPids?: string[];
+            grantFieldChanges?: components["schemas"]["RoleGrantFieldsChange"][];
             menuPids?: string[];
             revokedPartialCapabilityCodes?: string[];
             scopeChanges?: components["schemas"]["DataScopeUpdateRequest"][];
@@ -39773,6 +39775,7 @@ export interface components {
             defaultScopeType: string | null;
             fieldAccess?: components["schemas"]["RoleFieldAccessModel"][];
             fieldPolicies?: components["schemas"]["RoleFieldPolicyView"][];
+            grantFields?: components["schemas"]["RoleGrantFieldsBinding"][];
             groups: components["schemas"]["CapabilityGroup"][];
             matrix: components["schemas"]["PermissionMatrixDTO"];
             navigation?: components["schemas"]["RoleNavigationSelection"];
@@ -39924,6 +39927,31 @@ export interface components {
             name?: string;
             policyPid?: string;
             policyType?: string;
+        };
+        RoleGrantFieldsBinding: {
+            bindingPid?: string;
+            editable?: boolean;
+            fields?: components["schemas"]["RoleGrantFieldsField"][];
+            legacy?: boolean;
+            modelCode?: string;
+            modelLabel?: string | null;
+            permissionCode?: string;
+            readFields?: string[];
+            writeFields?: string[];
+        };
+        RoleGrantFieldsChange: {
+            bindingPid: string;
+            readFields: string[];
+            writeFields: string[];
+        };
+        RoleGrantFieldsField: {
+            code?: string;
+            label?: string | null;
+        };
+        RoleGrantFieldsReviewed: {
+            before?: components["schemas"]["RoleGrantFieldsBinding"];
+            readFields?: string[];
+            writeFields?: string[];
         };
         RoleMemberDTO: {
             /** Format: date-time */

@@ -29,11 +29,12 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
     @Update("""
         UPDATE ab_role_permission SET field_scope=CAST(#{scopeJson} AS jsonb), updated_at=CURRENT_TIMESTAMP, updated_by=#{actorId}
         WHERE tenant_id=#{tenantId} AND role_id=#{roleId} AND pid=#{bindingPid}
-          AND deleted_flag=FALSE AND snapshot_id IS NULL AND source_ref IS NULL
+          AND deleted_flag=FALSE AND snapshot_id IS NULL
+          AND source_ref IS NOT DISTINCT FROM #{expectedSourceRef,jdbcType=VARCHAR}
           AND UPPER(grant_type)='GRANT'
         """)
     int updateDirectFieldScope(@Param("tenantId") Long tenantId, @Param("roleId") Long roleId,
-            @Param("bindingPid") String bindingPid, @Param("scopeJson") String scopeJson, @Param("actorId") Long actorId);
+            @Param("bindingPid") String bindingPid, @Param("scopeJson") String scopeJson, @Param("actorId") Long actorId, @Param("expectedSourceRef") String expectedSourceRef);
 
     /**
      * Roles holding the tenant bootstrap "*" wildcard grant. Plugin imports register

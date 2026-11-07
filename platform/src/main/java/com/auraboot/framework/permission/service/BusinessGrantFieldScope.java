@@ -32,10 +32,14 @@ final class BusinessGrantFieldScope {
         if (!node.isArray() || node.size() > 1000) throw invalid();
         Set<String> result = new LinkedHashSet<>();
         for (JsonNode field : node) {
-            if (!field.isTextual() || !field.textValue().matches("[A-Za-z][A-Za-z0-9_]{0,127}")
+            if (!field.isTextual() || !validFieldCode(field.textValue())
                     || !result.add(field.textValue())) throw invalid();
         }
         return result;
+    }
+
+    static boolean validFieldCode(String code) {
+        return code != null && code.matches("[A-Za-z][A-Za-z0-9_]{0,127}");
     }
 
     private static MetaServiceException invalid() {

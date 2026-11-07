@@ -46,7 +46,7 @@ public class RoleGrantFieldScopeService {
                     .map(f -> new Field(f.getCode(), f.getDisplayName() != null ? f.getDisplayName() : f.getName()))
                     .sorted(Comparator.comparing(Field::code)).toList();
             var parsed = BusinessGrantFieldScope.parse(json, grant.getFieldScope() == null ? null : encode(grant.getFieldScope()), permission.getResourceCode());
-            boolean editable = grant.getSnapshotId() == null && grant.getSourceRef() == null && "GRANT".equalsIgnoreCase(grant.getGrantType());
+            boolean editable = directlyEditable(grant);
             result.add(new Binding(grant.getPid(), permission.getCode(), permission.getResourceCode(),
                     model.get().getDisplayName(), editable, parsed.unrestricted(),
                     parsed.readable().stream().sorted().toList(), parsed.writable().stream().sorted().toList(), fields));
@@ -76,12 +76,24 @@ public class RoleGrantFieldScopeService {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) throw denied();
         for (var change : changes) {
             var scope = Map.of("modelCode", change.before().modelCode(), "readFields", change.readFields(), "writeFields", change.writeFields());
-            if (grants.updateDirectFieldScope(role.getTenantId(), role.getId(), change.before().bindingPid(), encode(scope), MetaContext.getCurrentUserId()) != 1) throw denied();
+            var binding = grants.findByRole(role.getId()).stream().filter(row -> change.before().bindingPid().equals(row.getPid())).findFirst().orElseThrow(RoleGrantFieldScopeService::denied);
+            if (!Objects.equals(binding.getTenantId(), role.getTenantId()) || !directlyEditable(binding)) throw denied();
+            if (grants.updateDirectFieldScope(role.getTenantId(), role.getId(), change.before().bindingPid(), encode(scope), MetaContext.getCurrentUserId(), binding.getSourceRef()) != 1) throw denied();
         }
     }
 
+    private static boolean directlyEditable(com.auraboot.framework.rbac.entity.RolePermission binding) {
+        if (binding.getSnapshotId() != null || !"GRANT".equalsIgnoreCase(binding.getGrantType())) return false;
+        if (binding.getSourceRef() == null) return true;
+        // Host role copies are detached grants; their provenance is not an active publish owner.
+        String[] parts = binding.getSourceRef().split(":", -1);
+        return parts.length == 3 && "copy".equals(parts[0])
+                && com.auraboot.framework.common.util.UniqueIdGenerator.isValid(parts[1])
+                && com.auraboot.framework.common.util.UniqueIdGenerator.isValid(parts[2]);
+    }
+
     private static List<String> validate(List<String> fields, Set<String> allowed) {
-        if (fields == null || fields.size() > 1000 || fields.stream().anyMatch(f -> f == null || !allowed.contains(f))
+        if (fields == null || fields.size() > 1000 || fields.stream().anyMatch(f -> !BusinessGrantFieldScope.validFieldCode(f) || !allowed.contains(f))
                 || new HashSet<>(fields).size() != fields.size()) throw denied();
         return fields.stream().sorted().toList();
     }
