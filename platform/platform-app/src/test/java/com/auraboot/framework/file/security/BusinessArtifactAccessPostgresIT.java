@@ -329,6 +329,62 @@ class BusinessArtifactAccessPostgresIT extends BaseIntegrationTest {
     FileAccessorImpl accessor() { return new FileAccessorImpl(fileService,storage,testUser.getId()); }
     void grantScope(String action, String scope) { scopes.setScope(testTenant.getId(),testRole.getId(),model,action,scope,"MAX"); }
 
+    String useOnlyAlternativeDuty() throws Exception {
+        String alternate = permission + ".alternative";
+        grantCommittedPermissionToTestRole(alternate,"operation",model,"manage","Alternative artifact fixture");
+        owner.duties = Set.of(permission, alternate);
+        var entry = commands.selectById(commandId);
+        var config = json.readValue(entry.getExecutionConfig(), new com.fasterxml.jackson.core.type.TypeReference<Map<String,Object>>() {});
+        config.put("permissions",List.of(permission,alternate)); entry.setExecutionConfig(json.writeValueAsString(config));
+        commands.updateById(entry);
+        dutyStatus(permission,"inactive");
+        return alternate;
+    }
+    void dutyStatus(String code,String status) {
+        jdbc.update("UPDATE ab_role_permission SET status=? WHERE tenant_id=? AND role_id=? AND permission_id=(SELECT id FROM ab_permission WHERE tenant_id=? AND code=?)",
+                status,testTenant.getId(),testRole.getId(),testTenant.getId(),code);
+    }
+
+    @Test void a_single_complete_alternative_allows_real_command_and_file_access() throws Exception {
+        String alternate = useOnlyAlternativeDuty();
+        assertThat(grants.resolveModelRead(testTenantMember.getId(),model,
+                MetaContext.runWithCommandPermitPlan("TARGET",null,model,rootPid,() -> data.getByIdForAuthorization(model,rootPid)))
+                .result().granted()).isFalse();
+        try (var bytes = accessor().open(filePid)) { assertThat(bytes.readAllBytes()).isEqualTo(BYTES); }
+        grantCommittedPermissionToTestRole(com.auraboot.framework.permission.constants.MetaPermission.COMMAND_EXECUTE,
+                "API","command","execute","Alternative command fixture");
+        var request = new CommandExecuteRequest(); request.setTargetRecordId(rootPid); request.setOperationType("update");
+        request.setClientRequestId(UniqueIdGenerator.generate()); request.setPayload(Map.of());
+        var result = commandExecutor.execute(command,request);
+        assertThat(result.getData()).containsEntry("success",true);
+        String generated = result.getData().get("fileId").toString();
+        try (var bytes = accessor().open(generated)) { assertThat(bytes.readAllBytes()).isEqualTo(BYTES); }
+        grantScope("manage","none");
+        assertThatThrownBy(() -> accessor().open(generated)).isInstanceOf(AccessDeniedException.class);
+        grantScope("manage","all");
+        dutyStatus(alternate,"inactive");
+        assertThatThrownBy(() -> accessor().open(generated)).isInstanceOf(AccessDeniedException.class);
+        dutyStatus(permission,"active");
+        try (var bytes = accessor().open(generated)) { assertThat(bytes.readAllBytes()).isEqualTo(BYTES); }
+    }
+
+    @Test void an_alternative_still_requires_visible_file_and_source_fields() throws Exception {
+        String alternate = useOnlyAlternativeDuty();
+        for (var readable : List.of(List.of(fileField),List.of(secret))) {
+            jdbc.update("UPDATE ab_role_permission SET field_scope=?::jsonb WHERE tenant_id=? AND role_id=? AND permission_id=(SELECT id FROM ab_permission WHERE tenant_id=? AND code=?)",
+                    json.writeValueAsString(Map.of("modelCode",model,"readFields",readable,"writeFields",List.of())),
+                    testTenant.getId(),testRole.getId(),testTenant.getId(),alternate);
+            assertThatThrownBy(() -> accessor().open(filePid)).isInstanceOf(AccessDeniedException.class);
+        }
+        jdbc.update("UPDATE ab_role_permission SET field_scope=NULL WHERE tenant_id=? AND role_id=? AND permission_id=(SELECT id FROM ab_permission WHERE tenant_id=? AND code=?)",
+                testTenant.getId(),testRole.getId(),testTenant.getId(),alternate);
+        try (var bytes = accessor().open(filePid)) { assertThat(bytes.readAllBytes()).isEqualTo(BYTES); }
+        var mask = new FieldMaskConfig(); mask.setModelCode(model); mask.setFieldCode(secret); mask.setEnabled(true);
+        mask.setApplyToDetail(false); mask.setApplyToExport(true); mask.setMaskType("FULL"); mask.setReplacementChar("*");
+        masks.saveConfig(mask); maskIds.add(mask.getId());
+        assertThatThrownBy(() -> accessor().open(filePid)).isInstanceOf(AccessDeniedException.class);
+    }
+
     @Test void creator_reads_real_bytes_but_revoked_root_scope_blocks_known_file_id() throws Exception {
         try (var bytes = accessor().open(filePid)) { assertThat(bytes.readAllBytes()).isEqualTo(BYTES); }
         grantScope("manage","none");
@@ -380,13 +436,14 @@ class BusinessArtifactAccessPostgresIT extends BaseIntegrationTest {
         public String getCommandType() { return command; }
         final java.util.concurrent.atomic.AtomicInteger executions = new java.util.concurrent.atomic.AtomicInteger();
         boolean allowBindingMutation;
+        Set<String> duties = Set.of(permission);
         public Object execute(CommandContext context) {
             executions.incrementAndGet();
             var db = context.dataAccessor(); db.getById(model,rootPid); db.projectForPublicOutput(model,List.of(rootPid));
             var saved = db.savePublicArtifact(fileField,"command-fixture.txt","text/plain",BYTES,Map.of());
             return Map.of("success",true,"fileId",saved.fileId());
         }
-        public Boundary businessBoundary() { return new Boundary(command,model,"update",Set.of(permission)); }
+        public Boundary businessBoundary() { return new Boundary(command,model,"update",duties); }
         public Set<String> businessResourceModels() { return Set.of(model); }
         public Set<String> businessResultFields() { return Set.of("success","fileId"); }
         public Map<String,BusinessResultField> businessResultProjection() {

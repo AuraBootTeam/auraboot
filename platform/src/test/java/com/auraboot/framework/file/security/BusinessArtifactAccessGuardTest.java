@@ -107,6 +107,21 @@ class BusinessArtifactAccessGuardTest {
         file.setArtifactAuthorization(null); guard.authorize(file);
         verifyNoInteractions(data, commands, authorization, projection);
     }
+    @Test void either_complete_business_alternative_can_authorize_existing_bytes() throws Exception {
+        var alternatives = List.of("orders.export", "orders.export.alternative");
+        when(owner.businessBoundary()).thenReturn(new BusinessResourceAuthorization.Boundary(
+                "orders:export", "orders", "update", Set.copyOf(alternatives)));
+        definition.setExecutionConfig(new ObjectMapper().writeValueAsString(Map.of("type", "custom", "permissions", alternatives,
+                "handlerParams", Map.of("targetRecordAuthorization", "business", "targetRecordAction", "update", "dslPersistence", false))));
+        var alternate = new BusinessGrantDecision(PermissionResult.allow(List.of()), 7L,20L,30L,"orders",PID,
+                List.of(new BusinessGrantDecision.Grant(4L, 5L, alternatives.getLast(), BusinessGrantDecision.Fields.legacy())));
+        when(authorization.resolve(eq(30L), anyList(), eq("orders"), eq(root))).thenAnswer(invocation ->
+                invocation.<List<String>>getArgument(1).contains(alternatives.getLast()) ? alternate : denied);
+        guard.authorize(file);
+        verify(authorization).resolve(30L, alternatives, "orders", root);
+        when(authorization.resolve(eq(30L), anyList(), eq("orders"), eq(root))).thenReturn(denied);
+        assertThatThrownBy(() -> guard.authorize(file)).isInstanceOf(AccessDeniedException.class);
+    }
     @Test void hidden_file_reference_and_its_mask_block_bytes_even_when_other_sources_are_visible() {
         var lines = fields(Set.of("name","brand"),List.of());
         for (var rootFields : List.of(
