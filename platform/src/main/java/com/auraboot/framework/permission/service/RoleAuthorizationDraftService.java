@@ -152,6 +152,17 @@ public class RoleAuthorizationDraftService {
                             policy.getFieldCode(), policy.getMaskType(), policy.getMaskExpression(), policy.getPriority(), policy.getEnabled());
                 }).sorted(Comparator.comparing(RoleBoundaryMigrationPreview.Policy::policyPid)).toList();
         var referenced = roots.stream().flatMap(root -> root.permissions().stream()).collect(java.util.stream.Collectors.toSet());
+        var consumers = nativeBoundaries.consumers(consumerPermissions(role, roots)).stream().map(consumer -> {
+            var root = roots.stream().filter(candidate -> candidate.command().equals(consumer.commandCode())).findFirst();
+            String status = root.isEmpty() ? "LEGACY_OR_UNREGISTERED_REVIEW_REQUIRED"
+                    : "REGISTERED_BOUNDARY_REVIEW_REQUIRED";
+            if (!"published".equals(consumer.publicationStatus()) || (root.isPresent()
+                    && (!consumer.businessDeclared() || !Objects.equals(root.get().model(), consumer.modelCode())
+                        || !Objects.equals(root.get().action(), consumer.targetAction())
+                        || !root.get().permissions().equals(consumer.permissions())))) status = "ENTRY_DEFINITION_REQUIRES_REVIEW";
+            return new RoleBoundaryMigrationPreview.Consumer(consumer.commandCode(), consumer.modelCode(),
+                    consumer.commandType(), consumer.publicationStatus(), consumer.permissions(), status);
+        }).toList();
         return new RoleBoundaryMigrationPreview(role.getPid(), revision(role, roots),
                 role.getDefaultDataScopeType(), boundaries, views, scoped.stream()
                     .sorted(Comparator.comparing(scope -> scope.getResourceCode() + ":" + scope.getActionCode()))
@@ -160,7 +171,7 @@ public class RoleAuthorizationDraftService {
                             json.valueToTree(scope.getScopeConfig()))).toList(), fieldPolicies.snapshot(role), policies, views.stream()
                     .map(binding -> binding.permissionCode()).filter(Objects::nonNull)
                     .filter(code -> !referenced.contains(code) && !"meta.command.execute".equals(code)).distinct().sorted().toList(), views.stream().filter(binding -> binding.permissionCode() == null)
-                    .map(RoleBoundaryMigrationPreview.Binding::bindingPid).sorted().toList(), false);
+                    .map(RoleBoundaryMigrationPreview.Binding::bindingPid).sorted().toList(), consumers, false);
     }
 
     private PermissionDTO migrationDefinition(java.util.Collection<PermissionDTO> definitions, Long tenant, String code) {
@@ -299,11 +310,22 @@ public class RoleAuthorizationDraftService {
         state.put("catalog", catalog.listDeclarations(role.getTenantId()).stream()
                 .sorted(Comparator.comparing(declaration -> declaration.getCode())).toList());
         state.put("businessFieldRoots", roots);
+        state.put("commandConsumers", nativeBoundaries.consumers(consumerPermissions(role, roots)));
         state.put("businessOwnerEntrySources", nativeBoundaries.ownerSources(roots.stream()
                 .filter(root -> root.definitionSource() == null).map(BusinessFieldRoot::command).toList()));
         state.put("permissions", permissions.findAllActive().stream()
                 .sorted(Comparator.comparing(permission -> permission.getCode())).toList());
         return digest(state);
+    }
+
+    private Set<String> consumerPermissions(Role role, List<BusinessFieldRoot> roots) {
+        Set<String> result = roots.stream().flatMap(root -> root.permissions().stream())
+                .collect(java.util.stream.Collectors.toCollection(HashSet::new));
+        var ids = grants.findByRole(role.getId()).stream().map(RolePermission::getPermissionId).collect(java.util.stream.Collectors.toSet());
+        permissions.findAllActive().stream().filter(permission -> ids.contains(permission.getId())
+                && (permission.getTenantId() == null || Objects.equals(role.getTenantId(), permission.getTenantId())))
+                .map(PermissionDTO::getCode).filter(Objects::nonNull).forEach(result::add);
+        return result;
     }
 
     private List<BusinessFieldRoot> businessFieldRoots() {

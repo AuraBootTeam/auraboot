@@ -36,6 +36,60 @@ class NativeBusinessBoundaryCatalogTest {
         return command;
     }
 
+    @Test void consumersRetainLegacyAndUnpublishedDefinitionsWithTheSamePermission() {
+        var legacy = command(11, "bom:legacy");
+        legacy.setExecutionConfig("{\"type\":\"custom\",\"permissions\":[\"bom.project.manage\"]}");
+        legacy.setStatus("draft");
+        when(commands.findCurrentPermissionConsumers(List.of("bom.project.manage"), false))
+                .thenReturn(List.of(legacy, command(10, "bom:update")));
+        var result = catalog.consumers(java.util.Set.of("bom.project.manage", "meta.command.execute"));
+        assertThat(result).extracting(NativeBusinessBoundaryCatalog.Consumer::commandCode)
+                .containsExactly("bom:legacy", "bom:update");
+        assertThat(result.getFirst().businessDeclared()).isFalse();
+        assertThat(result.getFirst().publicationStatus()).isEqualTo("draft");
+        String before = result.getFirst().source(); legacy.setInputSchema("{\"type\":\"object\"}");
+        assertThat(catalog.consumers(java.util.Set.of("bom.project.manage")).getFirst().source()).isNotEqualTo(before);
+    }
+
+    @Test void consumerFingerprintIncludesDisabledRulesAndRefusesForeignRules() {
+        when(commands.findCurrentPermissionConsumers(List.of("bom.project.manage"), false)).thenReturn(List.of(command(10, "bom:update")));
+        var rule = new BindingRule(); rule.setId(21L); rule.setTenantId(100L); rule.setCommandId(10L); rule.setEnabled(false);
+        when(rules.findByCommandIds(List.of(10L))).thenReturn(List.of(rule));
+        String before = catalog.consumers(java.util.Set.of("bom.project.manage")).getFirst().source();
+        rule.setExpression("changed");
+        assertThat(catalog.consumers(java.util.Set.of("bom.project.manage")).getFirst().source()).isNotEqualTo(before);
+        rule.setTenantId(200L);
+        assertThatThrownBy(() -> catalog.consumers(java.util.Set.of("bom.project.manage"))).isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test void consumerInventoryCannotHideMalformedForeignDuplicateOrUnrelatedDefinitions() {
+        var command = command(10, "bom:update");
+        when(commands.findCurrentPermissionConsumers(List.of("bom.project.manage"), false)).thenReturn(List.of(command));
+        command.setExecutionConfig("{");
+        assertThatThrownBy(() -> catalog.consumers(java.util.Set.of("bom.project.manage"))).isInstanceOf(AccessDeniedException.class);
+        command.setExecutionConfig("{\"type\":\"custom\",\"permissions\":[\"other.permission\"]}");
+        assertThatThrownBy(() -> catalog.consumers(java.util.Set.of("bom.project.manage"))).isInstanceOf(AccessDeniedException.class);
+        command.setTenantId(200L);
+        assertThatThrownBy(() -> catalog.consumers(java.util.Set.of("bom.project.manage"))).isInstanceOf(AccessDeniedException.class);
+        command.setTenantId(100L);
+        when(commands.findCurrentPermissionConsumers(List.of("bom.project.manage"), false)).thenReturn(List.of(command,command));
+        assertThatThrownBy(() -> catalog.consumers(java.util.Set.of("bom.project.manage"))).isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test void wildcardConsumerInventoryDoesNotGuessALimitedBusinessPermissionSet() {
+        when(commands.findCurrentPermissionConsumers(List.of(), true)).thenReturn(List.of(command(10,"bom:update")));
+        assertThat(catalog.consumers(java.util.Set.of("*"))).hasSize(1);
+        verify(commands).findCurrentPermissionConsumers(List.of(), true);
+    }
+
+    @Test void emptyAndInfrastructureOnlyConsumerInventoryDoesNotQuery() {
+        assertThat(catalog.consumers(java.util.Set.of())).isEmpty();
+        assertThat(catalog.consumers(java.util.Set.of("meta.command.execute"))).isEmpty();
+        verifyNoInteractions(commands,rules);
+        MetaContext.clear();
+        assertThatThrownBy(() -> catalog.consumers(java.util.Set.of())).isInstanceOf(AccessDeniedException.class);
+    }
+
     @Test void discoversCurrentNativeContractsAndLoadsTheirRulesInOneBatch() {
         when(commands.findCurrentNativeBusinessDefinitions()).thenReturn(List.of(command(10, "bom:update"), command(11, "bom:edit")));
         var definitions = catalog.snapshot();

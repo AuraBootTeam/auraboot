@@ -7,12 +7,18 @@ import java.util.List;
 
 /** Role-local migration evidence, never an effective member-access decision or an automatic grant. */
 @Schema(requiredProperties = {"rolePid", "revision", "boundaries", "bindings", "scopes", "fieldPolicies",
-        "boundPolicies", "unmappedPermissionCodes", "unresolvedBindingPids", "equivalentMigrationProven"})
+        "boundPolicies", "unmappedPermissionCodes", "unresolvedBindingPids", "commandConsumers", "equivalentMigrationProven"})
 public record RoleBoundaryMigrationPreview(
         String rolePid, String revision, @Schema(nullable = true) String defaultScopeType,
         List<Boundary> boundaries, List<Binding> bindings, List<Scope> scopes,
         List<RoleFieldPolicyView> fieldPolicies, List<Policy> boundPolicies, List<String> unmappedPermissionCodes,
-        List<String> unresolvedBindingPids, boolean equivalentMigrationProven) {
+        List<String> unresolvedBindingPids, List<Consumer> commandConsumers, boolean equivalentMigrationProven) {
+    @Schema(name = "RoleBoundaryMigrationConsumer", requiredProperties = {"commandCode", "commandType", "permissionCodes", "reviewStatus"},
+            description = "Current declared consumer, not effective access or whole-role equivalence")
+    public record Consumer(String commandCode, @Schema(nullable = true) String modelCode, String commandType,
+            @Schema(nullable = true) String publicationStatus, List<String> permissionCodes,
+            @Schema(allowableValues = {"REGISTERED_BOUNDARY_REVIEW_REQUIRED", "LEGACY_OR_UNREGISTERED_REVIEW_REQUIRED", "ENTRY_DEFINITION_REQUIRES_REVIEW"})
+            String reviewStatus) {}
     @Schema(name = "RoleBoundaryMigrationBoundary", requiredProperties = {"commandCode", "rootModel", "targetAction", "operations"})
     public record Boundary(String commandCode, String rootModel, String targetAction, List<Operation> operations) {}
 

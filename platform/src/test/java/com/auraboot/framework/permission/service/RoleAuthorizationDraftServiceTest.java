@@ -123,6 +123,27 @@ class RoleAuthorizationDraftServiceTest {
         grant.setPid("binding-sales"); grant.setTenantId(100L); grant.setStatus("active");
     }
 
+    @Test void migrationRetainsMixedRegisteredAndLegacyConsumersWithoutClaimingEffectiveAccess() {
+        migrationFixture();
+        when(nativeBoundaries.consumers(any())).thenReturn(List.of(
+                new NativeBusinessBoundaryCatalog.Consumer("sales:release", "sales_order", "custom", "published",
+                        List.of("sales.manage"), true, "update", "registered"),
+                new NativeBusinessBoundaryCatalog.Consumer("sales:legacy", "sales_order", "custom", "published",
+                        List.of("sales.manage"), false, null, "legacy")));
+        var result = service.migrationPreview("role-a");
+        assertThat(result.commandConsumers()).hasSize(2);
+        assertThat(result.commandConsumers().get(1).reviewStatus()).isEqualTo("LEGACY_OR_UNREGISTERED_REVIEW_REQUIRED");
+        assertThat(result.equivalentMigrationProven()).isFalse();
+        var revision = result.revision();
+        when(nativeBoundaries.consumers(any())).thenReturn(List.of(
+                new NativeBusinessBoundaryCatalog.Consumer("sales:legacy", "sales_order", "delete", "published",
+                        List.of("sales.manage"), false, null, "changed-legacy-source")));
+        assertThatThrownBy(() -> service.apply("role-a", request(revision, false, null, List.of())))
+                .isInstanceOfSatisfying(RootUnCheckedException.class,
+                        error -> assertThat(error.getResponseCode()).isEqualTo(ResponseCode.CasVersionConflict));
+        verify(writes, never()).mutate();
+    }
+
     @Test void migrationReportsAnUnconfiguredScopeWithoutAddingAnAllGrant() {
         migrationFixture();
         var result = service.migrationPreview("role-a");

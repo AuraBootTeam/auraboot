@@ -200,11 +200,46 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
                 """, fields, getTestTenant().getId(), roleId, getTestTenant().getId(), nativePermissionCode);
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"input", "execution", "withdrawn"})
+    void legacyConsumerDefinitionChangesInvalidateReviewWithoutRoleWrites(String change) throws Exception {
+        nativeSource();
+        jdbc.update("UPDATE ab_command_definition SET execution_config=?::jsonb WHERE tenant_id=? AND pid=?",
+                json.writeValueAsString(Map.of("type", "custom", "permissions", List.of(nativePermissionCode))),
+                getTestTenant().getId(), nativeCommandPid);
+        var reviewed = drafts.migrationPreview(rolePid); String before = migrationBindingBytes();
+        assertThat(reviewed.commandConsumers()).anySatisfy(consumer -> {
+            assertThat(consumer.commandCode()).isEqualTo(nativeCommandCode);
+            assertThat(consumer.permissionCodes()).containsExactly(nativePermissionCode);
+            assertThat(consumer.reviewStatus()).isEqualTo("LEGACY_OR_UNREGISTERED_REVIEW_REQUIRED");
+        });
+        switch (change) {
+            case "input" -> jdbc.update("UPDATE ab_command_definition SET input_schema='{\"type\":\"object\"}'::jsonb WHERE tenant_id=? AND pid=?",
+                    getTestTenant().getId(), nativeCommandPid);
+            case "execution" -> jdbc.update("UPDATE ab_command_definition SET execution_config=jsonb_set(execution_config,'{type}','\"delete\"'::jsonb) WHERE tenant_id=? AND pid=?",
+                    getTestTenant().getId(), nativeCommandPid);
+            case "withdrawn" -> jdbc.update("UPDATE ab_command_definition SET status='draft' WHERE tenant_id=? AND pid=?",
+                    getTestTenant().getId(), nativeCommandPid);
+            default -> throw new AssertionError(change);
+        }
+        assertThatThrownBy(() -> drafts.apply(rolePid, new RoleAuthorizationDraftRequest(reviewed.revision(),
+                Set.of(nativeCapability), Set.of(), true, "all", true,
+                List.of(new DataScopeUpdateRequest(resource, "manage", "all", "MAX")))))
+                .isInstanceOfSatisfying(RootUnCheckedException.class,
+                        error -> assertThat(error.getResponseCode()).isEqualTo(ResponseCode.CasVersionConflict));
+        assertThat(migrationBindingBytes()).isEqualTo(before);
+        assertThat(defaultScope()).isNull(); assertThat(persistedScopes()).isEmpty();
+    }
+
     @Test void nativeMigrationFindsThePublishedDefinitionAndPreservesGrantTuplesDuringScopeDecision() throws Exception {
         nativeSource(); String before = migrationBindingBytes();
         var inspected = drafts.migrationPreview(rolePid);
         var nativeBoundary = inspected.boundaries().stream().filter(root -> nativeCommandCode.equals(root.commandCode())).findFirst().orElseThrow();
         assertThat(nativeBoundary.rootModel()).isEqualTo(resource); assertThat(nativeBoundary.targetAction()).isEqualTo("update");
+        assertThat(inspected.commandConsumers()).anySatisfy(consumer -> {
+            assertThat(consumer.commandCode()).isEqualTo(nativeCommandCode);
+            assertThat(consumer.reviewStatus()).isEqualTo("REGISTERED_BOUNDARY_REVIEW_REQUIRED");
+        });
         assertThat(nativeBoundary.operations().getFirst().scopeStatus()).isEqualTo("REQUIRES_EXPLICIT_SCOPE_DECISION");
         assertThat(inspected.unmappedPermissionCodes()).doesNotContain(nativePermissionCode);
         assertThat(inspected.bindings()).anySatisfy(binding -> {

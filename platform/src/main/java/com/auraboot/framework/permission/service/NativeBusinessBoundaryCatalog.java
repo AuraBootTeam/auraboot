@@ -29,6 +29,59 @@ public class NativeBusinessBoundaryCatalog {
 
     public record Definition(String commandCode, NativeBusinessCommandContract contract, String source) { }
 
+    public record Consumer(String commandCode, String modelCode, String commandType, String publicationStatus,
+                           List<String> permissions, boolean businessDeclared, String targetAction, String source) { }
+
+    /** A declaration inventory, including legacy consumers; never an execution/access verdict. */
+    public List<Consumer> consumers(java.util.Set<String> permissionCodes) {
+        if (!MetaContext.exists() || MetaContext.getCurrentTenantId() == null || permissionCodes == null
+                || permissionCodes.stream().anyMatch(code -> code == null || code.isBlank())) throw denied();
+        boolean all = permissionCodes.contains("*");
+        var codes = permissionCodes.stream().filter(code -> !"*".equals(code) && !"meta.command.execute".equals(code))
+                .sorted().toList();
+        if (!all && codes.isEmpty()) return List.of();
+        Long tenant = MetaContext.getCurrentTenantId();
+        var definitions = commands.findCurrentPermissionConsumers(codes, all);
+        if (definitions.stream().map(command -> command.getCode()).distinct().count() != definitions.size()
+                || definitions.stream().anyMatch(command -> !Objects.equals(tenant, command.getTenantId())
+                    || command.getId() == null || command.getCode() == null || command.getCode().isBlank()
+                    || !Boolean.TRUE.equals(command.getIsCurrent()) || !Boolean.FALSE.equals(command.getDeletedFlag()))) throw denied();
+        if (definitions.isEmpty()) return List.of();
+        var ids = definitions.stream().map(command -> command.getId()).toList();
+        var bindings = rules.findByCommandIds(ids);
+        if (bindings.stream().anyMatch(rule -> !Objects.equals(tenant, rule.getTenantId())
+                || !ids.contains(rule.getCommandId()) || rule.getId() == null)
+                || bindings.stream().map(rule -> rule.getId()).distinct().count() != bindings.size()) throw denied();
+        return definitions.stream().sorted(java.util.Comparator.comparing(command -> command.getCode())).map(command -> {
+            try {
+                var config = json.readTree(command.getExecutionConfig());
+                if (config == null || !config.isObject() || !config.path("type").isTextual()
+                        || config.path("type").asText().isBlank()) throw denied();
+                var declared = config.path("permissions");
+                if (!declared.isMissingNode() && !declared.isArray()) throw denied();
+                var permissions = new java.util.ArrayList<String>();
+                for (var code : declared) {
+                    if (!code.isTextual() || code.asText().isBlank() || !code.asText().equals(code.asText().strip())
+                            || permissions.contains(code.asText())) throw denied();
+                    permissions.add(code.asText());
+                }
+                if (!all && permissions.stream().noneMatch(codes::contains)) throw denied();
+                var params = config.path("handlerParams");
+                String source = json.copy().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
+                        .writeValueAsString(Map.of("command", command, "rules", bindings.stream()
+                            .filter(rule -> command.getId().equals(rule.getCommandId()))
+                            .sorted(java.util.Comparator.comparing(rule -> rule.getId())).toList()));
+                return new Consumer(command.getCode(), command.getModelCode(), config.path("type").asText(),
+                        command.getStatus(), permissions.stream().sorted().toList(),
+                        "business".equals(params.path("targetRecordAuthorization").asText()),
+                        params.path("targetRecordAction").isTextual() ? params.path("targetRecordAction").asText() : null, source);
+            } catch (JsonProcessingException invalid) {
+                // CATCH: invalid consumer metadata must block review instead of disappearing.
+                throw new AccessDeniedException("Command consumer metadata cannot be reviewed", invalid);
+            }
+        }).toList();
+    }
+
     public List<Definition> snapshot() {
         if (!MetaContext.exists()) throw denied();
         Long tenant = MetaContext.getCurrentTenantId();
