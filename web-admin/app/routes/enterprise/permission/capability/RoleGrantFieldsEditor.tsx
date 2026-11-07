@@ -86,6 +86,13 @@ export default function RoleGrantFieldsEditor({
           binding.editable === true &&
           !!binding.metadataRevision;
         const action = binding.permissionCode?.split('.').at(-1) ?? '';
+        const nativeRead = binding.permissionCode === `model.${model}.read`;
+        const nativeWrite = ['create', 'update'].some(
+          (operation) => binding.permissionCode === `model.${model}.${operation}`,
+        );
+        // A business grant carries both field sets; they do not authorize additional actions.
+        const canConfigureRead = !nativeWrite;
+        const canConfigureWrite = !nativeRead;
         const fields = binding.fields ?? [];
         const readFields = change?.readFields ?? binding.readFields ?? [];
         const writeFields = change?.writeFields ?? binding.writeFields ?? [];
@@ -163,10 +170,10 @@ export default function RoleGrantFieldsEditor({
                   className="text-accent disabled:text-text-3 underline"
                   onClick={() =>
                     update(
-                      action === 'read'
+                      canConfigureRead
                         ? fields.flatMap((field) => (field.code ? [field.code] : []))
                         : [],
-                      action !== 'read'
+                      canConfigureWrite
                         ? fields.flatMap((field) => (field.code ? [field.code] : []))
                         : [],
                     )
@@ -216,8 +223,8 @@ export default function RoleGrantFieldsEditor({
                                       checked={selected.includes(field.code!)}
                                       disabled={
                                         !writable ||
-                                        (mode === 'write' && action === 'read') ||
-                                        (mode === 'read' && action !== 'read')
+                                        (mode === 'write' && !canConfigureWrite) ||
+                                        (mode === 'read' && !canConfigureRead)
                                       }
                                       onChange={(event) => {
                                         const next = event.target.checked
