@@ -21,6 +21,15 @@ public final class FieldWriteAuthorizationSupport {
 
     /** Return submitted keys, including column aliases, without mutating the submitted input. */
     public Set<String> nonWritableInputKeys(String modelCode, Set<String> inputKeys) {
+        return nonWritableInputKeys(modelCode, inputKeys, true);
+    }
+
+    /** A complete business grant replaces ordinary positive field grants, never mandatory restrictions. */
+    public Set<String> nonWritablePolicyInputKeys(String modelCode, Set<String> inputKeys) {
+        return nonWritableInputKeys(modelCode, inputKeys, false);
+    }
+
+    private Set<String> nonWritableInputKeys(String modelCode, Set<String> inputKeys, boolean ordinaryGrants) {
         NativeHumanActor.requireCompleteIdentity();
         if (inputKeys == null || inputKeys.isEmpty()) return Set.of();
         var policyFields = policies.getNonWritableFields(
@@ -32,7 +41,7 @@ public final class FieldWriteAuthorizationSupport {
         if (!human && restricted.isEmpty()) return Set.of();
         var definitions = metadata.getModelFields(modelCode);
         if (definitions == null) throw new MetaServiceException("Field metadata unavailable for write authorization: " + modelCode);
-        if (human && !definitions.isEmpty()) {
+        if (ordinaryGrants && human && !definitions.isEmpty()) {
             var permissions = fields.getFieldPermissions(MetaContext.getCurrentMemberId(), modelCode);
             if (permissions == null || permissions.editableFields() == null)
                 throw new MetaServiceException("Field permissions unavailable for write authorization: " + modelCode);

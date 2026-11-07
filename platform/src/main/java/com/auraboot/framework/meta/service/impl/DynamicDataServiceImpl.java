@@ -1139,6 +1139,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
      *         apologetic full-row round-trip from a real attempt to change a forbidden field.
      */
     private Set<String> stripNonWritableFields(String modelCode, Map<String, Object> data) {
+        return stripNonWritableFields(modelCode, data, false);
+    }
+
+    private Set<String> stripNonWritableFields(String modelCode, Map<String,Object> data, boolean completeBusinessFields) {
         if (data == null || data.isEmpty()) {
             return Collections.emptySet();
         }
@@ -1146,13 +1150,14 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             MachineDataAccessGuards.requireWritable(modelCode, data);
             return Collections.emptySet();
         }
-        if (MetaContext.hasCommandPermitScopeFor(modelCode)) {
+        if (MetaContext.hasCommandPermitScopeFor(modelCode) && !AsyncTaskExecutionContext.isActive()) {
             return Collections.emptySet();
         }
         Long userId = getCurrentUserId();
-        Set<String> nonWritable = new FieldWriteAuthorizationSupport(
-                metadataService, fieldPermissionService, dataPermissionEngine)
-                .nonWritableInputKeys(modelCode, data.keySet());
+        var fieldAuthorization = new FieldWriteAuthorizationSupport(metadataService, fieldPermissionService, dataPermissionEngine);
+        Set<String> nonWritable = completeBusinessFields
+                ? fieldAuthorization.nonWritablePolicyInputKeys(modelCode, data.keySet())
+                : fieldAuthorization.nonWritableInputKeys(modelCode, data.keySet());
         if (nonWritable.isEmpty()) {
             return Collections.emptySet();
         }
@@ -1253,8 +1258,15 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         Map<String, Object> data = new LinkedHashMap<>(inputData);
 
         // Field-level write permission (gap #1): strip fields the current user may not write
-        Set<String> strippedNonWritable = stripNonWritableFields(modelCode, data);
-        applicationContext.getBean(NativeRecordFieldAuthorization.class).requireUpdate(modelCode, recordId, data);
+        Set<String> strippedNonWritable;
+        var nativeFields = applicationContext.getBean(NativeRecordFieldAuthorization.class);
+        if (AsyncTaskExecutionContext.isActive()) {
+            boolean businessFields = nativeFields.requireDeferredUpdate(modelCode, recordId, data);
+            strippedNonWritable = stripNonWritableFields(modelCode, data, businessFields);
+        } else {
+            strippedNonWritable = stripNonWritableFields(modelCode, data);
+            nativeFields.requireUpdate(modelCode, recordId, data);
+        }
 
         logOperation("update", modelCode, recordId, data.keySet());
 

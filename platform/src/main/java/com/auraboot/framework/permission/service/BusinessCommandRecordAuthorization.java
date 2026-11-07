@@ -74,6 +74,21 @@ public class BusinessCommandRecordAuthorization {
         return resolveInternal(memberId, List.of("model." + model + ".read"), model, record, "read");
     }
 
+    /** Null means this declared duty is not a write owner; an owning duty's refusal must not fall back. */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public BusinessGrantDecision resolveDeclaredRootWriteOrNull(Long member, String code, String model,
+                                                               Map<String,Object> record, String action) {
+        if (code == null || code.isBlank()) throw new org.springframework.security.access.AccessDeniedException("Current command authority is unavailable");
+        return snapshots.withFreshReads(() -> {
+            var permission = snapshots.resolvePermissionDefinition(MetaContext.getCurrentTenantId(), code);
+            if (permission == null) throw new org.springframework.security.access.AccessDeniedException("Current command permission is unavailable");
+            if (!("operation".equalsIgnoreCase(permission.getResourceType()) || "data".equalsIgnoreCase(permission.getResourceType()))
+                    || !Objects.equals(model, permission.getResourceCode())
+                    || !(action.equals(permission.getAction()) || "manage".equals(permission.getAction()))) return null;
+            return resolveInternal(member, List.of(code), model, record, action);
+        });
+    }
+
     /** Native model reads retain their existing permission aliases and record-share exceptions. */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public BusinessGrantDecision resolveOrdinaryRead(Long memberId, String model, Map<String,Object> record) {

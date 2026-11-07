@@ -71,6 +71,10 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
     private final DynamicDataService dynamicDataService;
 
     @Autowired
+    @org.springframework.context.annotation.Lazy
+    private DeferredCommandAuthorization deferredAuthorization;
+
+    @Autowired
     private com.auraboot.framework.i18n.service.I18nService i18nService;
 
     @Autowired(required = false)
@@ -121,6 +125,9 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
         if (handlerCode == null || handlerCode.isBlank()) {
             return AsyncTaskResult.nonRetryableFailure("command-handler task missing handlerCode");
         }
+        if (commandCode == null || commandCode.isBlank()) {
+            return AsyncTaskResult.nonRetryableFailure("command-handler task missing commandCode");
+        }
         Long tenantId = longValue(inputParams, "tenantId");
         Long userId = longValue(inputParams, "userId");
         String currentUserPid = text(inputParams, "currentUserPid");
@@ -129,7 +136,7 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
         String clientRequestId = text(inputParams, "clientRequestId");
         Long commandExpectedVersion = longValue(inputParams, "commandExpectedVersion");
         Map<String, Object> payload = mapValue(inputParams.get("payload"));
-        Map<String, Object> handlerParams = mapValue(inputParams.get("handlerParams"));
+
         long startedAt = System.nanoTime();
 
         Optional<CommandHandlerExtension> pluginHandler = extensionRegistry.getCommandHandler(handlerCode);
@@ -164,10 +171,15 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
             MetaContext.setContext(tenantId, userId, currentUserPid, String.valueOf(userId),
                     roles == null ? java.util.Set.of() : new java.util.HashSet<>(roles));
             MetaContext.setMemberId(member.getId());
+            if (deferredAuthorization == null) throw new org.springframework.security.access.AccessDeniedException(
+                    "Deferred command authorization is unavailable");
+            var delivery = deferredAuthorization.authorize(commandCode, handlerCode, modelCode, recordPid,
+                    payload, clientRequestId, commandExpectedVersion);
+
             com.auraboot.framework.plugin.pf4j.CommandHandlerCapabilityGuard.requireAvailable(
                     handler, handlerCode, aiProviderAccessorFactory != null, knowledgeBaseAccessor != null);
             String namespace = handlerCode.contains(":") ? handlerCode.split(":")[0] : null;
-            Map<String, Object> pluginSettings = new HashMap<>(handlerParams);
+            Map<String, Object> pluginSettings = new HashMap<>(delivery.handlerParams());
             pluginSettings.put("__commandCode", commandCode != null ? commandCode : handlerCode);
             pluginSettings.put("__handlerCode", handlerCode);
             if (userId != null) {
@@ -181,9 +193,9 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
                 pluginSettings.put(CommandHandlerExtension.CLIENT_REQUEST_ID_KEY,
                         clientRequestId.trim());
             }
-            if (commandExpectedVersion != null) {
+            if (delivery.expectedVersion() != null) {
                 pluginSettings.put(CommandHandlerExtension.EXPECTED_VERSION_KEY,
-                        commandExpectedVersion);
+                        delivery.expectedVersion());
             }
             com.auraboot.framework.plugin.pf4j.TenantSecretAccessorImpl.install(
                     pluginSettings, tenantId, cloudConfigService, objectMapper);
@@ -243,19 +255,14 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
                             .commandType(handlerCode)
                             .modelCode(modelCode)
                             .recordId(recordPid)
-                            .payload(payload)
+                            .payload(delivery.payload())
                             .settings(pluginSettings)
                             .dryRun(false)
                             .build();
 
-            // Re-establish the authority the command boundary granted on the request thread. This
-            // path never re-enters the pipeline, so without this the handler runs with none at all —
-            // which is precisely where production broke: the boundary said yes, and then the row the
-            // run had just created could not be updated by the run itself.
-            // The verdict travels WITH the task rather than riding a thread-local across the
-            // hand-off, so what background work carries is a decision that can be named, not an
-            // inherited bypass.
-            String commandAuthority = text(inputParams, "commandAuthority");
+            // Only a current delivery decision can install execution authority. The task's
+            // commandAuthority/commandPermitScope and handlerParams are historical intent.
+            String commandAuthority = delivery.authority();
             java.util.function.Supplier<Object> invocation = () -> {
                 try {
                     return handler.execute(pluginContext);
@@ -267,7 +274,7 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
                 java.util.function.Supplier<Object> delegate = invocation;
                 invocation = () -> MetaContext.runWithCommandAuthority(commandAuthority, delegate);
             }
-            String commandPermitScope = text(inputParams, "commandPermitScope");
+            String commandPermitScope = delivery.scope();
             java.util.function.Supplier<Object> permittedInvocation = invocation;
             java.util.function.Supplier<Object> commandScopedInvocation = commandCode == null
                     ? permittedInvocation
@@ -276,7 +283,7 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
                     ? permittedInvocation.get()
                     : MetaContext.runWithCommandPermitPlan(
                             commandPermitScope,
-                            commandExpectedVersion,
+                            delivery.expectedVersion(),
                             modelCode,
                             recordPid,
                             commandScopedInvocation);

@@ -207,6 +207,14 @@ class CommandTargetScopePhaseTest {
         verifyNoInteractions(dynamicDataService);
     }
 
+    @Test
+    void deferredTargetMustBeCheckedEvenWhenHandlerOwnsPersistence() {
+        var ctx = context("framework_record", "REC-1");
+        ctx.setDeferredHandlerAuthorization(true);
+        assertThat(phase().shouldSkip(ctx)).isFalse();
+        verifyNoInteractions(dynamicDataService);
+    }
+
     /**
      * An authorization read that cannot be evaluated must fail closed and roll back its isolated
      * transaction before the error reaches the outer command transaction.

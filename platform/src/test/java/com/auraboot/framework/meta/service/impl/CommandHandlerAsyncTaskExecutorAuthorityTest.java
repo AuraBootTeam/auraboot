@@ -24,20 +24,10 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
-/**
- * The async command path never re-enters the pipeline: {@code CommandHandlerAsyncTaskExecutor}
- * invokes the handler directly and re-materialises identity from {@code ab_async_task.input_params}.
- * The command boundary's decision would therefore be lost at the thread hand-off — and that is
- * exactly the path production broke on (2026-07-22, {@code async-task-3}): the boundary said yes,
- * then the row the run had just created could not be updated by the run itself.
- *
- * <p>So the authorization verdict plus permit grade/version travel WITH the task and are rebuilt
- * here. These tests pin that they are rebuilt when present, absent when not, and never left behind
- * on a pooled thread.
- */
+/** Delivery installs a fresh boundary decision; serialized permits cannot authorize a job. */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-@DisplayName("Async command handler rebuilds the boundary's authority")
+@DisplayName("Async command handler uses current delivery authority")
 class CommandHandlerAsyncTaskExecutorAuthorityTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -57,43 +47,35 @@ class CommandHandlerAsyncTaskExecutorAuthorityTest {
     }
 
     @Test
-    @DisplayName("a persisted verdict is rebuilt for the handler")
-    void aPersistedVerdictIsRebuilt() {
+    @DisplayName("a current verdict replaces the persisted verdict")
+    void currentVerdictReplacesPersistedVerdict() {
         CommandHandlerAsyncTaskExecutor executor = executorWithRecordingHandler();
 
         AsyncTaskResult result = executor.execute(input("qo.price.manage"), noopCallback());
 
         assertThat(result.isSuccess()).isTrue();
-        assertThat(authoritySeenByHandler.get()).isEqualTo("qo.price.manage");
+        assertThat(authoritySeenByHandler.get()).isEqualTo("current.duty");
     }
 
     @Test
-    @DisplayName("the persisted permit grade and server version are rebuilt for the handler")
-    void persistedPermitPlanIsRebuilt() {
+    @DisplayName("current scope and server version replace persisted values")
+    void currentPermitPlanReplacesPersistedPlan() {
         CommandHandlerAsyncTaskExecutor executor = executorWithRecordingHandler();
 
         AsyncTaskResult result = executor.execute(
                 inputWithPermit("qo.price.manage", "SELF", 7L), noopCallback());
 
         assertThat(result.isSuccess()).isTrue();
-        assertThat(permitScopeSeenByHandler).hasValue("SELF");
-        assertThat(expectedVersionSeenByHandler).hasValue(7L);
+        assertThat(permitScopeSeenByHandler).hasValue("TARGET");
+        assertThat(expectedVersionSeenByHandler).hasValue(11L);
         assertThat(MetaContext.hasCommandPermitScope()).isFalse();
     }
 
-    /**
-     * A task submitted by a command that granted nothing must carry nothing. If a missing verdict
-     * were treated as permission, every undeclared command would gain authority on the async path.
-     */
     @Test
-    @DisplayName("no persisted verdict means the handler runs with no authority")
-    void noVerdictMeansNoAuthority() {
-        CommandHandlerAsyncTaskExecutor executor = executorWithRecordingHandler();
-
-        AsyncTaskResult result = executor.execute(input(null), noopCallback());
-
-        assertThat(result.isSuccess()).isTrue();
-        assertThat(authoritySeenByHandler.get()).isNull();
+    void missingPersistedVerdictStillRequiresAndUsesCurrentDecision() {
+        var executor = executorWithRecordingHandler();
+        assertThat(executor.execute(input(null), noopCallback()).isSuccess()).isTrue();
+        assertThat(authoritySeenByHandler).hasValue("current.duty");
     }
 
     /** Pooled threads: the authority must not still be standing when the next task arrives. */
@@ -128,6 +110,29 @@ class CommandHandlerAsyncTaskExecutorAuthorityTest {
         assertThat(MetaContext.hasCommandAuthority()).isFalse();
     }
 
+    @Test
+    void persistedAuthorityAloneCannotAuthorizeDeferredExecution() {
+        CommandHandlerAsyncTaskExecutor executor = executorWithRecordingHandler();
+        org.springframework.test.util.ReflectionTestUtils.setField(executor, "deferredAuthorization", null);
+        AsyncTaskResult result = executor.execute(inputWithPermit("qo.price.manage", "ALL", 7L), noopCallback());
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(authoritySeenByHandler).hasNullValue();
+    }
+
+    @Test
+    void currentBoundaryRefusalStopsHandlerDespitePersistedAllow() {
+        var executor = executorWithRecordingHandler();
+        var authorization = org.mockito.Mockito.mock(DeferredCommandAuthorization.class);
+        org.mockito.Mockito.when(authorization.authorize(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenThrow(
+                new org.springframework.security.access.AccessDeniedException("Current grant was withdrawn"));
+        org.springframework.test.util.ReflectionTestUtils.setField(executor, "deferredAuthorization", authorization);
+        assertThat(executor.execute(inputWithPermit("old.allow", "ALL", 7L), noopCallback()).isSuccess()).isFalse();
+        assertThat(authoritySeenByHandler).hasNullValue();
+        assertThat(MetaContext.hasCommandAuthority()).isFalse();
+    }
+
     private CommandHandlerAsyncTaskExecutor executorWithRecordingHandler() {
         CommandHandlerExtension handler = new CommandHandlerExtension() {
             @Override public String getCommandType() { return "qo_quote_common:batch_source_prices"; }
@@ -152,6 +157,12 @@ class CommandHandlerAsyncTaskExecutorAuthorityTest {
     private CommandHandlerAsyncTaskExecutor injectedExecutor() {
         CommandHandlerAsyncTaskExecutor executor =
                 new CommandHandlerAsyncTaskExecutor(extensionRegistry, objectMapper, dynamicDataService);
+        var authorization = org.mockito.Mockito.mock(DeferredCommandAuthorization.class);
+        org.mockito.Mockito.when(authorization.authorize(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(
+                new DeferredCommandAuthorization.Decision("current.duty", "TARGET", 11L, Map.of(), Map.of()));
+        org.springframework.test.util.ReflectionTestUtils.setField(executor, "deferredAuthorization", authorization);
         org.springframework.test.util.ReflectionTestUtils.setField(
                 executor, "tenantMemberService", tenantMemberService);
         org.springframework.test.util.ReflectionTestUtils.setField(

@@ -505,4 +505,16 @@ class PermitPlanAssemblyPhaseTest {
         assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
     }
 
+    @Test void deferredPlanPinsOnlyTheFreshlyCheckedTargetAndNeverRestoresModelAll() {
+        var engine = Mockito.mock(DataPermissionEngine.class);
+        ReflectionTestUtils.setField(phase,"dataPermissionEngine",engine);
+        var ctx = ctxWithModel("task-1","bom_conversion_task_pcba");
+        ctx.setDeferredHandlerAuthorization(true); ctx.setTargetRecordReadable(true);
+        ctx.recordPhaseDecision(PhaseDecision.permit("authorization"));
+        phase.execute(ctx); assertThat(ctx.getPermitPlan().scope()).isEqualTo(ScopeGrade.TARGET);
+        ctx.setTargetRecordReadable(null); phase.execute(ctx); assertThat(ctx.getPermitPlan().scope()).isNull();
+        ctx.getRequest().setTargetRecordId(null); phase.execute(ctx); assertThat(ctx.getPermitPlan().scope()).isNull();
+        Mockito.verifyNoInteractions(engine);
+    }
+
 }

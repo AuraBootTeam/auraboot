@@ -35,6 +35,9 @@ public class CommandPipelineContext {
     private final Long userId;
     private final long startTime;
 
+    /** Host-only delivery evaluation; task JSON cannot select authorization policy. */
+    private boolean deferredHandlerAuthorization;
+
     // ==================== Populated during pipeline ====================
 
     /** Loaded command definition (set by LoadPhase) */

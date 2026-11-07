@@ -73,4 +73,10 @@ class FieldWriteAuthorizationSupportTest {
         assertThatThrownBy(() -> support.nonWritableInputKeys("orders", Set.of("cost_column")))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
     }
+    @Test void completeBusinessFieldsRetainMandatoryLogicalAndPhysicalRestrictions() {
+        when(policies.getNonWritableFields(7L,"orders",20L)).thenReturn(Set.of("cost_column"));
+        assertThat(support.nonWritablePolicyInputKeys("orders",Set.of("cost","name_column"))).containsExactly("cost");
+        verifyNoInteractions(fields);
+    }
+
 }

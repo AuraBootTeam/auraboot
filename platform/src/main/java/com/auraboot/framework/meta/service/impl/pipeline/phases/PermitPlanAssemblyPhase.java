@@ -141,6 +141,11 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
      * authority.</p>
      */
     private ScopeGrade resolveScope(CommandPipelineContext ctx) {
+        // A fresh delivery may lend only the target actually checked now, never a model-wide stored grade.
+        if (ctx.isDeferredHandlerAuthorization()) {
+            return ctx.getRequest() != null && StringUtils.hasText(ctx.getRequest().getTargetRecordId())
+                    && Boolean.TRUE.equals(ctx.getTargetRecordReadable()) ? ScopeGrade.TARGET : null;
+        }
         // A new root is checked inside its insert transaction; never publish model-wide authority.
         if (com.auraboot.framework.meta.security.NativeBusinessCommandContract.declaresCreation(ctx)) return null;
         // A trusted handler checked this exact target at the boundary. Keep that decision

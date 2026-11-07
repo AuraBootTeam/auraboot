@@ -28,6 +28,12 @@ public class NativeRecordFieldAuthorization {
         require("update", modelCode, recordId, submitted, Set.of());
     }
 
+    /** True only when the exact deferred root's complete business grant already checked submitted fields. */
+    public boolean requireDeferredUpdate(String modelCode, String recordId, Map<String,Object> submitted) {
+        if (!AsyncTaskExecutionContext.isActive()) throw denied("A claimed deferred delivery is required");
+        return require("update", modelCode, recordId, submitted, Set.of());
+    }
+
     /** Called after insertion, before materialization or observation, in the inserting transaction. */
     public void requireCreated(String modelCode, String recordId, Map<String,Object> submitted) {
         require("create", modelCode, recordId, submitted, Set.of());
@@ -39,13 +45,13 @@ public class NativeRecordFieldAuthorization {
         require("update", modelCode, recordId, submitted, observed);
     }
 
-    private void require(String action, String modelCode, String recordId, Map<String,Object> submitted,
+    private boolean require(String action, String modelCode, String recordId, Map<String,Object> submitted,
                          Set<String> observed) {
         NativeHumanActor.requireCompleteIdentity();
         if (!MetaContext.exists() || MetaContext.getCurrentMemberId() == null
                 || com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
                 || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
-                || MetaContext.hasCommandPermitScopeFor(modelCode)) return;
+                || MetaContext.hasCommandPermitScopeFor(modelCode) && !AsyncTaskExecutionContext.isActive()) return false;
         Integer isolation = TransactionSynchronizationManager.getCurrentTransactionIsolationLevel();
         if (!TransactionSynchronizationManager.isActualTransactionActive()
                 || TransactionSynchronizationManager.isCurrentTransactionReadOnly()
@@ -88,7 +94,17 @@ public class NativeRecordFieldAuthorization {
         com.auraboot.framework.meta.util.JsonbFieldHelper.normalizeJsonReadValues(model, canonical);
         if ("create".equals(action) && !Objects.equals(canonical.get("created_by"), MetaContext.getCurrentUserId()))
             throw denied("Created record ownership is not the current actor");
-        var grant = "create".equals(action)
+        // A queued command lends only the freshly checked root. Its owning business duty
+        // still uses complete current scope/condition/field facts, never technical sub-permissions.
+        com.auraboot.framework.permission.engine.model.BusinessGrantDecision grant = null;
+        if (AsyncTaskExecutionContext.isActive() && "TARGET".equals(MetaContext.getCommandPermitScopeFor(modelCode))
+                && Objects.equals(pid, MetaContext.getCommandPermitTargetFor(modelCode))
+                && MetaContext.getAuthorizedCommandCode() != null) {
+            grant = authorization.resolveDeclaredRootWriteOrNull(MetaContext.getCurrentMemberId(),
+                    MetaContext.getCommandAuthority(), modelCode, canonical, action);
+        }
+        boolean owningBusinessGrant = grant != null;
+        if (grant == null) grant = "create".equals(action)
                 ? authorization.resolveOrdinaryCreate(MetaContext.getCurrentMemberId(), modelCode, canonical)
                 : authorization.resolveOrdinaryUpdate(MetaContext.getCurrentMemberId(), modelCode, canonical);
         if (grant == null || !grant.result().granted()
@@ -126,6 +142,7 @@ public class NativeRecordFieldAuthorization {
                     || observed.stream().anyMatch(field -> !readGrant.canRead(field)))
                 throw new AccessDeniedException("FIELD_READ_DENIED: conditional mutation requires matching readable grant fields");
         }
+        return owningBusinessGrant;
     }
 
     private static AccessDeniedException denied(String reason) {

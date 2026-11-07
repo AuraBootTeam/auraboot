@@ -94,7 +94,8 @@ public class CommandTargetScopePhase implements CommandPhase {
         return command == null
                 || !StringUtils.hasText(command.getModelCode())
                 || !StringUtils.hasText(ctx.getRequest().getTargetRecordId())
-                || (isHandlerManagedTarget(ctx) && targetRecordAction(ctx) == null && !protectedTargetAuthorization(ctx));
+                || (!ctx.isDeferredHandlerAuthorization() && isHandlerManagedTarget(ctx)
+                    && targetRecordAction(ctx) == null && !protectedTargetAuthorization(ctx));
     }
 
     /** Server-owned command metadata; callers cannot turn a write into a read. */
