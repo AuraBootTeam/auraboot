@@ -3084,3 +3084,7 @@ im.agent.replyFailed: "AI 回复未能完成，请重试或联系管理员。"
 "roleGrantFields.action.execute": "执行授权"
 
 "command.transition.not_allowed": "当前任务状态不允许此操作，请刷新后重试。"
+
+"roleGrantFields.unconfigured": "此职责尚未配置当前对象。需明确配置后才能执行，仍受职责和记录范围约束。"
+"roleGrantFields.configureObject": "配置此对象"
+"roleGrantFields.enableObjectPreview": "为已选职责启用此对象；仍受记录范围约束，只允许选中的字段。"

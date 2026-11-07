@@ -21,6 +21,23 @@ class RoleCapabilityOpenApiContractTest {
     private final ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
 
     @Test
+    void objectSpecificGrantFieldsExposeTheNullableSelectorAndConfiguredState() throws Exception {
+        var converters = new ModelConverters(true);
+        var change = Json31.mapper().valueToTree(converters.readAll(
+                com.auraboot.framework.permission.dto.RoleGrantFields.Change.class).get("RoleGrantFieldsChange"));
+        var binding = Json31.mapper().valueToTree(converters.readAll(
+                com.auraboot.framework.permission.dto.RoleGrantFields.Binding.class).get("RoleGrantFieldsBinding"));
+        assertThat(change.at("/properties/modelCode/type").toString()).contains("string", "null");
+        assertThat(change.at("/properties/modelCode/pattern").asText()).isEqualTo("[A-Za-z_][A-Za-z0-9_]{0,127}");
+        assertThat(binding.at("/properties/configured/type").toString()).contains("boolean");
+        var output = java.nio.file.Path.of("build/test-evidence/grant-field-schema-properties.json");
+        java.nio.file.Files.createDirectories(output.getParent());
+        java.nio.file.Files.writeString(output, mapper.writeValueAsString(java.util.Map.of(
+                "RoleGrantFieldsChange", java.util.Map.of("modelCode", change.at("/properties/modelCode")),
+                "RoleGrantFieldsBinding", java.util.Map.of("configured", binding.at("/properties/configured")))));
+    }
+
+    @Test
     void declaredCapabilitiesWithoutOptionalDisplayMetadataKeepNullsAndConcreteCollections() {
         var declaration = CapabilityDefinitionDTO.builder().code("sales.cap.read")
                 .includes(List.of("sales.customer.read", "sales.customer.export")).build();
@@ -76,7 +93,9 @@ class RoleCapabilityOpenApiContractTest {
         role.setIsDefault(null);
         role.setIsSystem(null);
         var json = mapper.valueToTree(RoleResponse.from(role));
-        assertThat(json.size()).isEqualTo(13);
+        assertThat(json.size()).isEqualTo(15);
+        assertThat(json.get("memberCount").isNull()).isTrue();
+        assertThat(json.get("managementRole").isNull()).isTrue();
         assertThat(json.path("pid").asText()).isEqualTo("role-pid");
         assertThat(json.has("id")).isFalse();
         assertThat(json.has("tenantId")).isFalse();

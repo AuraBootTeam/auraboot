@@ -4,7 +4,7 @@ import type { AuthorizationDraft, AuthorizationPreview } from './authorizationDr
 export type GrantFieldChange = NonNullable<AuthorizationDraft['grantFieldChanges']>[number];
 export type GrantFieldBinding = NonNullable<AuthorizationPreview['grantFieldCandidates']>[number];
 const keyOf = (value: GrantFieldBinding | GrantFieldChange) =>
-  value.bindingPid ? `binding:${value.bindingPid}` : `permission:${value.permissionCode}`;
+  `${value.bindingPid ? `binding:${value.bindingPid}` : `permission:${value.permissionCode}`}:${value.modelCode ?? ''}`;
 
 interface Props {
   model: string;
@@ -115,6 +115,7 @@ export default function RoleGrantFieldsEditor({
                 : { permissionCode: binding.permissionCode }),
               expectedMetadataRevision:
                 change?.expectedMetadataRevision ?? binding.metadataRevision,
+              modelCode: binding.modelCode,
               readFields: read,
               writeFields: write,
             },
@@ -132,7 +133,8 @@ export default function RoleGrantFieldsEditor({
                   `roleGrantFields.action.${action}`,
                   undefined,
                   t('roleGrantFields.authorization', undefined, 'Authorization'),
-                )} · {index + 1}
+                )}{' '}
+                · {index + 1}
                 {!binding.bindingPid && (
                   <span className="text-text-2 ml-2 text-xs">
                     {t('roleGrantFields.pending', undefined, 'New in this draft')}
@@ -159,13 +161,17 @@ export default function RoleGrantFieldsEditor({
                 )}
               </p>
             )}
-            {binding.legacy && !change ? (
+            {(binding.legacy || binding.configured === false) && !change ? (
               <div className="text-text-2 flex flex-wrap items-center justify-between gap-2 text-xs">
                 <p>
                   {t(
-                    'roleGrantFields.legacy',
+                    binding.configured === false
+                      ? 'roleGrantFields.unconfigured'
+                      : 'roleGrantFields.legacy',
                     undefined,
-                    'No explicit field list. Existing authorization rules are preserved.',
+                    binding.configured === false
+                      ? 'This object is not configured for the duty. Configure it explicitly; record scope still applies.'
+                      : 'No explicit field list. Existing authorization rules are preserved.',
                   )}
                 </p>
                 <button
@@ -174,16 +180,22 @@ export default function RoleGrantFieldsEditor({
                   className="text-accent disabled:text-text-3 underline"
                   onClick={() =>
                     update(
-                      canConfigureRead
-                        ? fields.flatMap((field) => (field.code ? [field.code] : []))
-                        : [],
-                      canConfigureWrite
-                        ? fields.flatMap((field) => (field.code ? [field.code] : []))
-                        : [],
+                      binding.configured === false
+                        ? []
+                        : canConfigureRead
+                          ? fields.flatMap((field) => (field.code ? [field.code] : []))
+                          : [],
+                      binding.configured === false
+                        ? []
+                        : canConfigureWrite
+                          ? fields.flatMap((field) => (field.code ? [field.code] : []))
+                          : [],
                     )
                   }
                 >
-                  {t('roleGrantFields.configure', undefined, 'Set a finite field list')}
+                  {binding.configured === false
+                    ? t('roleGrantFields.configureObject', undefined, 'Configure this object')
+                    : t('roleGrantFields.configure', undefined, 'Set a finite field list')}
                 </button>
               </div>
             ) : (

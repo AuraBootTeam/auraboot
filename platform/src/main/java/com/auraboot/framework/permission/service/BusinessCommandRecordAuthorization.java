@@ -221,10 +221,15 @@ public class BusinessCommandRecordAuthorization {
                     trace.add(rowGuard);
                     if (rowGuard.verdict() == EvaluationVerdict.DENY) continue;
                 }
+                var fields = BusinessGrantFieldScope.select(json, grant.getFieldScopeJson(), model);
+                if (fields.isEmpty()) {
+                    trace.add(step(EvaluationVerdict.DENY, "No field grant is configured for this business object", code,
+                            grant.getRoleId(), grant.getId()));
+                    continue;
+                }
                 trace.add(step(EvaluationVerdict.ALLOW, "One complete business grant permits this target", code,
                         grant.getRoleId(), grant.getId()));
-                matched.add(new BusinessGrantDecision.Grant(grant.getId(), grant.getRoleId(), code,
-                        BusinessGrantFieldScope.parse(json, grant.getFieldScopeJson(), model)));
+                matched.add(new BusinessGrantDecision.Grant(grant.getId(), grant.getRoleId(), code, fields.get()));
             }
         }
         return decision(matched.isEmpty() ? denied("No complete business grant permits this target", trace)

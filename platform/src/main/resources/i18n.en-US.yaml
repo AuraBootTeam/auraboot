@@ -2893,3 +2893,7 @@ im.agent.replyFailed: "The AI reply could not be completed. Please retry or cont
 "roleGrantFields.action.execute": "Execute authorization"
 
 "command.transition.not_allowed": "This operation is not allowed in the current task state. Refresh and try again."
+
+"roleGrantFields.unconfigured": "This object is not configured for the duty. Configure it explicitly; record scope still applies."
+"roleGrantFields.configureObject": "Configure this object"
+"roleGrantFields.enableObjectPreview": "Enable this object under the selected duty. Record scope still applies; only selected fields are allowed."

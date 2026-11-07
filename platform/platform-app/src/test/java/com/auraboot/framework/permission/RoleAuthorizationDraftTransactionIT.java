@@ -62,7 +62,7 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
     @Autowired private com.auraboot.framework.meta.service.DynamicDataService dynamicData;
     @Autowired private com.auraboot.framework.meta.service.SchemaManagementService schema;
     private boolean physicalTable;
-    private Long modelId, fieldId;
+    private Long modelId, fieldId, secondModelId;
     private long roleId;
     private String rolePid;
     private String resource;
@@ -113,6 +113,10 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
             jdbc.update("DELETE FROM ab_command_definition WHERE tenant_id=? AND pid=?", getTestTenant().getId(), nativeCommandPid);
         }
         if (physicalTable) assertThat(schema.dropTableByModel(resource).isSuccess()).isTrue();
+        if (secondModelId != null) {
+            jdbc.update("DELETE FROM ab_meta_model_field_binding WHERE tenant_id=? AND model_id=?", getTestTenant().getId(), secondModelId);
+            jdbc.update("DELETE FROM ab_meta_model WHERE tenant_id=? AND id=?", getTestTenant().getId(), secondModelId);
+        }
         if (modelId != null) {
             jdbc.update("DELETE FROM ab_meta_model_field_binding WHERE tenant_id=? AND model_id=?", getTestTenant().getId(), modelId);
             jdbc.update("DELETE FROM ab_meta_model WHERE tenant_id=? AND id=?", getTestTenant().getId(), modelId);
@@ -898,6 +902,118 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
         assertThat(decision.canRead(resource+"_secret")).isTrue();
         assertThat(decision.canWrite(resource+"_secret")).isFalse();
         assertThat(decision.canRead("another_field")).isFalse();
+    }
+
+    private String multiObjectDuty() {
+        fieldPolicy();
+        var model = models.selectById(modelId);
+        model.setId(null); model.setPid(UniqueIdGenerator.generate()); model.setCode(resource + "_line");
+        models.insert(model); secondModelId = model.getId();
+        var fieldBinding = new com.auraboot.framework.meta.entity.ModelFieldBinding();
+        fieldBinding.setTenantId(getTestTenant().getId()); fieldBinding.setModelId(secondModelId);
+        fieldBinding.setFieldId(fieldId); fieldBinding.setFieldOrder(0); modelFields.insert(fieldBinding);
+        metadata.clearAllCache();
+        String code = "business." + resource + ".manage";
+        jdbc.update("""
+                INSERT INTO ab_permission (pid,tenant_id,code,name,resource_type,resource_code,action,
+                  source,status,deleted_flag,created_at,updated_at)
+                VALUES (?,?,?,?,'operation',?,'manage','test','active',false,now(),now())
+                """, UniqueIdGenerator.generate(), getTestTenant().getId(), code, "Manage project and lines", resource);
+        String duty = resource + ".cap.multi";
+        catalog.saveDefinition(CapabilityDefinitionDTO.builder().code(duty).group("Business fields").includes(List.of(code)).build());
+        var registry = org.mockito.Mockito.mock(com.auraboot.framework.plugin.pf4j.ExtensionRegistry.class);
+        var handlers = new java.util.ArrayList<com.auraboot.framework.plugin.extension.CommandHandlerExtension>();
+        for (String root : List.of(resource, resource + "_line")) {
+            var handler = org.mockito.Mockito.mock(com.auraboot.framework.plugin.extension.CommandHandlerExtension.class,
+                    org.mockito.Mockito.withSettings().extraInterfaces(com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.class));
+            var owner = (com.auraboot.framework.plugin.extension.BusinessResourceAuthorization) handler;
+            org.mockito.Mockito.when(owner.businessBoundary()).thenReturn(new com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.Boundary(
+                    "multi:" + root, root, "update", Set.of(code)));
+            org.mockito.Mockito.when(registry.getBusinessResourceOwner("multi:" + root)).thenReturn(java.util.Optional.of(handler));
+            handlers.add(handler);
+        }
+        org.mockito.Mockito.when(registry.getAllCommandHandlers()).thenReturn(handlers);
+        org.springframework.test.util.ReflectionTestUtils.setField(drafts, "extensions", registry);
+        return duty;
+    }
+
+    private RoleAuthorizationDraftRequest multiObjectRequest(RoleAuthorizationDraftSnapshot baseline, String duty) {
+        var candidates = drafts.preview(rolePid, new RoleAuthorizationDraftRequest(baseline.revision(), Set.of(duty), Set.of(),
+                true, "self", true, List.of())).grantFieldCandidates();
+        assertThat(candidates).hasSize(2);
+        var changes = candidates.stream().map(binding -> new com.auraboot.framework.permission.dto.RoleGrantFields.Change(
+                binding.bindingPid(), binding.bindingPid() == null ? binding.permissionCode() : null,
+                binding.metadataRevision(), List.of(resource + "_secret"),
+                binding.modelCode().equals(resource) ? List.of(resource + "_secret") : List.of(), binding.modelCode())).toList();
+        return new RoleAuthorizationDraftRequest(baseline.revision(), Set.of(duty), Set.of(), true, "self", true,
+                List.of(), null, null, null, changes);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void oneBusinessGrantKeepsIndependentObjectFieldsAndScopeInRealPostgres(boolean existing) {
+        String duty = multiObjectDuty();
+        if (existing) {
+            var initial = drafts.snapshot(rolePid);
+            drafts.apply(rolePid, new RoleAuthorizationDraftRequest(initial.revision(), Set.of(duty), Set.of(), true, "self", true, List.of()));
+        }
+        var baseline = drafts.snapshot(rolePid);
+        String before = migrationBindingBytes();
+        var request = multiObjectRequest(baseline, duty);
+        assertThat(drafts.preview(rolePid, request).grantFieldChanges()).hasSize(2);
+        assertThat(migrationBindingBytes()).isEqualTo(before);
+        var saved = drafts.apply(rolePid, request);
+        assertThat(saved.grantFields()).hasSize(2).allSatisfy(binding -> {
+            assertThat(binding.configured()).isTrue(); assertThat(binding.legacy()).isFalse();
+            assertThat(binding.readFields()).containsExactly(resource + "_secret");
+        });
+        assertThat(saved.grantFields().stream().map(binding -> binding.bindingPid()).distinct()).hasSize(1);
+        assertThat(persistedCodes()).containsExactly("business." + resource + ".manage");
+        assertThat(defaultScope()).isEqualTo("self");
+        String raw = jdbc.queryForObject("SELECT field_scope::text FROM ab_role_permission WHERE role_id=?", String.class, roleId);
+        assertThat(raw).contains("\"version\": 2", resource + "_line");
+        assertThat(roleAuthoring.assignRoleToMember(getTestTenantMember().getId(), roleId, getTestTenant().getId())).isTrue();
+        administrator.close(); administrator = null;
+        var resolver = applicationContext.getBean(com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization.class);
+        for (String root : List.of(resource, resource + "_line")) {
+            var record = new java.util.LinkedHashMap<String,Object>();
+            record.put("pid", UniqueIdGenerator.generate()); record.put("tenant_id", getTestTenant().getId());
+            record.put("created_by", getTestUser().getId()); record.put(resource + "_secret", "actual-witness");
+            var decision = resolver.resolve(getTestTenantMember().getId(), List.of("business." + resource + ".manage"), root, record);
+            assertThat(decision.result().granted()).isTrue(); assertThat(decision.canRead(resource + "_secret")).isTrue();
+            assertThat(decision.canWrite(resource + "_secret")).isEqualTo(root.equals(resource));
+            assertThat(decision.canRead("unlisted_field")).isFalse();
+            record.put("created_by", -getTestUser().getId());
+            assertThat(resolver.resolve(getTestTenantMember().getId(), List.of("business." + resource + ".manage"), root, record).result().granted()).isFalse();
+        }
+    }
+
+    @Test void multiObjectFieldsRollbackAfterRealWriteAndPreserveLegacySqlNull() {
+        String duty = multiObjectDuty();
+        var initial = drafts.snapshot(rolePid);
+        var baseline = drafts.apply(rolePid, new RoleAuthorizationDraftRequest(initial.revision(), Set.of(duty), Set.of(), true, "self", true, List.of()));
+        String before = migrationBindingBytes();
+        doAnswer(call -> {
+            assertThat(jdbc.queryForObject("SELECT field_scope->>'version' FROM ab_role_permission WHERE role_id=?", String.class, roleId)).isEqualTo("2");
+            throw new IllegalStateException("Fault after actual multi-object field writes");
+        }).when(navigation).auditAuthorization(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        try {
+            assertThatThrownBy(() -> drafts.apply(rolePid, multiObjectRequest(baseline, duty)))
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("actual multi-object");
+            assertThat(migrationBindingBytes()).isEqualTo(before);
+        } finally { reset(navigation); }
+        assertThat(drafts.snapshot(rolePid).revision()).isEqualTo(baseline.revision());
+    }
+
+    @Test void databaseRejectsJsonNullRatherThanTreatingItAsLegacySqlNull() {
+        var baseline = grantFieldsBaseline();
+        var binding = baseline.grantFields().getFirst();
+        String before = migrationBindingBytes();
+        assertThatThrownBy(() -> jdbc.update("UPDATE ab_role_permission SET field_scope='null'::jsonb WHERE pid=?", binding.bindingPid()))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class)
+                .hasMessageContaining("chk_role_permission_field_scope_object");
+        assertThat(migrationBindingBytes()).isEqualTo(before);
+        assertThat(drafts.snapshot(rolePid).revision()).isEqualTo(baseline.revision());
     }
 
     @Test void positiveGrantFieldsPreviewAndSavePreserveAllOtherBindingFacts() {

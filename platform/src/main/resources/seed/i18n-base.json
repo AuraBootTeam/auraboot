@@ -6778,5 +6778,20 @@
     "key": "roleGrantFields.action.execute",
     "zh-CN": "执行授权",
     "en-US": "Execute authorization"
+  },
+  {
+    "key": "roleGrantFields.unconfigured",
+    "zh-CN": "此职责尚未配置当前对象。需明确配置后才能执行，仍受职责和记录范围约束。",
+    "en-US": "This object is not configured for the duty. Configure it explicitly; record scope still applies."
+  },
+  {
+    "key": "roleGrantFields.configureObject",
+    "zh-CN": "配置此对象",
+    "en-US": "Configure this object"
+  },
+  {
+    "key": "roleGrantFields.enableObjectPreview",
+    "zh-CN": "为已选职责启用此对象；仍受记录范围约束，只允许选中的字段。",
+    "en-US": "Enable this object under the selected duty. Record scope still applies; only selected fields are allowed."
   }
 ]

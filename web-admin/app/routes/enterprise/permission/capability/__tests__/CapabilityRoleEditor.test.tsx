@@ -669,12 +669,14 @@ describe('positive grant field authoring in the original role draft', () => {
     expect(body.grantFieldChanges).toEqual([
       {
         bindingPid: 'saved-binding',
+        modelCode: 'order',
         expectedMetadataRevision: metadataRevision,
         readFields: ['name'],
         writeFields: [],
       },
       {
         permissionCode: 'model.order.update',
+        modelCode: 'order',
         expectedMetadataRevision: metadataRevision,
         readFields: [],
         writeFields: ['name'],
@@ -725,6 +727,7 @@ describe('positive grant field authoring in the original role draft', () => {
     ).toEqual([
       {
         bindingPid: 'saved-binding',
+        modelCode: 'order',
         expectedMetadataRevision: metadataRevision,
         readFields: [],
         writeFields: [],

@@ -73,6 +73,17 @@ class BusinessCommandRecordAuthorizationTest {
         assertThat(evaluate(record(999, "Shanghai")).granted()).isFalse();
     }
 
+    @Test void unconfiguredObjectCannotBorrowEvenFixedActionAuthorityFromTheSameDuty() {
+        var row = grant(11,101,CODE);
+        row.setFieldScopeJson("{\"version\":2,\"models\":{\"other\":{\"unrestricted\":true}}}");
+        grants(row); scope(101, DataScopeCondition.all());
+        guards(CODE, new PermissionPolicyService.ConditionGuard(11L, null));
+        var result = authorization.resolve(5L, List.of(CODE), MODEL, record(1,"Shanghai"));
+        assertThat(result.result().granted()).isFalse();assertThat(result.grants()).isEmpty();
+        row.setFieldScopeJson("{\"version\":2,\"models\":{\"receipt\":{\"readFields\":[],\"writeFields\":[]}}}");
+        assertThat(authorization.resolve(5L, List.of(CODE), MODEL, record(1,"Shanghai")).result().granted()).isTrue();
+    }
+
     @Test void missingGuardCannotBecomeAnUnconditionalGrant() {
         grants(grant(11, 101, CODE)); scope(101, DataScopeCondition.all()); guards(CODE);
         assertThat(evaluate(record(1, "Shanghai")).granted()).isFalse();

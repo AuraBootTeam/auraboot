@@ -37,10 +37,12 @@ public class RoleGrantFieldScopeService {
             var permission = definitions.get(grant.getPermissionId());
             if (!modelBoundPermission(permission, boundaries)) continue;
             if (grant.getPid() == null || grant.getPid().isBlank() || !seen.add(grant.getPid())) throw denied();
-            var binding = describe(permission, grant);
-            if (binding != null) result.add(binding);
+            for (String model : modelsFor(permission, boundaries)) {
+                var binding = describe(permission, grant, model);
+                if (binding != null) result.add(binding);
+            }
         }
-        return result.stream().sorted(Comparator.comparing(Binding::permissionCode).thenComparing(Binding::bindingPid)).toList();
+        return result.stream().sorted(Comparator.comparing(Binding::permissionCode).thenComparing(Binding::modelCode).thenComparing(Binding::bindingPid)).toList();
     }
 
     /** Project selected permissions without creating placeholder grants or changing live authority. */
@@ -53,8 +55,10 @@ public class RoleGrantFieldScopeService {
                 .map(p -> p.getCode()).filter(code -> resultingCodes.contains(code) && newlyGranted.contains(code) && !bound.contains(code)).distinct().sorted().toList();
         for (String code : pending) {
             var permission = definition(role, code, definitions, boundaries);
-            var binding = describe(permission, null);
-            if (binding != null) result.add(binding);
+            for (String model : modelsFor(permission, boundaries)) {
+                var binding = describe(permission, null, model);
+                if (binding != null) result.add(binding);
+            }
         }
         return List.copyOf(result);
     }
@@ -67,21 +71,32 @@ public class RoleGrantFieldScopeService {
         if (changes == null || changes.isEmpty()) return List.of();
         owned(role); authoring.requireWrite(); authoring.requireTarget(role.getId()); policies.requireWrite();
         if (changes.size() > 1000) throw denied();
-        var catalog = candidates(role, resultingCodes, newlyGranted, boundaries); var seen = new HashSet<String>(); List<Reviewed> result = new ArrayList<>();
+        var catalog = candidates(role, resultingCodes, newlyGranted, boundaries);
+        var definitions = definitions(role);
+        var seen = new HashSet<String>(); List<Reviewed> result = new ArrayList<>();
         for (var change : changes) {
             if (change == null || (change.bindingPid() == null) == (change.permissionCode() == null)) throw denied();
             boolean pending = change.bindingPid() == null;
-            String key = pending ? "permission:" + change.permissionCode() : "binding:" + change.bindingPid();
+            String model = change.modelCode();
+            if (model == null) {
+                var definition = pending ? definition(role, change.permissionCode(), definitions, boundaries)
+                        : grants.findByRole(role.getId()).stream().filter(row -> change.bindingPid().equals(row.getPid()))
+                            .map(row -> definitions.get(row.getPermissionId())).filter(Objects::nonNull)
+                            .findFirst().orElseThrow(RoleGrantFieldScopeService::denied);
+                model = definition.getResourceCode();
+            }
+            String selectedModel = model;
+            String key = (pending ? "permission:" + change.permissionCode() : "binding:" + change.bindingPid()) + ":" + selectedModel;
             if (!seen.add(key) || pending && !newlyGranted.contains(change.permissionCode())) throw denied();
-            var binding = catalog.stream().filter(b -> pending
+            var binding = catalog.stream().filter(b -> selectedModel.equals(b.modelCode()) && (pending
                     ? b.bindingPid() == null && change.permissionCode().equals(b.permissionCode())
-                    : change.bindingPid().equals(b.bindingPid())).findFirst().orElseThrow(RoleGrantFieldScopeService::denied);
+                    : change.bindingPid().equals(b.bindingPid()))).findFirst().orElseThrow(RoleGrantFieldScopeService::denied);
             if (!binding.editable() || !resultingCodes.contains(binding.permissionCode())) throw denied();
             if (pending && (change.expectedMetadataRevision() == null || !change.expectedMetadataRevision().matches("[a-f0-9]{64}"))) throw denied();
             if (change.expectedMetadataRevision() != null && !change.expectedMetadataRevision().equals(binding.metadataRevision())) throw conflict();
             Set<String> allowed = binding.fields().stream().map(Field::code).collect(java.util.stream.Collectors.toSet());
             var reads = validate(change.readFields(), allowed); var writes = validate(change.writeFields(), allowed);
-            if (pending || binding.legacy() || !reads.equals(binding.readFields()) || !writes.equals(binding.writeFields())) result.add(new Reviewed(binding, reads, writes));
+            if (pending || !binding.configured() || binding.legacy() || !reads.equals(binding.readFields()) || !writes.equals(binding.writeFields())) result.add(new Reviewed(binding, reads, writes));
         }
         return List.copyOf(result);
     }
@@ -91,21 +106,44 @@ public class RoleGrantFieldScopeService {
         owned(role); authoring.requireWrite(); authoring.requireTarget(role.getId()); policies.requireWrite();
         if (!TransactionSynchronizationManager.isActualTransactionActive()) throw denied();
         var definitions = definitions(role);
-        for (var change : changes) {
+        var grouped = changes.stream().collect(java.util.stream.Collectors.groupingBy(change ->
+                change.before().bindingPid() != null ? "binding:" + change.before().bindingPid()
+                        : "permission:" + change.before().permissionCode(), LinkedHashMap::new, java.util.stream.Collectors.toList()));
+        for (var group : grouped.values()) {
+            var before = group.getFirst().before();
             var matches = grants.findByRole(role.getId()).stream().filter(row -> {
-                if (change.before().bindingPid() != null) return change.before().bindingPid().equals(row.getPid());
+                if (before.bindingPid() != null) return before.bindingPid().equals(row.getPid());
                 var permission = definitions.get(row.getPermissionId());
-                return permission != null && change.before().permissionCode().equals(permission.getCode());
+                return permission != null && before.permissionCode().equals(permission.getCode());
             }).toList();
             if (matches.size() != 1) throw denied();
             var binding = matches.getFirst();
             if (!Objects.equals(binding.getTenantId(), role.getTenantId()) || !directlyEditable(binding)) throw denied();
             var permission = definitions.get(binding.getPermissionId());
-            if (!modelBoundPermission(permission, boundaries) || !change.before().modelCode().equals(permission.getResourceCode())) throw denied();
-            var current = describe(permission, binding);
-            if (current == null || !Objects.equals(change.before().metadataRevision(), current.metadataRevision())) throw conflict();
-            var scope = Map.of("modelCode", change.before().modelCode(), "readFields", change.readFields(), "writeFields", change.writeFields());
-            if (grants.updateDirectFieldScope(role.getTenantId(), role.getId(), binding.getPid(), encode(scope), MetaContext.getCurrentUserId(), binding.getSourceRef()) != 1) throw denied();
+            var models = modelsFor(permission, boundaries);
+            var document = BusinessGrantFieldScope.decode(json, binding.getFieldScope() == null ? null : encode(binding.getFieldScope()));
+            var next = new TreeMap<>(document.models());
+            if (document.legacy()) {
+                // Narrow one object without silently revoking another currently declared root.
+                for (String model : models) {
+                    if (describe(permission, binding, model) != null)
+                        next.put(model, com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Fields.legacy());
+                }
+            }
+            Set<String> seen = new HashSet<>();
+            for (var change : group) {
+                String model = change.before().modelCode();
+                if (!models.contains(model) || !seen.add(model) || !before.permissionCode().equals(change.before().permissionCode())) throw denied();
+                var current = describe(permission, binding, model);
+                if (current == null || !Objects.equals(change.before().metadataRevision(), current.metadataRevision())) throw conflict();
+                Set<String> allowed = current.fields().stream().map(Field::code).collect(java.util.stream.Collectors.toSet());
+                var reads = validate(change.readFields(), allowed); var writes = validate(change.writeFields(), allowed);
+                next.put(model, new com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Fields(false,
+                        Set.copyOf(reads), Set.copyOf(writes)));
+            }
+            String scope = BusinessGrantFieldScope.encode(json, next, document.versionTwo());
+            if (grants.updateDirectFieldScope(role.getTenantId(), role.getId(), binding.getPid(), scope,
+                    MetaContext.getCurrentUserId(), binding.getSourceRef()) != 1) throw denied();
         }
     }
 
@@ -123,15 +161,16 @@ public class RoleGrantFieldScopeService {
     }
 
     private Binding describe(com.auraboot.framework.permission.dto.PermissionDTO permission,
-            com.auraboot.framework.rbac.entity.RolePermission grant) {
-        var model = models.getModelDefinition(permission.getResourceCode());
+            com.auraboot.framework.rbac.entity.RolePermission grant, String modelCode) {
+        var model = models.getModelDefinition(modelCode);
         if (model.isEmpty()) return null;
-        var metadata = models.getModelFields(permission.getResourceCode());
+        var metadata = models.getModelFields(modelCode);
         var fields = metadata.stream().filter(f -> f.getCode() != null && !Boolean.TRUE.equals(f.getPrimaryKey())
                         && !SystemFieldConstants.isSystemField(f.getCode()) && !SystemFieldConstants.isSystemField(f.getColumnName()))
                 .map(f -> new Field(f.getCode(), f.getDisplayName() != null ? f.getDisplayName() : f.getName()))
                 .sorted(Comparator.comparing(Field::code)).toList();
-        var parsed = BusinessGrantFieldScope.parse(json, grant == null || grant.getFieldScope() == null ? null : encode(grant.getFieldScope()), permission.getResourceCode());
+        var selected = BusinessGrantFieldScope.select(json, grant == null || grant.getFieldScope() == null ? null : encode(grant.getFieldScope()), modelCode);
+        var parsed = selected.orElseGet(() -> new com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Fields(false, Set.of(), Set.of()));
         String revision;
         try {
             var state = new LinkedHashMap<String,Object>(); state.put("model", model.get());
@@ -141,26 +180,28 @@ public class RoleGrantFieldScopeService {
         } catch (JsonProcessingException | java.security.NoSuchAlgorithmException failure) {
             throw new IllegalStateException("Cannot compute grant field metadata revision", failure);
         }
-        return new Binding(grant == null ? null : grant.getPid(), permission.getCode(), permission.getResourceCode(),
+        return new Binding(grant == null ? null : grant.getPid(), permission.getCode(), modelCode,
                 model.get().getDisplayName(), grant == null || directlyEditable(grant), parsed.unrestricted(),
-                parsed.readable().stream().sorted().toList(), parsed.writable().stream().sorted().toList(), fields, revision);
+                parsed.readable().stream().sorted().toList(), parsed.writable().stream().sorted().toList(), fields, revision, selected.isPresent());
     }
 
     private static boolean modelBoundPermission(com.auraboot.framework.permission.dto.PermissionDTO permission, List<BusinessBoundary> boundaries) {
+        return !modelsFor(permission, boundaries).isEmpty();
+    }
+
+    private static List<String> modelsFor(com.auraboot.framework.permission.dto.PermissionDTO permission, List<BusinessBoundary> boundaries) {
         if (permission == null || permission.getCode() == null || permission.getCode().isBlank()
                 || "*".equals(permission.getCode()) || "meta.command.execute".equals(permission.getCode())
                 || permission.getResourceCode() == null
-                || !permission.getResourceCode().matches("[A-Za-z][A-Za-z0-9_]{0,127}")
-                || permission.getAction() == null || permission.getAction().isBlank()) return false;
+                || !permission.getResourceCode().matches("[A-Za-z_][A-Za-z0-9_]{0,127}")
+                || permission.getAction() == null || permission.getAction().isBlank()) return List.of();
         if (("model." + permission.getResourceCode() + "." + permission.getAction()).equals(permission.getCode()))
-            return Set.of("read", "create", "update").contains(permission.getAction());
-        // Business grants already carry this exact model's fields at runtime. Authoring the
-        // same binding does not confer native CRUD, change its scope or replace its source.
-        return ("operation".equalsIgnoreCase(permission.getResourceType())
-                || "data".equalsIgnoreCase(permission.getResourceType()))
-                && boundaries.stream().anyMatch(boundary -> permission.getCode().equals(boundary.permissionCode())
-                    && permission.getResourceCode().equals(boundary.model())
-                    && (permission.getAction().equals(boundary.action()) || "manage".equals(permission.getAction())));
+            return Set.of("read", "create", "update").contains(permission.getAction()) ? List.of(permission.getResourceCode()) : List.of();
+        if (!("operation".equalsIgnoreCase(permission.getResourceType()) || "data".equalsIgnoreCase(permission.getResourceType()))) return List.of();
+        // Only actual registered business roots, never caller-provided model names.
+        return boundaries.stream().filter(boundary -> permission.getCode().equals(boundary.permissionCode())
+                        && (permission.getAction().equals(boundary.action()) || "manage".equals(permission.getAction())))
+                .map(BusinessBoundary::model).distinct().sorted().toList();
     }
 
     private static com.auraboot.framework.exception.BusinessException conflict() {

@@ -28374,7 +28374,7 @@
             "type": "string"
           },
           "rate": {
-            "minimum": 1e-8,
+            "minimum": 1e-08,
             "type": "number"
           },
           "source": {
@@ -47803,6 +47803,9 @@
               "null"
             ]
           },
+          "configured": {
+            "type": "boolean"
+          },
           "editable": {
             "type": "boolean"
           },
@@ -47858,6 +47861,14 @@
           },
           "expectedMetadataRevision": {
             "pattern": "[a-f0-9]{64}",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "modelCode": {
+            "description": "Business object; omitted requests retain the permission's canonical resource model.",
+            "pattern": "[A-Za-z_][A-Za-z0-9_]{0,127}",
             "type": [
               "string",
               "null"

@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 341510110d61694d41d92116e14a1aa509d2bec353c2fd0edbeafc879271b650
+ * Contract SHA-256: b386ad682f0f93641e67098f4ab17a1ae3672809640298e51a753894f338aaa4
  */
 export interface paths {
     "/api/activities": {
@@ -39952,6 +39952,7 @@ export interface components {
         };
         RoleGrantFieldsBinding: {
             bindingPid?: string | null;
+            configured?: boolean;
             editable?: boolean;
             fields?: components["schemas"]["RoleGrantFieldsField"][];
             legacy?: boolean;
@@ -39966,6 +39967,8 @@ export interface components {
         RoleGrantFieldsChange: {
             bindingPid?: string | null;
             expectedMetadataRevision?: string | null;
+            /** @description Business object; omitted requests retain the permission's canonical resource model. */
+            modelCode?: string | null;
             permissionCode?: string | null;
             readFields: string[];
             writeFields: string[];

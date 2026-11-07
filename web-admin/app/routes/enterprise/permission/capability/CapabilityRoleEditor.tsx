@@ -559,6 +559,15 @@ export default function CapabilityRoleEditor({
             };
             return (
               <div key={index}>
+                {binding?.configured === false && (
+                  <p className="text-text-2">
+                    {t(
+                      'roleGrantFields.enableObjectPreview',
+                      undefined,
+                      'Enable this object under the selected duty. Record scope still applies; only selected fields are allowed.',
+                    )}
+                  </p>
+                )}
                 <p className="font-medium">
                   {binding?.modelLabel ||
                     t(
