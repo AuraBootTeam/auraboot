@@ -153,6 +153,65 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT to_jsonb(g)::text FROM ab_role_permission g JOIN ab_permission p ON p.id=g.permission_id WHERE g.tenant_id=? AND g.role_id=? AND p.code=? AND g.deleted_flag=FALSE",String.class,testTenant.getId(),testRole.getId(),code)).isEqualTo(before);
     }
 
+    private String restrictGrantFields(String action, List<String> readable, List<String> writable) throws Exception {
+        String code = "model." + model + "." + action;
+        String scope = json.writeValueAsString(Map.of("modelCode", model, "readFields", readable, "writeFields", writable));
+        assertThat(jdbc.update("UPDATE ab_role_permission g SET field_scope=?::jsonb FROM ab_permission p WHERE g.permission_id=p.id AND g.role_id=? AND g.tenant_id=? AND p.code=? AND g.deleted_flag=FALSE",
+                scope, testRole.getId(), testTenant.getId(), code)).isEqualTo(1);
+        return jdbc.queryForObject("SELECT to_jsonb(g)::text FROM ab_role_permission g JOIN ab_permission p ON p.id=g.permission_id WHERE g.tenant_id=? AND g.role_id=? AND p.code=? AND g.deleted_flag=FALSE",
+                String.class, testTenant.getId(), testRole.getId(), code);
+    }
+
+    @Test void conditionalWritesConsumeCompleteUpdateFieldsBeforeAnyMutation() throws Exception {
+        String before = restrictGrantFields("update", List.of(), List.of(label));
+        assertThat(data.compareAndSet(model, pid, label, "before", "cas-allowed")).isTrue();
+        assertThatThrownBy(() -> data.compareAndSet(model, pid, label, "cas-allowed", Map.of(label, "must-not-persist", quantity, 9)))
+                .isInstanceOf(AccessDeniedException.class).hasMessageContaining("FIELD_WRITE_DENIED");
+        assertThat(stored(label, pid)).isEqualTo("cas-allowed");
+        assertThat(stored(quantity, pid)).isEqualTo(1);
+        assertThatThrownBy(() -> data.compareAndSetBatch(model, label, List.of(
+                new com.auraboot.framework.plugin.extension.CompareAndSetUpdate(pid, "cas-allowed", Map.of(label, "batch-must-not-persist", quantity, 9)))))
+                .isInstanceOf(AccessDeniedException.class).hasMessageContaining("FIELD_WRITE_DENIED");
+        assertThat(stored(label, pid)).isEqualTo("cas-allowed");
+        assertThat(stored(quantity, pid)).isEqualTo(1);
+        data.compareAndSetBatch(model, label, List.of(
+                new com.auraboot.framework.plugin.extension.CompareAndSetUpdate(pid, "cas-allowed", Map.of(label, "batch-allowed"))));
+        assertThat(stored(label, pid)).isEqualTo("batch-allowed");
+        assertThat(data.compareAndSet(model, pid, label, "stale", "must-not-persist")).isFalse();
+        assertThat(stored(label, pid)).isEqualTo("batch-allowed");
+        assertThat(jdbc.queryForObject("SELECT to_jsonb(g)::text FROM ab_role_permission g JOIN ab_permission p ON p.id=g.permission_id WHERE g.tenant_id=? AND g.role_id=? AND p.code=? AND g.deleted_flag=FALSE",
+                String.class, testTenant.getId(), testRole.getId(), "model." + model + ".update")).isEqualTo(before);
+    }
+
+    @Test void conditionalComparisonsCannotBorrowReadableFieldsFromUpdateGrants() throws Exception {
+        restrictGrantFields("read", List.of(label), List.of());
+        restrictGrantFields("update", List.of(quantity), List.of(label, quantity));
+        for (int expected : List.of(1, 99)) {
+            assertThatThrownBy(() -> data.compareAndSet(model, pid, quantity, expected, Map.of(label, "inferred")))
+                    .isInstanceOf(AccessDeniedException.class).hasMessageContaining("FIELD_READ_DENIED");
+        }
+        assertThatThrownBy(() -> data.compareAndSetBatch(model, quantity, List.of(
+                new com.auraboot.framework.plugin.extension.CompareAndSetUpdate(pid, 1, Map.of(label, "inferred")))))
+                .isInstanceOf(AccessDeniedException.class).hasMessageContaining("FIELD_READ_DENIED");
+        assertThat(stored(label, pid)).isEqualTo("before");
+        assertThat(stored(quantity, pid)).isEqualTo(1);
+        assertThat(data.compareAndSet(model, pid, label, "before", "allowed")).isTrue();
+    }
+
+    @Test void nativeCounterRequiresBothWritableCounterAndReadableComparisonFields() throws Exception {
+        restrictGrantFields("update", List.of(), List.of(label));
+        assertThatThrownBy(() -> data.incrementWithinCap(model, pid, quantity, 1, null))
+                .isInstanceOf(AccessDeniedException.class).hasMessageContaining("FIELD_WRITE_DENIED");
+        assertThat(stored(quantity, pid)).isEqualTo(1);
+        restrictGrantFields("update", List.of(), List.of(quantity));
+        restrictGrantFields("read", List.of(quantity), List.of());
+        assertThatThrownBy(() -> data.incrementWithinCap(model, pid, quantity, 1, secret))
+                .isInstanceOf(AccessDeniedException.class).hasMessageContaining("FIELD_READ_DENIED");
+        assertThat(stored(quantity, pid)).isEqualTo(1);
+        assertThat(data.incrementWithinCap(model, pid, quantity, 1, null)).contains(2L);
+        assertThat(stored(quantity, pid)).isEqualTo(2);
+    }
+
     @Test void nativeCreateUsesTheActualDefaultedRowAndRejectsForbiddenFieldsWithoutInsertion() throws Exception {
         String code="model."+model+".create";
         String fieldScope=json.writeValueAsString(Map.of("modelCode",model,"readFields",List.of(),"writeFields",List.of(label)));

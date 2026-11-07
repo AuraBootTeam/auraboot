@@ -289,7 +289,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             "integer", "int", "long", "bigint", "decimal", "numeric", "float", "double");
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public boolean compareAndSet(String modelCode,
                                  String recordId,
                                  String fieldCode,
@@ -302,7 +302,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public boolean compareAndSet(String modelCode,
                                  String recordId,
                                  String fieldCode,
@@ -365,9 +365,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                         "compareAndSet requires writable mutable stored fields: " + nextFieldCode);
             }
         }
-        // CAS never needs a pre-read: the expected value and every scope predicate are part of
-        // the UPDATE itself. Exact-command provenance can be checked conservatively from the
-        // field definition; conditional immutability was rejected above because it needs a row.
+        // The SQL keeps the compare predicate atomic. Ordinary actors additionally authorize
+        // the locked record and comparison visibility in this same write snapshot.
+        applicationContext.getBean(NativeRecordFieldAuthorization.class).requireConditionalUpdate(
+                modelCode, recordId, nextValues, implicitVersion ? Set.of() : Set.of(fieldCode));
         FieldWriterGuard.assertFieldsAllowed(model, new ArrayList<>(data.keySet()));
 
         payloadTemporalNormalizer.normalize(data, model);
@@ -426,7 +427,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public void compareAndSetBatch(String modelCode, String fieldCode,
             List<com.auraboot.framework.plugin.extension.CompareAndSetUpdate> updates) {
         BusinessResourceDataScope.unsupported();
@@ -461,6 +462,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             for (String code : data.keySet()) {
                 assertBatchCasField(DynamicDataValueMapper.findFieldDefinition(model, code), code);
             }
+            applicationContext.getBean(NativeRecordFieldAuthorization.class).requireConditionalUpdate(
+                    modelCode, update.recordId(), update.nextValues(), Set.of(fieldCode));
             FieldWriterGuard.assertFieldsAllowed(model, new ArrayList<>(data.keySet()));
             payloadTemporalNormalizer.normalize(data, model);
             validationService.validateAndThrow(model, data, ValidationContext.UPDATE);
@@ -621,7 +624,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public Optional<Long> incrementWithinCap(String modelCode, String recordId,
                                               String counterCode, long delta, String capCode) {
         BusinessResourceDataScope.unsupported();
@@ -650,6 +653,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         observedFields.add(counterCode);
         if (capCode != null) observedFields.add(capCode);
         fieldPredicateAuthorizationSupport().requireReadable(model, observedFields);
+        applicationContext.getBean(NativeRecordFieldAuthorization.class).requireConditionalUpdate(
+                modelCode, recordId, Map.of(counterCode, delta), observedFields);
         StringBuilder guardedClause = new StringBuilder(buildSoftDeleteClause(model));
         RecordCommandWriterGuard.appendStoredPredicate(guardedClause, model, "update", code -> metadataService.getModelDefinition(code).orElse(null));
         String softDeleteClause = guardedClause.toString();

@@ -87,6 +87,8 @@ class DynamicDataServiceAtomicIncrementGuardTest {
         ReflectionTestUtils.setField(service, "dynamicDataMapper", mapper);
         ReflectionTestUtils.setField(service, "virtualFieldEngine", virtualFields);
         ReflectionTestUtils.setField(service, "applicationContext", applicationContext);
+        lenient().when(applicationContext.getBean(NativeRecordFieldAuthorization.class))
+                .thenReturn(mock(NativeRecordFieldAuthorization.class));
         ReflectionTestUtils.setField(service, "dataPermissionEngine", mock(com.auraboot.framework.meta.service.DataPermissionEngine.class));
         ReflectionTestUtils.setField(service, "dataDomainService", mock(com.auraboot.framework.meta.service.DataDomainService.class));
 

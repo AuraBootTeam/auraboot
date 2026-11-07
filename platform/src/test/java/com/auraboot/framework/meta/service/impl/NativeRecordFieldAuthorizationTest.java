@@ -127,4 +127,20 @@ class NativeRecordFieldAuthorizationTest {
         verify(authorization,never()).resolveOrdinaryUpdate(any(),any(),any());
     }
 
+    @Test void conditionalReadsUseIndependentGrantFieldsAndTheSameCanonicalRow() {
+        when(authorization.resolveOrdinaryUpdate(eq(5L),eq("project"),anyMap())).thenReturn(allowed("record"));
+        var read = new BusinessGrantDecision(PermissionResult.allow(List.of()),100L,1L,5L,"project","record",List.of(
+                new BusinessGrantDecision.Grant(10L,12L,"model.project.read",
+                        new BusinessGrantDecision.Fields(false,Set.of("name"),Set.of("secret")))));
+        when(authorization.resolveOrdinaryRead(eq(5L),eq("project"),anyMap())).thenReturn(read);
+        boundary.requireConditionalUpdate("project","record",Map.of("name","new"),Set.of("name"));
+        assertThatThrownBy(() -> boundary.requireConditionalUpdate("project","record",Map.of("name","new"),Set.of("secret")))
+                .isInstanceOf(AccessDeniedException.class).hasMessageContaining("FIELD_READ_DENIED");
+        verify(authorization,times(2)).resolveOrdinaryRead(eq(5L),eq("project"),argThat(facts ->
+                "PRIVATE".equals(facts.get("secret")) && "record".equals(facts.get("pid"))));
+        when(authorization.resolveOrdinaryRead(eq(5L),eq("project"),anyMap())).thenReturn(allowed("other"));
+        assertThatThrownBy(() -> boundary.requireConditionalUpdate("project","record",Map.of("name","new"),Set.of("name")))
+                .isInstanceOf(AccessDeniedException.class).hasMessageContaining("FIELD_READ_DENIED");
+    }
+
 }

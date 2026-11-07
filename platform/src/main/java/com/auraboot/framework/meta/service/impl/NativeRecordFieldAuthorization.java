@@ -25,15 +25,22 @@ public class NativeRecordFieldAuthorization {
     private final BusinessCommandRecordAuthorization authorization;
 
     public void requireUpdate(String modelCode, String recordId, Map<String,Object> submitted) {
-        require("update", modelCode, recordId, submitted);
+        require("update", modelCode, recordId, submitted, Set.of());
     }
 
     /** Called after insertion, before materialization or observation, in the inserting transaction. */
     public void requireCreated(String modelCode, String recordId, Map<String,Object> submitted) {
-        require("create", modelCode, recordId, submitted);
+        require("create", modelCode, recordId, submitted, Set.of());
     }
 
-    private void require(String action, String modelCode, String recordId, Map<String,Object> submitted) {
+    /** Conditional outcomes expose observed values, so require the independent read grant too. */
+    public void requireConditionalUpdate(String modelCode, String recordId,
+                                         Map<String,Object> submitted, Set<String> observed) {
+        require("update", modelCode, recordId, submitted, observed);
+    }
+
+    private void require(String action, String modelCode, String recordId, Map<String,Object> submitted,
+                         Set<String> observed) {
         if (!MetaContext.exists() || MetaContext.getCurrentMemberId() == null
                 || com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
                 || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
@@ -107,6 +114,17 @@ public class NativeRecordFieldAuthorization {
                     || com.auraboot.framework.meta.constant.SystemFieldConstants.isSystemField(field.getColumnName()))
                 throw denied("Immutable submitted field alias");
             if (!grant.canWrite(field.getCode())) throw denied("Submitted field is outside the matching write grant");
+        }
+
+        if (!observed.isEmpty()) {
+            var readGrant = authorization.resolveOrdinaryRead(MetaContext.getCurrentMemberId(), modelCode, canonical);
+            if (readGrant == null || !readGrant.result().granted()
+                    || !Objects.equals(readGrant.tenantId(), MetaContext.getCurrentTenantId())
+                    || !Objects.equals(readGrant.userId(), MetaContext.getCurrentUserId())
+                    || !Objects.equals(readGrant.memberId(), MetaContext.getCurrentMemberId())
+                    || !Objects.equals(readGrant.modelCode(), modelCode) || !Objects.equals(readGrant.recordPid(), pid)
+                    || observed.stream().anyMatch(field -> !readGrant.canRead(field)))
+                throw new AccessDeniedException("FIELD_READ_DENIED: conditional mutation requires matching readable grant fields");
         }
     }
 
