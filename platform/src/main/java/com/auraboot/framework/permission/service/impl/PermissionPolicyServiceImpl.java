@@ -58,6 +58,11 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
     @Override
+    @org.springframework.cache.annotation.Cacheable(value = "conditionGuards",
+            cacheManager = "permissionCacheManager",
+            key = "T(com.auraboot.framework.meta.cache.DataAccessCacheEpoch).current() + ':' + "
+                    + "T(com.auraboot.framework.application.tenant.MetaContext).getCurrentTenantId() + ':' + "
+                    + "#memberId + ':' + #permissionCode")
     public List<ConditionGuard> getConditionGuards(Long memberId, String permissionCode) {
         Long tenantId = MetaContext.getCurrentTenantId();
         List<Long> roleIds = resolveRoleIds(memberId, tenantId);
@@ -84,7 +89,7 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
                     row.getConditionsJson(),
                     runtimeValidationError(permission, row.getConditionsJson())));
         }
-        return guards;
+        return List.copyOf(guards);
     }
 
     @Override
