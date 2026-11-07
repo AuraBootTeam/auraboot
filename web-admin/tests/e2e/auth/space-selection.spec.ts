@@ -16,26 +16,29 @@
  *   - This is the default state after reset-and-init.sh
  */
 
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { BACKEND_URL } from '../../helpers/environments';
-
-async function initializedSessionToken(page: Page): Promise<string> {
-  // Space selection tests reuse the real login established by global setup.
-  // Repeated credential logins across the auth suite consume the production limiter.
-  const cookie = (await page.context().cookies()).find(item => item.name === '__session');
-  expect(cookie, 'Global setup must provide an authenticated BFF session').toBeDefined();
-  const session = JSON.parse(Buffer.from(decodeURIComponent(cookie!.value).split('.')[0], 'base64').toString());
-  expect(typeof session.jwtToken).toBe('string');
-  expect(session.jwtToken.length).toBeGreaterThan(50);
-  return session.jwtToken;
-}
+import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
 test.describe('Space Selection API', () => {
-  test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
+  // Each successful selection revokes the old session. Own one isolated session
+  // and carry forward its replacement token, without invalidating auth.setup state
+  // or spending three credential logins against the real ten-per-minute limiter.
+  test.describe.configure({ mode: 'serial' });
+  let currentToken: string;
+  test.beforeAll(async ({ request }) => {
+    const response = await request.post('/api/auth/login', {
+      data: { email: DEFAULT_TEST_ACCOUNT.email, password: DEFAULT_TEST_ACCOUNT.password },
+    });
+    expect(response.ok()).toBe(true);
+    const body = await response.json();
+    expect(body.data?.jwt, `Space fixture login failed: code=${body.code}`).toBeTruthy();
+    currentToken = body.data.jwt;
+  });
   test('my-spaces API returns platform + business spaces', async ({ page }) => {
-    const token = await initializedSessionToken(page);
+    const token = currentToken;
 
     // Fetch spaces
     const spacesRes = await page.request.get('/api/tenant-selection/my-spaces', {
@@ -63,7 +66,7 @@ test.describe('Space Selection API', () => {
   });
 
   test('selecting a space returns new JWT with tenantId', async ({ page }) => {
-    const token = await initializedSessionToken(page);
+    const token = currentToken;
 
     // Get business space
     const spacesRes = await page.request.get('/api/tenant-selection/my-spaces', {
@@ -88,6 +91,7 @@ test.describe('Space Selection API', () => {
     const selectBody = await selectRes.json();
     expect(selectBody.data.status).toBe('success');
     expect(selectBody.data.jwt).toBeTruthy();
+    currentToken = selectBody.data.jwt;
     // tenantId is now serialized as string from backend
     expect(String(selectBody.data.tenantId)).toBe(String(businessSpace.tenantId));
     const claims = Buffer.from(selectBody.data.jwt.split('.')[1], 'base64url').toString();
@@ -99,7 +103,7 @@ test.describe('Space Selection API', () => {
   });
 
   test('selecting platform space returns JWT with system tenant', async ({ page }) => {
-    const token = await initializedSessionToken(page);
+    const token = currentToken;
 
     // Get platform space
     const spacesRes = await page.request.get('/api/tenant-selection/my-spaces', {
@@ -124,6 +128,7 @@ test.describe('Space Selection API', () => {
     const selectBody = await selectRes.json();
     expect(selectBody.data.status).toBe('success');
     expect(selectBody.data.jwt).toBeTruthy();
+    currentToken = selectBody.data.jwt;
     expect(String(selectBody.data.tenantId)).toBe(String(platformSpace.tenantId));
     const claims = Buffer.from(selectBody.data.jwt.split('.')[1], 'base64url').toString();
     expect(claims.match(/"tenantId"\s*:\s*"?(\d+)"?(?=\s*[,}])/)?.[1]).toBe(String(platformSpace.tenantId));
