@@ -99,4 +99,5 @@ const Display: React.FC<DisplayProps> = ({
   );
 };
 
+export { Display };
 export default Display;
