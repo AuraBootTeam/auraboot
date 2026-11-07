@@ -21,15 +21,15 @@ public final class FieldWriteAuthorizationSupport {
 
     /** Return submitted keys, including column aliases, without mutating the submitted input. */
     public Set<String> nonWritableInputKeys(String modelCode, Set<String> inputKeys) {
-        return nonWritableInputKeys(modelCode, inputKeys, true);
+        return restrictedInputKeys(modelCode, inputKeys);
     }
 
-    /** A complete business grant replaces ordinary positive field grants, never mandatory restrictions. */
+    /** Complete business grants replace model authority, never metadata field roles or mandatory restrictions. */
     public Set<String> nonWritablePolicyInputKeys(String modelCode, Set<String> inputKeys) {
-        return nonWritableInputKeys(modelCode, inputKeys, false);
+        return restrictedInputKeys(modelCode, inputKeys);
     }
 
-    private Set<String> nonWritableInputKeys(String modelCode, Set<String> inputKeys, boolean ordinaryGrants) {
+    private Set<String> restrictedInputKeys(String modelCode, Set<String> inputKeys) {
         NativeHumanActor.requireCompleteIdentity();
         if (inputKeys == null || inputKeys.isEmpty()) return Set.of();
         var policyFields = policies.getNonWritableFields(
@@ -41,12 +41,14 @@ public final class FieldWriteAuthorizationSupport {
         if (!human && restricted.isEmpty()) return Set.of();
         var definitions = metadata.getModelFields(modelCode);
         if (definitions == null) throw new MetaServiceException("Field metadata unavailable for write authorization: " + modelCode);
-        if (ordinaryGrants && human && !definitions.isEmpty()) {
+        if (human && !definitions.isEmpty()) {
             var permissions = fields.getFieldPermissions(MetaContext.getCurrentMemberId(), modelCode);
-            if (permissions == null || permissions.editableFields() == null)
+            if (permissions == null || permissions.editableFields() == null
+                    || permissions.viewableFields() == null || permissions.hiddenFields() == null)
                 throw new MetaServiceException("Field permissions unavailable for write authorization: " + modelCode);
             for (var field : definitions) {
-                if (!SYSTEM_FIELDS.contains(field.getCode()) && !permissions.editableFields().contains(field.getCode()))
+                if (!SYSTEM_FIELDS.contains(field.getCode()) && (!permissions.editableFields().contains(field.getCode())
+                        || !permissions.viewableFields().contains(field.getCode()) || permissions.hiddenFields().contains(field.getCode())))
                     restricted.add(field.getCode());
             }
         }

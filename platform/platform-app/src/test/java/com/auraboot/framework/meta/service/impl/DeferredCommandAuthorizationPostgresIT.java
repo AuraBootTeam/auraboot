@@ -47,6 +47,7 @@ class DeferredCommandAuthorizationPostgresIT extends BaseIntegrationTest {
     @Autowired AsyncTaskServiceImpl tasks;
     @Autowired UserPermissionService permissions;
     @Autowired DataScopeService scopes;
+    @Autowired FieldPermissionService fieldPermissions;
     @Autowired ObjectMapper json;
     @MockitoSpyBean ExtensionRegistry extensions;
     Model model;
@@ -163,6 +164,21 @@ class DeferredCommandAuthorizationPostgresIT extends BaseIntegrationTest {
         assertThat(done.getStatus()).as(done.getErrorMessage()).isEqualTo("completed");
         assertThat(calls).hasValue(1);assertThat(row()).containsEntry(label,"approved");assertThat(grants()).isEqualTo(grants);
     }
+    @Test void completeBusinessCheckpointRetainsMetadataFieldRolesWithoutRequiringModelCrud() {
+        rootBusinessDuty();
+        jdbc.update("UPDATE ab_role_permission SET status='inactive' WHERE role_id=? AND permission_id IN(SELECT id FROM ab_permission WHERE tenant_id=? AND code=?)",getTestRole().getId(),tenant(),"model."+model.getCode()+".update");
+        var restriction=new ExtensionBean();restriction.setExtension(new HashMap<>(Map.of("fieldPermission",Map.of("edit",List.of("unassigned_"+model.getCode())))));
+        field.setExtension(restriction);fields.updateById(field);metadata.clearAllCache();evict();
+        assertThat(fieldPermissions.getFieldPermissions(getTestTenantMember().getId(),model.getCode()).editableFields()).doesNotContain(label);
+        var before=row();String original=grants();var rejected=execute(queued());var after=row();
+        assertThat(rejected.getStatus()).as("Current metadata role constraint; row=%s",after).isEqualTo("failed");
+        assertThat(calls).hasValue(1);assertThat(after).isEqualTo(before);assertThat(grants()).isEqualTo(original);
+        var unrestricted=new ExtensionBean();unrestricted.setExtension(new HashMap<>());
+        field.setExtension(unrestricted);fields.updateById(field);metadata.clearAllCache();evict();
+        var accepted=execute(queued());assertThat(accepted.getStatus()).as(accepted.getErrorMessage()).isEqualTo("completed");
+        assertThat(calls).hasValue(2);assertThat(row()).containsEntry(label,"approved");assertThat(grants()).isEqualTo(original);
+    }
+
     @Test void owningBusinessFieldsCannotBeBypassedByAnUnrestrictedModelGrant() throws Exception {
         rootBusinessDuty();
         jdbc.update("UPDATE ab_role_permission SET field_scope=?::jsonb WHERE role_id=? AND permission_id IN(SELECT id FROM ab_permission WHERE tenant_id=? AND code=?)",

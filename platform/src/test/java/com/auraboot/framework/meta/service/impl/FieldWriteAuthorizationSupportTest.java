@@ -76,7 +76,11 @@ class FieldWriteAuthorizationSupportTest {
     @Test void completeBusinessFieldsRetainMandatoryLogicalAndPhysicalRestrictions() {
         when(policies.getNonWritableFields(7L,"orders",20L)).thenReturn(Set.of("cost_column"));
         assertThat(support.nonWritablePolicyInputKeys("orders",Set.of("cost","name_column"))).containsExactly("cost");
-        verifyNoInteractions(fields);
+        verify(fields).getFieldPermissions(30L,"orders");
+    }
+
+    @Test void completeBusinessFieldsCannotBypassMetadataEditRoles() {
+        assertThat(support.nonWritablePolicyInputKeys("orders",Set.of("cost_column","name"))).containsExactly("cost_column");
     }
 
 }

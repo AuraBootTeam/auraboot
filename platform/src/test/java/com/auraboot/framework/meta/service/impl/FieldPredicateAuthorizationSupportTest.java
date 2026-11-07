@@ -100,4 +100,15 @@ class FieldPredicateAuthorizationSupportTest {
         assertThrows(AccessDeniedException.class,()->MetaContext.runWithCommandPermitScope("ALL",()->{check();return null;}));
     }
 
+    @Test void businessPredicateHonorsMetadataVisibilityEvenInsideABoundCommand() {
+        when(fields.getFieldPermissions(8L,"counter")).thenReturn(new FieldPermissionSet(Set.of(),Set.of(),Set.of("amount")));
+        var decision=new com.auraboot.framework.permission.engine.model.BusinessGrantDecision(
+                com.auraboot.framework.permission.engine.model.PermissionResult.allow(List.of()),1L,7L,8L,"counter","root",
+                List.of(new com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Grant(1L,2L,"counter.manage",
+                        new com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Fields(false,Set.of("amount"),Set.of("amount")))));
+        assertThrows(AccessDeniedException.class,()->MetaContext.runWithCommandPermitPlan("TARGET",1L,"counter","root",()->{
+            support.requireBusinessReadable(model,Set.of("amount"),decision);return null;
+        }));
+    }
+
 }

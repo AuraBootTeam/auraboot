@@ -160,14 +160,14 @@ class CommandInputFieldAuthorizationPhaseTest {
         when(policies.getFieldMaskRules(7L,"orders",20L)).thenReturn(List.of());
         when(masks.getEffectiveConfigs("orders",20L,"detail")).thenReturn(List.of());
         when(fields.getFieldPermissions(30L,"orders")).thenReturn(
-                new com.auraboot.framework.permission.engine.model.FieldPermissionSet(Set.of(),Set.of(),Set.of("cost","description")));
+                com.auraboot.framework.permission.engine.model.FieldPermissionSet.allAllowed(Set.of("cost","description")));
     }
     interface ControlledHandler extends com.auraboot.framework.plugin.extension.CommandHandlerExtension,
             com.auraboot.framework.plugin.extension.BusinessResourceAuthorization {}
 
     @Test void explicitControlInputUsesCompleteDutyFieldsWithoutTechnicalCrud() {
         control(); phase.execute(context);
-        verifyNoInteractions(fields);
+        verify(fields,atLeastOnce()).getFieldPermissions(30L,"orders");
         assertThat(context.getPayload()).containsExactly(Map.entry("suggestionId","suggestion-1"));
     }
     @Test void requiredControlTokenCannotBeOmittedOrReplacedByArbitraryInput() {
@@ -197,6 +197,17 @@ class CommandInputFieldAuthorizationPhaseTest {
         context.setBusinessGrantDecision(new com.auraboot.framework.permission.engine.model.BusinessGrantDecision(
                 com.auraboot.framework.permission.engine.model.PermissionResult.allow(List.of()),7L,20L,30L,"orders","root",
                 List.of(new com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Grant(1L,2L,"orders.update",restricted))));
+        assertThatThrownBy(()->phase.execute(context)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+    }
+
+    @Test void businessControlCannotBypassMetadataReadOnlyFieldRoles() {
+        control();when(fields.getFieldPermissions(30L,"orders")).thenReturn(
+                new com.auraboot.framework.permission.engine.model.FieldPermissionSet(Set.of("description"),Set.of(),Set.of()));
+        assertThatThrownBy(()->phase.execute(context)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+    }
+    @Test void businessControlCannotBypassMetadataHiddenFieldRoles() {
+        control();when(fields.getFieldPermissions(30L,"orders")).thenReturn(
+                new com.auraboot.framework.permission.engine.model.FieldPermissionSet(Set.of(),Set.of(),Set.of("description")));
         assertThatThrownBy(()->phase.execute(context)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
     }
 

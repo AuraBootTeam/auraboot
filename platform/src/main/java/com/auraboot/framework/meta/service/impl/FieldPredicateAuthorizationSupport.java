@@ -28,20 +28,8 @@ public final class FieldPredicateAuthorizationSupport {
         }
         // Trusted internal execution has already checked its separate owner resource contract.
         if (MetaContext.isCommandPermitBoundTo(model.getCode())) return;
-        Set<String> aliases = new LinkedHashSet<>(fieldCodes);
-        for (var field : model.getFields()) {
-            if (fieldCodes.contains(field.getCode()) && field.getColumnName() != null)
-                aliases.add(field.getColumnName());
-        }
-        Long userId = MetaContext.getCurrentUserId();
-        Long memberId = MetaContext.getCurrentMemberId();
-        if (!com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()) {
-            var permission = fields.getFieldPermissions(memberId, model.getCode());
-            if (permission == null || permission.viewableFields() == null || permission.hiddenFields() == null)
-                throw new MetaServiceException("Field permissions unavailable for conditional mutation");
-            if (!permission.viewableFields().containsAll(fieldCodes)
-                    || fieldCodes.stream().anyMatch(permission.hiddenFields()::contains)) deny();
-        }
+        if (!com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active())
+            requireMetadataReadable(model, fieldCodes);
         requireUnmasked(model, fieldCodes);
     }
 
@@ -50,7 +38,16 @@ public final class FieldPredicateAuthorizationSupport {
             com.auraboot.framework.permission.engine.model.BusinessGrantDecision decision) {
         NativeHumanActor.requireCompleteIdentity();
         if (decision == null || fieldCodes.stream().anyMatch(field -> !decision.canRead(field))) deny();
+        requireMetadataReadable(model, fieldCodes);
         requireUnmasked(model, fieldCodes);
+    }
+
+    private void requireMetadataReadable(ModelDefinition model, Set<String> fieldCodes) {
+        var permission=fields.getFieldPermissions(MetaContext.getCurrentMemberId(),model.getCode());
+        if(permission==null || permission.viewableFields()==null || permission.hiddenFields()==null)
+            throw new MetaServiceException("Field permissions unavailable for conditional mutation");
+        if(!permission.viewableFields().containsAll(fieldCodes)
+                || fieldCodes.stream().anyMatch(permission.hiddenFields()::contains)) deny();
     }
 
     private void requireUnmasked(ModelDefinition model, Set<String> fieldCodes) {
