@@ -119,7 +119,7 @@ class PluginRoleModelPermissionReconciliationIT extends BaseIntegrationTest {
     @Test void explicitModelClassificationUpgradesLegacyDefinitionWithoutRegrantingTheRole() throws Exception {
         install(); Long tenant=getTestTenant().getId(); String code="model."+model+".read";
         String identity=jdbc.queryForObject("SELECT jsonb_build_object('id',id,'pid',pid,'code',code,'resource',resource_code,'action',action,'status',status,'deleted',deleted_flag)::text FROM ab_permission WHERE tenant_id=? AND code=?",String.class,tenant,code);
-        jdbc.update("UPDATE ab_permission SET resource_type=NULL WHERE tenant_id=? AND code=?",tenant,code);
+        jdbc.update("UPDATE ab_permission SET resource_type=NULL,resource_code=NULL,action=NULL WHERE tenant_id=? AND code=?",tenant,code);
         jdbc.update("UPDATE ab_role SET default_data_scope_type=NULL WHERE tenant_id=? AND id=?",tenant,roleId);
         jdbc.update("UPDATE ab_role_permission SET status='inactive',priority=37,effective_date=CURRENT_DATE+2,expiry_date=CURRENT_DATE+30,field_scope=?::jsonb WHERE tenant_id=? AND role_id=?",
                 new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(Map.of("modelCode",model,"readFields",List.of(model+"_name"),"writeFields",List.of())),tenant,roleId);
@@ -130,10 +130,11 @@ class PluginRoleModelPermissionReconciliationIT extends BaseIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT jsonb_build_object('id',id,'pid',pid,'code',code,'resource',resource_code,'action',action,'status',status,'deleted',deleted_flag)::text FROM ab_permission WHERE tenant_id=? AND code=?",String.class,tenant,code)).isEqualTo(identity);
         assertThat(snapshot()).isEqualTo(before);
         write("config/permissions.json","""
-            [{"code":"model.%s.read","name:en":"Read widgets","resourceCode":"%s","action":"read"}]
-            """.formatted(model,model));
+            [{"code":"model.%s.read","name:en":"Read widgets"}]
+            """.formatted(model));
         assertThat(execute().isSuccess()).isTrue();
         assertThat(jdbc.queryForObject("SELECT resource_type FROM ab_permission WHERE tenant_id=? AND code=?",String.class,tenant,code)).isEqualTo("model");
+        assertThat(jdbc.queryForObject("SELECT jsonb_build_object('id',id,'pid',pid,'code',code,'resource',resource_code,'action',action,'status',status,'deleted',deleted_flag)::text FROM ab_permission WHERE tenant_id=? AND code=?",String.class,tenant,code)).isEqualTo(identity);
         assertThat(snapshot()).isEqualTo(before);
     }
 

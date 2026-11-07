@@ -55,4 +55,17 @@ class PluginPermissionResourceTypeImportTest {
         verifyNoInteractions(grants);
     }
 
+    @Test void omittedResourceAndActionPreserveThePublishedBoundary() {
+        var dto = new PermissionDefinitionDTO(); dto.setCode("model.project.read"); dto.setName("Read projects");
+        var previous = new PermissionDTO(); previous.setCode(dto.getCode()); previous.setPid("existing-permission");
+        previous.setResourceType("data"); previous.setResourceCode("project"); previous.setAction("read");
+        when(facade.checkPermissionExists(42L,dto.getCode())).thenReturn(true);
+        when(permissions.findByCode(dto.getCode())).thenReturn(previous);
+        var ledger = importer.importPermission(dto,"plugin","import",42L,ImportRequest.ConflictStrategy.OVERWRITE);
+        verify(definitions).updateForPluginImport(eq("Read projects"),isNull(),isNull(),eq("data"),
+                eq("project"),eq("read"),isNull(),isNull(),isNull(),isNull(),isNull(),eq("plugin"),eq(42L),eq(dto.getCode()));
+        assertThat(ledger.getResourcePid()).isEqualTo("existing-permission");
+        verifyNoInteractions(grants);
+    }
+
 }
