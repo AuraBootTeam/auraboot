@@ -91,6 +91,22 @@ class RoleAuthorizationDraftServiceTest {
                 Set.of("model.order.read"))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
     }
 
+    @Test void fieldCandidatesDoNotInventPendingBindingsOutsideTheActualGrantPlan() {
+        var definition = permission("model.order.read", "order", "read"); definition.setId(3L);
+        when(permissions.findAllActive()).thenReturn(List.of(definition));
+        when(grants.findByRole(1L)).thenReturn(List.of());
+        var metadata = mock(com.auraboot.framework.meta.service.MetaModelService.class);
+        when(metadata.getModelDefinition("order")).thenReturn(java.util.Optional.of(
+                com.auraboot.framework.meta.dto.ModelDefinition.builder().code("order").build()));
+        when(metadata.getModelFields("order")).thenReturn(List.of(
+                com.auraboot.framework.meta.dto.FieldDefinition.builder().code("name").name("Name").build()));
+        var editor = new RoleGrantFieldScopeService(grants, permissions, metadata,
+                mock(DataPermissionAuthoringAccess.class), authoringAccess, JsonMapper.builder().build());
+        assertThat(editor.candidates(role, Set.of("model.order.read"), Set.of())).isEmpty();
+        assertThat(editor.candidates(role, Set.of("model.order.read"), Set.of("model.order.read")))
+                .singleElement().satisfies(candidate -> assertThat(candidate.bindingPid()).isNull());
+    }
+
     @AfterEach void cleanup() { MetaContext.clear(); org.springframework.transaction.support.TransactionSynchronizationManager.clear(); }
 
     private void migrationFixture() {

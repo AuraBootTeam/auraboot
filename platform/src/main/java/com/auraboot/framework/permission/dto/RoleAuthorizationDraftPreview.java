@@ -15,7 +15,11 @@ public record RoleAuthorizationDraftPreview(
         RoleFieldPolicyPreview fieldPolicies,
         com.auraboot.framework.menu.dto.RoleNavigation.Selection navigation,
         List<RoleFieldAccess.Reviewed> fieldAccessChanges,
-        List<RoleGrantFields.Reviewed> grantFieldChanges) {
+        List<RoleGrantFields.Reviewed> grantFieldChanges,
+        List<RoleGrantFields.Binding> grantFieldCandidates) {
+    public RoleAuthorizationDraftPreview(String revision,CapabilitySelectionPreview capabilities,boolean changed,String scope,boolean apply,List<DataScopeUpdateRequest> scopes,RoleFieldPolicyPreview policies,com.auraboot.framework.menu.dto.RoleNavigation.Selection navigation,List<RoleFieldAccess.Reviewed> fields,List<RoleGrantFields.Reviewed> grantFields) {
+        this(revision,capabilities,changed,scope,apply,scopes,policies,navigation,fields,grantFields,null);
+    }
     public RoleAuthorizationDraftPreview(String revision,CapabilitySelectionPreview capabilities,boolean changed,String scope,boolean apply,List<DataScopeUpdateRequest> scopes,RoleFieldPolicyPreview policies,com.auraboot.framework.menu.dto.RoleNavigation.Selection navigation,List<RoleFieldAccess.Reviewed> fields) {
         this(revision,capabilities,changed,scope,apply,scopes,policies,navigation,fields,null);
     }

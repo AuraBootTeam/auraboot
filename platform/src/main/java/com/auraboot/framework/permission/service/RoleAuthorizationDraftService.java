@@ -254,7 +254,8 @@ public class RoleAuthorizationDraftService {
                 fieldPolicies.preview(role, request.fieldPolicyPids(), permittedModels),
                 request.menuPids()==null?null:roleNavigation.preview(role,request.menuPids(),resulting),
                 fieldAccess.preview(role,request.fieldChanges(),permittedModels),
-                grantFields.preview(role,request.grantFieldChanges(),resulting));
+                grantFields.preview(role,request.grantFieldChanges(),resulting,Set.copyOf(selection.grantedCodes())),
+                grantFields.candidates(role,resulting,Set.copyOf(selection.grantedCodes())));
     }
 
     private RoleAuthorizationDraftSnapshot snapshot(Role role, List<BusinessFieldRoot> roots) {
@@ -343,7 +344,7 @@ public class RoleAuthorizationDraftService {
         }
         for (var change : reviewed.grantFieldChanges()) {
             result.add(new com.auraboot.framework.menu.dto.RoleNavigation.AuthorizationChange("grant_fields",
-                    change.before().modelLabel(), change.before().legacy() ? "legacy" : digest(Map.of("readFields",change.before().readFields(),"writeFields",change.before().writeFields())),
+                    change.before().modelLabel(), change.before().bindingPid() == null ? "not_granted" : change.before().legacy() ? "legacy" : digest(Map.of("readFields",change.before().readFields(),"writeFields",change.before().writeFields())),
                     digest(Map.of("readFields",change.readFields(),"writeFields",change.writeFields()))));
         }
         if(reviewed.defaultScopeChanged())result.add(new com.auraboot.framework.menu.dto.RoleNavigation.AuthorizationChange("default_scope","",role.getDefaultDataScopeType(),reviewed.defaultScopeType()));

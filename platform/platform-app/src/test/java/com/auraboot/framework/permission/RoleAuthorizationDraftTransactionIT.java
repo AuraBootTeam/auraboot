@@ -811,6 +811,107 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
     }
 
+    private RoleAuthorizationDraftRequest newFieldsRequest(RoleAuthorizationDraftSnapshot baseline,
+            List<com.auraboot.framework.permission.dto.RoleGrantFields.Change> changes, Set<String> menus) {
+        return new RoleAuthorizationDraftRequest(baseline.revision(), Set.of(editCapability), Set.of(), true,
+                "self", true, List.of(), null, menus, null, changes);
+    }
+
+    private List<com.auraboot.framework.permission.dto.RoleGrantFields.Binding> newFieldCandidates(RoleAuthorizationDraftSnapshot baseline) {
+        return drafts.preview(rolePid, newFieldsRequest(baseline, null, null)).grantFieldCandidates();
+    }
+
+    private com.auraboot.framework.permission.dto.RoleGrantFields.Change newFieldChange(
+            com.auraboot.framework.permission.dto.RoleGrantFields.Binding candidate, List<String> reads, List<String> writes) {
+        return new com.auraboot.framework.permission.dto.RoleGrantFields.Change(null, candidate.permissionCode(), candidate.metadataRevision(), reads, writes);
+    }
+
+    @Test void newGrantFieldsAndSelectedDutiesCommitTogetherAndDriveRealAccess() {
+        fieldPolicy();
+        assertThat(schema.createTableByModel(resource).isSuccess()).isTrue(); physicalTable = true;
+        assertThat(roleAuthoring.assignRoleToMember(getTestTenantMember().getId(),roleId,getTestTenant().getId())).isTrue();
+        String record = MetaContext.runWithCommandPermitPlan("ALL",1L,resource,null,
+                () -> dynamicData.create(resource,new java.util.LinkedHashMap<>(Map.of(resource+"_secret","new-grant-value")))).get("pid").toString();
+        var baseline = drafts.snapshot(rolePid);
+        var candidates = newFieldCandidates(baseline);
+        assertThat(candidates).hasSize(2).allSatisfy(candidate -> {
+            assertThat(candidate.bindingPid()).isNull(); assertThat(candidate.metadataRevision()).matches("[a-f0-9]{64}");
+        });
+        assertThat(persistedCodes()).isEmpty();
+        var changes = candidates.stream().map(candidate -> newFieldChange(candidate,
+                candidate.permissionCode().equals(readCode) ? List.of(resource+"_secret") : List.of(),List.of())).toList();
+        var request = newFieldsRequest(baseline,changes,null);
+        assertThat(drafts.preview(rolePid,request).grantFieldChanges()).hasSize(2);
+        assertThat(persistedCodes()).isEmpty();
+        var saved = drafts.apply(rolePid,request);
+        assertThat(saved.grantFields()).hasSize(2).allSatisfy(binding -> {
+            assertThat(binding.bindingPid()).isNotBlank(); assertThat(binding.legacy()).isFalse();
+        });
+        assertThat(persistedCodes()).containsExactly(readCode,updateCode);
+        assertThat(defaultScope()).isEqualTo("self");
+        administrator.close(); administrator=null;
+        assertThat(dynamicData.getById(resource,record)).containsEntry(resource+"_secret","new-grant-value");
+        assertThatThrownBy(() -> dynamicData.update(resource,record,Map.of(resource+"_secret","must-not-persist")))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class).hasMessageContaining("FIELD_WRITE_DENIED");
+        assertThat(jdbc.queryForObject("SELECT "+resource+"_secret FROM "+metadata.getModelDefinition(resource).orElseThrow().getTableName()+" WHERE pid=?",String.class,record)).isEqualTo("new-grant-value");
+    }
+
+    @Test void newGrantFieldsFailureAfterFieldsAndMenuWritesRollsBackFirstSave() {
+        fieldPolicy();
+        String menuPid=UniqueIdGenerator.generate();
+        jdbc.update("INSERT INTO ab_menu(id,pid,tenant_id,code,name,type,path,visible,status,deleted_flag) VALUES(?,?,?,?,?,1,'/home',TRUE,'active',FALSE)",IdWorker.getId(),menuPid,getTestTenant().getId(),resource+"_new_fields_menu","First field configuration");
+        try {
+            var baseline=drafts.snapshot(rolePid);
+            var changes=newFieldCandidates(baseline).stream().map(candidate -> newFieldChange(candidate,List.of(),List.of())).toList();
+            doAnswer(call -> {
+                assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_role_permission WHERE tenant_id=? AND role_id=? AND field_scope IS NOT NULL",Long.class,getTestTenant().getId(),roleId)).isEqualTo(2L);
+                assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_role_navigation_menu WHERE role_id=?",Long.class,roleId)).isEqualTo(1L);
+                throw new IllegalStateException("Fault after actual first-save field and menu writes");
+            }).when(navigation).auditAuthorization(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any());
+            assertThatThrownBy(() -> drafts.apply(rolePid,newFieldsRequest(baseline,changes,Set.of(menuPid))))
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("Fault after actual first-save");
+            assertThat(persistedCodes()).isEmpty(); assertThat(defaultScope()).isNull();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_role_data_scope WHERE role_id=?",Long.class,roleId)).isZero();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_role_navigation_state WHERE role_id=?",Long.class,roleId)).isZero();
+            reset(navigation); assertThat(drafts.snapshot(rolePid).revision()).isEqualTo(baseline.revision());
+        } finally {reset(navigation);jdbc.update("DELETE FROM ab_role_navigation_menu WHERE menu_pid=?",menuPid);jdbc.update("DELETE FROM ab_menu WHERE pid=?",menuPid);}
+    }
+
+    @Test void newGrantFieldsReferencesCannotResetExistingBindingsOrSelectUnchosenPermissions() {
+        fieldPolicy();
+        var baseline=drafts.snapshot(rolePid);
+        var candidates=newFieldCandidates(baseline);
+        var update=candidates.stream().filter(c -> c.permissionCode().equals(updateCode)).findFirst().orElseThrow();
+        var unselected=new RoleAuthorizationDraftRequest(baseline.revision(),Set.of(readCapability),Set.of(),false,null,false,List.of(),null,null,null,List.of(newFieldChange(update,List.of(),List.of())));
+        assertThatThrownBy(() -> drafts.preview(rolePid,unselected)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        var missingRevision=new com.auraboot.framework.permission.dto.RoleGrantFields.Change(null,readCode,null,List.of(),List.of());
+        assertThatThrownBy(() -> drafts.apply(rolePid,newFieldsRequest(baseline,List.of(missingRevision),null))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(persistedCodes()).isEmpty();
+        var saved=drafts.apply(rolePid,newFieldsRequest(baseline,null,null));
+        var before=jdbc.queryForList("SELECT to_jsonb(g)::text AS facts FROM ab_role_permission g WHERE role_id=? ORDER BY pid",roleId);
+        assertThatThrownBy(() -> drafts.apply(rolePid,newFieldsRequest(saved,List.of(newFieldChange(update,List.of(),List.of())),null)))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        var binding=saved.grantFields().getFirst();
+        var mixed=new com.auraboot.framework.permission.dto.RoleGrantFields.Change(binding.bindingPid(),binding.permissionCode(),binding.metadataRevision(),List.of(),List.of());
+        assertThatThrownBy(() -> drafts.preview(rolePid,newFieldsRequest(saved,List.of(mixed),null))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(jdbc.queryForList("SELECT to_jsonb(g)::text AS facts FROM ab_role_permission g WHERE role_id=? ORDER BY pid",roleId)).isEqualTo(before);
+    }
+
+    @Test void newGrantFieldsDefinitionChangeRejectsTheReviewedFieldsBeforeAnyGrantExists() {
+        fieldPolicy();
+        var baseline=drafts.snapshot(rolePid);
+        var candidate=newFieldCandidates(baseline).stream().filter(c -> c.permissionCode().equals(readCode)).findFirst().orElseThrow();
+        var request=newFieldsRequest(baseline,List.of(newFieldChange(candidate,List.of(resource+"_secret"),List.of())),null);
+        drafts.preview(rolePid,request);
+        var field=fields.selectById(fieldId);
+        var extension=new com.auraboot.framework.meta.entity.payload.ExtensionBean();
+        extension.setExtension(new java.util.HashMap<>(Map.of("displayName","Changed field definition")));field.setExtension(extension);fields.updateById(field);metadata.clearAllCache();
+        assertThat(drafts.snapshot(rolePid).revision()).isEqualTo(baseline.revision());
+        assertThatThrownBy(() -> drafts.apply(rolePid,request)).isInstanceOfSatisfying(com.auraboot.framework.exception.BusinessException.class,
+                error -> assertThat(error.getResponseCode()).isEqualTo(ResponseCode.CasVersionConflict));
+        assertThat(persistedCodes()).isEmpty(); assertThat(defaultScope()).isNull();
+    }
+
     private RoleAuthorizationDraftRequest fieldsRequest(RoleAuthorizationDraftSnapshot baseline, Set<String> selected) {
         return new RoleAuthorizationDraftRequest(baseline.revision(), Set.of(editCapability), Set.of(), true,
                 "self", true, List.of(new DataScopeUpdateRequest(resource, "update", "none", "MAX")), selected);
