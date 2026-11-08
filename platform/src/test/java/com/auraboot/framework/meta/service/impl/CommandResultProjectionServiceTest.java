@@ -68,6 +68,20 @@ class CommandResultProjectionServiceTest {
                 Map.of("pid","root","tenant_id",7L,"row_version",2L,"cost",document)));
     }
 
+    @Test void explicitNullSourceCanBeInitializedButCannotAttestAnyResultBeforeTheWrite() {
+        jsonProjection();
+        var root=new LinkedHashMap<String,Object>(Map.of("pid","root","tenant_id",7L,"row_version",2L));root.put("cost",null);
+        context.setBusinessResultProjection(context.getBusinessResultProjection().bindRootDocuments(root));
+        assertThatThrownBy(() -> service.project(context,Map.of("quality",Map.of("passed",true))))
+                .isInstanceOf(AccessDeniedException.class);
+        bindDocument(Map.of("dryRun",Map.of("quality",Map.of("passed",true))));
+        assertThat(service.project(context,Map.of("quality",Map.of("passed",true))))
+                .containsExactly(Map.entry("quality",Map.of("passed",true)));
+        assertThatThrownBy(() -> context.getBusinessResultProjection().bindRootDocuments(
+                Map.of("pid","root","tenant_id",7L,"row_version",2L)))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
     @Test void exactRootJsonPathIsImmutableAndDoesNotExposeSiblingData() {
         jsonProjection();
         var values=new ArrayList<>(List.of(Map.of("passed",true,"count",3)));

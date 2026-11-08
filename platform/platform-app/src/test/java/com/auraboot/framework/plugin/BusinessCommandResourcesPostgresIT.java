@@ -146,8 +146,9 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
                     getTestTenant().getId(),getTestUser().getId(),getTestTenantMember().getId(),rootModel,rootPid,
                     List.of(new com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Grant(1L,2L,"fixture.receipt.confirm",
                             new com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Fields(false,Set.of(rootLabel),Set.of(rootLabel))))));
-            context.setBusinessResultProjection(resultProjection.prepare(context,owner).bindRootDocuments(Map.of(
-                    "pid",rootPid,"tenant_id",getTestTenant().getId(),"row_version",rootVersion,rootLabel,storedRootDocument())));
+            var rootFacts=new LinkedHashMap<String,Object>(Map.of("pid",rootPid,"tenant_id",getTestTenant().getId(),"row_version",rootVersion));
+            rootFacts.put(rootLabel,storedRootDocument());
+            context.setBusinessResultProjection(resultProjection.prepare(context,owner).bindRootDocuments(rootFacts));
         }
         return context;
     }
@@ -189,6 +190,24 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
         assertThat(storedRootDocument()).contains("\"passed\":true");
         assertThat(output.toString()).doesNotContain("PRIVATE");
         assertThat(permissions.canAction(getTestTenantMember().getId(),rootModel,"read")).isFalse();
+    }
+
+    @Test void initialNullJsonSourceRequiresAnActualPostWriteDocumentAndRollsBackForgedOutput() {
+        jsonSourceFixture();
+        jdbc.update("UPDATE "+physicalTables.get(rootModel)+" SET "+rootLabel+"=NULL WHERE pid=?",rootPid);
+        var output=command(scope -> {
+            scope.accessor().update(rootModel,rootPid,Map.of(rootLabel,"{\"dryRun\":{\"quality\":{\"passed\":true}}}"));
+            return scope.projectResult(Map.of("quality",Map.of("passed",true)));
+        });
+        assertThat(output).containsEntry("quality",Map.of("passed",true));
+        assertThat(storedRootDocument()).contains("\"passed\":true");
+        jdbc.update("UPDATE "+physicalTables.get(rootModel)+" SET "+rootLabel+"=NULL WHERE pid=?",rootPid);
+        rootVersion=jdbc.queryForObject("SELECT row_version FROM "+physicalTables.get(rootModel)+" WHERE pid=?",Long.class,rootPid);
+        assertThatThrownBy(() -> command(scope -> {
+            scope.accessor().create(ledgerModel,Map.of(ledgerParent,rootPid,ledgerQty,"1"));
+            return scope.projectResult(Map.of("quality",Map.of("passed",true)));
+        })).isInstanceOf(DataAccessorException.class).hasMessageContaining("PERMISSION_DENIED");
+        assertThat(storedRootDocument()).isNull();assertThat(ledgerCount()).isZero();
     }
 
     @Test void forgedStructuredResultPoisonsAndRollsBackActualEarlierRootAndChildWrites() {

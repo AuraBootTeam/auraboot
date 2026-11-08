@@ -45,8 +45,13 @@ public record BusinessResultProjectionPlan(BusinessTargetAuthorization target,
                 || Boolean.TRUE.equals(root.get("deleted_flag"))
                 || !(root.get("row_version") instanceof Number version) || version.longValue()<0) throw denied();
         Map<String,String> documents=new LinkedHashMap<>();
-        for (var field:fields.values()) if(field.kind()==BusinessResultField.Kind.ROOT_JSON_PATH)
-            documents.computeIfAbsent(field.sourceField(),key -> BusinessResultJsonSource.document(root.get(key)));
+        for (var field:fields.values()) if(field.kind()==BusinessResultField.Kind.ROOT_JSON_PATH) {
+            String source=field.sourceField();
+            if(!root.containsKey(source))throw denied();
+            // An explicit SQL NULL is a captured empty initial state, never evidence for a result.
+            // Exact path verification still requires a real host-loaded post-write document.
+            if(root.get(source)!=null)documents.computeIfAbsent(source,key -> BusinessResultJsonSource.document(root.get(key)));
+        }
         if(documents.values().stream().mapToInt(String::length).sum()>4_194_304) throw denied();
         return new BusinessResultProjectionPlan(target,grant,fields,sources,readable,policyMasks,detailMasks,documents);
     }
