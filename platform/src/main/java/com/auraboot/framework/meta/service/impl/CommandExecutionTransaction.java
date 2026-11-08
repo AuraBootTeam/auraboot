@@ -21,7 +21,12 @@ public class CommandExecutionTransaction {
 
     public <T> T execute(String commandCode, boolean dryRun, Supplier<T> operation) {
         var owner = extensions.getBusinessResourceOwner(commandCode).orElse(null);
-        var isolation = owner instanceof BusinessResourceAuthorization resource ? resource.resourceReadIsolation() : null;
+        var resourceIsolation = owner instanceof BusinessResourceAuthorization resource ? resource.resourceReadIsolation() : null;
+        var handler = extensions.getCommandHandler(commandCode).orElse(null);
+        var handlerIsolation = handler == null ? null : handler.commandReadIsolation();
+        if (resourceIsolation != null && handlerIsolation != null && resourceIsolation != handlerIsolation)
+            throw new AccessDeniedException("Conflicting command owner transaction requirements");
+        var isolation = resourceIsolation != null ? resourceIsolation : handlerIsolation;
         var template = new TransactionTemplate(transactions);
         if (isolation != null) {
             // Preserve the caller's atomic unit: never suspend it just to satisfy an owner.

@@ -31,6 +31,12 @@ public interface DataScopeService {
         return DataScopeCondition.none();
     }
 
+    /** Explicit owner opt-in: retain an action override, otherwise use this role's object read scope. */
+    default DataScopeCondition resolveObjectBoundScopeForRole(Long memberId, Long roleId, String permissionResource,
+                                                              String action, String recordModel) {
+        return DataScopeCondition.none();
+    }
+
     /** Role-local ordinary read scope; implementations must qualify the owner before preserving legacy NULL. */
     default DataScopeCondition resolveOrdinaryReadScopeForRole(Long memberId, Long roleId, String recordModel) {
         return DataScopeCondition.none();

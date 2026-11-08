@@ -41,6 +41,29 @@ class CommandExecutionTransactionTest {
         verify(manager).commit(status);
     }
 
+    @Test void ordinary_plugin_owner_can_require_a_snapshot_before_its_first_source_read() {
+        var handler = mock(CommandHandlerExtension.class);
+        when(extensions.getCommandHandler("bom:start_conversion")).thenReturn(Optional.of(handler));
+        when(handler.commandReadIsolation()).thenReturn(BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ);
+        when(manager.getTransaction(any())).thenReturn(status);
+        assertThat(transaction.execute("bom:start_conversion",false,()->"queued")).isEqualTo("queued");
+        verify(manager).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_REPEATABLE_READ));
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        var operation = mock(java.util.function.Supplier.class);
+        assertThatThrownBy(()->transaction.execute("bom:start_conversion",false,operation)).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(operation);
+    }
+
+    @Test void conflicting_handler_and_resource_owners_cannot_weaken_the_transaction() {
+        owner();
+        var handler = mock(CommandHandlerExtension.class);
+        when(extensions.getCommandHandler("orders:export")).thenReturn(Optional.of(handler));
+        when(handler.commandReadIsolation()).thenReturn(BusinessResourceAuthorization.ReadIsolation.SERIALIZABLE);
+        assertThatThrownBy(()->transaction.execute("orders:export",false,()->"bad")).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(manager);
+    }
+
     @Test void ordinary_commands_keep_default_required_transaction_semantics() {
         when(manager.getTransaction(any())).thenReturn(status);
         assertThat(transaction.execute("orders:update", false, () -> "completed")).isEqualTo("completed");

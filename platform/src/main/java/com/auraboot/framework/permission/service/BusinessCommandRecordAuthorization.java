@@ -190,7 +190,18 @@ public class BusinessCommandRecordAuthorization {
             for (var grant : grants) {
                 if (grant.getId() == null || grant.getRoleId() == null || grant.getPermissionCode() == null
                         || !(code.equals(grant.getPermissionCode()) || "*".equals(grant.getPermissionCode()))) continue;
-                var scope = ordinaryModelAction
+                Object scopePolicy = permission.getExtension() instanceof Map<?, ?> extension
+                        ? extension.get("businessScopePolicy") : null;
+                if (scopePolicy != null && !"record".equals(scopePolicy)) {
+                    trace.add(step(EvaluationVerdict.DENY, "Unknown business object scope policy", code,
+                            grant.getRoleId(), grant.getId()));
+                    continue;
+                }
+                boolean objectBoundScope = !ordinaryModelAction && "record".equals(scopePolicy);
+                var scope = objectBoundScope
+                        ? scopes.resolveObjectBoundScopeForRole(member, grant.getRoleId(), permission.getResourceCode(),
+                            permission.getAction(), model)
+                        : ordinaryModelAction
                         ? ("read".equals(nativeAction)
                             ? scopes.resolveOrdinaryReadScopeForRole(member,grant.getRoleId(),model)
                             : "create".equals(nativeAction)
@@ -198,7 +209,7 @@ public class BusinessCommandRecordAuthorization {
                                 : scopes.resolveOrdinaryUpdateScopeForRole(member,grant.getRoleId(),model))
                         : scopes.resolveScopeForRole(member, grant.getRoleId(), permission.getResourceCode(),
                             permission.getAction(), model);
-                var scopeStep = ordinaryModelAction && scope != null && "not_configured".equals(scope.scopeType())
+                var scopeStep = (ordinaryModelAction || objectBoundScope) && scope != null && "not_configured".equals(scope.scopeType())
                         ? step(EvaluationVerdict.NOT_APPLICABLE, "Legacy native-model scope is not configured", code, grant.getRoleId(), grant.getId())
                         : scopeEvaluator.evaluateGrantScope(scope, member, model, permission.getAction(), record);
                 if (scopeStep == null || scopeStep.verdict() == null) continue;

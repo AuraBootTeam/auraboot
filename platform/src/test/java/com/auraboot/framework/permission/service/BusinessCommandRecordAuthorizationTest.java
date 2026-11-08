@@ -311,6 +311,29 @@ class BusinessCommandRecordAuthorizationTest {
     private com.auraboot.framework.permission.engine.model.PermissionResult evaluate(Map<String, Object> record) {
         return authorization.evaluate(5L, List.of(CODE), MODEL, record);
     }
+    @Test void optedInObjectScopeRetainsSelfOwnershipAndDoesNotBorrowAnotherGrant() {
+        var permission = permission(CODE);permission.setExtension(Map.of("businessScopePolicy","record"));
+        when(snapshots.resolvePermissionDefinition(100L,CODE)).thenReturn(permission);
+        grants(grant(11,101,CODE),grant(22,202,CODE));
+        guards(CODE,new PermissionPolicyService.ConditionGuard(11L,null),new PermissionPolicyService.ConditionGuard(22L,null));
+        when(scopes.resolveObjectBoundScopeForRole(5L,101L,"inventory.receipt","confirm",MODEL))
+                .thenReturn(new DataScopeCondition("self","created_by",1L,null,List.of(),List.of()));
+        when(scopes.resolveObjectBoundScopeForRole(5L,202L,"inventory.receipt","confirm",MODEL)).thenReturn(DataScopeCondition.none());
+        assertThat(evaluate(record(1,"Shanghai")).granted()).isTrue();
+        assertThat(evaluate(record(999,"Shanghai")).granted()).isFalse();
+        verify(scopes,never()).resolveScopeForRole(any(),any(),any(),any(),any());
+    }
+
+    @Test void objectScopeLegacyAbsenceIsNotAnAllRewriteAndUnknownPolicyFailsClosed() {
+        var permission = permission(CODE);permission.setExtension(Map.of("businessScopePolicy","record"));
+        when(snapshots.resolvePermissionDefinition(100L,CODE)).thenReturn(permission);
+        grants(grant(11,101,CODE));guards(CODE,new PermissionPolicyService.ConditionGuard(11L,null));
+        when(scopes.resolveObjectBoundScopeForRole(5L,101L,"inventory.receipt","confirm",MODEL)).thenReturn(DataScopeCondition.notConfigured());
+        assertThat(evaluate(record(1,"Shanghai")).granted()).isTrue();
+        permission.setExtension(Map.of("businessScopePolicy","unknown"));
+        assertThat(evaluate(record(1,"Shanghai")).granted()).isFalse();
+    }
+
     private void grants(RolePermissionMapper.BusinessGrantRow... rows) {
         when(bindings.findBusinessGrants(100L, 1L, 5L, CODE)).thenReturn(List.of(rows));
     }

@@ -33,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -681,6 +682,39 @@ class DataScopeServiceImplTest {
         assertThat(service.resolveScopeForRole(6L, 7L, "inventory.receipt", "confirm", "receipt").scopeType()).isEqualTo("none");
         assertThat(service.resolveScopeForRole(5L, 7L, "inventory.receipt", "confirm", "receipt").scopeType()).isEqualTo("none");
         org.mockito.Mockito.verifyNoInteractions(roleDataScopeMapper);
+    }
+
+    @Test void objectBoundActionsUseTheGrantOwnersExistingReadScopeWithoutWritingConfiguration() {
+        MetaContext.setMemberId(5L);
+        var role = new com.auraboot.framework.rbac.entity.Role(); role.setDefaultDataScopeType("all");
+        when(roleMapper.findEffectiveGrantOwner(100L,1L,5L,7L)).thenReturn(role);
+        when(roleDataScopeMapper.findByTenantAndRole(100L,7L)).thenReturn(List.of(scope("quote","read","self")));
+        var result = service.resolveObjectBoundScopeForRole(5L,7L,"quote","manage","quote");
+        assertThat(result.scopeType()).isEqualTo("self"); assertThat(result.ownerValue()).isEqualTo(1L);
+        verify(userRoleMapper, never()).findRoleIdsByMemberId(any());
+    }
+
+    @Test void objectBoundActionOverridesAndMalformedRestrictionsNeverFallBackToReadAll() {
+        MetaContext.setMemberId(5L);
+        var role = new com.auraboot.framework.rbac.entity.Role();
+        when(roleMapper.findEffectiveGrantOwner(100L,1L,5L,7L)).thenReturn(role);
+        var denied = scope("quote","manage","none");
+        when(roleDataScopeMapper.findByTenantAndRole(100L,7L)).thenReturn(List.of(scope("quote","read","all"),denied));
+        assertThat(service.resolveObjectBoundScopeForRole(5L,7L,"quote","manage","quote").scopeType()).isEqualTo("none");
+        denied.setScopeType("all");denied.setScopeConfig(Map.of("unknownRestriction",true));
+        assertThat(service.resolveObjectBoundScopeForRole(5L,7L,"quote","manage","quote").scopeType()).isEqualTo("none");
+    }
+
+    @Test void objectBoundLegacyNullRequiresTheExactActiveRoleAndPreservesReadNone() {
+        MetaContext.setMemberId(5L);
+        when(roleMapper.findEffectiveGrantOwner(100L,1L,5L,7L)).thenReturn(new com.auraboot.framework.rbac.entity.Role());
+        when(roleDataScopeMapper.findByTenantAndRole(100L,7L)).thenReturn(List.of());
+        assertThat(service.resolveObjectBoundScopeForRole(5L,7L,"quote","manage","quote").scopeType()).isEqualTo("not_configured");
+        assertThat(service.resolveScopeForRole(5L,7L,"quote","manage","quote").scopeType()).isEqualTo("none");
+        when(roleDataScopeMapper.findByTenantAndRole(100L,7L)).thenReturn(List.of(scope("quote","read","none")));
+        assertThat(service.resolveObjectBoundScopeForRole(5L,7L,"quote","manage","quote").scopeType()).isEqualTo("none");
+        when(roleMapper.findEffectiveGrantOwner(100L,1L,5L,7L)).thenReturn(null);
+        assertThat(service.resolveObjectBoundScopeForRole(5L,7L,"quote","manage","quote").scopeType()).isEqualTo("none");
     }
 
     private static RoleDataScope scope(String resource, String action, String type) {

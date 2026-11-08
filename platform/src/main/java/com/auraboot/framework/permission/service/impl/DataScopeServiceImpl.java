@@ -79,6 +79,12 @@ public class DataScopeServiceImpl implements DataScopeService {
     }
 
     @Override
+    public DataScopeCondition resolveObjectBoundScopeForRole(Long memberId, Long roleId, String permissionResource,
+                                                             String action, String recordModel) {
+        return resolveGrantScope(memberId, roleId, permissionResource, action, recordModel, true, true);
+    }
+
+    @Override
     public DataScopeCondition resolveOrdinaryReadScopeForRole(Long memberId, Long roleId, String recordModel) {
         return resolveGrantScope(memberId,roleId,recordModel,"read",recordModel,true);
     }
@@ -95,6 +101,12 @@ public class DataScopeServiceImpl implements DataScopeService {
 
     private DataScopeCondition resolveGrantScope(Long memberId, Long roleId, String permissionResource,
                                                 String action, String recordModel, boolean ordinaryRead) {
+        return resolveGrantScope(memberId, roleId, permissionResource, action, recordModel, ordinaryRead, false);
+    }
+
+    private DataScopeCondition resolveGrantScope(Long memberId, Long roleId, String permissionResource,
+                                                String action, String recordModel, boolean ordinaryRead,
+                                                boolean inheritObjectScope) {
         if (!MetaContext.exists() || memberId == null || roleId == null
                 || !java.util.Objects.equals(memberId, MetaContext.getCurrentMemberId())
                 || MetaContext.getCurrentTenantId() == null || MetaContext.getCurrentUserId() == null
@@ -105,9 +117,16 @@ public class DataScopeServiceImpl implements DataScopeService {
         Long tenant = MetaContext.getCurrentTenantId();
         var role = roleMapper.findEffectiveGrantOwner(tenant, MetaContext.getCurrentUserId(), memberId, roleId);
         if (role == null) return DataScopeCondition.none();
-        var entries = roleDataScopeMapper.findByTenantAndRole(tenant, roleId).stream()
+        var roleScopes = roleDataScopeMapper.findByTenantAndRole(tenant, roleId);
+        var entries = roleScopes.stream()
                 .filter(entry -> permissionResource.equals(entry.getResourceCode()) && action.equals(entry.getActionCode()))
                 .toList();
+        // An explicit action restriction always wins, including NONE or malformed metadata.
+        // The fallback is local to the exact grant owner; another role cannot lend its scope.
+        if (entries.isEmpty() && inheritObjectScope) {
+            entries = roleScopes.stream().filter(entry -> recordModel.equals(entry.getResourceCode())
+                    && "read".equals(entry.getActionCode())).toList();
+        }
         // Never silently discard a custom restriction that this scope resolver cannot interpret.
         if (entries.size() > 1 || entries.stream().anyMatch(entry -> entry.getScopeConfig() != null
                 && !(entry.getScopeConfig() instanceof Map<?, ?> config && config.isEmpty()))) {
