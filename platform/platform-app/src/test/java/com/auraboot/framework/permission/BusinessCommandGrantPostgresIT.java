@@ -97,8 +97,19 @@ class BusinessCommandGrantPostgresIT extends BaseIntegrationTest {
         assertThat(authorization.resolveNative(member(), List.of(code), model, record(false,"Beijing"), "update").result().granted()).isFalse();
         assertThat(jdbc.queryForList("SELECT resource_code,action_code,scope_type,scope_config FROM ab_role_data_scope WHERE tenant_id=? AND role_id=?", tenant(), roleA)).isEqualTo(before);
         assertThat(jdbc.queryForObject("SELECT default_data_scope_type FROM ab_role WHERE id=?", String.class, roleA)).isNull();
-        jdbc.update("UPDATE ab_role_data_scope SET scope_type='none' WHERE tenant_id=? AND role_id=?", tenant(), roleA);
+        // The same physical metadata can forbid standalone child creation while an admitted
+        // domain command writes its internal projection under the original object/field policy.
+        jdbc.update("UPDATE ab_permission SET extension=?::jsonb WHERE id=?",
+                json.writeValueAsString(Map.of("domainModels", Map.of(model, List.of("read")))), permissionId);
         assertThat(authorization.resolveNative(member(), List.of(code), model, record(true,"Beijing"), "create").result().granted()).isFalse();
+        MetaContext.runWithCommandPermitPlan("TARGET", null, "parent", "parent-pid", () ->
+            MetaContext.runWithAuthorizedCommandCode("domain:convert", () -> MetaContext.runWithCommandAuthority(code, () -> {
+                assertThat(authorization.resolveNative(member(), List.of(code), model, record(true,"Beijing"), "create").result().granted()).isTrue();
+                assertThat(authorization.resolveNative(member(), List.of(code), model, record(false,"Beijing"), "update").result().granted()).isFalse();
+                assertThat(jdbc.queryForList("SELECT resource_code,action_code,scope_type,scope_config FROM ab_role_data_scope WHERE tenant_id=? AND role_id=?", tenant(), roleA)).isEqualTo(before);
+                jdbc.update("UPDATE ab_role_data_scope SET scope_type='none' WHERE tenant_id=? AND role_id=?", tenant(), roleA);
+                assertThat(authorization.resolveNative(member(), List.of(code), model, record(true,"Beijing"), "create").result().granted()).isFalse();
+            })));
     }
 
     @Test void nativeCreationReadsCompleteSourceGrantsAndDoesNotRewriteThem() throws Exception {

@@ -103,6 +103,27 @@ class BusinessCommandRecordAuthorizationTest {
         verify(bindings, times(2)).findBusinessGrants(100L, 1L, 5L, CODE);
     }
 
+    @Test void internalDerivedWritesReuseTheDutyButStillEnforceObjectAndFieldConstraints() {
+        var definition = permission(CODE); definition.setResourceCode("domain"); definition.setAction("write");
+        definition.setExtension(Map.of("domainModels", Map.of(MODEL, List.of("read"))));
+        when(snapshots.resolvePermissionDefinition(100L, CODE)).thenReturn(definition);
+        var row = grant(11, 101, CODE);
+        row.setFieldScopeJson("{\"version\":2,\"models\":{\"receipt\":{\"readFields\":[\"city\"],\"writeFields\":[]}}}");
+        grants(row); guards(CODE, new PermissionPolicyService.ConditionGuard(11L, null));
+        when(scopes.resolveObjectBoundScopeForRole(5L, 101L, MODEL, "update", MODEL))
+                .thenReturn(new DataScopeCondition("self", "created_by", 1L, null, List.of(), List.of()));
+        assertThat(authorization.resolveNative(5L, List.of(CODE), MODEL, record(1,"Shanghai"), "update").result().granted()).isFalse();
+        MetaContext.runWithCommandPermitPlan("TARGET", null, "root", "root-pid", () ->
+            MetaContext.runWithAuthorizedCommandCode("example:convert", () -> MetaContext.runWithCommandAuthority(CODE, () -> {
+                var decision = authorization.resolveNative(5L, List.of(CODE), MODEL, record(1,"Shanghai"), "update");
+                assertThat(decision.result().granted()).isTrue();
+                assertThat(decision.canWrite("city")).isFalse();
+                assertThat(authorization.resolveNative(5L, List.of(CODE), MODEL, record(999,"Shanghai"), "update").result().granted()).isFalse();
+                when(scopes.resolveObjectBoundScopeForRole(5L,101L,MODEL,"update",MODEL)).thenReturn(DataScopeCondition.none());
+                assertThat(authorization.resolveNative(5L, List.of(CODE), MODEL, record(1,"Shanghai"), "update").result().granted()).isFalse();
+            })));
+    }
+
     @Test void domainLevelDoesNotRemoveOriginalFieldAndExplicitScopeRestrictions() {
         var definition = permission(CODE); definition.setResourceCode("domain"); definition.setAction("write");
         definition.setExtension(Map.of("domainModels", Map.of(MODEL, List.of("read", "update"))));

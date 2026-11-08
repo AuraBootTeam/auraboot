@@ -88,6 +88,37 @@ class PermissionSnapshotCacheTest {
     }
 
     @Test
+    void internalMutationUsesTheAuthorizedDomainWhileStandaloneCrudKeepsItsOwnMinimum() {
+        var write = permission(901L, "example.cap.write");
+        write.setResourceType("operation"); write.setResourceCode("example"); write.setAction("write");
+        write.setExtension(Map.of("domainModels", Map.of("derived", List.of("read"))));
+        var manage = permission(902L, "example.cap.manage");
+        manage.setResourceType("operation"); manage.setResourceCode("example"); manage.setAction("manage");
+        manage.setExtension(Map.of("domainModels", Map.of("derived", List.of("read", "create"))));
+        var read = permission(903L, "example.cap.read");
+        read.setResourceType("operation"); read.setResourceCode("example"); read.setAction("read");
+        read.setExtension(Map.of("domainModels", Map.of("derived", List.of("read"))));
+        when(permissionMapper.findResolvableDefinitions(100L)).thenReturn(List.of(read, write, manage));
+        assertThat(cache.resourcePermissionCodes(100L, "derived", "create")).containsExactly("example.cap.manage");
+        com.auraboot.framework.application.tenant.MetaContext.setContext(100L, 1L, "actor", "actor");
+        try {
+            com.auraboot.framework.application.tenant.MetaContext.runWithCommandAuthority("example.cap.write", () ->
+                assertThat(cache.resourcePermissionCodes(100L, "derived", "create")).containsExactly("example.cap.manage"));
+            com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitPlan("TARGET", null, "root", "root-pid", () ->
+                com.auraboot.framework.application.tenant.MetaContext.runWithAuthorizedCommandCode("example:view", () ->
+                    com.auraboot.framework.application.tenant.MetaContext.runWithCommandAuthority("example.cap.read", () ->
+                        assertThat(cache.resourcePermissionCodes(100L, "derived", "create")).containsExactly("example.cap.manage"))));
+            com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitPlan("TARGET", null, "root", "root-pid", () ->
+                com.auraboot.framework.application.tenant.MetaContext.runWithAuthorizedCommandCode("example:convert", () ->
+                    com.auraboot.framework.application.tenant.MetaContext.runWithCommandAuthority("example.cap.write", () -> {
+                        assertThat(cache.resourcePermissionCodes(100L, "derived", "create")).containsExactly("example.cap.write");
+                        assertThat(cache.resourcePermissionCodes(100L, "unrelated", "create")).doesNotContain("example.cap.write");
+                    })));
+            assertThat(cache.resourcePermissionCodes(100L, "derived", "create")).containsExactly("example.cap.manage");
+        } finally { com.auraboot.framework.application.tenant.MetaContext.clear(); }
+    }
+
+    @Test
     void passiveExpiryRefreshesNegativeCatalogWithoutAnEvent() {
         when(permissionMapper.findResolvableDefinitions(100L))
                 .thenReturn(List.of())

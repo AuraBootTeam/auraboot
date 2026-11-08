@@ -183,7 +183,8 @@ public class BusinessCommandRecordAuthorization {
             var permission = snapshots.resolvePermissionDefinition(tenant, code);
             boolean modelRead = "read".equals(nativeAction);
             boolean domain = DomainPermissionPolicy.owns(permission, model);
-            if (!DomainPermissionPolicy.models(permission).isEmpty() && !DomainPermissionPolicy.permits(permission, model, nativeAction)) {
+            if (!DomainPermissionPolicy.models(permission).isEmpty() && !DomainPermissionPolicy.permits(permission, model, nativeAction)
+                    && !DomainPermissionPolicy.isCurrentCommandMutation(permission, model, nativeAction)) {
                 trace.add(step(EvaluationVerdict.DENY, "Domain level does not own this model/action", code, null, null));
                 continue;
             }

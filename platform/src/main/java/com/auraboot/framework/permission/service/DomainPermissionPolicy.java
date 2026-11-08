@@ -33,5 +33,17 @@ public final class DomainPermissionPolicy {
         Object actions = models(permission).get(model);
         return actions instanceof List<?> values && (action == null || values.contains(action));
     }
+    /** Internal effects consume the admitted use case's duty, not the standalone CRUD minimum.
+     * Object/action scopes and field policies are still evaluated for the actual affected row.
+     */
+    public static boolean isCurrentCommandMutation(Permission permission, String model, String action) {
+        return Set.of("create", "update", "delete").contains(action == null ? "" : action)
+                && permission != null && Set.of("write", "manage").contains(permission.getAction())
+                && owns(permission, model)
+                && com.auraboot.framework.application.tenant.MetaContext.hasCommandPermitScope()
+                && com.auraboot.framework.application.tenant.MetaContext.getAuthorizedCommandCode() != null
+                && Objects.equals(permission.getCode(),
+                    com.auraboot.framework.application.tenant.MetaContext.getCommandAuthority());
+    }
     private static AccessDeniedException denied() { return new AccessDeniedException("Invalid published business domain policy"); }
 }
