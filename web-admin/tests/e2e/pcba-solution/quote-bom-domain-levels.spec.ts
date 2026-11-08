@@ -202,6 +202,9 @@ test.describe('BOM & Quote domain levels', () => {
         await page.getByTestId(`role-item-${role.code}`).click();
         await page.getByTestId('permission-right-tab-capabilities').click();
         await expect(page.getByTestId(`domain-legacy-${domain}.cap.read`)).toBeVisible();
+        await expect(
+          page.getByTestId(`domain-legacy-${domain === 'bom' ? 'qo' : 'bom'}.cap.read`),
+        ).toHaveCount(0);
         const domainCard = page.getByTestId(
           `capability-group-${domain === 'bom' ? 'BOM' : '报价（Quote）'}`,
         );
@@ -313,6 +316,9 @@ test.describe('BOM & Quote domain levels', () => {
           await page.getByTestId(`role-item-${role.code}`).click();
           await page.getByTestId('permission-right-tab-capabilities').click();
           await expect(page.getByTestId(selector)).toBeChecked();
+          await expect(
+            page.getByTestId(`domain-legacy-${domain === 'bom' ? 'qo' : 'bom'}.cap.read`),
+          ).toHaveCount(0);
           await page.getByTestId(selector).scrollIntoViewIfNeeded();
           await page.screenshot({
             path: info.outputPath(`${domain}-${iteration}-${level}-saved.png`),

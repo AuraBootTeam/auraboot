@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { domainLevels, selectDomainLevel } from '../domainLevels';
+import { domainLevels, selectDomainLevel, hasLegacyDomainGrants } from '../domainLevels';
 import type { Capability } from '../types';
 
 const levels = ['read', 'write', 'manage'].map((name, index) => ({
@@ -13,6 +13,21 @@ const levels = ['read', 'write', 'manage'].map((name, index) => ({
 })) as Capability[];
 
 describe('domain permission levels', () => {
+  it('does not label shared rendering dependencies as historical cross-domain authority', () => {
+    const sharedOnly = levels.map((cap) => ({
+      ...cap,
+      includes: ['meta.model.read', ...cap.includes],
+      authorizationState: 'partial' as const,
+      missingCodes: cap.includes,
+    }));
+    expect(hasLegacyDomainGrants(sharedOnly, [], [])).toBe(false);
+    const release = sharedOnly.map((cap) => ({
+      ...cap,
+      missingCodes: cap.missingCodes.filter((code) => code !== 'bom.structure.release'),
+    }));
+    expect(hasLegacyDomainGrants(release, [], [])).toBe(true);
+    expect(hasLegacyDomainGrants(release, [], ['bom.cap.manage'])).toBe(false);
+  });
   it('recognizes only a complete strictly nested triple', () => {
     const groups = [{ group: 'BOM', capabilities: levels }];
     expect(domainLevels(groups, 'bom.cap.write')).toEqual(levels);

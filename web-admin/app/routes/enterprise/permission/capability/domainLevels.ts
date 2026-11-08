@@ -43,3 +43,24 @@ export function selectDomainLevel(
     ],
   };
 }
+
+/** Shared page metadata does not imply a historical business grant in another domain. */
+export function hasLegacyDomainGrants(
+  levels: Capability[],
+  selected: string[],
+  revoked: string[],
+): boolean {
+  const namespace = levels[0].code.replace(/cap\.read$/, '');
+  return levels.some((cap, index) => {
+    if (
+      selected.includes(cap.code) ||
+      revoked.includes(cap.code) ||
+      cap.authorizationState !== 'partial'
+    )
+      return false;
+    const lower = new Set(index === 0 ? [] : levels[index - 1].includes);
+    return cap.includes.some(
+      (code) => code.startsWith(namespace) && !lower.has(code) && !cap.missingCodes?.includes(code),
+    );
+  });
+}

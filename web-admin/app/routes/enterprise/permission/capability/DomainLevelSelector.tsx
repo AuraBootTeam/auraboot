@@ -2,6 +2,7 @@ import type { Capability } from './types';
 import { useI18n } from '~/contexts/I18nContext';
 import { getLocalizedText } from '~/utils/i18n';
 import text from './domainLevels.i18n.json';
+import { hasLegacyDomainGrants } from './domainLevels';
 
 export default function DomainLevelSelector({
   levels,
@@ -18,16 +19,7 @@ export default function DomainLevelSelector({
 }) {
   const { t, locale } = useI18n();
   const active = [...levels].reverse().find((cap) => selected.includes(cap.code));
-  const legacy = levels.some((cap, index) => {
-    if (
-      selected.includes(cap.code) ||
-      revoked.includes(cap.code) ||
-      cap.authorizationState !== 'partial'
-    )
-      return false;
-    const lower = new Set(index === 0 ? [] : levels[index - 1].includes);
-    return cap.includes.some((code) => !lower.has(code) && !cap.missingCodes?.includes(code));
-  });
+  const legacy = hasLegacyDomainGrants(levels, selected, revoked);
   const label = (value: Record<string, string>) => getLocalizedText(value, locale, t);
   return (
     <div data-testid={`domain-levels-${levels[0].code}`} className="space-y-3 py-3">
