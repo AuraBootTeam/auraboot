@@ -65,6 +65,9 @@ public class CommandTargetScopePhase implements CommandPhase {
     private com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization businessAuthorization;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.permission.service.DomainCommandAuthorization domains;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.auraboot.framework.meta.service.impl.CommandResultProjectionService resultProjection;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -329,7 +332,9 @@ public class CommandTargetScopePhase implements CommandPhase {
 
             var result = nativeContract != null
                     ? businessAuthorization.resolveNative(member, codes, modelCode, record, action)
-                    : businessAuthorization.resolve(member, codes, modelCode, record);
+                    : domains != null && ctx.getAuthorizationVerdict() != null && domains.isDomain(ctx.getAuthorizationVerdict().permissionCode())
+                        ? businessAuthorization.resolveForAction(member, codes, modelCode, record, action)
+                        : businessAuthorization.resolve(member, codes, modelCode, record);
             if (result == null || !result.result().granted()) return false;
             if (com.auraboot.framework.meta.security.NativeBusinessCommandContract.declaresTransition(ctx))
                 com.auraboot.framework.meta.security.NativeBusinessCommandContract.validateTransitionState(ctx.getExecConfig(), record, true);

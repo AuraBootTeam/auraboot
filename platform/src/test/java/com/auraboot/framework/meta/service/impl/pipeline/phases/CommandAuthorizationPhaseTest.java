@@ -47,6 +47,16 @@ class CommandAuthorizationPhaseTest {
                 userPermissionService, recordShareService, dynamicDataServiceProvider);
     }
 
+    @Test void domainRefusalDoesNotFallBackToARecordShareOrChildPermission() {
+        var domains = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.DomainCommandAuthorization.class);
+        when(domains.authorize("example.cap.write")).thenReturn(false);
+        var phase = phase();
+        org.springframework.test.util.ReflectionTestUtils.setField(phase, "domains", domains);
+        var context = contextWithPermissions(List.of("example.cap.write"), 42L);
+        assertThatThrownBy(() -> phase.execute(context)).isInstanceOf(BusinessException.class);
+        verifyNoInteractions(userPermissionService, recordShareService);
+    }
+
     @Test
     void executeSkipsPermissionServiceWhenCommandDeclaresNoPermissions() {
         CommandAuthorizationPhase phase = phase();

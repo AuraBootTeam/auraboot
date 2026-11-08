@@ -39,7 +39,13 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
     public List<CapabilityGroup> resolveForRole(Long roleId) {
         Long tenantId = MetaContext.getCurrentTenantId();
         List<PermissionDTO> allActive = permissionService.findAllActive();
+        Set<String> domainModels = allActive.stream().filter(permission -> permission.getExtension() != null)
+                .map(permission -> permission.getExtension().get("domainModels"))
+                .filter(java.util.Map.class::isInstance).map(value -> (java.util.Map<?,?>) value)
+                .flatMap(value -> value.keySet().stream()).map(String::valueOf).collect(Collectors.toSet());
         List<String> allCodes = allActive.stream()
+                .filter(permission -> permission.getExtension() == null || !permission.getExtension().containsKey("retiredDomainOperation"))
+                .filter(permission -> !"model".equals(permission.getResourceType()) || !domainModels.contains(permission.getResourceCode()))
                 .map(PermissionDTO::getCode).filter(Objects::nonNull).toList();
         // code -> localized display name, so convention-derived capabilities render business labels
         // (e.g. 许可证) instead of the raw resource segment (license).

@@ -71,6 +71,8 @@ public class PermissionInterceptor implements HandlerInterceptor {
     private final MenuMapper menuMapper;
     private final AdminRoleChecker adminRoleChecker;
     private final PageSchemaMapper pageSchemaMapper;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.permission.service.impl.PermissionSnapshotCache domainPolicies;
 
     /**
      * REG-5/6 (DDR-2026-06-30): role/permission ASSIGNMENT is restricted to tenant_admin.
@@ -191,6 +193,16 @@ public class PermissionInterceptor implements HandlerInterceptor {
                         "tenant_admin required for role/permission assignment,permissionCode: " + permissionCode);
             }
         }
+
+        // Native domain CRUD authorizes in the shared application service for HTTP and non-HTTP callers.
+        // Metadata-only endpoints and other products retain their original interceptor contract.
+        if (domainPolicies != null && handler instanceof HandlerMethod endpoint && endpoint.getBeanType() == com.auraboot.framework.meta.controller.DynamicController.class
+                && Set.of("getById", "create", "createCompat", "update", "delete", "batchCreate", "batchUpdate",
+                    "batchDelete", "validate", "getFieldOptions", "executeCustomQuery", "executeCustomAction", "exportData",
+                    "downloadExport", "importData", "getStats", "getRelationData", "saveWithRelations").contains(endpoint.getMethod().getName())
+                && permissionCode.startsWith("model.") && permissionCode.lastIndexOf('.') > 6
+                && domainPolicies.hasDomainModel(MetaContext.getCurrentTenantId(),
+                    permissionCode.substring(6, permissionCode.lastIndexOf('.')))) return true;
 
         // 3. Check user permission
         boolean hasPermission = userPermissionService.hasPermission(userId, permissionCode);

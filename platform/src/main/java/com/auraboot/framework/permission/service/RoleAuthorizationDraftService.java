@@ -128,7 +128,8 @@ public class RoleAuthorizationDraftService {
                         status = "PERMISSION_MAPPING_UNAVAILABLE";
                     else if ("view".equals(definition.getAction()) && code.equals(definition.getResourceCode()))
                         status = "ENTRY_FALLBACK_REQUIRES_MAPPING";
-                    else if (root.definitionSource() != null && (!root.model().equals(definition.getResourceCode())
+                    else if (root.definitionSource() != null && !DomainPermissionPolicy.permits(definition, root.model(), root.action())
+                            && (!root.model().equals(definition.getResourceCode())
                             || !(root.action().equals(definition.getAction()) || "manage".equals(definition.getAction()))))
                         status = "BOUNDARY_MAPPING_REQUIRES_REVIEW";
                     else if (owners.isEmpty()) status = "MISSING_BUSINESS_GRANT";
@@ -242,6 +243,14 @@ public class RoleAuthorizationDraftService {
                     && permission.getAction() != null) {
                 permittedPairs.add(permission.getResourceCode() + ":" + permission.getAction());
                 permittedModels.add(permission.getResourceCode());
+                if (permission.getExtension() != null && permission.getExtension().get("domainModels") instanceof Map<?,?> models) {
+                    models.forEach((model, actions) -> {
+                        if (model instanceof String name && actions instanceof List<?> values) {
+                            permittedModels.add(name);
+                            values.forEach(action -> permittedPairs.add(name + ":" + action));
+                        }
+                    });
+                }
             }
         }
         // Restrictive policies may cover the root and declared public sources without model CRUD.

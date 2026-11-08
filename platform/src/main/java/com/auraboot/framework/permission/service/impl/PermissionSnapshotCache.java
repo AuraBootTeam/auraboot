@@ -318,6 +318,34 @@ public class PermissionSnapshotCache {
         });
     }
 
+    public List<String> domainPermissionAlternatives(Long tenantId, String code) {
+        var required = resolvePermissionDefinition(tenantId, code);
+        if (com.auraboot.framework.permission.service.DomainPermissionPolicy.models(required).isEmpty()) return List.of(code);
+        var levels = List.of("read", "write", "manage");
+        return getPermissionCatalog(tenantId).definitionsByNormalizedCode().values().stream()
+                .filter(permission -> !com.auraboot.framework.permission.service.DomainPermissionPolicy.models(permission).isEmpty()
+                    && java.util.Objects.equals(required.getResourceCode(), permission.getResourceCode())
+                    && levels.indexOf(permission.getAction()) >= levels.indexOf(required.getAction()))
+                .map(Permission::getCode).distinct().sorted().toList();
+    }
+
+    public boolean hasDomainModel(Long tenantId, String model) {
+        return getPermissionCatalog(tenantId).definitionsByNormalizedCode().values().stream()
+                .anyMatch(permission -> com.auraboot.framework.permission.service.DomainPermissionPolicy.owns(permission, model));
+    }
+
+    /** Published domain policies replace model-operation grants only for explicitly owned resources. */
+    public List<String> resourcePermissionCodes(Long tenantId, String model, String action) {
+        var policies = getPermissionCatalog(tenantId).definitionsByNormalizedCode().values().stream()
+                .filter(permission -> com.auraboot.framework.permission.service.DomainPermissionPolicy.owns(permission, model)).toList();
+        if (policies.isEmpty() || "read".equals(action) && policies.stream().anyMatch(permission ->
+                permission.getExtension() instanceof Map<?,?> extension
+                && extension.get("dataControlledReads") instanceof List<?> protectedModels && protectedModels.contains(model)))
+            return com.auraboot.framework.permission.engine.evaluator.PermissionCodeCandidates.forResourceAction(model, action);
+        return policies.stream().filter(permission -> com.auraboot.framework.permission.service.DomainPermissionPolicy.permits(permission, model, action))
+                .map(Permission::getCode).distinct().sorted().toList();
+    }
+
     private String normalizePermissionCode(String permissionCode) {
         return permissionCode.toLowerCase(Locale.ROOT);
     }

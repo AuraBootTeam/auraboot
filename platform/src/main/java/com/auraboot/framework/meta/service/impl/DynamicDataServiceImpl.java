@@ -96,6 +96,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @SuppressWarnings("java/log-injection")
 public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDataService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.permission.service.DomainCommandAuthorization domainAuthorization;
+
+    private void requireDomainAction(String model, String action) {
+        if (domainAuthorization != null) domainAuthorization.requireResource(model, action);
+    }
+
     private static final String DEFAULT_LIST_SORT_COLUMN = "updated_at";
     private static final String DEFAULT_LIST_SORT_DIRECTION = "DESC";
 
@@ -214,6 +221,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Observed(name = "dynamic_data.list", contextualName = "dynamic-data-list")
     public PaginationResult<Map<String, Object>> list(String modelCode, DynamicQueryRequest request) {
+        requireDomainAction(modelCode, "read");
         BusinessResourceDataScope.query(modelCode, request);
         return dynamicDataListingSupport().list(modelCode,request);
     }
@@ -295,6 +303,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                                  String fieldCode,
                                  Object expectedValue,
                                  Object nextValue) {
+        requireDomainAction(modelCode, "update");
         BusinessResourceDataScope.unsupported();
         Map<String, Object> nextValues = new LinkedHashMap<>();
         nextValues.put(fieldCode, nextValue);
@@ -308,6 +317,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                                  String fieldCode,
                                  Object expectedValue,
                                  Map<String, Object> nextValues) {
+        requireDomainAction(modelCode, "update");
         BusinessResourceDataScope.unsupported();
         validateModelCode(modelCode);
         assertWritable(modelCode);
@@ -430,6 +440,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public void compareAndSetBatch(String modelCode, String fieldCode,
             List<com.auraboot.framework.plugin.extension.CompareAndSetUpdate> updates) {
+        requireDomainAction(modelCode, "update");
         BusinessResourceDataScope.unsupported();
         validateModelCode(modelCode);
         assertWritable(modelCode);
@@ -627,6 +638,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public Optional<Long> incrementWithinCap(String modelCode, String recordId,
                                               String counterCode, long delta, String capCode) {
+        requireDomainAction(modelCode, "update");
         BusinessResourceDataScope.unsupported();
         assertWritable(modelCode);
         ModelDefinition model = getModelDefinition(modelCode);
@@ -731,6 +743,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Observed(name = "dynamic_data.get_by_id", contextualName = "dynamic-data-get-by-id")
     public Map<String, Object> getById(String modelCode, String recordId) {
+        requireDomainAction(modelCode, "read");
         return getByIdInternal(modelCode, recordId, true);
     }
 
@@ -954,6 +967,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public Map<String, Object> create(String modelCode, Map<String, Object> data) {
+        requireDomainAction(modelCode, "create");
         BusinessResourceDataScope.create(modelCode, data);
         if (MachineDataAccessContext.isActive()) MachineDataAccessContext.requireDecision(modelCode).requireAction("create");
         validateModelCode(modelCode);
@@ -1241,6 +1255,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public Map<String, Object> update(String modelCode, String recordId, Map<String, Object> inputData) {
+        requireDomainAction(modelCode, "update");
         BusinessResourceDataScope.update(modelCode, recordId, inputData);
         validateModelCode(modelCode);
         assertWritable(modelCode);
@@ -1431,6 +1446,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public void delete(String modelCode, String recordId) {
+        requireDomainAction(modelCode, "delete");
         BusinessResourceDataScope.delete(modelCode, recordId);
         validateModelCode(modelCode);
         assertWritable(modelCode);
@@ -1635,6 +1651,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
     @Override
     public DynamicBatchResponse batchCreate(String modelCode, List<Map<String, Object>> dataList) {
+        requireDomainAction(modelCode, "create");
         BusinessResourceDataScope.unsupported();
         return dynamicDataBatchSupport().batchCreate(modelCode,dataList);
     }
@@ -1655,6 +1672,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public List<Map<String, Object>> bulkCreate(String modelCode, List<Map<String, Object>> dataList) {
+        requireDomainAction(modelCode, "create");
         BusinessResourceDataScope.unsupported();
         return dynamicDataBatchSupport().bulkCreate(modelCode,dataList);
     }
@@ -1666,6 +1684,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public DynamicBatchResponse batchUpdate(String modelCode, List<Map<String, Object>> dataList) {
+        requireDomainAction(modelCode, "update");
         BusinessResourceDataScope.unsupported();
         return dynamicDataBatchSupport().batchUpdate(modelCode,dataList);
     }
@@ -1673,6 +1692,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public void batchDelete(String modelCode, List<String> recordIds) {
+        requireDomainAction(modelCode, "delete");
         BusinessResourceDataScope.unsupported();
         dynamicDataBatchSupport().batchDelete(modelCode,recordIds);
     }
@@ -1690,6 +1710,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(readOnly = true)
     public List<Map<String, Object>> executeCustomQuery(String modelCode, String queryName, Map<String, Object> queryParams) {
+        requireDomainAction(modelCode, "read");
         BusinessResourceDataScope.unsupported();
         return dynamicDataListingSupport().executeCustomQuery(modelCode,queryName,queryParams);
     }
@@ -1699,6 +1720,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(readOnly = true)
     public Map<String, Object> aggregate(String modelCode, AggregateRequest aggregateRequest) {
+        requireDomainAction(modelCode, "read");
         BusinessResourceDataScope.unsupported();
         return dynamicDataListingSupport().aggregate(modelCode,aggregateRequest);
     }
@@ -1708,6 +1730,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(readOnly = true)
     public Map<String, Object> getStats(String modelCode, Map<String, Object> statsParams) {
+        requireDomainAction(modelCode, "read");
         BusinessResourceDataScope.unsupported();
         return dynamicDataListingSupport().getStats(modelCode,statsParams);
     }
@@ -1721,6 +1744,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getRelationData(String modelCode, String recordId,
                                                     String relationName, Map<String, Object> queryParams) {
+        requireDomainAction(modelCode, "read");
         BusinessResourceDataScope.unsupported();
         validateModelCode(modelCode);
         logOperation("getRelationData", modelCode, relationName);
@@ -1735,6 +1759,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Transactional
     public RelationOperationResult createRelations(String modelCode, String recordId,
                                                     String relationName, List<String> targetRecordIds) {
+        requireDomainAction(modelCode, "update");
         BusinessResourceDataScope.unsupported();
         validateModelCode(modelCode);
         logOperation("createRelations", modelCode, relationName);
@@ -1750,6 +1775,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Transactional
     public RelationOperationResult removeRelations(String modelCode, String recordId,
                                                     String relationName, List<String> targetRecordIds) {
+        requireDomainAction(modelCode, "update");
         BusinessResourceDataScope.unsupported();
         validateModelCode(modelCode);
         logOperation("removeRelations", modelCode, relationName);
@@ -1765,6 +1791,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
     @Override
     public ValidationResult validate(String modelCode, Map<String, Object> data, ValidationContext validationContext) {
+        requireDomainAction(modelCode, "read");
         BusinessResourceDataScope.unsupported();
         validateModelCode(modelCode);
 
@@ -1783,6 +1810,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(readOnly = true)
     public List<FieldOption> getFieldOptions(String modelCode, String fieldCode, FieldOptionRequest optionRequest) {
+        requireDomainAction(modelCode, "read");
         BusinessResourceDataScope.unsupported();
         return referenceOptionsQuery().getFieldOptions(modelCode,fieldCode,optionRequest);
     }
@@ -1792,6 +1820,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(readOnly = true)
     public ExportResult exportData(String modelCode, DataExportRequest exportRequest) {
+        requireDomainAction(modelCode, "read");
         BusinessResourceDataScope.unsupported();
         return dynamicDataTransferSupport().exportData(modelCode,exportRequest);
     }
@@ -1801,6 +1830,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public ImportResult importData(String modelCode, DataImportRequest importRequest) {
+        requireDomainAction(modelCode, "create");
         BusinessResourceDataScope.unsupported();
         return dynamicDataTransferSupport().importData(modelCode,importRequest);
     }
@@ -1810,6 +1840,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional
     public ActionExecutionResult executeCustomAction(String modelCode, String actionName, Map<String, Object> actionParams) {
+        requireDomainAction(modelCode, "update");
         BusinessResourceDataScope.unsupported();
         return dynamicDataTransferSupport().executeCustomAction(modelCode,actionName,actionParams);
     }
@@ -1896,6 +1927,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public JointSubTableSaveResponse saveWithRelations(String modelCode, JointSubTableSaveRequest request) {
+        requireDomainAction(modelCode, "update");
         BusinessResourceDataScope.unsupported();
         return dynamicJointSaveSupport().saveWithRelations(modelCode,request);
     }

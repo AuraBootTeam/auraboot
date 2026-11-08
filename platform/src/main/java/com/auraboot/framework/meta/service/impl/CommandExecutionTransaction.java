@@ -19,7 +19,29 @@ public class CommandExecutionTransaction {
     private final PlatformTransactionManager transactions;
     private final ExtensionRegistry extensions;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.permission.service.DomainCommandAuthorization domains;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.meta.mapper.CommandDefinitionMapper definitions;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.permission.service.impl.PermissionSnapshotCache snapshots;
+    private boolean domainCommand(String commandCode) {
+        if (definitions == null || snapshots == null) return false;
+        var command = definitions.findCurrentByCode(commandCode);
+        if (command == null || command.getExecutionConfig() == null) return false;
+        var config = com.auraboot.framework.common.util.JsonUtil.parse(command.getExecutionConfig(), new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String,Object>>() {});
+        if (!(config.get("permissions") instanceof java.util.List<?> codes)) return false;
+        return codes.stream().anyMatch(code -> code instanceof String value && !com.auraboot.framework.permission.service.DomainPermissionPolicy.models(
+                snapshots.resolvePermissionDefinition(com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId(), value)).isEmpty());
+    }
+
     public <T> T execute(String commandCode, boolean dryRun, Supplier<T> operation) {
+        return domains == null ? executeTransaction(commandCode, dryRun, operation)
+                : domains.withinInvocation(() -> executeTransaction(commandCode, dryRun, operation));
+    }
+
+    private <T> T executeTransaction(String commandCode, boolean dryRun, Supplier<T> operation) {
         var owner = extensions.getBusinessResourceOwner(commandCode).orElse(null);
         var resourceIsolation = owner instanceof BusinessResourceAuthorization resource ? resource.resourceReadIsolation() : null;
         var handler = extensions.getCommandHandler(commandCode).orElse(null);
@@ -28,6 +50,7 @@ public class CommandExecutionTransaction {
             throw new AccessDeniedException("Conflicting command owner transaction requirements");
         var isolation = resourceIsolation != null ? resourceIsolation : handlerIsolation;
         var template = new TransactionTemplate(transactions);
+        if (isolation == null && domainCommand(commandCode)) isolation = BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ;
         if (isolation != null) {
             // Preserve the caller's atomic unit: never suspend it just to satisfy an owner.
             // An existing transaction must already attest the exact required isolation.

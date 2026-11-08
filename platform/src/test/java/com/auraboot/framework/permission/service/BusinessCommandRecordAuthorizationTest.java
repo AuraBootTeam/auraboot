@@ -44,6 +44,8 @@ class BusinessCommandRecordAuthorizationTest {
         MetaContext.setContext(100L, 1L, "actor-pid", "actor"); MetaContext.setMemberId(5L);
         TransactionSynchronizationManager.setActualTransactionActive(true);
         TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(Connection.TRANSACTION_REPEATABLE_READ);
+        when(snapshots.resourcePermissionCodes(any(), any(), any())).thenAnswer(call ->
+                com.auraboot.framework.permission.engine.evaluator.PermissionCodeCandidates.forResourceAction(call.getArgument(1), call.getArgument(2)));
         when(snapshots.withFreshReads(any())).thenAnswer(call -> ((Supplier<?>) call.getArgument(0)).get());
         when(snapshots.resolvePermissionDefinition(100L, CODE)).thenReturn(permission(CODE));
         when(vocabulary.buildBusinessContext(eq(5L), eq(MODEL), any())).thenAnswer(call -> DecisionContext.builder()
@@ -52,6 +54,61 @@ class BusinessCommandRecordAuthorizationTest {
 
     @AfterEach void clear() {
         MetaContext.clear(); TransactionSynchronizationManager.clear();
+    }
+
+    @Test void retiredGeneratedModelBindingsRemainFieldConstraintsWithoutSupplyingOperationAuthority() {
+        var definition = permission(CODE); definition.setResourceCode("domain"); definition.setAction("write");
+        definition.setExtension(Map.of("domainModels", Map.of(MODEL, List.of("read", "update"))));
+        when(snapshots.resolvePermissionDefinition(100L, CODE)).thenReturn(definition);
+        String oldCode = "model." + MODEL + ".update";
+        var oldDefinition = permission(oldCode); oldDefinition.setResourceType("model");
+        oldDefinition.setResourceCode(MODEL); oldDefinition.setAction("update");
+        when(snapshots.resolvePermissionDefinition(100L, oldCode)).thenReturn(oldDefinition);
+        var old = grant(12,101,oldCode);old.setFieldScopeJson("{\"version\":2,\"models\":{\"receipt\":{\"readFields\":[\"city\"],\"writeFields\":[]}}}");
+        when(bindings.findBusinessGrants(100L,1L,5L,oldCode)).thenReturn(List.of(old));
+        grants(grant(11,101,CODE));guards(CODE,new PermissionPolicyService.ConditionGuard(11L,null));
+        guards(oldCode,new PermissionPolicyService.ConditionGuard(12L,null));
+        when(scopes.resolveObjectBoundScopeForRole(5L,101L,MODEL,"update",MODEL)).thenReturn(DataScopeCondition.all());
+        var result=authorization.resolveNative(5L,List.of(CODE),MODEL,record(1,"Shanghai"),"update");
+        assertThat(result.result().granted()).isTrue();assertThat(result.canRead("city")).isTrue();assertThat(result.canWrite("city")).isFalse();
+        grants();
+        assertThat(authorization.resolveNative(5L,List.of(CODE),MODEL,record(1,"Shanghai"),"update").result().granted()).isFalse();
+    }
+
+    @Test void domainUsesOneFunctionBindingAndOriginalObjectScopeForInternalRows() {
+        var definition = permission(CODE);
+        definition.setResourceCode("domain"); definition.setAction("write");
+        definition.setExtension(Map.of("domainModels", Map.of(MODEL, List.of("read", "create", "update"))));
+        when(snapshots.resolvePermissionDefinition(100L, CODE)).thenReturn(definition);
+        var domains = new DomainCommandAuthorization(snapshots, bindings);
+        org.springframework.test.util.ReflectionTestUtils.setField(authorization, "domains", domains);
+        grants(grant(11, 101, CODE)); guards(CODE, new PermissionPolicyService.ConditionGuard(11L, null));
+        when(scopes.resolveObjectBoundScopeForRole(5L, 101L, MODEL, "update", MODEL))
+                .thenReturn(new DataScopeCondition("self", "created_by", 1L, null, List.of(), List.of()));
+        domains.withinInvocation(() -> {
+            assertThat(domains.authorize(CODE)).isTrue();
+            assertThat(authorization.resolveNative(5L, List.of(CODE), MODEL, record(1, "Shanghai"), "update").result().granted()).isTrue();
+            assertThat(authorization.resolveNative(5L, List.of(CODE), MODEL, record(999, "Shanghai"), "update").result().granted()).isFalse();
+            assertThat(authorization.resolveNative(5L, List.of(CODE), MODEL, record(1, "Shanghai"), "delete").result().granted()).isFalse();
+            return null;
+        });
+        verify(bindings, times(1)).findBusinessGrants(100L, 1L, 5L, CODE);
+        domains.withinInvocation(() -> { assertThat(domains.authorize(CODE)).isTrue(); return null; });
+        verify(bindings, times(2)).findBusinessGrants(100L, 1L, 5L, CODE);
+    }
+
+    @Test void domainLevelDoesNotRemoveOriginalFieldAndExplicitScopeRestrictions() {
+        var definition = permission(CODE); definition.setResourceCode("domain"); definition.setAction("write");
+        definition.setExtension(Map.of("domainModels", Map.of(MODEL, List.of("read", "update"))));
+        when(snapshots.resolvePermissionDefinition(100L, CODE)).thenReturn(definition);
+        var row = grant(11, 101, CODE);
+        row.setFieldScopeJson("{\"version\":2,\"models\":{\"receipt\":{\"readFields\":[\"city\"],\"writeFields\":[]}}}");
+        grants(row); guards(CODE, new PermissionPolicyService.ConditionGuard(11L, null));
+        when(scopes.resolveObjectBoundScopeForRole(5L, 101L, MODEL, "update", MODEL)).thenReturn(DataScopeCondition.all());
+        var result = authorization.resolveNative(5L, List.of(CODE), MODEL, record(1, "Shanghai"), "update");
+        assertThat(result.result().granted()).isTrue(); assertThat(result.canRead("city")).isTrue(); assertThat(result.canWrite("city")).isFalse();
+        when(scopes.resolveObjectBoundScopeForRole(5L, 101L, MODEL, "update", MODEL)).thenReturn(DataScopeCondition.none());
+        assertThat(authorization.resolveNative(5L, List.of(CODE), MODEL, record(1, "Shanghai"), "update").result().granted()).isFalse();
     }
 
     @Test void cannotBorrowAllScopeFromAConditionalRoleAndAnUnconditionalGuardFromAnother() throws Exception {

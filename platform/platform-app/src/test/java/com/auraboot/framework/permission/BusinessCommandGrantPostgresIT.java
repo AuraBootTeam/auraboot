@@ -74,6 +74,33 @@ class BusinessCommandGrantPostgresIT extends BaseIntegrationTest {
         if (permissionId != 0) jdbc.update("DELETE FROM ab_permission WHERE tenant_id=? AND id=?", tenant(), permissionId);
     }
 
+    @Autowired private com.auraboot.framework.permission.mapper.PermissionMapper permissionDefinitions;
+
+    @Test void domainJsonHydratesThroughRealMapperAndNullDefaultRetainsObjectSelfScope() throws Exception {
+        String extension = json.writeValueAsString(Map.of("domainModels", Map.of(model, List.of("read", "create", "update"))));
+        jdbc.update("UPDATE ab_permission SET action='write',extension=?::jsonb WHERE id=?", extension, permissionId);
+        jdbc.update("UPDATE ab_role SET default_data_scope_type=NULL WHERE id=?", roleA);
+        jdbc.update("UPDATE ab_user_role SET status='inactive' WHERE tenant_id=? AND role_id=?", tenant(), roleB);
+        jdbc.update("""
+                INSERT INTO ab_role_data_scope (pid,tenant_id,role_id,resource_code,action_code,scope_type,merge_strategy)
+                VALUES (?,?,?,?,'read','self','MAX')
+                """, UniqueIdGenerator.generate(), tenant(), roleA, model);
+        var hydrated = permissionDefinitions.findResolvableDefinitions(tenant()).stream()
+                .filter(p -> p.getId().equals(permissionId)).findFirst().orElseThrow();
+        assertThat(hydrated.getExtension()).isInstanceOf(Map.class);
+        assertThat(permissionDefinitions.findByStatus("active").stream().filter(p -> p.getId().equals(permissionId))
+                .findFirst().orElseThrow().getExtension()).isInstanceOf(Map.class);
+        assertThat(permissionDefinitions.findByIds(List.of(permissionId)).getFirst().getExtension()).isInstanceOf(Map.class);
+        assertThat(com.auraboot.framework.permission.service.DomainPermissionPolicy.permits(hydrated, model, "create")).isTrue();
+        var before = jdbc.queryForList("SELECT resource_code,action_code,scope_type,scope_config FROM ab_role_data_scope WHERE tenant_id=? AND role_id=?", tenant(), roleA);
+        assertThat(authorization.resolveNative(member(), List.of(code), model, record(true,"Beijing"), "create").result().granted()).isTrue();
+        assertThat(authorization.resolveNative(member(), List.of(code), model, record(false,"Beijing"), "update").result().granted()).isFalse();
+        assertThat(jdbc.queryForList("SELECT resource_code,action_code,scope_type,scope_config FROM ab_role_data_scope WHERE tenant_id=? AND role_id=?", tenant(), roleA)).isEqualTo(before);
+        assertThat(jdbc.queryForObject("SELECT default_data_scope_type FROM ab_role WHERE id=?", String.class, roleA)).isNull();
+        jdbc.update("UPDATE ab_role_data_scope SET scope_type='none' WHERE tenant_id=? AND role_id=?", tenant(), roleA);
+        assertThat(authorization.resolveNative(member(), List.of(code), model, record(true,"Beijing"), "create").result().granted()).isFalse();
+    }
+
     @Test void nativeCreationReadsCompleteSourceGrantsAndDoesNotRewriteThem() throws Exception {
         jdbc.update("UPDATE ab_permission SET resource_code=?,action='create' WHERE id=?", model, permissionId);
         jdbc.update("UPDATE ab_role SET default_data_scope_type='none' WHERE id=?", roleA);

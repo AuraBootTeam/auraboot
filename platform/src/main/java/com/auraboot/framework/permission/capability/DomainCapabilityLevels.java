@@ -8,7 +8,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/** Optional three-level authoring convention; atomic runtime grants and scopes are unchanged. */
+/** Recognizes nested domain-level declarations for role authoring. */
 final class DomainCapabilityLevels {
     private DomainCapabilityLevels() {}
 

@@ -22,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Complete business grants are alternatives: function AND scope AND guards from ONE binding.
@@ -39,6 +40,8 @@ public class BusinessCommandRecordAuthorization {
     private final PolicyEvaluator policyEvaluator;
     private final com.fasterxml.jackson.databind.ObjectMapper json;
     private final com.auraboot.framework.permission.engine.evaluator.RecordShareEvaluator recordShares;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private DomainCommandAuthorization domains;
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public PermissionResult evaluate(Long memberId, List<String> declaredPermissions,
@@ -68,10 +71,19 @@ public class BusinessCommandRecordAuthorization {
         return resolveInternal(memberId, declaredPermissions, recordModel, record, action);
     }
 
+    /** Apply the server-declared target action to domain data policies, retaining legacy consumers. */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public BusinessGrantDecision resolveForAction(Long member, List<String> codes, String model,
+                                                  Map<String,Object> record, String action) {
+        boolean domain = codes != null && codes.stream().anyMatch(code -> DomainPermissionPolicy.owns(
+                snapshots.resolvePermissionDefinition(MetaContext.getCurrentTenantId(), code), model));
+        return resolveInternal(member, codes, model, record, domain ? action : null);
+    }
+
     /** Resolve a complete generated model-read grant for an artifact reader, without an execution permit. */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public BusinessGrantDecision resolveModelRead(Long memberId, String model, Map<String,Object> record) {
-        return resolveInternal(memberId, List.of("model." + model + ".read"), model, record, "read");
+        return resolveInternal(memberId, snapshots.resourcePermissionCodes(MetaContext.getCurrentTenantId(), model, "read"), model, record, "read");
     }
 
     /** Null means this declared duty is not a write owner; an owning duty's refusal must not fall back. */
@@ -82,6 +94,8 @@ public class BusinessCommandRecordAuthorization {
         return snapshots.withFreshReads(() -> {
             var permission = snapshots.resolvePermissionDefinition(MetaContext.getCurrentTenantId(), code);
             if (permission == null) throw new org.springframework.security.access.AccessDeniedException("Current command permission is unavailable");
+            if (DomainPermissionPolicy.permits(permission, model, action))
+                return resolveInternal(member, List.of(code), model, record, action);
             if (!("operation".equalsIgnoreCase(permission.getResourceType()) || "data".equalsIgnoreCase(permission.getResourceType()))
                     || !Objects.equals(model, permission.getResourceCode())
                     || !(action.equals(permission.getAction()) || "manage".equals(permission.getAction()))) return null;
@@ -93,7 +107,7 @@ public class BusinessCommandRecordAuthorization {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public BusinessGrantDecision resolveOrdinaryRead(Long memberId, String model, Map<String,Object> record) {
         return resolveInternal(memberId,
-                com.auraboot.framework.permission.engine.evaluator.PermissionCodeCandidates.forResourceAction(model, "read"),
+                snapshots.resourcePermissionCodes(MetaContext.getCurrentTenantId(), model, "read"),
                 model, record, "read", true);
     }
 
@@ -101,7 +115,7 @@ public class BusinessCommandRecordAuthorization {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public BusinessGrantDecision resolveOrdinaryUpdate(Long memberId, String model, Map<String,Object> record) {
         return resolveInternal(memberId,
-                com.auraboot.framework.permission.engine.evaluator.PermissionCodeCandidates.forResourceAction(model, "update"),
+                snapshots.resourcePermissionCodes(MetaContext.getCurrentTenantId(), model, "update"),
                 model, record, "update", true);
     }
 
@@ -112,7 +126,7 @@ public class BusinessCommandRecordAuthorization {
                 || !Objects.equals(MetaContext.getCurrentUserId(), record.get("created_by")))
             return decision(denied("Native creation ownership is unavailable", List.of()), memberId, model, record, List.of());
         return resolveInternal(memberId,
-                com.auraboot.framework.permission.engine.evaluator.PermissionCodeCandidates.forResourceAction(model, "create"),
+                snapshots.resourcePermissionCodes(MetaContext.getCurrentTenantId(), model, "create"),
                 model, record, "create", true);
     }
 
@@ -168,7 +182,12 @@ public class BusinessCommandRecordAuthorization {
         for (String code : new java.util.LinkedHashSet<>(codes)) {
             var permission = snapshots.resolvePermissionDefinition(tenant, code);
             boolean modelRead = "read".equals(nativeAction);
-            if (nativeAction != null && ((!modelRead && !ordinaryModelAction && code.startsWith("model."))
+            boolean domain = DomainPermissionPolicy.owns(permission, model);
+            if (!DomainPermissionPolicy.models(permission).isEmpty() && !DomainPermissionPolicy.permits(permission, model, nativeAction)) {
+                trace.add(step(EvaluationVerdict.DENY, "Domain level does not own this model/action", code, null, null));
+                continue;
+            }
+            if (!domain && nativeAction != null && ((!modelRead && !ordinaryModelAction && code.startsWith("model."))
                     || modelRead && !ordinaryModelAction && !code.equals("model." + model + ".read") || permission == null
                     || !model.equals(permission.getResourceCode())
                     || !(nativeAction.equals(permission.getAction()) || !modelRead && "manage".equals(permission.getAction())))) {
@@ -182,14 +201,15 @@ public class BusinessCommandRecordAuthorization {
                 trace.add(step(EvaluationVerdict.DENY, "Declared business permission is unavailable", code, null, null));
                 continue;
             }
-            var grants = bindings.findBusinessGrants(tenant, MetaContext.getCurrentUserId(), member, code);
+            var grants = domain && domains != null ? domains.grants(code)
+                    : bindings.findBusinessGrants(tenant, MetaContext.getCurrentUserId(), member, code);
             if (grants == null || grants.stream().anyMatch(row -> !"grant".equals(row.getGrantType()))) {
                 trace.add(step(EvaluationVerdict.DENY, "Business permission has an effective deny", code, null, null));
                 continue;
             }
             for (var grant : grants) {
                 if (grant.getId() == null || grant.getRoleId() == null || grant.getPermissionCode() == null
-                        || !(code.equals(grant.getPermissionCode()) || "*".equals(grant.getPermissionCode()))) continue;
+                        || !(domain || code.equals(grant.getPermissionCode()) || "*".equals(grant.getPermissionCode()))) continue;
                 Object scopePolicy = permission.getExtension() instanceof Map<?, ?> extension
                         ? extension.get("businessScopePolicy") : null;
                 if (scopePolicy != null && !"record".equals(scopePolicy)) {
@@ -197,8 +217,12 @@ public class BusinessCommandRecordAuthorization {
                             grant.getRoleId(), grant.getId()));
                     continue;
                 }
-                boolean objectBoundScope = !ordinaryModelAction && "record".equals(scopePolicy);
-                var scope = objectBoundScope
+                boolean objectBoundScope = domain || !ordinaryModelAction && "record".equals(scopePolicy);
+                String scopeAction = domain ? Objects.requireNonNullElse(nativeAction,
+                        "read".equals(permission.getAction()) ? "read" : "update") : permission.getAction();
+                var scope = domain
+                        ? scopes.resolveObjectBoundScopeForRole(member, grant.getRoleId(), model, scopeAction, model)
+                        : objectBoundScope
                         ? scopes.resolveObjectBoundScopeForRole(member, grant.getRoleId(), permission.getResourceCode(),
                             permission.getAction(), model)
                         : ordinaryModelAction
@@ -233,6 +257,8 @@ public class BusinessCommandRecordAuthorization {
                     if (rowGuard.verdict() == EvaluationVerdict.DENY) continue;
                 }
                 var fields = BusinessGrantFieldScope.select(json, grant.getFieldScopeJson(), model);
+                if (domain && fields.isPresent()) fields = restrictDomainData(permission, grant.getRoleId(), member, model,
+                        scopeAction, record, fields.get());
                 if (fields.isEmpty()) {
                     trace.add(step(EvaluationVerdict.DENY, "No field grant is configured for this business object", code,
                             grant.getRoleId(), grant.getId()));
@@ -245,6 +271,62 @@ public class BusinessCommandRecordAuthorization {
         }
         return decision(matched.isEmpty() ? denied("No complete business grant permits this target", trace)
                 : PermissionResult.allow(List.copyOf(trace)), member, model, record, matched);
+    }
+
+    /** Retired codes are data-policy references only; they never supply positive function authority. */
+    private java.util.Optional<BusinessGrantDecision.Fields> restrictDomainData(
+            com.auraboot.framework.permission.entity.Permission permission, Long role, Long member, String model,
+            String action, Map<String,Object> record, BusinessGrantDecision.Fields fields) {
+        List<?> declared = permission.getExtension() instanceof Map<?,?> extension
+                && extension.get("dataPolicyReferences") instanceof Map<?,?> references
+                && references.get(model) instanceof List<?> values ? values : List.of();
+        Set<String> codes = new java.util.LinkedHashSet<>();
+        for (Object raw : declared) {
+            if (!(raw instanceof String code)) return java.util.Optional.empty();
+            codes.add(code);
+        }
+        // Generated model bindings can carry existing field/row restrictions even when the plugin
+        // never listed them in permissions.json. They are constraints, never fallback authority.
+        codes.addAll(com.auraboot.framework.permission.engine.evaluator.PermissionCodeCandidates.forResourceAction(model, action));
+        for (String code : codes) {
+            var definition = snapshots.resolvePermissionDefinition(MetaContext.getCurrentTenantId(), code);
+            if (definition == null && !declared.contains(code)) continue;
+            if (definition == null || !model.equals(definition.getResourceCode())) return java.util.Optional.empty();
+            String policyAction = definition.getAction();
+            if (!(action.equals(policyAction) || "manage".equals(policyAction)
+                    && (!"read".equals(action) || !"read".equals(permission.getAction())))) continue;
+            var scope = scopes.resolveObjectBoundScopeForRole(member, role, model, policyAction, model);
+            if (scope == null || !"not_configured".equals(scope.scopeType())
+                    && scopeEvaluator.evaluateGrantScope(scope, member, model, policyAction, record).verdict() == EvaluationVerdict.DENY)
+                return java.util.Optional.empty();
+            var rows = domains == null ? bindings.findBusinessGrants(MetaContext.getCurrentTenantId(), MetaContext.getCurrentUserId(), member, code)
+                    : domains.grants(code);
+            if (rows == null) return java.util.Optional.empty();
+            for (var row : rows) {
+                if (!role.equals(row.getRoleId())) continue;
+                if (!"grant".equals(row.getGrantType())) return java.util.Optional.empty();
+                var guards = policies.getConditionGuards(member, code);
+                var guard = guards == null ? null : guards.stream().filter(value -> row.getId().equals(value.grantId())).findFirst().orElse(null);
+                if (policyEvaluator.evaluateGrant(member, code, model, record, guard).verdict() == EvaluationVerdict.DENY)
+                    return java.util.Optional.empty();
+                if (row.getDataScopeAstJson() != null && !row.getDataScopeAstJson().isBlank() && !"null".equals(row.getDataScopeAstJson().strip())
+                        && policyEvaluator.evaluateGrant(member, code, model, record,
+                            new PermissionPolicyService.ConditionGuard(row.getId(), row.getDataScopeAstJson())).verdict() == EvaluationVerdict.DENY)
+                    return java.util.Optional.empty();
+                var stored = BusinessGrantFieldScope.select(json, row.getFieldScopeJson(), model);
+                if (stored.isEmpty()) return java.util.Optional.empty();
+                fields = intersect(fields, stored.get());
+            }
+        }
+        return java.util.Optional.of(fields);
+    }
+
+    private static BusinessGrantDecision.Fields intersect(BusinessGrantDecision.Fields left, BusinessGrantDecision.Fields right) {
+        if (left.unrestricted()) return right;
+        if (right.unrestricted()) return left;
+        var read = new java.util.HashSet<>(left.readable()); read.retainAll(right.readable());
+        var write = new java.util.HashSet<>(left.writable()); write.retainAll(right.writable());
+        return new BusinessGrantDecision.Fields(false, read, write);
     }
 
     private static BusinessGrantDecision decision(PermissionResult result, Long member, String model,

@@ -69,6 +69,25 @@ class PermissionSnapshotCacheTest {
     }
 
     @Test
+    void domainOwnershipReplacesModelGrantsWithoutChangingOtherProducts() {
+        var read = permission(901L, "example.cap.read");
+        read.setResourceType("operation"); read.setResourceCode("example"); read.setAction("read");
+        read.setExtension(Map.of("domainModels", Map.of("example_record", List.of("read"))));
+        var write = permission(902L, "example.cap.write");
+        write.setResourceType("operation"); write.setResourceCode("example"); write.setAction("write");
+        write.setExtension(Map.of("domainModels", Map.of("example_record", List.of("read", "create", "update"))));
+        when(permissionMapper.findResolvableDefinitions(100L)).thenReturn(List.of(read, write));
+        assertThat(cache.resourcePermissionCodes(100L, "example_record", "read")).containsExactly("example.cap.read", "example.cap.write");
+        assertThat(cache.resourcePermissionCodes(100L, "example_record", "create")).containsExactly("example.cap.write");
+        assertThat(cache.resourcePermissionCodes(100L, "example_record", "delete")).isEmpty();
+        assertThat(cache.hasDomainModel(100L, "example_record")).isTrue();
+        assertThat(cache.hasDomainModel(100L, "unrelated")).isFalse();
+        assertThat(cache.domainPermissionAlternatives(100L, "example.cap.read")).containsExactly("example.cap.read", "example.cap.write");
+        assertThat(cache.domainPermissionAlternatives(100L, "example.cap.write")).containsExactly("example.cap.write");
+        assertThat(cache.resourcePermissionCodes(100L, "unrelated", "read")).containsExactly("unrelated:read", "unrelated.read", "model.unrelated.read");
+    }
+
+    @Test
     void passiveExpiryRefreshesNegativeCatalogWithoutAnEvent() {
         when(permissionMapper.findResolvableDefinitions(100L))
                 .thenReturn(List.of())

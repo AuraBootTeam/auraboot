@@ -201,7 +201,8 @@ test.describe('BOM & Quote domain levels', () => {
         await page.getByTestId('role-search-input').fill(role.code);
         await page.getByTestId(`role-item-${role.code}`).click();
         await page.getByTestId('permission-right-tab-capabilities').click();
-        await expect(page.getByTestId(`domain-legacy-${domain}.cap.read`)).toBeVisible();
+        // Retained legacy atoms are data-policy references and cannot contribute operation authority.
+        await expect(page.getByTestId(`domain-legacy-${domain}.cap.read`)).toHaveCount(0);
         await expect(
           page.getByTestId(`domain-legacy-${domain === 'bom' ? 'qo' : 'bom'}.cap.read`),
         ).toHaveCount(0);

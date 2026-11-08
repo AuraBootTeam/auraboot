@@ -200,7 +200,8 @@ public class RoleGrantFieldScopeService {
         if (!("operation".equalsIgnoreCase(permission.getResourceType()) || "data".equalsIgnoreCase(permission.getResourceType()))) return List.of();
         // Only actual registered business roots, never caller-provided model names.
         return boundaries.stream().filter(boundary -> permission.getCode().equals(boundary.permissionCode())
-                        && (permission.getAction().equals(boundary.action()) || "manage".equals(permission.getAction())))
+                        && (DomainPermissionPolicy.permits(permission, boundary.model(), boundary.action())
+                            || permission.getAction().equals(boundary.action()) || "manage".equals(permission.getAction())))
                 .map(BusinessBoundary::model).distinct().sorted().toList();
     }
 

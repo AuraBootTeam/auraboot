@@ -151,8 +151,11 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
         Set<Long> granted=rolePermissionService.getPermissionIdsByRoleId(roleId);
         boolean mapped=permissionService.findAllActive().stream().anyMatch(permission->
                 granted.contains(permission.getId()) && hasRecordScopeMapping(permission)
-                && request.resourceCode().equals(permission.getResourceCode())
-                && request.actionCode().equals(permission.getAction()));
+                && (request.resourceCode().equals(permission.getResourceCode()) && request.actionCode().equals(permission.getAction())
+                    || permission.getExtension() != null
+                    && permission.getExtension().get("domainModels") instanceof java.util.Map<?,?> models
+                    && models.get(request.resourceCode()) instanceof java.util.List<?> actions
+                    && actions.contains(request.actionCode())));
         if(!mapped) throw new RootUnCheckedException(BadParam,"Action scope requires a current mapped role permission");
         dataScopeService.setScope(tenantId,roleId,request.resourceCode(),request.actionCode(),request.scopeType(),request.mergeStrategy());
     }

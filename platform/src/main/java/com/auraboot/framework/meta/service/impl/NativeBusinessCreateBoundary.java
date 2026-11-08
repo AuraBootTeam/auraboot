@@ -61,8 +61,14 @@ public class NativeBusinessCreateBoundary {
         snapshot.setReadOnly(true);
         // The outer insert retains its write transaction. Only grant reads use this consistent
         // snapshot; they do not commit the insert or need visibility of its uncommitted row.
-        var grant = snapshot.execute(status -> authorization.resolveNative(MetaContext.getCurrentMemberId(),
-                contract.permissions(), contract.model(), record, "create"));
+        // Domain commands already established the coherent transaction and function decision.
+        // Candidate/inserted-row data checks use that same snapshot, including their own write.
+        boolean coherent = java.util.Set.of(TransactionDefinition.ISOLATION_REPEATABLE_READ, TransactionDefinition.ISOLATION_SERIALIZABLE)
+                .contains(Objects.requireNonNullElse(TransactionSynchronizationManager.getCurrentTransactionIsolationLevel(), -1));
+        var grant = coherent ? authorization.resolveNative(MetaContext.getCurrentMemberId(),
+                contract.permissions(), contract.model(), record, "create")
+                : snapshot.execute(status -> authorization.resolveNative(MetaContext.getCurrentMemberId(),
+                    contract.permissions(), contract.model(), record, "create"));
         if (grant == null || !grant.result().granted()
                 || !Objects.equals(grant.tenantId(), context.getTenantId())
                 || !Objects.equals(grant.userId(), context.getUserId())
