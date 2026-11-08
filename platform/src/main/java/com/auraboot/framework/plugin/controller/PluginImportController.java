@@ -4,6 +4,9 @@ import com.auraboot.framework.common.util.PathSafetyUtils;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.plugin.dto.imports.*;
 import com.auraboot.framework.plugin.service.PluginImportService;
+import com.auraboot.framework.application.security.AdminRoleChecker;
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.rbac.constant.RoleConstants;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -102,6 +105,7 @@ public class PluginImportController {
 
     private final PluginImportService importService;
     private final AsyncTaskServiceImpl asyncTaskService;
+    private final AdminRoleChecker adminRoleChecker;
     private final ObjectMapper objectMapper;
     // ==================== Upload & Parse ====================
 
@@ -283,9 +287,95 @@ public class PluginImportController {
                 .identifierMappingPath(request.getIdentifierMappingPath())
                 .build();
 
+        if (request.getTargetTenantIds() != null && !request.getTargetTenantIds().isEmpty()) {
+            return importDirectorySyncFanOut(request, normalizedPath, deferReferenceValidation, request.getTargetTenantIds());
+        }
+
         ImportExecuteResult result = importService.execute(preview.getImportId(), importRequest);
 
         return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Multi-tenant fan-out: run the same directory import once per target tenant, each under
+     * that tenant's identity. Platform admin only — a mis-scoped import writes governance
+     * rows into the wrong tenant, which is exactly the failure mode this escape hatch exists
+     * to fix (score-import roles imported into the admin's tenant instead of the schools).
+     */
+    private ResponseEntity<ImportExecuteResult> importDirectorySyncFanOut(
+            DirectoryImportRequest request,
+            java.nio.file.Path normalizedPath,
+            boolean deferReferenceValidation,
+            java.util.List<Long> targetTenantIds) {
+        MetaContext.Snapshot caller = MetaContext.snapshot();
+        if (caller == null || caller.userId() == null) {
+            return ResponseEntity.status(401).body(ImportExecuteResult.builder()
+                    .success(false).errorMessage("No caller context").build());
+        }
+        if (!adminRoleChecker.hasRole(caller.tenantId(), caller.userId(), RoleConstants.PLATFORM_ADMIN)) {
+            return ResponseEntity.status(403).body(ImportExecuteResult.builder()
+                    .success(false).errorMessage("targetTenantIds requires the platform_admin role").build());
+        }
+
+        java.util.List<Map<String, Object>> perTenant = new java.util.ArrayList<>();
+        for (Long tenantId : targetTenantIds) {
+            MetaContext.Snapshot target = new MetaContext.Snapshot(tenantId, caller.userId(),
+                    caller.userPid(), caller.username(), caller.roleIds(), null,
+                    caller.envId(), caller.otelTraceId(), null);
+            MetaContext.restore(target);
+            try {
+                ImportPreviewResult preview = importService.parseDirectory(normalizedPath.toString(), deferReferenceValidation);
+                if (!preview.isValid()) {
+                    perTenant.add(Map.of("tenantId", tenantId, "success", false,
+                            "errors", String.join(", ", preview.getErrors())));
+                    continue;
+                }
+                ImportRequest importRequest = ImportRequest.builder()
+                        .importId(preview.getImportId())
+                        .conflictStrategy(request.getConflictStrategy() != null
+                                ? request.getConflictStrategy()
+                                : ImportRequest.ConflictStrategy.OVERWRITE)
+                        .validateReferences(request.getValidateReferences())
+                        .autoDeployProcesses(request.getAutoDeployProcesses())
+                        .autoPublishModels(request.getAutoPublishModels())
+                        .autoPublishFields(request.getAutoPublishFields())
+                        .autoPublishCommands(request.getAutoPublishCommands())
+                        .autoPublishPages(request.getAutoPublishPages())
+                        .createResourcePermissions(request.getCreateResourcePermissions())
+                        .identifierMappingPath(request.getIdentifierMappingPath())
+                        .build();
+                ImportExecuteResult result = importService.execute(preview.getImportId(), importRequest);
+                Map<String, Object> row = new java.util.LinkedHashMap<>();
+                row.put("tenantId", tenantId);
+                row.put("success", result.isSuccess());
+                row.put("pluginId", result.getPluginId());
+                row.put("version", result.getVersion());
+                if (result.getErrorMessage() != null) row.put("errorMessage", result.getErrorMessage());
+                perTenant.add(row);
+            } catch (Exception failure) {
+                perTenant.add(Map.of("tenantId", tenantId, "success", false,
+                        "errorMessage", String.valueOf(failure.getMessage())));
+            } finally {
+                MetaContext.restore(caller);
+            }
+        }
+        boolean allSuccess = perTenant.stream().allMatch(r -> Boolean.TRUE.equals(r.get("success")));
+        log.info("Multi-tenant import fan-out completed: targets={}, allSuccess={}, perTenant={}",
+                targetTenantIds, allSuccess, perTenant);
+        ImportExecuteResult summary = ImportExecuteResult.builder()
+                .success(allSuccess)
+                .errorMessage(allSuccess ? null
+                        : "Some tenants failed — see per-tenant detail in the X-Import-Fan-Out-Results header or the server log")
+                .build();
+        String detail;
+        try {
+            detail = new ObjectMapper().writeValueAsString(perTenant);
+        } catch (Exception e) {
+            detail = String.valueOf(perTenant);
+        }
+        return ResponseEntity.status(allSuccess ? 200 : 207)
+                .header("X-Import-Fan-Out-Results", detail)
+                .body(summary);
     }
 
     @PostMapping("/reconcile-directory-role-permissions")
@@ -324,6 +414,10 @@ public class PluginImportController {
         // Plugin rename upgrade contract: optional identifier-mapping JSON consumed by
         // IdentifierMappingDataMigrator after the imported models are published.
         private String identifierMappingPath;
+        // Multi-tenant fan-out: when present (platform admin only), the import runs once per
+        // listed tenant instead of the caller's own tenant — new plugin features reach every
+        // existing tenant without per-tenant import runs.
+        private java.util.List<Long> targetTenantIds;
     }
 
     // ==================== Preview ====================
