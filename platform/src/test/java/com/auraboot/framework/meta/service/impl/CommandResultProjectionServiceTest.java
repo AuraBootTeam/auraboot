@@ -77,8 +77,9 @@ class CommandResultProjectionServiceTest {
         bindDocument(Map.of("dryRun",Map.of("quality",Map.of("passed",true))));
         assertThat(service.project(context,Map.of("quality",Map.of("passed",true))))
                 .containsExactly(Map.entry("quality",Map.of("passed",true)));
-        assertThatThrownBy(() -> context.getBusinessResultProjection().bindRootDocuments(
-                Map.of("pid","root","tenant_id",7L,"row_version",2L)))
+        context.setBusinessResultProjection(context.getBusinessResultProjection().bindRootDocuments(
+                Map.of("pid","root","tenant_id",7L,"row_version",2L)));
+        assertThatThrownBy(() -> service.project(context,Map.of("quality",Map.of("passed",true))))
                 .isInstanceOf(AccessDeniedException.class);
     }
 

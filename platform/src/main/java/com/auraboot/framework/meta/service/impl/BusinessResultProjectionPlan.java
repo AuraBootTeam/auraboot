@@ -47,8 +47,7 @@ public record BusinessResultProjectionPlan(BusinessTargetAuthorization target,
         Map<String,String> documents=new LinkedHashMap<>();
         for (var field:fields.values()) if(field.kind()==BusinessResultField.Kind.ROOT_JSON_PATH) {
             String source=field.sourceField();
-            if(!root.containsKey(source))throw denied();
-            // An explicit SQL NULL is a captured empty initial state, never evidence for a result.
+            // SQL row maps may omit NULL columns. Either representation is an unattested initial state.
             // Exact path verification still requires a real host-loaded post-write document.
             if(root.get(source)!=null)documents.computeIfAbsent(source,key -> BusinessResultJsonSource.document(root.get(key)));
         }

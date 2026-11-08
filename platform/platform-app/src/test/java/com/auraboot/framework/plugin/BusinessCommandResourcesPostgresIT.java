@@ -146,8 +146,7 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
                     getTestTenant().getId(),getTestUser().getId(),getTestTenantMember().getId(),rootModel,rootPid,
                     List.of(new com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Grant(1L,2L,"fixture.receipt.confirm",
                             new com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Fields(false,Set.of(rootLabel),Set.of(rootLabel))))));
-            var rootFacts=new LinkedHashMap<String,Object>(Map.of("pid",rootPid,"tenant_id",getTestTenant().getId(),"row_version",rootVersion));
-            rootFacts.put(rootLabel,storedRootDocument());
+            var rootFacts=MetaContext.runWithCommandPermitScope("ALL",()->data.getById(rootModel,rootPid));
             context.setBusinessResultProjection(resultProjection.prepare(context,owner).bindRootDocuments(rootFacts));
         }
         return context;
