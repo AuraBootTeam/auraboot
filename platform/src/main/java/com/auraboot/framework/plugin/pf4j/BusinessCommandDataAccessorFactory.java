@@ -694,7 +694,8 @@ public class BusinessCommandDataAccessorFactory {
                     // Establish object membership before reporting a version conflict. Value-sensitive
                     // write checks must see a fresh intent, rather than misclassifying a stale retry.
                     authorize(new BusinessResourceAuthorization.Request(BusinessResourceAuthorization.Action.READ,model,pid,row,null,null));
-                    long expected = rootModel.equals(model) && rootPid.equals(pid) ? rootVersion : version(row);
+                    // Initialization pins the external version; subsequent writes use this locked invocation's current row.
+                    long expected = version(row);
                     Object claimed = request.changes().get("_expectedVersion");
                     if (claimed != null && (!(claimed instanceof Number number)
                             || new BigDecimal(number.toString()).longValueExact() != expected)) {

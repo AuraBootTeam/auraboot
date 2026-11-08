@@ -192,6 +192,30 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
         assertThat(permissions.canAction(getTestTenantMember().getId(),rootModel,"read")).isFalse();
     }
 
+    @Test void repeatedRootWritesAdvanceOnlyInsideTheLockedInvocationAndRollBackTogether() {
+        jsonSourceFixture();
+        String first="{\"dryRun\":{\"quality\":{\"passed\":false,\"count\":1}}}";
+        String last="{\"dryRun\":{\"quality\":{\"passed\":true,\"count\":2}}}";
+        var output=command(scope -> {
+            scope.accessor().update(rootModel,rootPid,Map.of(rootLabel,first));
+            scope.accessor().update(rootModel,rootPid,Map.of(rootLabel,last));
+            return scope.projectResult(Map.of("quality",Map.of("passed",true,"count",2)));
+        });
+        assertThat(output).containsEntry("quality",Map.of("passed",true,"count",2));
+        assertThat(storedRootDocument()).isEqualTo(last);
+        long storedVersion=jdbc.queryForObject("SELECT row_version FROM "+physicalTables.get(rootModel)+" WHERE pid=?",Long.class,rootPid);
+        assertThat(storedVersion).isEqualTo(rootVersion+2);
+        rootVersion=storedVersion;
+        assertThatThrownBy(() -> command(scope -> {
+            scope.accessor().update(rootModel,rootPid,Map.of(rootLabel,first));
+            scope.accessor().update(rootModel,rootPid,Map.of(rootLabel,last));
+            scope.accessor().delete(lineModel,linePid);
+            return null;
+        })).isInstanceOf(DataAccessorException.class).hasMessageContaining("PERMISSION_DENIED");
+        assertThat(storedRootDocument()).isEqualTo(last);
+        assertThat(jdbc.queryForObject("SELECT row_version FROM "+physicalTables.get(rootModel)+" WHERE pid=?",Long.class,rootPid)).isEqualTo(storedVersion);
+    }
+
     @Test void initialNullJsonSourceRequiresAnActualPostWriteDocumentAndRollsBackForgedOutput() {
         jsonSourceFixture();
         jdbc.update("UPDATE "+physicalTables.get(rootModel)+" SET "+rootLabel+"=NULL WHERE pid=?",rootPid);
