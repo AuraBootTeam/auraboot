@@ -77,7 +77,7 @@ class PermissionSnapshotCacheTest {
         write.setResourceType("operation"); write.setResourceCode("example"); write.setAction("write");
         write.setExtension(Map.of("domainModels", Map.of("example_record", List.of("read", "create", "update"))));
         when(permissionMapper.findResolvableDefinitions(100L)).thenReturn(List.of(read, write));
-        assertThat(cache.resourcePermissionCodes(100L, "example_record", "read")).containsExactly("example.cap.read", "example.cap.write");
+        assertThat(cache.resourcePermissionCodes(100L, "example_record", "read")).containsExactly("example.cap.read");
         assertThat(cache.resourcePermissionCodes(100L, "example_record", "create")).containsExactly("example.cap.write");
         assertThat(cache.resourcePermissionCodes(100L, "example_record", "delete")).isEmpty();
         assertThat(cache.hasDomainModel(100L, "example_record")).isTrue();

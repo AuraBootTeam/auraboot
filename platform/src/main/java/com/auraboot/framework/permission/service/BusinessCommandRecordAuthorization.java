@@ -305,12 +305,14 @@ public class BusinessCommandRecordAuthorization {
             for (var row : rows) {
                 if (!role.equals(row.getRoleId())) continue;
                 if (!"grant".equals(row.getGrantType())) return java.util.Optional.empty();
-                var guards = policies.getConditionGuards(member, code);
+                String sourceCode = row.getPermissionCode();
+                if (!(code.equals(sourceCode) || "*".equals(sourceCode))) return java.util.Optional.empty();
+                var guards = policies.getConditionGuards(member, sourceCode);
                 var guard = guards == null ? null : guards.stream().filter(value -> row.getId().equals(value.grantId())).findFirst().orElse(null);
-                if (policyEvaluator.evaluateGrant(member, code, model, record, guard).verdict() == EvaluationVerdict.DENY)
+                if (policyEvaluator.evaluateGrant(member, sourceCode, model, record, guard).verdict() == EvaluationVerdict.DENY)
                     return java.util.Optional.empty();
                 if (row.getDataScopeAstJson() != null && !row.getDataScopeAstJson().isBlank() && !"null".equals(row.getDataScopeAstJson().strip())
-                        && policyEvaluator.evaluateGrant(member, code, model, record,
+                        && policyEvaluator.evaluateGrant(member, sourceCode, model, record,
                             new PermissionPolicyService.ConditionGuard(row.getId(), row.getDataScopeAstJson())).verdict() == EvaluationVerdict.DENY)
                     return java.util.Optional.empty();
                 var stored = BusinessGrantFieldScope.select(json, row.getFieldScopeJson(), model);

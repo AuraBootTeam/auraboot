@@ -71,6 +71,12 @@ class BusinessCommandRecordAuthorizationTest {
         when(scopes.resolveObjectBoundScopeForRole(5L,101L,MODEL,"update",MODEL)).thenReturn(DataScopeCondition.all());
         var result=authorization.resolveNative(5L,List.of(CODE),MODEL,record(1,"Shanghai"),"update");
         assertThat(result.result().granted()).isTrue();assertThat(result.canRead("city")).isTrue();assertThat(result.canWrite("city")).isFalse();
+        old.setPermissionCode("*");
+        guards(oldCode, new PermissionPolicyService.ConditionGuard(13L, null));
+        guards("*", new PermissionPolicyService.ConditionGuard(12L, null));
+        var wildcard = authorization.resolveNative(5L,List.of(CODE),MODEL,record(1,"Shanghai"),"update");
+        assertThat(wildcard.result().granted()).isTrue();
+        assertThat(wildcard.canWrite("city")).isFalse();
         grants();
         assertThat(authorization.resolveNative(5L,List.of(CODE),MODEL,record(1,"Shanghai"),"update").result().granted()).isFalse();
     }

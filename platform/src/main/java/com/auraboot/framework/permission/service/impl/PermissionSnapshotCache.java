@@ -342,7 +342,13 @@ public class PermissionSnapshotCache {
                 permission.getExtension() instanceof Map<?,?> extension
                 && extension.get("dataControlledReads") instanceof List<?> protectedModels && protectedModels.contains(model)))
             return com.auraboot.framework.permission.engine.evaluator.PermissionCodeCandidates.forResourceAction(model, action);
-        return policies.stream().filter(permission -> com.auraboot.framework.permission.service.DomainPermissionPolicy.permits(permission, model, action))
+        var allowed = policies.stream().filter(permission -> com.auraboot.framework.permission.service.DomainPermissionPolicy.permits(permission, model, action)).toList();
+        var levels = List.of("read", "write", "manage");
+        Map<String,Integer> minimum = new java.util.HashMap<>();
+        allowed.forEach(permission -> minimum.merge(permission.getResourceCode(), levels.indexOf(permission.getAction()), Math::min));
+        // Resolve inheritance from one required level, so a higher level cannot bypass an explicit
+        // deny of the required operation by being evaluated as an independent alternative.
+        return allowed.stream().filter(permission -> minimum.get(permission.getResourceCode()) == levels.indexOf(permission.getAction()))
                 .map(Permission::getCode).distinct().sorted().toList();
     }
 

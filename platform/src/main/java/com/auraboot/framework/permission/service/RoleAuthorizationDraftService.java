@@ -366,8 +366,11 @@ public class RoleAuthorizationDraftService {
     private Set<String> fieldCandidates(Role role, List<BusinessFieldRoot> roots) {
         Set<String> result=new HashSet<>();
         roots.forEach(root->{result.add(root.model());result.addAll(root.publicFields().keySet());});
-        permissions.findRoleConfiguredPermissions(role.getId()).stream().map(permission->permission.getResourceCode())
-                .filter(Objects::nonNull).forEach(result::add);
+        for (var permission : permissions.findRoleConfiguredPermissions(role.getId())) {
+            if (permission.getExtension() != null && permission.getExtension().get("domainModels") instanceof Map<?,?> models)
+                models.keySet().stream().filter(String.class::isInstance).map(String.class::cast).forEach(result::add);
+            else if (permission.getResourceCode() != null) result.add(permission.getResourceCode());
+        }
         return result;
     }
 
