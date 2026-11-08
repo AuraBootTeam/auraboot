@@ -10,6 +10,33 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CapabilityNavigationGroupsTest {
     @Test
+    void domainLevelsRemainOneExplicitCardInsteadOfMixingWithNavigationDuties() {
+        var read = com.auraboot.framework.plugin.dto.imports.CapabilityDefinitionDTO.builder()
+                .code("bom.cap.read").group("BOM").tier("viewer").displayGroupOrder(0)
+                .includes(List.of("bom.project.read")).build();
+        var write = com.auraboot.framework.plugin.dto.imports.CapabilityDefinitionDTO.builder()
+                .code("bom.cap.write").group("BOM").tier("editor").displayGroupOrder(0)
+                .includes(List.of("bom.project.read", "bom.convert.execute")).build();
+        var manage = com.auraboot.framework.plugin.dto.imports.CapabilityDefinitionDTO.builder()
+                .code("bom.cap.manage").group("BOM").tier("admin").displayGroupOrder(0)
+                .includes(List.of("bom.project.read", "bom.convert.execute", "bom.structure.release")).build();
+        var declarations = List.of(read, write, manage);
+        var groups = new CapabilityResolver().resolve(declarations, manage.getIncludes(), java.util.Set.of(),
+                java.util.Map.of(), java.util.Map.of("bom.project.read", java.util.Map.of(
+                        "displayGroup", "工程", "displayGroupOrder", 90)));
+        var section = menu(1, null, "工程", null, 90);
+        var extension = new com.auraboot.framework.meta.entity.payload.ExtensionBean();
+        extension.setDynamicProperty(CapabilityNavigationGroups.CAPABILITY_CODES,
+                declarations.stream().map(com.auraboot.framework.plugin.dto.imports.CapabilityDefinitionDTO::getCode).toList());
+        section.setExtension(extension);
+        var result = CapabilityNavigationGroups.regroup(groups, List.of(section));
+        assertThat(result).extracting(CapabilityGroup::getGroup).containsExactly("BOM");
+        assertThat(result.get(0).getCapabilities()).hasSize(3).allMatch(cap -> !cap.isGranted());
+        assertThat(result.get(0).getCapabilities()).allMatch(cap -> cap.getDisplayGroupOrder() == 0);
+        assertThat(manage.getIncludes()).containsExactly("bom.project.read", "bom.convert.execute", "bom.structure.release");
+    }
+
+    @Test
     void productModuleOwnershipIsIndependentOfSharedReadDependenciesAndMenuVisibility() {
         Capability duty = capability("报价单", "quote.read");
         duty.setIncludes(List.of("quote.read", "customer.read"));

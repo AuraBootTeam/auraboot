@@ -202,6 +202,11 @@ test.describe('BOM & Quote domain levels', () => {
         await page.getByTestId(`role-item-${role.code}`).click();
         await page.getByTestId('permission-right-tab-capabilities').click();
         await expect(page.getByTestId(`domain-legacy-${domain}.cap.read`)).toBeVisible();
+        const domainCard = page.getByTestId(
+          `capability-group-${domain === 'bom' ? 'BOM' : '报价（Quote）'}`,
+        );
+        await expect(domainCard.locator('input[type="radio"]')).toHaveCount(4);
+        await expect(domainCard.locator('input[type="checkbox"]')).toHaveCount(0);
         for (const [iteration, level] of [
           'read',
           'write',

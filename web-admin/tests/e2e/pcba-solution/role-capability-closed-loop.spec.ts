@@ -222,68 +222,115 @@ test.describe('Role × capability 真机闭环 @smoke', () => {
 });
 
 
-test('a standalone BOM rules capability grants UI authoring and revokes to read-only without RFQ intake', async ({ page, browser }, info) => {
+test('BOM domain management authors rules and downgrades to read without Quote authority', async ({
+  page,
+  browser,
+}, info) => {
   test.setTimeout(180_000);
   const code = `e2e_rules_only_${Date.now()}`;
-  const created = await page.request.post('/api/roles', { data: { code, name: code, type: 'custom' } });
+  const created = await page.request.post('/api/roles', {
+    data: { code, name: code, type: 'custom' },
+  });
   expect(created.ok()).toBe(true);
   const role = (await created.json()).data;
   const user = makeQuoteRoleUser('rules-only', code, [code]);
   await ensureQuoteRoleUser(page, user);
+  // Dedicated fixture only: preserve production ranges and assign visible rule menus separately.
+  const scoped = await page.request.put(`/api/permissions/matrix/${role.pid}/default-scope`, {
+    data: { scopeType: 'self' },
+  });
+  expect(scoped.status()).toBe(200);
+  const baseline = (
+    await (await page.request.get(`/api/permission/roles/${role.pid}/draft`)).json()
+  ).data;
+  const choices = new Map<string, any>(
+    baseline.navigation.menus.map((menu: any) => [menu.pid, menu]),
+  );
+  const ruleMenus = new Set<string>(
+    baseline.navigation.menus
+      .filter((menu: any) => menu.enabled && !menu.directory && menu.permissionCode === 'bom.rule.read')
+      .map((menu: any) => menu.pid),
+  );
+  expect(ruleMenus.size).toBeGreaterThan(0);
+  const ruleMenuLabels: string[] = [];
+  let aliasMenu = baseline.navigation.menus.find((menu: any) => menu.permissionCode === 'bom.rule.read' && /表头别名|Header Aliases/i.test(menu.name));
+  expect(aliasMenu).toBeDefined();
+  while (aliasMenu) {
+    ruleMenuLabels.unshift(aliasMenu.name);
+    aliasMenu = choices.get(aliasMenu.parentPid);
+  }
+  const seeded = await page.request.put(`/api/permission/roles/${role.pid}/draft`, {
+    data: {
+      expectedRevision: baseline.revision,
+      selectedCapabilityCodes: [],
+      revokedPartialCapabilityCodes: [],
+      defaultScopeChanged: false,
+      applyDefaultToCurrentGrants: false,
+      scopeChanges: [],
+      menuPids: [...ruleMenus],
+    },
+  });
+  expect(seeded.status(), await seeded.text()).toBe(200);
   async function selectCapabilities(manage: boolean) {
     await page.goto('/home');
     await ensureSidebarExpanded(page);
     await page.getByTestId('sidebar').locator('a[href="/enterprise/permissions"]').click();
     await page.getByTestId('role-search-input').fill(code);
     await page.getByTestId(`role-item-${code}`).click();
-    await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', role.pid);
-    await page.getByTestId('capability-checkbox-qo.cap.platform_read').check();
-    await page.getByTestId('capability-checkbox-bom.cap.rules_manage').setChecked(manage);
-    await page.getByTestId('capability-checkbox-bom.cap.rules_view').setChecked(!manage);
-    await expect(page.getByTestId('capability-checkbox-qo.cap.intake')).not.toBeChecked();
+    await expect(page.getByTestId('capability-role-editor')).toHaveAttribute(
+      'data-role-pid',
+      role.pid,
+    );
+    await page.getByTestId('permission-right-tab-capabilities').click();
+    await page.getByTestId(`domain-level-bom.cap.${manage ? 'manage' : 'read'}`).check();
     await page.getByTestId('capability-save').click();
     await expect(page.getByTestId('confirm-dialog')).toBeVisible();
-    const saved = page.waitForResponse(r => r.url().includes('/api/permission/capabilities?') && r.request().method() === 'PUT');
+    const saved = page.waitForResponse(
+      (r) =>
+        r.url().includes(`/api/permission/roles/${role.pid}/draft`) &&
+        r.request().method() === 'PUT',
+    );
     await page.getByTestId('confirm-ok').click();
     const response = await saved;
     expect(response.status()).toBe(200);
-    expect(response.request().postDataJSON().slice().sort()).toEqual([
-      manage ? 'bom.cap.rules_manage' : 'bom.cap.rules_view',
-      'qo.cap.platform_read',
-    ].sort());
+    expect(response.request().postDataJSON().selectedCapabilityCodes.slice().sort()).toEqual(
+      (manage ? ['bom.cap.read', 'bom.cap.write', 'bom.cap.manage'] : ['bom.cap.read']).sort(),
+    );
     expect(String((await response.json()).code)).toBe('0');
     await expect(page.getByTestId('capability-save')).toBeDisabled();
   }
-  async function assertRuleOnlyReads(rulePage: Page) {
+  async function assertRuleMenuWithDomainRead(rulePage: Page) {
     const snapshot = await fetchRoleSnapshot(rulePage);
     expect(snapshot.menuPaths).not.toContain(MENU.project);
     expect(snapshot.menuPaths).not.toContain('/p/bom_conversion_task_pcba_workbench');
-    for (const pageKey of ['req_requirement_set_pcba_bom', 'bom_conversion_task_pcba_workbench']) {
-      const response = await rulePage.request.get(`/api/dynamic/${pageKey}/list`, {
+    for (const model of ['req_requirement_set_pcba_bom', 'bom_conversion_task_pcba']) {
+      const response = await rulePage.request.get(`/api/dynamic/${model}/list`, {
         params: { pageNum: 1, pageSize: 1 },
       });
-      expect(response.status(), `${pageKey} must not be admitted by a rule navigation dependency`).toBe(403);
-      expect(String((await response.json()).code)).toBe('403');
+      expect(response.status(), 'BOM read is independent of visible navigation entries').toBe(200);
+      expect(String((await response.json()).code)).toBe('0');
     }
+    await expectCommandDenied(rulePage, 'qo_quote_common:create', {});
   }
   await selectCapabilities(true);
   const writer = await openQuoteRolePage(browser, user);
   try {
-    await assertRuleOnlyReads(writer.page);
-    await ensureSidebarExpanded(writer.page);
-    const sidebar = writer.page.getByTestId('sidebar');
-    const alias = sidebar.locator('a[href="/p/bom_header_alias"]');
-    if (!(await alias.isVisible())) {
-      const center = sidebar.getByRole('button', { name: '规则中心', exact: true });
-      if (!(await center.isVisible())) await sidebar.getByRole('button', { name: 'BOM转化工具', exact: true }).click();
-      await center.click();
-    }
-    await alias.click();
+    await assertRuleMenuWithDomainRead(writer.page);
+    await navigateToMenuByClick(writer.page, ruleMenuLabels);
     await writer.page.locator('main').getByRole('button', { name: '新建', exact: true }).click();
     await writer.page.getByTestId('form-field-bom_ha_alias').getByRole('textbox').fill(code);
-    await writer.page.getByTestId('form-field-bom_ha_system_field').getByRole('combobox').first().click();
+    await writer.page
+      .getByTestId('form-field-bom_ha_system_field')
+      .getByRole('combobox')
+      .first()
+      .click();
     await writer.page.getByRole('option', { name: '品牌/厂家', exact: true }).click();
-    const pending = writer.page.waitForResponse(r => decodeURIComponent(r.url()).includes('/api/meta/commands/execute/bom:create_header_alias') && r.request().method() === 'POST');
+    const pending = writer.page.waitForResponse(
+      (r) =>
+        decodeURIComponent(r.url()).includes(
+          '/api/meta/commands/execute/bom:create_header_alias',
+        ) && r.request().method() === 'POST',
+    );
     await writer.page.getByRole('button', { name: '保存', exact: true }).click();
     const response = await pending;
     expect(new URL(response.url()).origin).toBe(new URL(writer.page.url()).origin);
@@ -291,27 +338,24 @@ test('a standalone BOM rules capability grants UI authoring and revokes to read-
     expect(String((await response.json()).code)).toBe('0');
     const payload = response.request().postDataJSON();
     expect(payload.payload?.bom_ha_alias ?? payload.params?.payload?.bom_ha_alias).toBe(code);
-    const rows = await queryDynamicRecords(page, 'bom_header_alias', [{ fieldName: 'bom_ha_alias', operator: 'EQ', value: code }]);
+    const rows = await queryDynamicRecords(page, 'bom_header_alias', [
+      { fieldName: 'bom_ha_alias', operator: 'EQ', value: code },
+    ]);
     expect(rows).toHaveLength(1);
-    await writer.page.screenshot({ path: info.outputPath('standalone-rules-created.png'), fullPage: true });
+    await writer.page.screenshot({
+      path: info.outputPath('standalone-rules-created.png'),
+      fullPage: true,
+    });
     await selectCapabilities(false);
     // A fresh login proves persisted authorization and avoids a cached browser permission map.
     await writer.context.close();
     const reader = await openQuoteRolePage(browser, user);
     try {
-      await assertRuleOnlyReads(reader.page);
-      await ensureSidebarExpanded(reader.page);
-      const sidebar = reader.page.getByTestId('sidebar');
-      const alias = sidebar.locator('a[href="/p/bom_header_alias"]');
-      if (!(await alias.isVisible())) {
-        const center = sidebar.getByRole('button', { name: '规则中心', exact: true });
-        if (!(await center.isVisible())) await sidebar.getByRole('button', { name: 'BOM转化工具', exact: true }).click();
-        await expect(center).toBeVisible();
-        await center.click();
-      }
-      await expect(alias).toBeVisible();
-      await alias.click();
-      await expect(reader.page.locator('main').getByRole('button', { name: '新建', exact: true })).toHaveCount(0);
+      await assertRuleMenuWithDomainRead(reader.page);
+      await navigateToMenuByClick(reader.page, ruleMenuLabels);
+      await expect(
+        reader.page.locator('main').getByRole('button', { name: '新建', exact: true }),
+      ).toHaveCount(0);
       const row = reader.page.getByRole('row').filter({ hasText: code });
       await expect(row).toBeVisible();
       await clickRowActionByLocator(reader.page, row, 'view', '查看');
@@ -319,14 +363,27 @@ test('a standalone BOM rules capability grants UI authoring and revokes to read-
       await expect(reader.page.locator('main')).toContainText(code);
       await expect(reader.page.getByTestId('toolbar-btn-edit')).toHaveCount(0);
       await expect(reader.page.getByTestId('toolbar-btn-delete')).toHaveCount(0);
-      const denied = await probeCommand(reader.page, 'bom:create_header_alias', { bom_ha_alias: `${code}-denied`, bom_ha_system_field: 'brand' });
+      const denied = await probeCommand(reader.page, 'bom:create_header_alias', {
+        bom_ha_alias: `${code}-denied`,
+        bom_ha_system_field: 'brand',
+      });
       expect(denied.status).toBe(403);
-      expect(await queryDynamicRecords(page, 'bom_header_alias', [{ fieldName: 'bom_ha_alias', operator: 'EQ', value: `${code}-denied` }])).toHaveLength(0);
-      await reader.page.screenshot({ path: info.outputPath('standalone-rules-read-only.png'), fullPage: true });
-    } finally { await reader.context.close(); }
-  } finally { await writer.context.close(); }
+      expect(
+        await queryDynamicRecords(page, 'bom_header_alias', [
+          { fieldName: 'bom_ha_alias', operator: 'EQ', value: `${code}-denied` },
+        ]),
+      ).toHaveLength(0);
+      await reader.page.screenshot({
+        path: info.outputPath('standalone-rules-read-only.png'),
+        fullPage: true,
+      });
+    } finally {
+      await reader.context.close();
+    }
+  } finally {
+    await writer.context.close();
+  }
 });
-
 
 test('a standalone model-service capability manages tenant LLM settings without cloud or console access', async ({ page, browser }, info) => {
   test.setTimeout(180_000);

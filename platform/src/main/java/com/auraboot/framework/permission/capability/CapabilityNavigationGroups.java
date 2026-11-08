@@ -17,6 +17,11 @@ final class CapabilityNavigationGroups {
     private CapabilityNavigationGroups() { }
 
     static List<CapabilityGroup> regroup(List<CapabilityGroup> groups, List<Menu> menus) {
+        Set<String> domainLevels = DomainCapabilityLevels.levelCodes(groups.stream()
+                .flatMap(group -> group.getCapabilities().stream())
+                .map(capability -> com.auraboot.framework.plugin.dto.imports.CapabilityDefinitionDTO.builder()
+                        .code(capability.getCode()).tier(capability.getTier()).includes(capability.getIncludes()).build())
+                .toList());
         Map<Long, Menu> byId = new HashMap<>();
         menus.stream().filter(menu -> menu.getId() != null).forEach(menu -> byId.put(menu.getId(), menu));
         Map<String, Menu> declaredSections = new HashMap<>();
@@ -47,7 +52,7 @@ final class CapabilityNavigationGroups {
             for (Capability capability : group.getCapabilities()) {
                 // Technical diagnostics must not become selectable business duties just because
                 // their underlying permission happens to appear on a menu.
-                if (!capability.isConventionDerived()) {
+                if (!capability.isConventionDerived() && !domainLevels.contains(capability.getCode())) {
                     Set<Menu> sections = new HashSet<>();
                     Menu declaredSection = declaredSections.get(capability.getCode());
                     if (declaredSection != null) {
