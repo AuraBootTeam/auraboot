@@ -32,12 +32,13 @@ final class DomainCapabilityLevels {
                     || writes.equals(reads) || manages.equals(writes)) continue;
             domains.put(prefix, manages);
         }
-        // Old imported declarations may remain in storage. Hide only explicitly covered aliases
-        // of a complete, nested domain triple; never delete grants or suppress unrelated domains.
+        // A complete triple owns this domain's operation directory. Retire its older authoring
+        // entries (including stale dependencies), but preserve existing data visibility controls.
+        // This is metadata projection only: no grants, conditions or scopes are changed.
         return declarations.stream().filter(declaration -> domains.entrySet().stream().noneMatch(domain ->
                 declaration.isValid() && declaration.getCode().startsWith(domain.getKey())
+                        && !"data".equals(declaration.getTier())
                         && !Set.of(domain.getKey() + "read", domain.getKey() + "write", domain.getKey() + "manage")
-                            .contains(declaration.getCode())
-                        && domain.getValue().containsAll(declaration.getIncludes()))).toList();
+                            .contains(declaration.getCode()))).toList();
     }
 }

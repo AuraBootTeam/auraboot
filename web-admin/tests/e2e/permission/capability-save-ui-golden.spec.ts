@@ -2,7 +2,15 @@ import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { BASE_URL } from '../../helpers/environments';
-import { makeQuoteRoleUser, ensureQuoteRoleUser, openQuoteRolePage, fetchRoleSnapshot } from '../pcba-solution/quote-e2e-helpers';
+import {
+  makeQuoteRoleUser,
+  ensureQuoteRoleUser,
+  openQuoteRolePage,
+  fetchRoleSnapshot,
+  seedQuoteScaffold,
+  reassignRecordOwnerByEmail,
+  openPgClient,
+} from '../pcba-solution/quote-e2e-helpers';
 
 /**
  * Regression guard for the snowflake-id precision bug (fixed in #993): capability save must work when
@@ -30,7 +38,8 @@ async function createRole(page: Page) {
 }
 
 test('① capability save persists through the browser on a snowflake-id role', async ({
-  page, browser,
+  page,
+  browser,
 }, info) => {
   test.setTimeout(120_000);
   const role = await createRole(page);
@@ -82,8 +91,9 @@ test('① capability save persists through the browser on a snowflake-id role', 
   await diagnostics.locator('input').fill('model.tenant_member.read', { timeout: 15_000 });
   const diagnosticRow = diagnostics.getByTestId('diagnostic-action-model.tenant_member.read');
   await expect(diagnosticRow).toBeVisible();
-  const memberViewCapability = view.flatMap(group => group.capabilities)
-    .find(item => item.code === 'org.cap.member_view');
+  const memberViewCapability = view
+    .flatMap((group) => group.capabilities)
+    .find((item) => item.code === 'org.cap.member_view');
   expect(memberViewCapability).toBeTruthy();
   await expect(diagnostics.locator('input[type="checkbox"]')).toHaveCount(0);
   await expect(diagnostics.locator('select')).toHaveCount(0);
@@ -221,16 +231,21 @@ test('① capability save persists through the browser on a snowflake-id role', 
   await expect(page.getByTestId('permission-page')).toBeVisible();
   await page.getByTestId('role-search-input').fill(readerRole.code);
   await page.getByTestId(`role-item-${readerRole.code}`).click();
-  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', readerRole.pid);
+  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute(
+    'data-role-pid',
+    readerRole.pid,
+  );
   const readerCheckbox = page.getByTestId('capability-checkbox-org.cap.role_view');
   await readerCheckbox.check();
   const saveReader = async (selection: string[]) => {
-    const responsePromise = page.waitForResponse(response => {
+    const responsePromise = page.waitForResponse((response) => {
       const url = new URL(response.url());
-      return url.origin === new URL(page.url()).origin
-        && url.pathname === '/api/permission/capabilities'
-        && url.searchParams.get('rolePid') === readerRole.pid
-        && response.request().method() === 'PUT';
+      return (
+        url.origin === new URL(page.url()).origin &&
+        url.pathname === '/api/permission/capabilities' &&
+        url.searchParams.get('rolePid') === readerRole.pid &&
+        response.request().method() === 'PUT'
+      );
     });
     await page.getByTestId('capability-save').click();
     await expect(page.getByTestId('confirm-dialog')).toBeVisible();
@@ -255,52 +270,85 @@ test('① capability save persists through the browser on a snowflake-id role', 
     }
     const readerCapUrl = `/api/permission/capabilities?rolePid=${encodeURIComponent(readerRole.pid)}`;
     const readerMatrixUrl = `/api/permissions/matrix/${encodeURIComponent(readerRole.pid)}`;
-    const matrixResponse = reader.page.waitForResponse(response => {
+    const matrixResponse = reader.page.waitForResponse((response) => {
       const url = new URL(response.url());
-      return url.origin === new URL(reader.page.url()).origin
-        && url.pathname === readerMatrixUrl && response.request().method() === 'GET';
+      return (
+        url.origin === new URL(reader.page.url()).origin &&
+        url.pathname === readerMatrixUrl &&
+        response.request().method() === 'GET'
+      );
     });
     await reader.page.getByRole('link', { name: /角色|Roles/, exact: true }).click();
     await expect(reader.page.getByTestId('permission-page')).toBeVisible();
     await reader.page.getByTestId('role-search-input').fill(readerRole.code);
     await reader.page.getByTestId(`role-item-${readerRole.code}`).click();
     expect((await matrixResponse).status()).toBe(200);
-    await expect(reader.page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', readerRole.pid);
+    await expect(reader.page.getByTestId('capability-role-editor')).toHaveAttribute(
+      'data-role-pid',
+      readerRole.pid,
+    );
     await expect(reader.page.getByTestId('capability-checkbox-org.cap.role_view')).toBeChecked();
     await expect(reader.page.getByTestId('capability-checkbox-org.cap.role_view')).toBeDisabled();
     await expect(reader.page.getByText(/仅可查看角色|Read-only role access/)).toBeVisible();
     // PermissionGuard fail-closed semantics: destructive row actions (toggle/delete,
     // gated on org.role.update) are not rendered for a read-only viewer at all.
-    for (const id of [`role-action-toggle-${readerRole.code}`, `role-action-delete-${readerRole.code}`]) {
+    for (const id of [
+      `role-action-toggle-${readerRole.code}`,
+      `role-action-delete-${readerRole.code}`,
+    ]) {
       await expect(reader.page.getByTestId(id)).toHaveCount(0);
     }
-    for (const id of ['role-create-btn', `role-action-edit-${readerRole.code}`,
-      'capability-save', 'data-scope-modify-btn', 'permission-right-tab-audit']) {
+    for (const id of [
+      'role-create-btn',
+      `role-action-edit-${readerRole.code}`,
+      'capability-save',
+      'data-scope-modify-btn',
+      'permission-right-tab-audit',
+    ]) {
       await expect(reader.page.getByTestId(id)).toBeDisabled();
     }
-    await reader.page.screenshot({ path: info.outputPath('role-reader-capabilities.png'), fullPage: true });
+    await reader.page.screenshot({
+      path: info.outputPath('role-reader-capabilities.png'),
+      fullPage: true,
+    });
     await reader.page.getByTestId('permission-right-tab-members').click();
     await expect(reader.page.getByTestId('role-member-tab')).toBeVisible();
     await expect(reader.page.getByTestId('role-member-add-btn')).toBeDisabled();
     const removeButtons = reader.page.locator('[data-testid^="role-member-remove-"]');
     await expect(removeButtons).toHaveCount(1);
     await expect(removeButtons.first()).toBeDisabled();
-    await reader.page.screenshot({ path: info.outputPath('role-reader-members.png'), fullPage: true });
+    await reader.page.screenshot({
+      path: info.outputPath('role-reader-members.png'),
+      fullPage: true,
+    });
     const beforeScopeResponse = await page.request.get(`${BASE}${readerMatrixUrl}/default-scope`);
     expect(beforeScopeResponse.status()).toBe(200);
     const beforeScope = await beforeScopeResponse.json();
     expect(String(beforeScope.code)).toBe('0');
     expect((await reader.page.request.put(readerCapUrl, { data: [] })).status()).toBe(403);
-    expect((await reader.page.request.put(`${readerMatrixUrl}/default-scope`, { data: { scopeType: 'all' } })).status()).toBe(403);
-    expect((await reader.page.request.post(`/api/roles/${readerRole.pid}/members/remove`, { data: [] })).status()).toBe(403);
+    expect(
+      (
+        await reader.page.request.put(`${readerMatrixUrl}/default-scope`, {
+          data: { scopeType: 'all' },
+        })
+      ).status(),
+    ).toBe(403);
+    expect(
+      (
+        await reader.page.request.post(`/api/roles/${readerRole.pid}/members/remove`, { data: [] })
+      ).status(),
+    ).toBe(403);
     const afterScopeResponse = await page.request.get(`${BASE}${readerMatrixUrl}/default-scope`);
     expect(afterScopeResponse.status()).toBe(200);
     const afterScope = await afterScopeResponse.json();
     expect(String(afterScope.code)).toBe('0');
     expect(afterScope.data).toEqual(beforeScope.data);
     const persisted = await (await page.request.get(`${BASE}${readerCapUrl}`)).json();
-    expect(persisted.data.flatMap((group: any) => group.capabilities)
-      .find((item: any) => item.code === 'org.cap.role_view').authorizationState).toBe('full');
+    expect(
+      persisted.data
+        .flatMap((group: any) => group.capabilities)
+        .find((item: any) => item.code === 'org.cap.role_view').authorizationState,
+    ).toBe('full');
 
     // Explicit revocation through the upper-level editor removes the reader's access.
     await readerCheckbox.uncheck();
@@ -375,13 +423,16 @@ test('capability draft survives failed save and canceled navigation', async ({ p
   await expect(page.getByTestId('role-member-tab')).toBeVisible();
 });
 
-test('switching roles requires draft confirmation and never saves the discarded selection', async ({ page }, info) => {
+test('switching roles requires draft confirmation and never saves the discarded selection', async ({
+  page,
+}, info) => {
   const original = await createRole(page);
   const other = await createRole(page);
   const url = `${BASE}/api/permission/capabilities?rolePid=${encodeURIComponent(original.pid)}`;
   const before = await page.request.get(url);
   expect(before.status()).toBe(200);
-  const capability = (await before.json()).data.flatMap((group: any) => group.capabilities)
+  const capability = (await before.json()).data
+    .flatMap((group: any) => group.capabilities)
     .find((item: any) => !item.conventionDerived && item.includes.length > 0);
   expect(capability).toBeTruthy();
   await page.goto('/home');
@@ -389,28 +440,43 @@ test('switching roles requires draft confirmation and never saves the discarded 
   await page.getByRole('link', { name: /角色|Roles/, exact: true }).click();
   await page.getByTestId('role-search-input').fill(original.code);
   await page.getByTestId(`role-item-${original.code}`).click();
-  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', original.pid);
+  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute(
+    'data-role-pid',
+    original.pid,
+  );
   await page.getByTestId(`capability-checkbox-${capability.code}`).check();
   await expect(page.getByTestId('capability-draft')).toBeVisible();
   await page.getByTestId('role-search-input').fill(other.code);
   await page.getByTestId(`role-item-${other.code}`).click();
   await expect(page.getByTestId('confirm-dialog')).toBeVisible();
-  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', original.pid);
+  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute(
+    'data-role-pid',
+    original.pid,
+  );
   await page.screenshot({ path: info.outputPath('rbac-discard-confirm.png'), fullPage: true });
   await page.getByTestId('confirm-cancel').click();
   await expect(page.getByTestId(`capability-checkbox-${capability.code}`)).toBeChecked();
   await page.getByTestId(`role-item-${other.code}`).click();
   await page.getByTestId('confirm-ok').click();
-  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', other.pid);
+  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute(
+    'data-role-pid',
+    other.pid,
+  );
   await expect(page.getByTestId('capability-draft')).toHaveCount(0);
   await page.getByTestId('role-search-input').fill(original.code);
   await page.getByTestId(`role-item-${original.code}`).click();
-  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', original.pid);
+  await expect(page.getByTestId('capability-role-editor')).toHaveAttribute(
+    'data-role-pid',
+    original.pid,
+  );
   await expect(page.getByTestId(`capability-checkbox-${capability.code}`)).not.toBeChecked();
   const after = await page.request.get(url);
   expect(after.status()).toBe(200);
-  expect((await after.json()).data.flatMap((group: any) => group.capabilities)
-    .find((item: any) => item.code === capability.code).granted).toBe(false);
+  expect(
+    (await after.json()).data
+      .flatMap((group: any) => group.capabilities)
+      .find((item: any) => item.code === capability.code).granted,
+  ).toBe(false);
 });
 
 test('capability grant readback failure blocks stale editing and retry reads the persisted grant', async ({
@@ -603,12 +669,19 @@ test('partial revocation retains selected shared actions and completion persists
   });
 });
 
-
-test('configured display groups support upper-level grant and revoke without changing actions', async ({ page }, info) => {
+test('configured display groups support upper-level grant and revoke without changing actions', async ({
+  page,
+}, info) => {
   const coreRoot = process.env.AURA_CORE_PROJECT_ROOT ?? resolve(process.cwd(), '..');
-  const manifest = JSON.parse(readFileSync(resolve(coreRoot, 'plugins/org-management/plugin.json'), 'utf8'));
-  const definitions = JSON.parse(readFileSync(resolve(coreRoot, 'plugins/org-management/config/capabilities.json'), 'utf8'));
-  const original = definitions.find((item: { code: string }) => item.code === 'org.cap.member_view');
+  const manifest = JSON.parse(
+    readFileSync(resolve(coreRoot, 'plugins/org-management/plugin.json'), 'utf8'),
+  );
+  const definitions = JSON.parse(
+    readFileSync(resolve(coreRoot, 'plugins/org-management/config/capabilities.json'), 'utf8'),
+  );
+  const original = definitions.find(
+    (item: { code: string }) => item.code === 'org.cap.member_view',
+  );
   expect(original).toBeTruthy();
   // Import only the existing declaration; do not import models, menus, or commands.
   delete manifest.resourceDirs;
@@ -621,14 +694,20 @@ test('configured display groups support upper-level grant and revoke without cha
     expect(response.status()).toBe(200);
     const body = await response.json();
     expect(String(body.code)).toBe('0');
-    return body.data as Array<{ group: string; capabilities: Array<{
-      code: string; includes: string[]; granted: boolean; authorizationState: string;
-    }> }>;
+    return body.data as Array<{
+      group: string;
+      capabilities: Array<{
+        code: string;
+        includes: string[];
+        granted: boolean;
+        authorizationState: string;
+      }>;
+    }>;
   };
   const codesOf = (groups: Awaited<ReturnType<typeof readGroups>>) =>
-    groups.flatMap(group => group.capabilities.map(cap => cap.code)).sort();
+    groups.flatMap((group) => group.capabilities.map((cap) => cap.code)).sort();
   const initial = await readGroups();
-  expect(initial.flatMap(group => group.capabilities).filter(cap => cap.granted)).toEqual([]);
+  expect(initial.flatMap((group) => group.capabilities).filter((cap) => cap.granted)).toEqual([]);
   const importDeclaration = async (declaration: typeof original, dryRun = false) => {
     const response = await page.request.post(
       `${BASE}/api/plugins/import/execute-direct?conflictStrategy=OVERWRITE&autoDeployProcesses=false&dryRun=${dryRun}`,
@@ -639,18 +718,25 @@ test('configured display groups support upper-level grant and revoke without cha
     expect(dryRun ? result.valid : result.success).toBe(true);
     return result;
   };
-  const readCap = async () => (await readGroups()).flatMap(group => group.capabilities)
-    .find(cap => cap.code === original.code)!;
+  const readCap = async () =>
+    (await readGroups())
+      .flatMap((group) => group.capabilities)
+      .find((cap) => cap.code === original.code)!;
 
   await importDeclaration(modified, true);
   // Always restore this temporary display update, including after a failed UI assertion.
   // Created roles and grant/revoke evidence remain; no database cleanup is performed.
   try {
     const imported = await importDeclaration(modified);
-    await info.attach('configured-group-import', { body: JSON.stringify(imported), contentType: 'application/json' });
+    await info.attach('configured-group-import', {
+      body: JSON.stringify(imported),
+      contentType: 'application/json',
+    });
     const updated = await readGroups();
     expect(codesOf(updated)).toEqual(codesOf(initial));
-    expect(updated.find(group => group.group === groupName)?.capabilities.map(cap => cap.code)).toEqual([original.code]);
+    expect(
+      updated.find((group) => group.group === groupName)?.capabilities.map((cap) => cap.code),
+    ).toEqual([original.code]);
     expect((await readCap()).includes).toEqual(original.includes);
     expect((await readCap()).authorizationState).toBe('none');
 
@@ -660,7 +746,10 @@ test('configured display groups support upper-level grant and revoke without cha
     await expect(page.getByTestId('permission-page')).toBeVisible();
     await page.getByTestId('role-search-input').fill(role.code);
     await page.getByTestId(`role-item-${role.code}`).click();
-    await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', role.pid);
+    await expect(page.getByTestId('capability-role-editor')).toHaveAttribute(
+      'data-role-pid',
+      role.pid,
+    );
     const group = page.getByTestId(`capability-group-${groupName}`);
     const checkbox = group.getByTestId(`capability-checkbox-${original.code}`);
     await group.scrollIntoViewIfNeeded();
@@ -672,21 +761,34 @@ test('configured display groups support upper-level grant and revoke without cha
     for (const grant of [true, false]) {
       await checkbox.scrollIntoViewIfNeeded();
       await checkbox.setChecked(grant);
-      const previewPromise = page.waitForResponse(response =>
-        response.url().includes('/api/permission/capabilities/preview') && response.request().method() === 'POST');
+      const previewPromise = page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/permission/capabilities/preview') &&
+          response.request().method() === 'POST',
+      );
       await page.getByTestId('capability-save').click();
       const previewResponse = await previewPromise;
       expect(previewResponse.status()).toBe(200);
       const preview = await previewResponse.json();
       expect(String(preview.code)).toBe('0');
-      expect(preview.data[grant ? 'grantedCodes' : 'revokedCodes'].sort()).toEqual([...original.includes].sort());
+      expect(preview.data[grant ? 'grantedCodes' : 'revokedCodes'].sort()).toEqual(
+        [...original.includes].sort(),
+      );
       expect(previewResponse.request().postDataJSON()).toEqual(grant ? [original.code] : []);
       await expect(page.getByTestId('confirm-dialog')).toBeVisible();
-      await info.attach(grant ? 'configured-group-grant-preview' : 'configured-group-revoke-preview',
-        { body: JSON.stringify(preview.data), contentType: 'application/json' });
-      await page.screenshot({ path: info.outputPath(`configured-group-${grant ? 'grant' : 'revoke'}-preview.png`), fullPage: true });
-      const savedPromise = page.waitForResponse(response =>
-        response.url().includes('/api/permission/capabilities') && response.request().method() === 'PUT');
+      await info.attach(
+        grant ? 'configured-group-grant-preview' : 'configured-group-revoke-preview',
+        { body: JSON.stringify(preview.data), contentType: 'application/json' },
+      );
+      await page.screenshot({
+        path: info.outputPath(`configured-group-${grant ? 'grant' : 'revoke'}-preview.png`),
+        fullPage: true,
+      });
+      const savedPromise = page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/permission/capabilities') &&
+          response.request().method() === 'PUT',
+      );
       await page.getByTestId('confirm-ok').click();
       const saved = await savedPromise;
       expect(saved.status()).toBe(200);
@@ -696,18 +798,31 @@ test('configured display groups support upper-level grant and revoke without cha
       await page.reload();
       await page.getByTestId('role-search-input').fill(role.code);
       await page.getByTestId(`role-item-${role.code}`).click();
-      await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', role.pid);
+      await expect(page.getByTestId('capability-role-editor')).toHaveAttribute(
+        'data-role-pid',
+        role.pid,
+      );
       await group.scrollIntoViewIfNeeded();
       await expect(checkbox).toBeChecked({ checked: grant });
-      await page.screenshot({ path: info.outputPath(`configured-group-${grant ? 'granted' : 'revoked'}.png`), fullPage: true });
+      await page.screenshot({
+        path: info.outputPath(`configured-group-${grant ? 'granted' : 'revoked'}.png`),
+        fullPage: true,
+      });
     }
   } finally {
     const restored = await importDeclaration(original);
-    await info.attach('configured-group-restored', { body: JSON.stringify(restored), contentType: 'application/json' });
+    await info.attach('configured-group-restored', {
+      body: JSON.stringify(restored),
+      contentType: 'application/json',
+    });
     const groups = await readGroups();
     expect(codesOf(groups)).toEqual(codesOf(initial));
-    expect(groups.some(group => group.group === groupName)).toBe(false);
-    expect(groups.find(group => group.group === original.group)?.capabilities.some(cap => cap.code === original.code)).toBe(true);
+    expect(groups.some((group) => group.group === groupName)).toBe(false);
+    expect(
+      groups
+        .find((group) => group.group === original.group)
+        ?.capabilities.some((cap) => cap.code === original.code),
+    ).toBe(true);
     expect((await readCap()).includes).toEqual(original.includes);
   }
 });
@@ -744,6 +859,15 @@ test.describe('BOM & Quote domain levels', () => {
           data: { scopeType: 'self' },
         }),
       );
+      await unwrap(
+        await page.request.put(`/api/permission/capabilities?rolePid=${role.pid}`, {
+          data: [
+            `${domain}.cap.read`,
+            `${domain}.cap.write`,
+            ...(domain === 'qo' ? ['qo.cap.cost'] : []),
+          ],
+        }),
+      );
       const model = domain === 'bom' ? 'req_requirement_set_pcba_bom' : 'qo_quote_common';
       const hiddenField = domain === 'bom' ? 'bom_project_remark' : 'qo_quote_notes';
       await unwrap(
@@ -756,7 +880,11 @@ test.describe('BOM & Quote domain levels', () => {
         await page.request.put(draftUrl, {
           data: {
             expectedRevision: initial.revision,
-            selectedCapabilityCodes: [],
+            selectedCapabilityCodes: [
+              `${domain}.cap.read`,
+              `${domain}.cap.write`,
+              ...(domain === 'qo' ? ['qo.cap.cost'] : []),
+            ],
             revokedPartialCapabilityCodes: [],
             defaultScopeChanged: false,
             applyDefaultToCurrentGrants: false,
@@ -767,13 +895,17 @@ test.describe('BOM & Quote domain levels', () => {
       );
       const policyState = (snapshot: any) => ({
         defaultScopeType: snapshot.defaultScopeType,
-        scopes: snapshot.scopes,
         fieldPolicies: snapshot.fieldPolicies,
         fieldAccess: snapshot.fieldAccess,
-        navigation: snapshot.navigation,
+        navigation: {
+          mode: snapshot.navigation.mode,
+          selectedMenuPids: snapshot.navigation.selectedMenuPids,
+        },
       });
-      const baseline = policyState(await unwrap(await page.request.get(draftUrl)));
-      expect(baseline.scopes.length).toBeGreaterThan(0);
+      const baselineSnapshot = await unwrap(await page.request.get(draftUrl));
+      const baselineScopes = baselineSnapshot.scopes;
+      const baseline = policyState(baselineSnapshot);
+      expect(baselineScopes.length).toBeGreaterThan(0);
       expect(baseline.defaultScopeType).toBe('self');
       expect(
         baseline.fieldAccess
@@ -785,7 +917,7 @@ test.describe('BOM & Quote domain levels', () => {
       );
       expect(
         catalog
-          .filter((cap: any) => cap.code.startsWith(`${domain}.cap.`))
+          .filter((cap: any) => cap.code.startsWith(`${domain}.cap.`) && cap.tier !== 'data')
           .map((cap: any) => cap.code)
           .sort(),
       ).toEqual(['manage', 'read', 'write'].map((level) => `${domain}.cap.${level}`).sort());
@@ -818,18 +950,35 @@ test.describe('BOM & Quote domain levels', () => {
             clientRequestId: `levels-${domain}-${Date.now()}-${Math.random()}`,
           },
         });
-      const normal = domain === 'bom' ? 'bom:create_project' : 'qo_quote_common:create';
+      const normal = domain === 'bom' ? 'bom:create_project' : 'qo_quote_common:update';
       const release =
         domain === 'bom' ? 'bom:release_structure_revision' : 'qo_quote_common:approve';
       const fixture =
         domain === 'bom'
           ? { bom_project_name: `LEVEL-${Date.now()}`, bom_project_quality_level: 'industrial' }
-          : {
-              qo_quote_code: `LEVEL-${Date.now()}`,
-              qo_quote_customer: 'Permission gate customer',
-              qo_quote_set_count: 1,
-            };
+          : { qo_quote_discount_pct: 0.05 };
       let createdPid: string | undefined;
+      const setHiddenFixture = async (recordPid: string) => {
+        const { client, database } = await openPgClient();
+        try {
+          expect(database).toBe(process.env.POSTGRES_DB);
+          const seeded = await client.query(
+            `UPDATE mt_${model} SET ${hiddenField}=$1 WHERE pid=$2`,
+            ['Domain-level hidden fixture', recordPid],
+          );
+          expect(seeded.rowCount).toBe(1);
+        } finally {
+          await client.end();
+        }
+      };
+      if (domain === 'qo') {
+        await page.goto('/home');
+        // Reuse the release gate's existing scaffold and SELF-owner fixture helpers.
+        const seeded = await seedQuoteScaffold(page, 'DOMAIN-LEVEL', []);
+        await reassignRecordOwnerByEmail(seeded.rows, user.email);
+        createdPid = seeded.quoteId;
+        await setHiddenFixture(createdPid);
+      }
       try {
         await page.goto('/enterprise/permissions');
         await expect(page.getByTestId('role-table')).toBeVisible();
@@ -869,7 +1018,16 @@ test.describe('BOM & Quote domain levels', () => {
           await unwrap(await saved);
           await expect(page.getByTestId('confirm-dialog')).toBeHidden();
           const snapshot = await unwrap(await page.request.get(draftUrl));
+          if (domain === 'qo')
+            expect(
+              snapshot.groups
+                .flatMap((g: any) => g.capabilities)
+                .find((c: any) => c.code === 'qo.cap.cost').granted,
+            ).toBe(true);
           expect(policyState(snapshot)).toEqual(baseline);
+          expect(snapshot.scopes).toEqual(expect.arrayContaining(baselineScopes));
+          // New actions may inherit the existing SELF default; original ranges must survive.
+          for (const scope of snapshot.scopes) expect(scope.scopeType).toBe('self');
           const granted = snapshot.groups
             .flatMap((g: any) => g.capabilities)
             .filter((c: any) => c.granted)
@@ -883,12 +1041,14 @@ test.describe('BOM & Quote domain levels', () => {
                 );
           for (const name of ['read', 'write', 'manage'])
             expect(granted.includes(`${domain}.cap.${name}`)).toBe(expected.includes(name));
-          const result = await command(normal, fixture);
+          const result = await command(normal, fixture, domain === 'qo' ? createdPid : undefined);
           if (level === 'read' || level === 'none') expect(result.status()).toBe(403);
           else {
             const output = await unwrap(result);
-            createdPid = (output.data ?? output).recordPid ?? (output.data ?? output).recordId;
+            if (domain === 'bom')
+              createdPid = (output.data ?? output).recordPid ?? (output.data ?? output).recordId;
             expect(createdPid).toMatch(/^[A-Z0-9]{26}$/);
+            if (domain === 'bom') await setHiddenFixture(createdPid!);
           }
           const releaseResponse = await command(
             release,
@@ -905,6 +1065,16 @@ test.describe('BOM & Quote domain levels', () => {
               await actor.request.get(`/api/dynamic/${model}/${createdPid}`),
             );
             expect(record[hiddenField] == null).toBe(true);
+            const { client } = await openPgClient();
+            try {
+              const raw = await client.query(
+                `SELECT ${hiddenField} AS value FROM mt_${model} WHERE pid=$1`,
+                [createdPid],
+              );
+              expect(raw.rows[0].value).toBe('Domain-level hidden fixture');
+            } finally {
+              await client.end();
+            }
           }
           const other = domain === 'bom' ? 'qo_quote_common:create' : 'bom:create_project';
           expect((await command(other, fixture)).status()).toBe(403);

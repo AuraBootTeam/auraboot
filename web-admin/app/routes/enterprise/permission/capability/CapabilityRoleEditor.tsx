@@ -187,6 +187,17 @@ export default function CapabilityRoleEditor({
     );
   }, [projectedMatrix, capabilityView.primaryGroups]);
   const primarySelected = selected.filter((code) => primaryCodes.has(code));
+  // Data visibility controls are retained in the saved draft but are not operation levels.
+  // Omitting these existing bindings would revoke them during an unrelated level change.
+  const dataCodes = new Set(
+    groups
+      .flatMap((group) => group.capabilities)
+      .filter((capability) => capability.tier === 'data')
+      .map((capability) => capability.code),
+  );
+  const authoringSelected = selected.filter(
+    (code) => primaryCodes.has(code) || dataCodes.has(code),
+  );
   const boundFields = baselineSnapshot?.fieldPolicies;
   const fieldBaseline = (boundFields ?? []).flatMap((policy) =>
     typeof policy.policyPid === 'string' ? [policy.policyPid] : [],
@@ -264,7 +275,7 @@ export default function CapabilityRoleEditor({
   const draftBody = useMemo<AuthorizationDraft>(
     () => ({
       expectedRevision: baselineSnapshot?.revision ?? '',
-      selectedCapabilityCodes: primarySelected,
+      selectedCapabilityCodes: authoringSelected,
       revokedPartialCapabilityCodes: revokedPartial,
       defaultScopeChanged: defaultChanged,
       defaultScopeType: defaultChanged ? defaultScope : null,
@@ -277,7 +288,7 @@ export default function CapabilityRoleEditor({
     }),
     [
       baselineSnapshot?.revision,
-      JSON.stringify(primarySelected),
+      JSON.stringify(authoringSelected),
       JSON.stringify(revokedPartial),
       defaultChanged,
       defaultScope,

@@ -26,7 +26,7 @@ export function menuSectionForCapability(capability: Capability): string | null 
 }
 
 function isAdvancedCapability(capability: Capability): boolean {
-  return capability.conventionDerived;
+  return capability.conventionDerived || capability.tier === 'data';
 }
 
 function countGranted(groups: CapabilityGroup[]): number {

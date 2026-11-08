@@ -40,6 +40,19 @@ const groups: CapabilityGroup[] = [
 ];
 
 describe('capabilityHelpers', () => {
+  it('keeps existing data visibility grants in the baseline but out of operation levels and presets', () => {
+    const data = { ...cap('qo.cap.cost', true, true), tier: 'data' };
+    const business = { ...cap('qo.cap.read', true), tier: 'viewer' };
+    const input = [{ group: 'Quote', capabilities: [business, data] }];
+    expect(splitCapabilityGroupsForPrimaryView(input).primaryGroups[0].capabilities).toEqual([
+      business,
+    ]);
+    expect(splitCapabilityGroupsForPrimaryView(input).advancedGroups[0].capabilities).toEqual([
+      data,
+    ]);
+    expect(grantedCapabilityCodes(input)).toEqual(['qo.cap.read', 'qo.cap.cost']);
+    expect(capabilityCodesForTier(input, 'admin')).toEqual(['qo.cap.read']);
+  });
   it('keeps a declared capability without a group selectable in the primary view', () => {
     const ungrouped = { ...cap('org.cap.read', false), group: null };
     const split = splitCapabilityGroupsForPrimaryView([{ group: null, capabilities: [ungrouped] }]);
