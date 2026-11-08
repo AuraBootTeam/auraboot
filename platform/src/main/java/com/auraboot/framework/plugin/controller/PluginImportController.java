@@ -333,7 +333,13 @@ public class PluginImportController {
                     caller.envId(), caller.otelTraceId(), null);
             MetaContext.restore(target);
             try {
-                ImportPreviewResult preview = importService.parseDirectory(normalizedPath.toString(), deferReferenceValidation);
+                // Fan-out always defers cross-reference validation (S-REF-*): governance rows
+                // differ per target tenant, and the gaps a target can heal at execute time —
+                // menu permission codes the tenant never saw are created by the import, and
+                // global-flagged dashboards the tenant may not rewrite degrade to skips —
+                // must not abort that tenant's preview. Single-tenant imports keep the
+                // caller's strictness.
+                ImportPreviewResult preview = importService.parseDirectory(normalizedPath.toString(), true);
                 if (!preview.isValid()) {
                     perTenant.add(Map.of("tenantId", tenantId, "success", false,
                             "errors", String.join(", ", preview.getErrors())));

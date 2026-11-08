@@ -158,4 +158,41 @@ class PluginAccessResourceImporterTest {
         importer.importMenus(m,new ImportRequest(),result,"p","i",42L);
         assertThat(result.getResourceCounts()).containsEntry("MENU",Map.of("UPDATE",1));
     }
+    @Test void menuReferencingPermissionMissingFromTenantCreatesItBeforeMenusAndBindsToAdmin() {
+        // Fan-out into a tenant that has never seen xy.score_import.read: the menu row used
+        // to land referencing a code resolving to nothing (runtime 403), or the preview
+        // aborted the whole tenant. The import must be self-contained instead.
+        var m=new PluginManifestExtended();
+        m.setMenus(List.of(MenuDefinitionDTO.builder().code("score_import")
+                .permissionCode("xy.score_import.read").build()));
+        when(permissions.findByTenantIdAndCode(42L,"xy.score_import.read")).thenReturn(null);
+        when(resources.importPermission(any(),eq("p"),eq("i"),eq(42L),eq(ImportRequest.ConflictStrategy.SKIP)))
+                .thenReturn(trackedResource("CREATE",201L,"xy.score_import.read"));
+        when(roles.findByTenantId(42L)).thenReturn(List.of(tenantAdmin()));
+        when(permissions.findRolePermissions(7L)).thenReturn(List.of());
+        when(resources.importMenu(any(),eq("p"),eq("i"),eq(42L),any()))
+                .thenReturn(trackedResource("CREATE",301L,"score_import"));
+        when(resources.pruneStaleMenus(eq("p"),eq("i"),eq(42L),any())).thenReturn(0);
+        var result=new ImportExecuteResult();
+        importer.importMenus(m,new ImportRequest(),result,"p","i",42L);
+        var ordered=inOrder(resources,bindings);
+        ordered.verify(resources).importPermission(any(),eq("p"),eq("i"),eq(42L),eq(ImportRequest.ConflictStrategy.SKIP));
+        ordered.verify(bindings).insert(argThat((RolePermission b) ->
+                Long.valueOf(7L).equals(b.getRoleId()) && Long.valueOf(201L).equals(b.getPermissionId())));
+        ordered.verify(resources).importMenu(any(),eq("p"),eq("i"),eq(42L),any());
+        verify(users).evictRoleUsers(42L,7L);
+    }
+    @Test void menuReferencingPermissionTenantAlreadyHasIsNeverRecreatedOrGranted() {
+        var existing=new PermissionDTO(); existing.setId(201L);
+        var m=new PluginManifestExtended();
+        m.setMenus(List.of(MenuDefinitionDTO.builder().code("score_import")
+                .permissionCode("xy.score_import.read").build()));
+        when(permissions.findByTenantIdAndCode(42L,"xy.score_import.read")).thenReturn(existing);
+        when(resources.importMenu(any(),eq("p"),eq("i"),eq(42L),any()))
+                .thenReturn(trackedResource("UPDATE",301L,"score_import"));
+        when(resources.pruneStaleMenus(eq("p"),eq("i"),eq(42L),any())).thenReturn(0);
+        importer.importMenus(m,new ImportRequest(),new ImportExecuteResult(),"p","i",42L);
+        verify(resources,never()).importPermission(any(),any(),any(),any(),any());
+        verifyNoInteractions(bindings,roles,users);
+    }
 }

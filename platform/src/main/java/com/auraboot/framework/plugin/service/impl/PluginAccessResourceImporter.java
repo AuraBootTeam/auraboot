@@ -222,6 +222,8 @@ final class PluginAccessResourceImporter {
                              ImportExecuteResult result, String pluginPid, String importId, Long tenantId){
         if (manifest.getMenus() == null) return;
 
+        ensureMenuReferencedPermissions(manifest, pluginPid, importId, tenantId);
+
         // Clear menu code→id map before processing this batch
         if (resourceImporter instanceof PluginResourceImporterImpl impl) {
             impl.clearMenuCodeMap();
@@ -257,6 +259,51 @@ final class PluginAccessResourceImporter {
 
         // Auto-generate menu i18n records from name:zh-CN / name:en fields
         generateMenuI18nRecords(sorted, tenantId);
+    }
+
+    /**
+     * Menus may reference permission codes the target tenant has never seen — a fan-out
+     * into a fresh school tenant where the plugin declares the code in menus.json but not
+     * in permissions.json used to abort at preview (S-REF-MENU-PERMISSION) and, when the
+     * import did proceed, left the menu 403-ing at runtime because the code resolved to
+     * nothing. Create any missing code here, before menu rows are written, so an import
+     * is self-contained. Existing codes are never touched (SKIP strategy: only the
+     * create branch runs), and codes this creates are bound to tenant_admin exactly like
+     * every other freshly created permission declaration.
+     */
+    void ensureMenuReferencedPermissions(PluginManifestExtended manifest, String pluginPid,
+                                         String importId, Long tenantId) {
+        Set<String> referenced = new LinkedHashSet<>();
+        for (MenuDefinitionDTO menu : manifest.getMenus()) {
+            if (menu != null && menu.getPermissionCode() != null && !menu.getPermissionCode().isBlank()) {
+                referenced.add(menu.getPermissionCode());
+            }
+        }
+        if (referenced.isEmpty()) return;
+
+        List<PluginResource> createdPermissions = new ArrayList<>();
+        for (String code : referenced) {
+            PermissionDTO existing = null;
+            try {
+                existing = permissionService.findByTenantIdAndCode(tenantId, code);
+            } catch (Exception e) {
+                log.debug("Menu permission lookup failed, treating as missing: code={}, reason={}",
+                        logSafe(code), logSafe(e.toString()));
+            }
+            if (existing != null) continue;
+
+            log.info("Menu references permission '{}' absent from tenant {} — creating it during import",
+                    logSafe(code), tenantId);
+            PluginResource created = resourceImporter.importPermission(
+                    PermissionDefinitionDTO.builder().code(code).build(),
+                    pluginPid, importId, tenantId, ImportRequest.ConflictStrategy.SKIP);
+            if (created != null && created.getActionEnum() == ResourceAction.CREATE) {
+                createdPermissions.add(created);
+            }
+        }
+        if (!createdPermissions.isEmpty()) {
+            bindCreatedPermissionsToTenantAdmin(createdPermissions, tenantId);
+        }
     }
 
     List<MenuDefinitionDTO> topologicalSortMenus(List<MenuDefinitionDTO> menus){
