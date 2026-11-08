@@ -5,6 +5,8 @@ import com.auraboot.framework.permission.event.PermissionDefinitionChangedEvent;
 import com.auraboot.framework.permission.event.RolePermissionChangedEvent;
 import com.auraboot.framework.permission.event.UserRoleChangedEvent;
 import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.permission.service.impl.PermissionSnapshotCache;
+import com.auraboot.framework.plugin.event.PluginImportCompletedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,7 +14,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /** Verifies that transaction listeners preserve explicit tenant isolation during eviction. */
 @ExtendWith(MockitoExtension.class)
@@ -21,11 +27,22 @@ class PermissionCacheEvictionListenerTest {
     @Mock
     private UserPermissionService userPermissionService;
 
+    @Mock
+    private org.springframework.cache.CacheManager cacheManager;
+
+    @Mock
+    private org.springframework.cache.Cache cache;
+
+    private PermissionSnapshotCache snapshotCache;
+
     private PermissionCacheEvictionListener listener;
 
     @BeforeEach
     void setUp() {
-        listener = new PermissionCacheEvictionListener(userPermissionService);
+        lenient().when(cacheManager.getCache(anyString())).thenReturn(cache);
+        snapshotCache = new PermissionSnapshotCache(
+                null, null, null, null, null, cacheManager);
+        listener = new PermissionCacheEvictionListener(userPermissionService, snapshotCache);
     }
 
     @Test
@@ -71,5 +88,15 @@ class PermissionCacheEvictionListenerTest {
                 this, 100L, "model.user.read", "CREATE"));
 
         assertThat(DataAccessCacheEpoch.current()).isGreaterThan(before + 1);
+    }
+
+    @Test
+    void pluginImportCompletedClearsEveryPermissionRegionAndOrphansEpochKeys() {
+        long before = DataAccessCacheEpoch.current();
+
+        listener.onPluginImportCompleted(new PluginImportCompletedEvent(this, 100L, "edu-core"));
+
+        verify(cacheManager, org.mockito.Mockito.atLeastOnce()).getCache(org.mockito.ArgumentMatchers.anyString());
+        assertThat(DataAccessCacheEpoch.current()).isGreaterThan(before);
     }
 }
