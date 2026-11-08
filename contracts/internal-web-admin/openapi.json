@@ -25215,6 +25215,13 @@
           "path": {
             "type": "string"
           },
+          "targetTenantIds": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
           "validateReferences": {
             "type": "boolean"
           }
