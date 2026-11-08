@@ -297,6 +297,9 @@ public class DynamicDataAccessorImpl implements DataAccessor {
         } catch (AccessDeniedException | com.auraboot.framework.exception.PermissionDeniedException denied) {
             // CATCH: public plugin boundary — translate host authorization types
             // into the stable, transport-neutral DataAccessor contract.
+            log.warn("Plugin data authorization rejected command={} tenant={} user={}",
+                    MetaContext.getAuthorizedCommandCode(), MetaContext.getCurrentTenantId(),
+                    MetaContext.getCurrentUserId(), denied);
             throw new DataAccessorException(DataAccessErrorCode.PERMISSION_DENIED, denied);
         }
     }
