@@ -6,7 +6,7 @@ import com.auraboot.framework.plugin.dto.imports.*;
 import com.auraboot.framework.plugin.service.PluginImportService;
 import com.auraboot.framework.application.security.AdminRoleChecker;
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.rbac.constant.RoleConstants;
+import com.auraboot.framework.permission.enums.RoleCodes;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -312,9 +312,18 @@ public class PluginImportController {
             return ResponseEntity.status(401).body(ImportExecuteResult.builder()
                     .success(false).errorMessage("No caller context").build());
         }
-        if (!adminRoleChecker.hasRole(caller.tenantId(), caller.userId(), RoleConstants.PLATFORM_ADMIN)) {
-            return ResponseEntity.status(403).body(ImportExecuteResult.builder()
-                    .success(false).errorMessage("targetTenantIds requires the platform_admin role").build());
+        // Per-target authority: the caller must administer EACH target tenant
+        // (tenant_admin there, or platform_admin anywhere). A caller who cannot
+        // write governance rows into a tenant must not fan out into it.
+        for (Long tenantId : targetTenantIds) {
+            boolean authorized = adminRoleChecker.hasRole(tenantId, caller.userId(), RoleCodes.PLATFORM_ADMIN)
+                    || adminRoleChecker.hasRole(tenantId, caller.userId(), RoleCodes.TENANT_ADMIN);
+            if (!authorized) {
+                return ResponseEntity.status(403).body(ImportExecuteResult.builder()
+                        .success(false)
+                        .errorMessage("targetTenantIds requires tenant_admin or platform_admin in every target tenant; missing authority for tenant " + tenantId)
+                        .build());
+            }
         }
 
         java.util.List<Map<String, Object>> perTenant = new java.util.ArrayList<>();
