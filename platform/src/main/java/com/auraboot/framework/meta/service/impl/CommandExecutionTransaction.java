@@ -26,12 +26,14 @@ public class CommandExecutionTransaction {
     private com.auraboot.framework.meta.mapper.CommandDefinitionMapper definitions;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.auraboot.framework.permission.service.impl.PermissionSnapshotCache snapshots;
-    private boolean domainCommand(String commandCode) {
-        if (definitions == null || snapshots == null) return false;
+    private java.util.Map<String,Object> commandConfiguration(String commandCode) {
+        if (definitions == null) return java.util.Map.of();
         var command = definitions.findCurrentByCode(commandCode);
-        if (command == null || command.getExecutionConfig() == null) return false;
-        var config = com.auraboot.framework.common.util.JsonUtil.parse(command.getExecutionConfig(), new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String,Object>>() {});
-        if (!(config.get("permissions") instanceof java.util.List<?> codes)) return false;
+        if (command == null || command.getExecutionConfig() == null) return java.util.Map.of();
+        return com.auraboot.framework.common.util.JsonUtil.parse(command.getExecutionConfig(), new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String,Object>>() {});
+    }
+    private boolean domainCommand(java.util.Map<String,Object> config) {
+        if (snapshots == null || !(config.get("permissions") instanceof java.util.List<?> codes)) return false;
         return codes.stream().anyMatch(code -> code instanceof String value && !com.auraboot.framework.permission.service.DomainPermissionPolicy.models(
                 snapshots.resolvePermissionDefinition(com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId(), value)).isEmpty());
     }
@@ -50,7 +52,14 @@ public class CommandExecutionTransaction {
             throw new AccessDeniedException("Conflicting command owner transaction requirements");
         var isolation = resourceIsolation != null ? resourceIsolation : handlerIsolation;
         var template = new TransactionTemplate(transactions);
-        if (isolation == null && domainCommand(commandCode)) isolation = BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ;
+        var config = commandConfiguration(commandCode);
+        if (isolation == null && domainCommand(config)) {
+            boolean serializable = com.auraboot.framework.meta.transaction.CommandTransactionIsolationPolicy.requiresSerializable(config)
+                    || Integer.valueOf(org.springframework.transaction.TransactionDefinition.ISOLATION_SERIALIZABLE).equals(
+                        TransactionSynchronizationManager.getCurrentTransactionIsolationLevel());
+            isolation = serializable ? BusinessResourceAuthorization.ReadIsolation.SERIALIZABLE
+                    : BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ;
+        }
         if (isolation != null) {
             // Preserve the caller's atomic unit: never suspend it just to satisfy an owner.
             // An existing transaction must already attest the exact required isolation.

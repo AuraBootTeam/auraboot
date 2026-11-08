@@ -73,6 +73,8 @@ public class PermissionInterceptor implements HandlerInterceptor {
     private final PageSchemaMapper pageSchemaMapper;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.auraboot.framework.permission.service.impl.PermissionSnapshotCache domainPolicies;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.meta.mapper.CommandDefinitionMapper commandDefinitions;
 
     /**
      * REG-5/6 (DDR-2026-06-30): role/permission ASSIGNMENT is restricted to tenant_admin.
@@ -193,6 +195,10 @@ public class PermissionInterceptor implements HandlerInterceptor {
                         "tenant_admin required for role/permission assignment,permissionCode: " + permissionCode);
             }
         }
+
+        if (MetaPermission.COMMAND_EXECUTE.equals(permissionCode) && handler instanceof HandlerMethod endpoint
+                && endpoint.getBeanType() == com.auraboot.framework.meta.controller.config.CommandController.class
+                && "execute".equals(endpoint.getMethod().getName()) && publishedDomainCommand(request)) return true;
 
         // Native domain CRUD authorizes in the shared application service for HTTP and non-HTTP callers.
         // Metadata-only endpoints and other products retain their original interceptor contract.
@@ -488,6 +494,20 @@ public class PermissionInterceptor implements HandlerInterceptor {
         }
 
         return resolved.contains("{") ? template : resolved;
+    }
+
+    private boolean publishedDomainCommand(HttpServletRequest request) {
+        if (domainPolicies == null || commandDefinitions == null || !MetaContext.exists()) return false;
+        Object raw = request.getAttribute(org.springframework.web.servlet.HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
+        if (!(raw instanceof java.util.Map<?,?> variables) || !(variables.get("commandCode") instanceof String code)) return false;
+        var command = commandDefinitions.findCurrentByCode(code);
+        if (command == null || !code.equals(command.getCode()) || command.getExecutionConfig() == null) return false;
+        var config = com.auraboot.framework.common.util.JsonUtil.parse(command.getExecutionConfig(),
+                new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String,Object>>() {});
+        if (!(config.get("permissions") instanceof java.util.List<?> permissions) || permissions.size() != 1
+                || !(permissions.getFirst() instanceof String permission)) return false;
+        return !com.auraboot.framework.permission.service.DomainPermissionPolicy.models(
+                domainPolicies.resolvePermissionDefinition(MetaContext.getCurrentTenantId(), permission)).isEmpty();
     }
 
     private boolean isReadOnlyModelPagePermission(String permissionTemplate) {

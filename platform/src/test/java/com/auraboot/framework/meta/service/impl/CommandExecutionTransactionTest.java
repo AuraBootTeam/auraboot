@@ -31,6 +31,27 @@ class CommandExecutionTransactionTest {
         when(((BusinessResourceAuthorization) handler).resourceReadIsolation()).thenReturn(BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ);
     }
 
+    @Test void domainEntryReusesTheDeclaredSerializableTransactionInsteadOfRequiringRepeatableRead() {
+        var definitions=mock(com.auraboot.framework.meta.mapper.CommandDefinitionMapper.class);
+        var snapshots=mock(com.auraboot.framework.permission.service.impl.PermissionSnapshotCache.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(transaction,"definitions",definitions);
+        org.springframework.test.util.ReflectionTestUtils.setField(transaction,"snapshots",snapshots);
+        com.auraboot.framework.application.tenant.MetaContext.setContext(100L,1L,"actor","actor");
+        var command=new com.auraboot.framework.meta.entity.CommandDefinition();
+        command.setExecutionConfig("{\"permissions\":[\"example.cap.manage\"],\"handlerParams\":{\"transactionIsolation\":\"serializable\"}}");
+        when(definitions.findCurrentByCode("example:seed")).thenReturn(command);
+        var permission=new com.auraboot.framework.permission.entity.Permission();permission.setResourceType("operation");permission.setAction("manage");
+        permission.setExtension(java.util.Map.of("domainModels",java.util.Map.of("example",java.util.List.of("read","update"))));
+        when(snapshots.resolvePermissionDefinition(100L,"example.cap.manage")).thenReturn(permission);
+        when(manager.getTransaction(any())).thenReturn(status);
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(TransactionDefinition.ISOLATION_SERIALIZABLE);
+        try {
+            assertThat(transaction.execute("example:seed",false,()->"completed")).isEqualTo("completed");
+            verify(manager).getTransaction(argThat(value->value.getIsolationLevel()==TransactionDefinition.ISOLATION_SERIALIZABLE));
+        } finally {com.auraboot.framework.application.tenant.MetaContext.clear();}
+    }
+
     @Test void owner_isolation_is_selected_before_any_pipeline_operation() {
         owner(); when(manager.getTransaction(any())).thenReturn(status);
         assertThat(transaction.execute("orders:export", false, () -> {
