@@ -298,8 +298,8 @@ public class DynamicDataAccessorImpl implements DataAccessor {
             // CATCH: public plugin boundary — translate host authorization types
             // into the stable, transport-neutral DataAccessor contract.
             log.warn("Plugin data authorization rejected command={} tenant={} user={}",
-                    MetaContext.getAuthorizedCommandCode(), MetaContext.getCurrentTenantId(),
-                    MetaContext.getCurrentUserId(), denied);
+                    MetaContext.getAuthorizedCommandCode(), MetaContext.exists() ? MetaContext.getCurrentTenantId() : null,
+                    MetaContext.exists() ? MetaContext.getCurrentUserId() : null, denied);
             throw new DataAccessorException(DataAccessErrorCode.PERMISSION_DENIED, denied);
         }
     }
