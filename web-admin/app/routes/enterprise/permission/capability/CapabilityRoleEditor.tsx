@@ -28,6 +28,7 @@ import {
   splitCapabilityGroupsForPrimaryView,
 } from './capabilityHelpers';
 import CapabilityChecklist from './CapabilityChecklist';
+import { selectDomainLevel } from './domainLevels';
 import DataScopeBar from './DataScopeBar';
 import { scopeOption } from '../scopeConfig';
 import CapabilityDiagnostics from './CapabilityDiagnostics';
@@ -407,6 +408,13 @@ export default function CapabilityRoleEditor({
     },
     [capabilityView.primaryGroups, primaryCodes, selected, readOnly],
   );
+
+  const onSelectLevel = (levels: Capability[], code: string | null) => {
+    if (readOnly) return;
+    const next = selectDomainLevel(selected, revokedPartial, levels, code);
+    setSelected(next.selected);
+    setRevokedPartial(next.revoked);
+  };
 
   const save = async () => {
     if (readOnly || !baselineSnapshot || conflict || !reviewedDraft.current) return;
@@ -981,6 +989,7 @@ export default function CapabilityRoleEditor({
               )}
             </p>
             <CapabilityChecklist
+              onSelectLevel={onSelectLevel}
               groups={filteredGroups}
               catalog={groups}
               matrix={matrix}

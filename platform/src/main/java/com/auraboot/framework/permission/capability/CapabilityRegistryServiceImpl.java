@@ -36,7 +36,8 @@ public class CapabilityRegistryServiceImpl implements CapabilityRegistryService 
 
     @Override
     public List<CapabilityDefinitionDTO> listDeclarations(Long tenantId) {
-        return capabilityMapper.findByTenant(tenantId).stream().map(this::toDto).toList();
+        return DomainCapabilityLevels.currentDeclarations(
+                capabilityMapper.findByTenant(tenantId).stream().map(this::toDto).toList());
     }
 
     private CapabilityRecord toRecord(CapabilityDefinitionDTO dto, Long tenantId) {
