@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: ec8704be15abb8ab80b71fe30e07a19261caeacca567ef74a0a5c820d2be1235
+ * Contract SHA-256: 1f6f6c1db1bf70fbccc64143c6db99af23345bf9288603eb2d77fc7fe7a2a6d8
  */
 export interface paths {
     "/api/activities": {
@@ -31610,6 +31610,7 @@ export interface components {
             deferReferenceValidation?: boolean;
             identifierMappingPath?: string;
             path?: string;
+            targetTenantIds?: number[];
             validateReferences?: boolean;
         };
         DomainExportTaskDTO: {
