@@ -172,6 +172,7 @@ public class FileUploadController {
      */
     @PostMapping("/relation")
     @RequirePermission(MetaPermission.SYS_FILE_RELATION_MANAGE)
+    @org.springframework.transaction.annotation.Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public ApiResponse<Boolean> createFileRelation(
             @RequestBody FileRelationRequestDTO request,
             @CurrentUserId Long userId) {

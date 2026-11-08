@@ -347,7 +347,7 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public boolean createFileRelation(FileRelationRequestDTO request, Long userId) {
         if (userId == null || !userId.equals(MetaContext.getCurrentUserId()))
             throw new org.springframework.security.access.AccessDeniedException("File relations require the current actor");
@@ -389,7 +389,7 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public boolean appendFileRelation(FileRelationRequestDTO request, Long userId) {
         if (!MetaContext.exists()) throw new BusinessException("An authenticated business file relation is required");
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -425,7 +425,7 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public void assertFileRelationMutationAllowed(String entityType, String entityId, String fieldName) {
         relationMutationGuard.authorize(entityType,entityId,fieldName);
     }
@@ -457,7 +457,7 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public boolean removeFileRelation(String entityType, String entityId, String fieldName) {
         assertFileRelationMutationAllowed(entityType,entityId,fieldName);
         QueryWrapper<FileRelationEntity> wrapper = new QueryWrapper<>();

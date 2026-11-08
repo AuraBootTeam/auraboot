@@ -45,6 +45,8 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
     @Autowired com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionService publicProjection;
     @Autowired com.auraboot.framework.meta.service.impl.CommandResultProjectionService resultProjection;
     @Autowired FieldMaskService masks;
+    @Autowired org.springframework.context.ApplicationContext relationContext;
+    @Autowired com.auraboot.framework.permission.service.UserPermissionService relationPermissions;
     @Autowired com.auraboot.framework.file.dao.mapper.FileMapper sourceFiles;
     @Autowired com.auraboot.framework.file.dao.mapper.FileRelationMapper sourceRelations;
     @Autowired com.auraboot.framework.infrastructure.storage.StorageProvider sourceStorage;
@@ -497,6 +499,68 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
         sourceStorage.delete(file.getFileName());
         sourceStorage.upload(file.getFileName(),new java.io.ByteArrayInputStream(new byte[]{1,2}),2,"application/octet-stream");
         assertThatThrownBy(() -> command(scope -> scope.accessor().readBusinessSourceFile(rootLabel))).isInstanceOf(DataAccessorException.class);
+    }
+
+    @Test void fileRelationControllerOwnsTheCoherentReadAndWriteTransaction() {
+        var file=sourceAttachment();
+        jdbc.update("DELETE FROM ab_file_relation WHERE tenant_id=? AND file_id=?",getTestTenant().getId(),file.getId().toString());
+        long role=com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        var permissionIds=new ArrayList<Long>();
+        jdbc.update("INSERT INTO ab_role(id,pid,tenant_id,code,name,type,status,deleted_flag,default_data_scope_type) VALUES(?,?,?,?,?,'custom','active',FALSE,'all')",
+                role,UniqueIdGenerator.generate(),getTestTenant().getId(),rootModel+"_files","Owned file relation fixture");
+        jdbc.update("INSERT INTO ab_user_role(id,pid,tenant_id,member_id,role_id,status,deleted_flag) VALUES(?,?,?,?,?,'active',FALSE)",
+                com.baomidou.mybatisplus.core.toolkit.IdWorker.getId(),UniqueIdGenerator.generate(),getTestTenant().getId(),getTestTenantMember().getId(),role);
+        try {
+            for(String action:List.of("read","update")) {
+                Long permission=jdbc.queryForObject("INSERT INTO ab_permission(pid,tenant_id,code,name,resource_type,resource_code,action,source,status,deleted_flag) VALUES(?,?,?,?,'model',?,?,'test','active',FALSE) RETURNING id",
+                        Long.class,UniqueIdGenerator.generate(),getTestTenant().getId(),"model."+rootModel+"."+action,"File relation "+action,rootModel,action);
+                permissionIds.add(permission);
+                jdbc.update("INSERT INTO ab_role_permission(id,pid,tenant_id,role_id,permission_id,grant_type,status,deleted_flag) VALUES(?,?,?,?,?,'grant','active',FALSE)",
+                        com.baomidou.mybatisplus.core.toolkit.IdWorker.getId(),UniqueIdGenerator.generate(),getTestTenant().getId(),role,permission);
+            }
+            relationPermissions.evictPermissionDefinitions(getTestTenant().getId());
+            relationPermissions.evictUserPermissions(getTestTenant().getId(),getTestUser().getId());
+            assertThat(permissions.canAction(getTestTenantMember().getId(),rootModel,"read")).isTrue();
+            assertThat(permissions.canAction(getTestTenantMember().getId(),rootModel,"update")).isTrue();
+            var request=new com.auraboot.framework.file.dto.FileRelationRequestDTO();request.setEntityType(rootModel);
+            request.setEntityId(rootPid);request.setFieldName(rootLabel);request.setFileIds(new String[]{file.getPid()});
+            // Call the actual Spring controller proxy. MVC permission interception is covered by the BOM HTTP journey.
+            var response=relationContext.getBean(com.auraboot.framework.file.controller.FileUploadController.class).createFileRelation(request,getTestUser().getId());
+            assertThat(response.getData()).isTrue();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_file_relation WHERE tenant_id=? AND entity_type=? AND entity_id=? AND field_name=? AND file_id=? AND deleted_flag=FALSE",
+                    Long.class,getTestTenant().getId(),rootModel,rootPid,rootLabel,file.getId().toString())).isEqualTo(1);
+            assertThat(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            var files=relationContext.getBean(com.auraboot.framework.file.service.FileService.class);
+            assertThat(files.removeFileRelation(rootModel,rootPid,rootLabel)).isTrue();
+            assertThat(files.appendFileRelation(request,getTestUser().getId())).isTrue();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_file_relation WHERE tenant_id=? AND entity_id=? AND file_id=? AND deleted_flag=FALSE",
+                    Long.class,getTestTenant().getId(),rootPid,file.getId().toString())).isEqualTo(1);
+            jdbc.update("UPDATE ab_role_permission SET status='inactive' WHERE tenant_id=? AND role_id=? AND permission_id=?",
+                    getTestTenant().getId(),role,permissionIds.get(1));
+            relationPermissions.evictRoleUsers(getTestTenant().getId(),role);
+            relationPermissions.evictUserPermissions(getTestTenant().getId(),getTestUser().getId());
+            assertThatThrownBy(()->relationContext.getBean(com.auraboot.framework.file.controller.FileUploadController.class)
+                    .createFileRelation(request,getTestUser().getId()))
+                    .isInstanceOfAny(org.springframework.security.access.AccessDeniedException.class,com.auraboot.framework.exception.PermissionDeniedException.class);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_file_relation WHERE tenant_id=? AND entity_id=? AND file_id=? AND deleted_flag=FALSE",
+                    Long.class,getTestTenant().getId(),rootPid,file.getId().toString())).isEqualTo(1);
+            String fieldsJson=new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(Map.of("modelCode",rootModel,"readFields",List.of(rootLabel),"writeFields",List.of())).toString();
+            jdbc.update("UPDATE ab_role_permission SET status='active',field_scope=?::jsonb WHERE tenant_id=? AND role_id=? AND permission_id=?",
+                    fieldsJson,getTestTenant().getId(),role,permissionIds.get(1));
+            relationPermissions.evictRoleUsers(getTestTenant().getId(),role);relationPermissions.evictUserPermissions(getTestTenant().getId(),getTestUser().getId());
+            assertThatThrownBy(()->relationContext.getBean(com.auraboot.framework.file.controller.FileUploadController.class)
+                    .createFileRelation(request,getTestUser().getId())).isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
+                    .hasMessageContaining("FIELD_WRITE_DENIED");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_file_relation WHERE tenant_id=? AND entity_id=? AND file_id=? AND deleted_flag=FALSE",
+                    Long.class,getTestTenant().getId(),rootPid,file.getId().toString())).isEqualTo(1);
+        } finally {
+            jdbc.update("DELETE FROM ab_role_permission WHERE tenant_id=? AND role_id=?",getTestTenant().getId(),role);
+            jdbc.update("DELETE FROM ab_user_role WHERE tenant_id=? AND role_id=?",getTestTenant().getId(),role);
+            jdbc.update("DELETE FROM ab_role WHERE tenant_id=? AND id=?",getTestTenant().getId(),role);
+            for(Long id:permissionIds)jdbc.update("DELETE FROM ab_permission WHERE tenant_id=? AND id=?",getTestTenant().getId(),id);
+            relationPermissions.evictPermissionDefinitions(getTestTenant().getId());
+            relationPermissions.evictUserPermissions(getTestTenant().getId(),getTestUser().getId());
+        }
     }
 
     class Owner implements CommandHandlerExtension,BusinessResourceAuthorization {
