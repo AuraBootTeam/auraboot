@@ -44,7 +44,7 @@ class RuleSimulatorImplTest {
     private DynamicDataService dds;
     private BackgroundRuleAccessor ruleAccessor;
     private BackgroundProductAccessor productAccessor;
-    private FakeTimeSeriesPort tsp;
+    private com.auraboot.framework.plugin.extension.iot.TimeSeriesPort tsp;
     private EmqxRuleTestService emqxRuleTest;
     private RuleSimulatorImpl sim;
 
@@ -55,7 +55,7 @@ class RuleSimulatorImplTest {
         dds = mock(DynamicDataService.class);
         ruleAccessor = mock(BackgroundRuleAccessor.class);
         productAccessor = mock(BackgroundProductAccessor.class);
-        tsp = new FakeTimeSeriesPort();
+        tsp = mock(com.auraboot.framework.plugin.extension.iot.TimeSeriesPort.class);
         emqxRuleTest = mock(EmqxRuleTestService.class);
         sim = new RuleSimulatorImpl(dds, ruleAccessor, productAccessor, tsp, emqxRuleTest, new ObjectMapper());
     }
@@ -96,10 +96,10 @@ class RuleSimulatorImplTest {
         when(productAccessor.getSchema("pk-air")).thenReturn(Optional.of(new ProductSchema(
                 List.of(new PropertyDef("temp", "float", true, "°C", Map.of())), List.of(), List.of())));
         // Three telemetry frames at distinct timestamps.
-        tsp.points = List.of(
+        when(tsp.queryRange(anyLong(), any())).thenReturn(List.of(
                 new TimeSeriesPoint("dev-1", "temp", T0, 90, "GOOD"),
                 new TimeSeriesPoint("dev-1", "temp", T0.plusSeconds(60), 50, "GOOD"),
-                new TimeSeriesPoint("dev-1", "temp", T0.plusSeconds(120), 85, "GOOD"));
+                new TimeSeriesPoint("dev-1", "temp", T0.plusSeconds(120), 85, "GOOD")));
         // EMQX says: frame1 (90) fires, frame2 (50) no, frame3 (85) fires.
         when(emqxRuleTest.matches(anyString(), anyString(), anyString()))
                 .thenReturn(true).thenReturn(false).thenReturn(true);
@@ -127,10 +127,10 @@ class RuleSimulatorImplTest {
         stubDeviceList(deviceRow("dev-1", "iot-1", "pk-air"));
         when(productAccessor.getSchema("pk-air")).thenReturn(Optional.of(new ProductSchema(
                 List.of(new PropertyDef("temp", "float", true, "°C", Map.of())), List.of(), List.of())));
-        tsp.points = List.of(
+        when(tsp.queryRange(anyLong(), any())).thenReturn(List.of(
                 new TimeSeriesPoint("dev-1", "temp", T0, 90, "GOOD"),
                 new TimeSeriesPoint("dev-1", "temp", T0.plusSeconds(60), 95, "GOOD"),
-                new TimeSeriesPoint("dev-1", "temp", T0.plusSeconds(120), 99, "GOOD"));
+                new TimeSeriesPoint("dev-1", "temp", T0.plusSeconds(120), 99, "GOOD")));
         when(emqxRuleTest.matches(anyString(), anyString(), anyString())).thenReturn(true);
 
         SimResult r = sim.simulate(42L, "rule-temp", window(1));
@@ -146,7 +146,7 @@ class RuleSimulatorImplTest {
         stubDeviceList(deviceRow("dev-1", "iot-1", "pk-air"));
         when(productAccessor.getSchema("pk-air")).thenReturn(Optional.of(new ProductSchema(
                 List.of(new PropertyDef("temp", "float", true, "°C", Map.of())), List.of(), List.of())));
-        tsp.points = List.of();
+        when(tsp.queryRange(anyLong(), any())).thenReturn(List.of());
 
         SimResult r = sim.simulate(42L, "rule-temp", window(100));
 
@@ -206,29 +206,4 @@ class RuleSimulatorImplTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
-    /** Minimal in-test TimeSeriesPort: only queryRange is exercised. */
-    static final class FakeTimeSeriesPort implements com.auraboot.framework.plugin.extension.iot.TimeSeriesPort {
-        List<TimeSeriesPoint> points = List.of();
-
-        @Override
-        public void writeBatch(long tenantId, List<TimeSeriesPoint> points) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public List<TimeSeriesPoint> queryLatest(long tenantId, String deviceCode, List<String> codes, int limit) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public List<TimeSeriesPoint> queryRange(long tenantId, QueryParams.Range params) {
-            return points;
-        }
-
-        @Override
-        public List<com.auraboot.framework.plugin.extension.iot.AggregatedPoint> queryAggregate(
-                long tenantId, QueryParams.Aggregate params) {
-            throw new UnsupportedOperationException();
-        }
-    }
 }
