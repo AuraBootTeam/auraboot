@@ -171,7 +171,7 @@ test.describe('PCBA quote minimal create regression', () => {
   test.describe.configure({ timeout: 120_000 });
 
   test.beforeEach(async ({ page }) => {
-    await ensureTenantAdminRegisteredPermissions(page, ['qo.quote.read', 'qo.quote.create', 'qo.quote.manage', 'qo.price.manage']);
+    await ensureTenantAdminRegisteredPermissions(page, ['qo.cap.read', 'qo.cap.write']);
   });
 
   test('Q01-02 creates customer and linked project inside quote reference dropdowns', async ({ page }, testInfo) => {

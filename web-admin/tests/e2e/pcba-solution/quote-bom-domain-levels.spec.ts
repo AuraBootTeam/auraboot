@@ -104,20 +104,16 @@ test.describe('BOM & Quote domain levels', () => {
           selectedMenuPids: snapshot.navigation.selectedMenuPids,
         },
       });
-      // Model a historical role with one extra release/approval atom, not a complete manager.
-      const legacySnapshot = await unwrap(await page.request.get(draftUrl));
-      const legacyCode = domain === 'bom' ? 'bom.structure.release' : 'qo.quote.approve';
-      const legacyAction = legacySnapshot.matrix.modules
+      // Retired operations must be absent after the explicit release-data upgrade.
+      const upgradedSnapshot = await unwrap(await page.request.get(draftUrl));
+      const retiredCodes = domain === 'bom'
+        ? ['bom.structure.release', 'bom.project.manage']
+        : ['qo.quote.approve', 'qo.quote.manage'];
+      const registeredCodes = upgradedSnapshot.matrix.modules
         .flatMap((m: any) => m.resources)
         .flatMap((resource: any) => resource.actions)
-        .find((action: any) => action.code === legacyCode);
-      expect(legacyAction?.permissionPid).toBeTruthy();
-      const heldPids = await unwrap(await page.request.get(`/api/roles/${role.pid}/permissions`));
-      await unwrap(
-        await page.request.post(`/api/roles/${role.pid}/permissions`, {
-          data: [...heldPids, legacyAction.permissionPid],
-        }),
-      );
+        .map((action: any) => action.code);
+      for (const code of retiredCodes) expect(registeredCodes).not.toContain(code);
       const baselineSnapshot = await unwrap(await page.request.get(draftUrl));
       const baselineScopes = baselineSnapshot.scopes;
       const baseline = policyState(baselineSnapshot);
@@ -201,7 +197,7 @@ test.describe('BOM & Quote domain levels', () => {
         await page.getByTestId('role-search-input').fill(role.code);
         await page.getByTestId(`role-item-${role.code}`).click();
         await page.getByTestId('permission-right-tab-capabilities').click();
-        // Retained legacy atoms are data-policy references and cannot contribute operation authority.
+        // Removed operation atoms must not appear as legacy operation authority.
         await expect(page.getByTestId(`domain-legacy-${domain}.cap.read`)).toHaveCount(0);
         await expect(
           page.getByTestId(`domain-legacy-${domain === 'bom' ? 'qo' : 'bom'}.cap.read`),
