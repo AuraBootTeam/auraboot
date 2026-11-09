@@ -25,7 +25,11 @@ def check_file(path):
             issues.append(f'{tname}: missing updated_by column')
         if 'tenant_id' not in cols_lower:
             issues.append(f'{tname}: missing tenant_id column')
-        if 'pid' not in cols_lower.split(','):
+        # A pid COLUMN is 'pid <type> ...' — a bare-word equality split() missed every
+        # typed declaration (pid VARCHAR(32) NOT NULL UNIQUE) and false-positived whole
+        # schemas (all 27 edu mt_xy_* tables carry pid; the core baseline was inflated
+        # by the same bug). Also require a word boundary so e.g. 'xpid' does not match.
+        if not any(re.match(r'\s*pid\s+\S', col) for col in cols_lower.split(',')):
             issues.append(f'{tname}: missing pid column')
 
     drops = re.findall(r'DROP (?:TABLE|COLUMN)\s+\w+', content, re.I)
