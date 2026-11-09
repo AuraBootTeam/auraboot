@@ -217,6 +217,29 @@ if ! run_flyway validate > "$ARTIFACTS/flyway-validate.log" 2>&1; then
   exit 1
 fi
 
+# Migration convention gate (P6 follow-up): the committed baseline holds the accepted
+# historical debt (1057 legacy violations); only NEW violations block the run. The
+# ratchet reports fixed entries so the baseline can shrink monotonically.
+if ! python3 "$SCRIPT_DIR/check-migration-conventions.py" \
+    "$PROJECT_ROOT/platform/src/main/resources/db/migration/core" \
+    --baseline-file "$SCRIPT_DIR/migration-conventions-baseline.txt" \
+    > "$ARTIFACTS/migration-conventions.log" 2>&1; then
+  printf '[oss-backend-unit-ci] product-failure: new migration convention violations (see %s)\n' "$ARTIFACTS/migration-conventions.log" >&2
+  exit 1
+fi
+
+# Ledger reconciliation (P6 follow-up): every migration file must be registered in the
+# freshly-applied ledger — catches naming drift and directory/ledger divergence early.
+if ! docker compose "${COMPOSE_ARGS[@]}" exec -T postgres \
+  psql -U auraboot -d aura_boot -tA -c "SELECT DISTINCT version FROM ab_flyway_schema_history WHERE version IS NOT NULL ORDER BY 1" \
+  > "$ARTIFACTS/ledger-versions.txt" 2> "$ARTIFACTS/ledger-query.log" \
+  || ! python3 "$SCRIPT_DIR/reconcile-migration-ledger.py" \
+    "$PROJECT_ROOT/platform/src/main/resources/db/migration/core" "$ARTIFACTS/ledger-versions.txt" \
+    > "$ARTIFACTS/ledger-reconcile.log" 2>&1; then
+  printf '[oss-backend-unit-ci] product-failure: migration ledger reconciliation failed (see %s)\n' "$ARTIFACTS/ledger-reconcile.log" >&2
+  exit 1
+fi
+
 # Bootstrap never resets shared-suite fixtures or bypasses immutable binding guards.
 BOOTSTRAP_DATABASE="aura_boot_bootstrap_${RUNTIME_TOKEN//-/_}"
 if ! docker compose "${COMPOSE_ARGS[@]}" exec -T postgres \

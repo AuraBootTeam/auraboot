@@ -34,18 +34,52 @@ def check_file(path):
 
     return issues
 
-if __name__ == '__main__':
-    target_dir = sys.argv[1] if len(sys.argv) > 1 else '.'
-    all_issues = []
+def issue_lines(target_dir):
+    """Every current violation as its stable 'file: issue' identity line."""
+    lines = []
     for root, dirs, files in os.walk(target_dir):
         for f in sorted(files):
             if not f.endswith('.sql'): continue
             path = os.path.join(root, f)
             for issue in check_file(path):
-                all_issues.append(f'{f}: {issue}')
-    if all_issues:
-        for i in all_issues: print(f'  ⚠️  {i}')
-        print(f'\n{len(all_issues)} convention issue(s) found')
+                lines.append(f'{f}: {issue}')
+    return lines
+
+if __name__ == '__main__':
+    args = sys.argv[1:]
+    target_dir = args[0] if args else '.'
+    baseline_file = None
+    if '--baseline-file' in args:
+        baseline_file = args[args.index('--baseline-file') + 1]
+    current = issue_lines(target_dir)
+    if '--write-baseline' in args:
+        # Self-generate the accepted-debt baseline in the exact identity format the
+        # ratchet compares — no manual reformatting, no prefix drift.
+        with open(baseline_file, 'w', encoding='utf-8') as out:
+            out.write('\n'.join(current) + ('\n' if current else ''))
+        print(f'baseline written: {len(current)} accepted issue(s) -> {baseline_file}')
+        sys.exit(0)
+    if baseline_file:
+        # Ratchet: the committed baseline holds the accepted historical debt; only
+        # violations NOT in the baseline block CI. Ratcheting down is encouraged —
+        # the script reports how many accepted issues were fixed so the baseline
+        # can be regenerated and the debt shrinks monotonically.
+        baseline = set()
+        if os.path.exists(baseline_file):
+            baseline = {line.rstrip('\n') for line in open(baseline_file, encoding='utf-8') if line.strip()}
+        regressions = sorted(set(current) - baseline)
+        fixed = sorted(baseline - set(current))
+        for i in regressions: print(f'  🚫 NEW violation: {i}')
+        if fixed:
+            print(f'  ✅ {len(fixed)} accepted issue(s) fixed since baseline — regenerate the baseline to shrink the debt')
+        if regressions:
+            print(f'\n{len(regressions)} NEW convention violation(s) (baseline holds {len(baseline)} accepted)')
+            sys.exit(1)
+        print(f'✅ No new migration convention violations (baseline holds {len(baseline)} accepted; {len(fixed)} fixed)')
+        sys.exit(0)
+    if current:
+        for i in current: print(f'  ⚠️  {i}')
+        print(f'\n{len(current)} convention issue(s) found')
         sys.exit(1)
     else:
         print('✅ All migrations pass convention checks')
