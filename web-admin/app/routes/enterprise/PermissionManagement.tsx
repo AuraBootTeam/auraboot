@@ -33,6 +33,7 @@ import PermissionAuditTab from './permission/PermissionAuditTab';
 import type { Role } from './permission/types';
 import {
   isRecommendedBomRole,
+  localizedRoleText,
   recommendedBomRoleLabel,
   sortRolesForPermissionSetup,
 } from './permission/roleDisplayHelpers';
@@ -77,7 +78,7 @@ function RoleAccessDenied() {
 }
 
 function PermissionManagementContent() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { hasPermission, hasRole } = useAuth();
   const isTenantAdmin = hasRole('tenant_admin');
   const canManageRoles = isTenantAdmin && hasPermission('org.role.update');
@@ -409,7 +410,7 @@ function PermissionManagementContent() {
                         }`}
                       >
                         <td data-testid={`role-row-${role.code}`} className="max-w-0 px-3 py-2">
-                          <div className="flex items-center gap-2">
+                          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                             {role.type === 'SYSTEM' && (
                               <span
                                 className={`inline-flex flex-shrink-0 items-center rounded px-1 py-0.5 text-[10px] font-medium ${
@@ -420,17 +421,24 @@ function PermissionManagementContent() {
                               </span>
                             )}
                             <span
-                              className={`truncate text-sm font-medium ${
+                              className={`max-w-full truncate text-sm font-medium ${
                                 isDisabled
                                   ? 'text-gray-400 line-through'
                                   : 'text-gray-900 dark:text-gray-100'
                               }`}
                             >
-                              {role.name}
+                              {localizedRoleText(role, 'name', locale)}
                             </span>
                             {isRecommendedBomRole(role.code) && (
                               <span className="inline-flex flex-shrink-0 items-center rounded-full border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300">
-                                {recommendedBomRoleLabel(role.code)}
+                                {localizedRoleText(
+                                  {
+                                    ...role,
+                                    name: recommendedBomRoleLabel(role.code) ?? role.name,
+                                  },
+                                  'name',
+                                  locale,
+                                )}
                               </span>
                             )}
                           </div>
@@ -506,7 +514,7 @@ function PermissionManagementContent() {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-text-1 text-lg font-semibold break-words">
-                  {selectedRole.name}
+                  {localizedRoleText(selectedRole, 'name', locale)}
                 </h2>
                 <span
                   data-testid="role-summary-member-count"
@@ -535,7 +543,7 @@ function PermissionManagementContent() {
                   data-testid="role-summary-description"
                   className="text-text-2 mt-1 max-w-3xl text-xs break-words"
                 >
-                  {selectedRole.description}
+                  {localizedRoleText(selectedRole, 'description', locale)}
                 </p>
               )}
               <p className="text-text-2 mt-1 max-w-3xl text-xs">
