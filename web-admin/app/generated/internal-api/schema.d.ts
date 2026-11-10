@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 1f6f6c1db1bf70fbccc64143c6db99af23345bf9288603eb2d77fc7fe7a2a6d8
+ * Contract SHA-256: 3e0d83a42ac278ba6d70fd55861b85fb419196a4ac55b3d70c096242b7602213
  */
 export interface paths {
     "/api/activities": {
@@ -5317,7 +5317,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["observe"];
+        post: operations["observe_1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -16263,6 +16263,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/notifications/wechat-subscription/observations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["observe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/wechat-subscription/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["templates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/observability/correlation/{traceId}": {
         parameters: {
             query?: never;
@@ -24607,6 +24639,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseCatalog: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["Catalog"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseCategory: {
             code?: string;
             context?: unknown;
@@ -27968,6 +28008,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseRecorded: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["Recorded"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseRecordShareAccessResponse: {
             code?: string;
             context?: unknown;
@@ -29604,6 +29652,9 @@ export interface components {
             label?: string;
             value?: string;
         };
+        Catalog: {
+            records?: components["schemas"]["Template"][];
+        };
         Category: {
             categoryType?: string;
             code?: string;
@@ -29814,6 +29865,10 @@ export interface components {
             order?: number | null;
             scope?: string | null;
             teamId?: string | null;
+        };
+        Choice: {
+            status: string;
+            templateId: string;
         };
         ClientConfig: {
             components?: components["schemas"]["ComponentConfig"][];
@@ -38244,6 +38299,10 @@ export interface components {
             recordState?: string;
             tabs?: components["schemas"]["TabCapability"][];
         };
+        Recorded: {
+            delivered?: boolean;
+            recorded?: boolean;
+        };
         RecordShareAccessResponse: {
             canRead?: boolean;
             canUpdate?: boolean;
@@ -40198,6 +40257,11 @@ export interface components {
             name?: string;
             status?: string;
         };
+        Template: {
+            kind?: string;
+            templateId?: string;
+            type?: string;
+        };
         TemplateDef: {
             category?: string;
             description?: string;
@@ -41117,6 +41181,10 @@ export interface components {
             code?: string;
             displayName?: string;
             inviteCode?: string;
+        };
+        WechatSubscriptionObservationRequest: {
+            idempotencyKey: string;
+            results: components["schemas"]["Choice"][];
         };
         WindowMetrics: {
             baseline?: components["schemas"]["ArmMetrics"];
@@ -49603,7 +49671,7 @@ export interface operations {
             };
         };
     };
-    observe: {
+    observe_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -68787,6 +68855,50 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseMapStringObject"];
+                };
+            };
+        };
+    };
+    observe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WechatSubscriptionObservationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseRecorded"];
+                };
+            };
+        };
+    };
+    templates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseCatalog"];
                 };
             };
         };

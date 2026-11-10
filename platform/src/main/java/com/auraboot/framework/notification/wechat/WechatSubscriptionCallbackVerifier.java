@@ -93,6 +93,10 @@ public final class WechatSubscriptionCallbackVerifier {
         if (signature == null || !signature.matches("[0-9a-f]{40}")) throw rejected("CALLBACK_SIGNATURE_INVALID");
         Arrays.sort(parts);
         try {
+            // WeChat requires SHA-1 over the sorted token/timestamp/nonce/ciphertext tuple.
+            // This private protocol verifier cannot choose SHA-256; its published WeChat vector is tested.
+            // https://developers.weixin.qq.com/miniprogram/dev/framework/server-ability/message-push.html
+            // codeql[java/weak-cryptographic-algorithm] Required WeChat wire signature only, not application password or integrity hashing.
             byte[] expected = MessageDigest.getInstance("SHA-1")
                     .digest(String.join("", parts).getBytes(StandardCharsets.UTF_8));
             if (!MessageDigest.isEqual(expected, HexFormat.of().parseHex(signature))) {
