@@ -1,3 +1,6 @@
+import type { components } from '~/generated/internal-api/schema';
+import { resolveCommandErrorMessage } from '~/framework/meta/utils/commandResponseErrors';
+import ImportWarnings from './ImportWarnings';
 /**
  * Installed tab — manage locally installed plugins.
  *
@@ -9,6 +12,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import IMPORT_TEXT from './InstalledTab.i18n.json';
 import {
   PuzzlePieceIcon,
   ArrowUpTrayIcon,
@@ -42,19 +47,9 @@ export interface PluginRecord {
   compatibilityMessage?: string;
 }
 
-interface ImportPreviewResult {
-  importId: string;
-  pluginId: string;
-  namespace: string;
-  version: string;
-  displayName: string;
-  valid: boolean;
-  isUpgrade: boolean;
-  previousVersion?: string;
-  errors: string[];
-  warnings: string[];
-  actionCounts: Record<string, Record<string, number>>;
-}
+type ImportPreviewResult = Required<Pick<components['schemas']['ImportPreviewResult'],
+  'importId' | 'pluginId' | 'namespace' | 'version' | 'displayName' | 'valid' | 'upgrade' | 'errors' | 'warnings' | 'actionCounts'
+>> & Pick<components['schemas']['ImportPreviewResult'], 'previousVersion'>;
 
 interface Props {
   onCountChange?: (count: number) => void;
@@ -63,7 +58,8 @@ interface Props {
 
 export default function InstalledTab({ onCountChange, onImportSuccess }: Props) {
   const { showErrorToast } = useToastContext();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const text = (key: keyof typeof IMPORT_TEXT) => getLocalizedText(IMPORT_TEXT[key], locale);
 
   const [plugins, setPlugins] = useState<PluginRecord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -73,6 +69,7 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [previewResult, setPreviewResult] = useState<ImportPreviewResult | null>(null);
+  const [outcome, setOutcome] = useState<{ success: boolean; warnings: string[]; preservedCount?: number; error?: string } | null>(null);
   const [selectedPlugin, setSelectedPlugin] = useState<PluginRecord | null>(null);
 
   const fetchPlugins = useCallback(async () => {
@@ -106,6 +103,10 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
       });
       if (response.ok) {
         const apiResponse = await response.json();
+        if (apiResponse.code !== undefined && String(apiResponse.code) !== '0') {
+          showErrorToast(apiResponse.message || text('failed'));
+          return;
+        }
         const result: ImportPreviewResult = apiResponse.data ?? apiResponse;
         setPreviewResult(result);
         setShowUploadModal(false);
@@ -127,19 +128,26 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
         method: 'post',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          conflictStrategy: 'overwrite',
+          conflictStrategy: 'overwrite_safe',
           autoDeployProcesses: false,
           autoPublishPages: false,
         }),
       });
-      if (response.ok) {
+      const envelope = await response.json();
+      const result = envelope.data ?? envelope;
+      if (response.ok && (envelope.code === undefined || String(envelope.code) === '0') && result.success !== false) {
+        const counts = Object.values(result.resourceCounts ?? {}) as Array<Record<string, number>>;
+        const preservedCount = counts.reduce((total, entry) => total + (entry.skip ?? entry.SKIP ?? 0), 0);
+        setOutcome({ success: true, warnings: result.warnings ?? [], preservedCount });
         setShowPreviewModal(false);
         setPreviewResult(null);
         fetchPlugins();
         onImportSuccess?.();
       } else {
-        const error = await response.json();
-        showErrorToast(`Import failed: ${error.desc || error.message || 'Unknown error'}`);
+        const message = result.errorMessage || resolveCommandErrorMessage(envelope, 'plugin.import', undefined, locale, text('failed'));
+        setOutcome({ success: false, warnings: [], error: message });
+        setShowPreviewModal(false);
+        showErrorToast(message);
       }
     } finally {
       setUploading(false);
@@ -237,6 +245,21 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
 
   return (
     <div>
+      {outcome && (
+        <section role="status" className={`mb-5 rounded-xl border p-5 ${outcome.success ? 'border-blue-200 bg-blue-50/50' : 'border-red-200 bg-red-50/50'}`}>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="font-semibold text-gray-900">{text(outcome.success ? 'completed' : 'failed')}</h3>
+              <p className="mt-1 text-sm text-gray-600">{text(outcome.success ? ((outcome.warnings.length || outcome.preservedCount) ? 'preserved' : 'safeHint') : 'failureHint')}</p>
+            </div>
+            <button type="button" onClick={() => setOutcome(null)} className="shrink-0 text-sm text-gray-600 hover:text-gray-900">{text('close')}</button>
+          </div>
+          {!!outcome.preservedCount && <p className="mt-3 text-sm font-medium text-blue-900">{text('preservedCountLabel')}：{outcome.preservedCount}</p>}
+          {outcome.error && <p className="mt-3 text-sm text-red-700">{outcome.error}</p>}
+          {outcome.warnings.length > 0 && <ImportWarnings warnings={outcome.warnings} />}
+        </section>
+      )}
+
       {/* Action bar */}
       <div className="mb-4 flex justify-end gap-2">
         <button
@@ -364,7 +387,7 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
 
       {/* Upload Modal */}
       {showUploadModal && (
-        <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
           <div className="mx-4 w-full max-w-md rounded-lg bg-white shadow-xl">
             <div className="border-b border-gray-200 px-6 py-4">
               <h3 className="text-lg font-medium text-gray-900">{t('plugin.upload.title')}</h3>
@@ -406,7 +429,7 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
 
       {/* Preview Modal */}
       {showPreviewModal && previewResult && (
-        <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
           <div className="mx-4 flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-xl">
             <div className="border-b border-gray-200 px-6 py-4">
               <h3 className="text-lg font-medium text-gray-900">{t('plugin.preview.title')}</h3>
@@ -431,7 +454,7 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
                     <span className="text-gray-500">{t('plugin.column.namespace')}</span>
                     <span className="font-mono text-sm">{previewResult.namespace}</span>
                   </div>
-                  {previewResult.isUpgrade && (
+                  {previewResult.upgrade && (
                     <div className="flex justify-between">
                       <span className="text-gray-500">{t('plugin.preview.upgradeFrom')}</span>
                       <span>{previewResult.previousVersion}</span>
@@ -460,28 +483,22 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
                     <ExclamationTriangleIcon className="h-4 w-4" />
                     {t('plugin.preview.warnings')}
                   </h4>
-                  <ul className="space-y-1 rounded-lg bg-yellow-50 p-4 text-sm text-yellow-700">
-                    {previewResult.warnings.map((warning, i) => (
-                      <li key={i}>• {warning}</li>
-                    ))}
-                  </ul>
+                  <ImportWarnings warnings={previewResult.warnings} />
                 </div>
               )}
 
+              <div className="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <h4 className="text-sm font-semibold text-blue-900">{text('safeTitle')}</h4>
+                <p className="mt-1 text-sm text-blue-800">{text('safeHint')}</p>
+              </div>
               {Object.keys(previewResult.actionCounts).length > 0 && (
                 <div>
                   <h4 className="mb-2 text-sm font-medium text-gray-700">{t('plugin.preview.actionsToPlan')}</h4>
                   <div className="grid grid-cols-2 gap-2 rounded-lg bg-gray-50 p-4 text-sm">
-                    {Object.entries(previewResult.actionCounts).map(([type, actions]) => (
-                      <div key={type} className="flex justify-between">
-                        <span className="text-gray-500">{type}</span>
-                        <span className="font-medium">
-                          {Object.entries(actions).map(([action, count]) => (
-                            <span key={action} className="ml-2">
-                              {action}: {count}
-                            </span>
-                          ))}
-                        </span>
+                    {Object.entries(previewResult.actionCounts).map(([action, count]) => (
+                      <div key={action} className="flex justify-between gap-4">
+                        <span className="text-gray-500">{text(action in IMPORT_TEXT ? action as keyof typeof IMPORT_TEXT : 'plannedAction')}</span>
+                        <span className="font-medium">{count}</span>
                       </div>
                     ))}
                   </div>
@@ -505,7 +522,7 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
               >
                 {uploading
                   ? t('plugin.import.importing')
-                  : previewResult.isUpgrade
+                  : previewResult.upgrade
                     ? t('plugin.import.confirmUpgrade')
                     : t('plugin.import.confirmInstall')}
               </button>
@@ -516,7 +533,7 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
 
       {/* Detail Modal */}
       {showDetailModal && selectedPlugin && (
-        <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
           <div className="mx-4 w-full max-w-lg rounded-lg bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h3 className="text-lg font-medium text-gray-900">{t('plugin.detail.title')}</h3>

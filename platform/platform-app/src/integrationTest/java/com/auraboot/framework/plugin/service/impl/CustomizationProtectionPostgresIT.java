@@ -16,7 +16,7 @@ import com.auraboot.framework.plugin.mapper.PluginResourceMapper;
 import com.auraboot.framework.plugin.service.PluginResourceTracker;
 import com.auraboot.framework.versioning.service.VersionHistoryService;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
-import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean;
+import com.baomidou.mybatisplus.spring.MybatisSqlSessionFactoryBean;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.junit.jupiter.api.*;

@@ -23,6 +23,7 @@ import {
   RuntimeRichTextPreview,
   RuntimeSelectionInfoPreview,
   RuntimeStatCardPreview,
+  RuntimeTextPreview,
   RuntimeToolbarPreview,
   RuntimeTraceGraphPreview,
 } from './RuntimeContentPreviews';
@@ -287,6 +288,8 @@ export function RuntimeBlock({ block, runtimeServices, pageContext, blockPath }:
       return <RuntimeTraceGraphPreview block={block} />;
     case 'selection-info':
       return <RuntimeSelectionInfoPreview block={block} />;
+    case 'text':
+      return <RuntimeTextPreview block={block} />;
     case 'gerber-viewer':
       return <RuntimeGerberViewerPreview block={block} />;
     default: {

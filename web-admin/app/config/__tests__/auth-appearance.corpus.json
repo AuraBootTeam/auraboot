@@ -462,5 +462,68 @@
       "defaultLocale": "zh-CN",
       "helpUrl": "https://asset s.example.com/image.png"
     }
+  },
+  {
+    "name": "beams effect",
+    "valid": true,
+    "value": {
+      "version": 1,
+      "template": "background",
+      "defaultLocale": "zh-CN",
+      "images": {
+        "mode": "background",
+        "backgroundUrl": "/brand/campus.webp"
+      },
+      "effects": {
+        "mode": "beams"
+      }
+    }
+  },
+  {
+    "name": "aurora effect",
+    "valid": true,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "effects": {
+        "mode": "aurora"
+      }
+    }
+  },
+  {
+    "name": "empty effects object",
+    "valid": true,
+    "value": {
+      "version": 1,
+      "template": "centered",
+      "defaultLocale": "zh-CN",
+      "effects": {}
+    }
+  },
+  {
+    "name": "unknown effect mode",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "effects": {
+        "mode": "particles"
+      }
+    }
+  },
+  {
+    "name": "unknown effects key",
+    "valid": false,
+    "value": {
+      "version": 1,
+      "template": "split",
+      "defaultLocale": "zh-CN",
+      "effects": {
+        "mode": "beams",
+        "speed": 2
+      }
+    }
   }
 ]

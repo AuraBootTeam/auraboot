@@ -19,7 +19,7 @@ import static com.auraboot.framework.openplatform.service.OpenApiResourceContrac
 import static org.assertj.core.api.Assertions.*;
 
 /** Real two-source SQL, token/installation grants, source pinning and authenticated public HTTP. */
-@org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
+@org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 class OpenApiQueryIntegrationTest extends BaseIntegrationTest {
     @Autowired private com.auraboot.framework.plugin.service.impl.PluginPublicPublicationLifecycle pluginPublications;
     @Autowired private com.auraboot.framework.plugin.service.PluginImportService pluginImports;

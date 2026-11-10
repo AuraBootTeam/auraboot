@@ -7,7 +7,7 @@ import com.auraboot.framework.plugin.extension.approval.ApprovalContract;
 import com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
-import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
+import org.springframework.boot.servlet.autoconfigure.MultipartProperties;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.util.unit.DataSize;
 import java.util.Map;

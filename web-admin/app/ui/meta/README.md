@@ -1,3 +1,8 @@
+---
+type: system-reference
+status: active
+---
+
 # Metadata field authoring
 
 Creating a field from the model's field-selection dialog requires two different values:

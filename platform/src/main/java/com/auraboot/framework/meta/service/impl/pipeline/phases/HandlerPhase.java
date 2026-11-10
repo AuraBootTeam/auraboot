@@ -612,6 +612,10 @@ public class HandlerPhase implements CommandPhase {
         }
 
         Map<String, Object> asyncHandlerParams = resolveHandlerParams(execConfig);
+        if (asyncHandlerParams.containsKey(com.auraboot.framework.plugin.pf4j.CommandCreatedDataAccessor.OPT_IN)
+                && (isAsyncHandler(asyncHandlerParams) || !secondaryHandlers.isEmpty())) {
+            throw new AccessDeniedException("Command-created models require one synchronous handler");
+        }
         if (Boolean.TRUE.equals(asyncHandlerParams.get(
                 com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.OPT_IN))
                 && isAsyncHandler(asyncHandlerParams)) {
@@ -651,8 +655,11 @@ public class HandlerPhase implements CommandPhase {
                 handlerCode, commandCode,
                 handler != null ? handler.getClass().getName() : "<none>", secondaryHandlers.size());
 
-        try (DynamicDataQueryScope queryScope = DynamicDataQueryScope.open()) {
-            var fileScope = commandTargetFiles == null ? null : commandTargetFiles.forCommand(pipelineContext);
+        try (DynamicDataQueryScope queryScope = DynamicDataQueryScope.open();
+             var commandCreates = com.auraboot.framework.plugin.pf4j.CommandCreatedDataAccessor.open(
+                     dynamicDataService, metaModelService, pipelineContext, objectMapper)) {
+            var fileScope = commandTargetFiles == null ? null : commandCreates == null ? commandTargetFiles.forCommand(pipelineContext)
+                    : commandTargetFiles.forCommand(pipelineContext, commandCreates);
             try (fileScope;
                  var sealedContentScope = sealedContentFactory == null ? null : sealedContentFactory.forCommand(pipelineContext);
                  var subjectScope = subjectAcknowledgements == null ? null : subjectAcknowledgements.forCommand(pipelineContext)) {
@@ -689,7 +696,7 @@ public class HandlerPhase implements CommandPhase {
                 com.auraboot.framework.plugin.pf4j.VerifiedPhoneGrantAccessorImpl.install(
                         pluginSettings, tenantId, userId, request.isDryRun(), wechatMiniIdentityService);
                 pluginSettings.put("__dataAccessor",
-                        com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
+                        commandCreates != null ? commandCreates : com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
                             ? new com.auraboot.framework.openplatform.service.InstalledMachineDataAccessor(dynamicDataService)
                             : new com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl(dynamicDataService));
                 if (commandExecutor != null && !com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()) {

@@ -36,6 +36,7 @@ frontend:
 config:
   importOrder:
     - core-meta
+    - page-manager
     - org-management
     - platform-admin
     - core-ownership

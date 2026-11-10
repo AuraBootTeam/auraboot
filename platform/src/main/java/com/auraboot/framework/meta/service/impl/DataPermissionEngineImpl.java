@@ -149,6 +149,11 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
     public String buildRequiredReadFilterForQuery(Long tenantId, String modelCode, Long userId,
             List<QueryCondition> conditions, String keyword) {
         if (!requiredReads.isConfigured(modelCode)) return "";
+        if (MachineDataAccessContext.isActive() && MachineDataAccessContext.requiredReferenceReadScope() != null) {
+            MachineDataAccessContext.requireDecision(modelCode).requireAction("read");
+            // This explicit path compiles bound machine constraints in the guard, never human defaults.
+            return requiredReads.sqlFilter(tenantId,modelCode,userId,"",false,conditions,keyword);
+        }
         String permit = CommandPermitDataAccess.rowFilter(modelCode, userId);
         return requiredReads.sqlFilter(tenantId, modelCode, userId,
                 permit != null ? permit : baseRowFilter(tenantId, modelCode, "read", userId), permit == null,conditions,keyword);

@@ -6,7 +6,7 @@
 <p align="center">
   <a href="LICENSE.txt"><img src="https://img.shields.io/badge/License-Apache_2.0_with_AuraBoot_supplements-blue.svg" alt="License"></a>
   <a href="#"><img src="https://img.shields.io/badge/Java-21-orange.svg" alt="Java 21"></a>
-  <a href="#"><img src="https://img.shields.io/badge/Spring_Boot-3.5-green.svg" alt="Spring Boot 3.5"></a>
+  <a href="#"><img src="https://img.shields.io/badge/Spring_Boot-4.1-green.svg" alt="Spring Boot 4.1"></a>
   <a href="#"><img src="https://img.shields.io/badge/React-19-blue.svg" alt="React 19"></a>
   <a href="#"><img src="https://img.shields.io/badge/PostgreSQL-16-336791.svg" alt="PostgreSQL"></a>
   <a href="https://github.com/AuraBootTeam/auraboot/stargazers"><img src="https://img.shields.io/github/stars/AuraBootTeam/auraboot?style=social" alt="GitHub Stars"></a>
@@ -109,15 +109,15 @@ Multi-channel notifications (email, in-app, webhook), event bus for cross-module
 ```bash
 git clone https://github.com/AuraBootTeam/auraboot.git
 cd auraboot
-cp .env.example .env
+test -f .env || cp .env.example .env
 chmod 600 .env
-# Generate once; keep this installation key in .env across restarts.
-printf 'OPEN_PLATFORM_PROTOCOL_SIGNING_KEY=%s\n' "$(openssl rand -hex 32)" >> .env
-docker compose --profile full up --build -d   # 2–4 min cold start
+# Prepare once; preserve existing installation keys across restarts.
+python3 scripts/prepare-quickstart-env.py --file .env
+docker compose --profile full up --build -d
 ./scripts/quickstart.sh                       # creates the admin, imports the plugins
 ```
 
-The `full` profile starts PostgreSQL + the Spring Boot backend + the Node BFF/SSR frontend. Cold start takes 2–4 minutes (the backend health check has a 120s start period).
+The `full` profile starts PostgreSQL + the Spring Boot backend + the Node BFF/SSR frontend. Wait for the backend to be healthy before initialization. Download/build time depends on your machine and network; the 120s health-check start period is not an installation-time guarantee.
 
 **`scripts/quickstart.sh` is not optional.** `docker compose up` starts the services and nothing else: it creates no admin user and imports no plugins. Without this step the login below fails with *"Invalid username or password"*, and even past it the platform has zero models and zero menus. The script is idempotent — run it again any time.
 
@@ -212,7 +212,7 @@ If you are working on AI features, run both `test` and `testAi`. The AI stack li
 | Layer | Technology |
 |---|---|
 | Language | Java 21, TypeScript |
-| Backend | Spring Boot 3.5, MyBatis-Plus, PF4J |
+| Backend | Spring Boot 4.1, MyBatis-Plus, PF4J |
 | Frontend | React 19, Tailwind CSS 4, React Router 7, Vite 8 |
 | Database | PostgreSQL 15+ (with pgvector) |
 | Cache | Redis 7+ |

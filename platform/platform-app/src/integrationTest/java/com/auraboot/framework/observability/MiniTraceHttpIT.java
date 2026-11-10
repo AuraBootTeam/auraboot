@@ -7,16 +7,16 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.SpringApplication;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
-import org.springframework.boot.autoconfigure.web.servlet.ServletWebServerFactoryAutoConfiguration;
-import org.springframework.boot.autoconfigure.web.servlet.DispatcherServletAutoConfiguration;
-import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
-import org.springframework.boot.autoconfigure.http.HttpMessageConvertersAutoConfiguration;
-import org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration;
-import org.springframework.boot.actuate.autoconfigure.observation.ObservationAutoConfiguration;
-import org.springframework.boot.actuate.autoconfigure.observation.web.servlet.WebMvcObservationAutoConfiguration;
-import org.springframework.boot.actuate.autoconfigure.tracing.MicrometerTracingAutoConfiguration;
-import org.springframework.boot.actuate.autoconfigure.opentelemetry.OpenTelemetryAutoConfiguration;
-import org.springframework.boot.actuate.autoconfigure.tracing.OpenTelemetryTracingAutoConfiguration;
+import org.springframework.boot.tomcat.autoconfigure.servlet.TomcatServletWebServerAutoConfiguration;
+import org.springframework.boot.webmvc.autoconfigure.DispatcherServletAutoConfiguration;
+import org.springframework.boot.webmvc.autoconfigure.WebMvcAutoConfiguration;
+import org.springframework.boot.http.converter.autoconfigure.HttpMessageConvertersAutoConfiguration;
+import org.springframework.boot.jackson2.autoconfigure.Jackson2AutoConfiguration;
+import org.springframework.boot.micrometer.observation.autoconfigure.ObservationAutoConfiguration;
+import org.springframework.boot.webmvc.autoconfigure.WebMvcObservationAutoConfiguration;
+import org.springframework.boot.micrometer.tracing.autoconfigure.MicrometerTracingAutoConfiguration;
+import org.springframework.boot.opentelemetry.autoconfigure.OpenTelemetrySdkAutoConfiguration;
+import org.springframework.boot.micrometer.tracing.opentelemetry.autoconfigure.OpenTelemetryTracingAutoConfiguration;
 import org.springframework.context.annotation.Import;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -78,11 +78,11 @@ class MiniTraceHttpIT {
     }
 
     @Configuration(proxyBeanMethods = false)
-    @ImportAutoConfiguration({ServletWebServerFactoryAutoConfiguration.class,
+    @ImportAutoConfiguration({TomcatServletWebServerAutoConfiguration.class,
         DispatcherServletAutoConfiguration.class, WebMvcAutoConfiguration.class,
-        HttpMessageConvertersAutoConfiguration.class, JacksonAutoConfiguration.class,
+        HttpMessageConvertersAutoConfiguration.class, Jackson2AutoConfiguration.class,
         ObservationAutoConfiguration.class, WebMvcObservationAutoConfiguration.class,
-        MicrometerTracingAutoConfiguration.class, OpenTelemetryAutoConfiguration.class,
+        MicrometerTracingAutoConfiguration.class, OpenTelemetrySdkAutoConfiguration.class,
         OpenTelemetryTracingAutoConfiguration.class})
     @Import({TraceIdResponseFilter.class, Probe.class})
     static class Config {}

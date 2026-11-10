@@ -14,6 +14,8 @@ export interface EngineResult {
   textSummary?: string;
   errorMessage?: string;
   durationMs?: number;
+  skillVersionLabel?: string;
+  trialAuditStatus?: string;
   toolCallCount?: number;
 }
 
@@ -86,6 +88,25 @@ export function SkillTrialResult({ result }: { result: EngineResult }) {
                 'Execution did not complete. Check inputs, permissions and tool configuration.',
               )}
       </p>
+      {result.skillVersionLabel && (
+        <p className="text-text-2 text-sm">
+          {label('version', '本次使用版本', 'Executed version')} {result.skillVersionLabel}
+        </p>
+      )}
+      {result.trialAuditStatus === 'unavailable' && (
+        <p role="alert" className="text-danger">
+          {label(
+            'auditUnavailable',
+            '运行回执未能记录，请核查执行结果，勿因此重跑写操作。',
+            'Execution receipt unavailable. Check the outcome; do not rerun writes because of this warning.',
+          )}
+        </p>
+      )}
+      {!successful && result.errorMessage && (
+        <p role="alert" className="text-danger">
+          {result.errorMessage}
+        </p>
+      )}
       {isQuery ? (
         <ChatBiResultCard result={query} />
       ) : (

@@ -261,7 +261,7 @@ class TypeHandlersAndInterceptorsTest {
                 MetaFieldMapper.class.getMethod("findCurrentByTenant"),
                 MetaFieldMapper.class.getMethod("findAllVersionsByCode", String.class),
                 MetaFieldMapper.class.getMethod("selectPageList", com.baomidou.mybatisplus.extension.plugins.pagination.Page.class,
-                        String.class, String.class, String.class, Boolean.class),
+                        String.class, String.class, String.class, Boolean.class, String.class),
                 MetaFieldMapper.class.getMethod("findByDataType", String.class),
                 MetaFieldMapper.class.getMethod("findByDataSource", Long.class),
                 MetaFieldMapper.class.getMethod("findByStatus", String.class),

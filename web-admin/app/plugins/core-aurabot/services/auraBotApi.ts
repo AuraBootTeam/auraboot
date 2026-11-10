@@ -211,6 +211,14 @@ export const auraBotApi = {
     return result.data;
   },
 
+  async getConversationExecution(conversationId: number): Promise<{ state: 'idle' | 'running'; startedAt?: string; phase?: string }> {
+    const response = await agentFetch(`${API_BASE_URL}/conversations/${conversationId}/execution`, { method: 'get', credentials: 'include' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const result = await response.json();
+    if (String(result.code) !== '0' || !['idle', 'running'].includes(result.data?.state)) throw new Error('Execution state unavailable');
+    return result.data;
+  },
+
   async getConversationMessages(conversationId: number): Promise<AuraBotConversationMessage[]> {
     const response = await agentFetch(
       `${API_BASE_URL}/conversations/${conversationId}/messages?limit=100`,
@@ -501,7 +509,7 @@ export const auraBotApi = {
       let fullContent = '';
       let buffer = '';
 
-      await processSSEStream(reader, decoder, buffer, fullContent, callbacks);
+      await processSSEStream(reader, decoder, buffer, fullContent, callbacks, Boolean(request.formFill));
     } catch (error) {
       callbacks.onError(formatFetchError(error, 'chat'));
     }
@@ -566,7 +574,9 @@ async function processSSEStream(
   buffer: string,
   fullContent: string,
   callbacks: ChatStreamOptions,
+  requireTerminal = false,
 ): Promise<void> {
+  let terminalReceived = false;
   let currentEvent = '';
   let traceId: string | undefined;
 
@@ -665,6 +675,7 @@ async function processSSEStream(
                 );
                 break;
               case 'done':
+                terminalReceived = true;
                 if (typeof data.content === 'string' && data.content) {
                   fullContent = fullContent || data.content;
                 }
@@ -698,6 +709,10 @@ async function processSSEStream(
     reader.releaseLock();
   }
 
+  if (requireTerminal && !terminalReceived) {
+    callbacks.onError('$i18n:aurabot.formFill.failed', traceId);
+    return;
+  }
   callbacks.onDone(fullContent, traceId);
 }
 

@@ -22,7 +22,7 @@ export async function handleLegacySessionMigration(
     return res.status(403).json({ migrated: false });
   }
   const authorization = req.get('authorization') || '';
-  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  const match = authorization.match(/^Bearer[ \t]+([A-Za-z0-9._~+\/-]+=*)[ \t]*$/i);
   if (!match?.[1]) {
     return res.status(401).json({ migrated: false });
   }

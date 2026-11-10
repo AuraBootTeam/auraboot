@@ -157,6 +157,19 @@ vi.mock('~/framework/meta/rendering/ControlledFieldRenderer', () => ({
 }));
 
 describe('RecursiveBlockRenderer', () => {
+  it('renders native text content as escaped text rather than executable markup', () => {
+    const content = '<img src=x onerror="window.__securityText=1">';
+    const schema: PageSchemaV3 = {
+      schemaVersion: 3, id: 'native-text-list', kind: 'list', blocks: [{
+        id: 'list', blockType: 'list', blocks: [{ id: 'selection-note', blockType: 'text', props: { content } }],
+      }],
+    };
+    const { container } = render(<RecursiveBlockRenderer schema={schema} />);
+    expect(screen.getByTestId('runtime-text-selection-note')).toHaveTextContent(content);
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('[onerror]')).toBeNull();
+  });
+
   it('renders a PageSchema V3 composite page directly', () => {
     render(<RecursiveBlockRenderer schema={samplePageSchemaV3} />);
 

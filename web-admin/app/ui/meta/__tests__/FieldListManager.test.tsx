@@ -25,6 +25,7 @@ const fields: ModelFieldBinding[] = [
     required: false,
     pid: 'field-one',
     code: 'first',
+    displayName: '客户名称',
     fieldCode: 'first',
     dataType: 'string',
     displayOrder: 1,
@@ -61,6 +62,13 @@ describe('FieldListManager keyboard and permission boundaries', () => {
   beforeEach(() => {
     permissions.clear();
     vi.restoreAllMocks();
+  });
+
+  it('shows business labels while keeping complete technical codes available', () => {
+    fixture();
+    expect(screen.getByText('客户名称')).toBeVisible();
+    expect(screen.getByTitle('first')).toHaveTextContent('first');
+    expect(screen.getByTitle('second')).toHaveTextContent('second');
   });
 
   it('activates the real keyboard sensor and cancels without saving', async () => {

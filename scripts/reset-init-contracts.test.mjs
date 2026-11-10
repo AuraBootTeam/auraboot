@@ -702,6 +702,8 @@ test('per-plugin mapping is admitted before HTTP and applies only to the exact m
   const other=JSON.parse(call('request','/plugins/category',planned.stdout).stdout);
   assert.equal(Object.hasOwn(other,'identifierMappingPath'),false);
   assert.equal(target.deferReferenceValidation,true);
+  assert.equal(target.autoPublishPages,true, "Shared runtime imports must publish navigable pages");
+  assert.equal(other.autoPublishPages,true);
   assert.deepEqual(Object.keys(target).sort(),['autoPublishCommands','autoPublishFields','autoPublishModels','autoPublishPages','conflictStrategy','deferReferenceValidation','identifierMappingPath','path'].sort());
   for(const specs of [
     ['','com.example.missing=/mapping.json'],

@@ -238,6 +238,7 @@ public class PageSchemaController {
     @DeleteMapping("/{pid}")
     @Operation(summary = "删除页面配置", description = "软删除指定的页面配置")
     @RequirePermission(MetaPermission.PAGE_SCHEMA_MANAGE)
+    @Transactional
     public ApiResponse<Void> delete(
             @Parameter(description = "页面配置PID") @PathVariable String pid,
             @Parameter(hidden = true) @CurrentUserId Long userId) {

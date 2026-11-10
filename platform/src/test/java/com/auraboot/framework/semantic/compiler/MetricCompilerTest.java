@@ -395,6 +395,24 @@ class MetricCompilerTest {
     // ---- 14. order by + limit/offset -----------------------------------------
 
     @Test
+    void orderFieldInjectionIsRejectedAndDirectionCannotBecomeSql() {
+        for (String field : List.of("total_sales\"; DROP TABLE orders; --", "total_sales DESC", "region; SELECT 1")) {
+            SemanticQueryRequest request = req();
+            request.setMetrics(List.of("total_sales"));
+            request.setDimensions(List.of("region"));
+            request.setOrder(List.of(new SemanticQueryRequest.OrderBy(field, "desc")));
+            assertThatThrownBy(() -> compiler.compile(salesModel, request, user))
+                    .isInstanceOf(MetricCompileException.class)
+                    .extracting("errorCode").isEqualTo("UNKNOWN_METRIC");
+        }
+        SemanticQueryRequest request = req();
+        request.setMetrics(List.of("total_sales"));
+        request.setOrder(List.of(new SemanticQueryRequest.OrderBy("total_sales", "DESC; DROP TABLE orders")));
+        CompiledQuery compiled = compiler.compile(salesModel, request, user);
+        assertThat(compiled.getSql()).contains("ORDER BY \"sales.total_sales\" ASC").doesNotContain("DROP");
+    }
+
+    @Test
     void order_limit_offset_appear_in_sql() {
         SemanticQueryRequest r = req();
         r.setMetrics(List.of("total_sales"));

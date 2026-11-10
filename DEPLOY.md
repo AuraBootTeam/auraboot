@@ -32,10 +32,10 @@ git clone https://github.com/AuraBootTeam/auraboot.git
 cd auraboot
 
 # Configure the installation environment
-cp .env.example .env
+test -f .env || cp .env.example .env
 chmod 600 .env
-# Generate once; keep this installation key in .env across restarts.
-printf 'OPEN_PLATFORM_PROTOCOL_SIGNING_KEY=%s\n' "$(openssl rand -hex 32)" >> .env
+# Prepare once; preserve existing installation keys across restarts.
+python3 scripts/prepare-quickstart-env.py --file .env
 # Edit .env with other settings (change JWT_SECRET for production).
 
 # Start the full stack (first run builds images — allow 5-10 min)
@@ -87,8 +87,8 @@ curl -O https://raw.githubusercontent.com/AuraBootTeam/auraboot/main/docker-comp
 curl -O https://raw.githubusercontent.com/AuraBootTeam/auraboot/main/scripts/quickstart.sh
 
 # On first installation, create a persistent protocol signing key.
-# Keep .env across restarts; do not regenerate this key on every start.
-printf 'OPEN_PLATFORM_PROTOCOL_SIGNING_KEY=%s\n' "$(openssl rand -hex 32)" >> .env
+# Keep .env across restarts; this preserves existing signing material.
+python3 scripts/prepare-quickstart-env.py --file .env
 
 # Pull + start (backend + frontend + postgres, all prebuilt)
 docker compose -f docker-compose.pull.yml up -d

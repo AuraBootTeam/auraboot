@@ -8,6 +8,7 @@ import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.organization.service.OrganizationService;
 import com.auraboot.framework.permission.engine.model.DataScopeCondition;
 import com.auraboot.framework.permission.entity.RoleDataScope;
+import com.auraboot.framework.permission.event.RolePermissionChangedEvent;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.permission.mapper.RoleDataScopeMapper;
@@ -15,6 +16,7 @@ import com.auraboot.framework.rbac.mapper.UserRoleMapper;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -84,6 +86,12 @@ class DataScopeServiceImplTest {
 
     @Mock
     private TenantMemberMapper tenantMemberMapper;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private DataScopeCacheEvictor dataScopeCacheEvictor;
 
     @Mock
     private OrganizationService organizationService;
@@ -513,6 +521,12 @@ class DataScopeServiceImplTest {
         verify(roleDataScopeMapper).updateById(captor.capture());
         assertThat(captor.getValue().getScopeType()).isEqualTo("all");
         assertThat(captor.getValue().getMergeStrategy()).isEqualTo("MAX");
+        verify(dataScopeCacheEvictor).evictAfterCommit();
+        ArgumentCaptor<RolePermissionChangedEvent> eventCaptor =
+                ArgumentCaptor.forClass(RolePermissionChangedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().getRoleId()).isEqualTo(7L);
+        assertThat(eventCaptor.getValue().getOperation()).isEqualTo("UPDATE");
     }
 
     @Test
@@ -526,6 +540,14 @@ class DataScopeServiceImplTest {
         assertThat(captor.getValue().getScopeType()).isEqualTo("self");
         assertThat(captor.getValue().getMergeStrategy()).isEqualTo("MAX"); // default
         assertThat(captor.getValue().getPid()).isNotBlank();
+        verify(dataScopeCacheEvictor).evictAfterCommit();
+    }
+
+    @Test
+    void invalidScopeNeverTouchesEvictionOrEventChannel() {
+        assertThatThrownBy(() -> service.setScope(100L, 7L, "quote", "read", "own", "MAX"))
+                .isInstanceOf(RootUnCheckedException.class);
+        verifyNoInteractions(dataScopeCacheEvictor, eventPublisher);
     }
 
     @Test
@@ -533,6 +555,8 @@ class DataScopeServiceImplTest {
         service.removeScope(100L, 7L, "model.user", "read");
 
         verify(roleDataScopeMapper).delete(any(LambdaQueryWrapper.class));
+        verify(dataScopeCacheEvictor).evictAfterCommit();
+        verify(eventPublisher).publishEvent(any(RolePermissionChangedEvent.class));
     }
 
     @Test
@@ -602,6 +626,21 @@ class DataScopeServiceImplTest {
         when(organizationService.getEmployeeByMemberPid("creator-member")).thenReturn(null, Map.of());
         assertThat(service.isCreatorInDepartments(77L, List.of("dept-a"))).isFalse();
         assertThat(service.isCreatorInDepartments(77L, List.of("dept-a"))).isFalse();
+    }
+
+    @Test
+    void resolveScopeCacheKeyEmbedsTheDataAccessEpoch() throws NoSuchMethodException {
+        var key = DataScopeServiceImpl.class
+                .getMethod("resolveScope", Long.class, String.class, String.class)
+                .getAnnotation(org.springframework.cache.annotation.Cacheable.class)
+                .key();
+        assertThat(key).contains("T(com.auraboot.framework.meta.cache.DataAccessCacheEpoch).current()");
+        // A permission-affecting event (PermissionCacheEvictionListener) advances the epoch,
+        // so the member-scoped condition key from before the event is never hit again even
+        // before the after-commit region eviction runs.
+        long before = com.auraboot.framework.meta.cache.DataAccessCacheEpoch.current();
+        long after = com.auraboot.framework.meta.cache.DataAccessCacheEpoch.bump();
+        assertThat(after).isGreaterThan(before);
     }
 
 }

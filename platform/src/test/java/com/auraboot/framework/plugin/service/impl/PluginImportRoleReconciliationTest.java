@@ -73,4 +73,13 @@ class PluginImportRoleReconciliationTest {
         verify(service, never()).reconcileRolePermissions(any(), anyLong());
         verifyNoInteractions(roles, permissions, bindings);
     }
+    // FIND_TENANT_DELEGATION: production resolves permissions tenant-scoped now; keep the
+    // legacy per-code stubs authoritative by delegating the scoped lookup to them.
+    {
+        when(permissions.findByTenantIdAndCode(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString()))
+            .thenAnswer(inv -> {
+                try { return permissions.findByCode(inv.getArgument(1)); }
+                catch (Exception absent) { throw absent; }
+            });
+    }
 }

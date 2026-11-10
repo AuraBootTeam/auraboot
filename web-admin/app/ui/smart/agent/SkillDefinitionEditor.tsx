@@ -13,6 +13,7 @@ import { usePermissions } from '~/contexts/AuthContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import { get, post } from '~/shared/services/http-client';
 import { SkillTrialResult, type EngineResult } from './SkillTrialResult';
+import { SkillGovernancePanel, type TrialDefinition } from './SkillGovernancePanel';
 import {
   bindSkill,
   editableSchema,
@@ -87,6 +88,10 @@ export function SkillDefinitionEditor({ runtime }: Props) {
   const [loadFailed, setLoadFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [managed, setManaged] = useState(false);
+  const [trialDefinition, setTrialDefinition] = useState<TrialDefinition>();
+  const [trialError, setTrialError] = useState(false);
+  const [governanceRevision, setGovernanceRevision] = useState(0);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const notify = (message: string) => {
@@ -118,6 +123,51 @@ export function SkillDefinitionEditor({ runtime }: Props) {
     ).every((control) => control.disabled || control.reportValidity());
   const canManage = hasPermission('acp_agent_skill');
   const canRun = hasPermission('acp.runtime.manage');
+  useEffect(() => {
+    let current = true;
+    setTrialDefinition(undefined);
+    setTrialError(false);
+    setConsent(false);
+    if (saved && canRun)
+      void get<TrialDefinition>(
+        `/api/agent/skills/${encodeURIComponent(saved.skill_code)}/trial-definition`,
+      )
+        .then((response) => {
+          if (!current) return;
+          if (String(response.code) === '0' && response.data) setTrialDefinition(response.data);
+          else setTrialError(true);
+        })
+        .catch(() => {
+          if (current) setTrialError(true);
+        });
+    return () => {
+      current = false;
+    };
+  }, [saved, canRun, managed, governanceRevision]);
+  const previousTrialHash = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const nextHash = trialDefinition?.definitionHash;
+    if (!nextHash) return;
+    if (previousTrialHash.current && previousTrialHash.current !== nextHash) {
+      setValues({});
+      setResult(undefined);
+    }
+    previousTrialHash.current = nextHash;
+    setConsent(false);
+  }, [trialDefinition]);
+  const trialSchema = inputSchema(
+    trialDefinition ? (trialDefinition.inputSchema ?? {}) : (saved?.skill_input_schema ?? {}),
+  );
+  const trialSupported =
+    trialDefinition?.available === true &&
+    !!trialDefinition.definitionHash &&
+    editableSchema(trialSchema) &&
+    ['template', 'sequential', 'orchestration'].includes(
+      trialDefinition
+        ? (trialDefinition.executionMode ?? 'template')
+        : (saved?.execution_mode ?? 'template'),
+    );
+  const trialFields = trialSupported ? fieldsFromSchema(trialSchema) : [];
   const canBind = hasPermission('acp_agent_definition');
   const supported =
     editableSchema(schema) &&
@@ -280,6 +330,7 @@ export function SkillDefinitionEditor({ runtime }: Props) {
       );
       setSaved(stored);
       setDraft(stored);
+      setGovernanceRevision((revision) => revision + 1);
       setSchema(inputSchema(stored.skill_input_schema));
       setDirty(false);
       setValues({});
@@ -362,9 +413,11 @@ export function SkillDefinitionEditor({ runtime }: Props) {
         post<EngineResult>(`/api/agent/skills/${encodeURIComponent(saved.skill_code)}/execute`, {
           input: values,
           userMessage: message,
+          expectedDefinitionHash: trialDefinition?.definitionHash,
         }),
       );
       setResult(output);
+      setGovernanceRevision((revision) => revision + 1);
     } catch (cause) {
       fail(cause);
     } finally {
@@ -406,7 +459,7 @@ export function SkillDefinitionEditor({ runtime }: Props) {
       {notice && (
         <p
           role="status"
-          className="rounded-control border-border bg-subtle text-text sticky top-4 z-10 border p-3 shadow-sm"
+          className="rounded-control border-border bg-subtle text-text border p-3 shadow-sm"
         >
           {notice}
         </p>
@@ -795,6 +848,16 @@ export function SkillDefinitionEditor({ runtime }: Props) {
           </button>
         </fieldset>
       </div>
+      {saved?.pid && canManage && !saved.is_builtin && (
+        <SkillGovernancePanel
+          pid={saved.pid}
+          dirty={dirty}
+          canPublish={canRun && !saved.is_builtin && !loadFailed}
+          revision={governanceRevision}
+          onManaged={setManaged}
+          onPublished={() => setGovernanceRevision((revision) => revision + 1)}
+        />
+      )}
       {section(
         label('colleagues', '绑定AI同事', 'Bind an AI colleague'),
         <>
@@ -857,19 +920,53 @@ export function SkillDefinitionEditor({ runtime }: Props) {
           <p className="text-text-2 text-sm">
             {label(
               'trialHelp',
-              '使用已保存且启用的版本。可能产生模型费用和真实业务操作；原有权限、确认与审批继续生效。本次结果在离开页面后清空。',
-              'Uses the saved active definition. Model costs and real effects are possible. Permissions, confirmation and approval remain enforced. Results clear when leaving this page.',
+              '使用当前生效快照；尚未纳管的技能沿用已保存且启用的定义。可能产生模型费用和真实业务操作；原有权限、确认与审批继续生效。运行身份和状态保留在上方回执中，不保存敏感输入与输出。',
+              'Uses the active snapshot, or the saved active legacy definition. Model costs and real effects are possible. Permissions, confirmation and approval remain enforced. Version and status receipts persist above without sensitive inputs or outputs.',
             )}
           </p>
+          {saved && canRun && !trialDefinition && !trialError && (
+            <p role="status">
+              {label(
+                'contractLoading',
+                '正在读取生效输入契约…',
+                'Loading the effective input contract…',
+              )}
+            </p>
+          )}
+          {trialError && (
+            <div role="alert">
+              <p>
+                {label(
+                  'contractFailed',
+                  '无法核对生效输入契约，本次试运行已禁用。',
+                  'Effective input contract unavailable. Trial execution is disabled.',
+                )}
+              </p>
+              <button
+                type="button"
+                className={BUTTON}
+                onClick={() => setGovernanceRevision((n) => n + 1)}
+              >
+                {label('contractReload', '重新核对生效契约', 'Reload effective contract')}
+              </button>
+            </div>
+          )}
+          {trialDefinition?.available === false && (
+            <p role="status">
+              {label(
+                'notActive',
+                '技能尚未生效，请启用原定义或评审发布草稿。',
+                'Skill is inactive. Activate the legacy definition or review and publish the draft.',
+              )}
+            </p>
+          )}
           <div>
             <fieldset
               ref={trial}
-              disabled={
-                busy || !saved || dirty || saved.skill_status !== 'active' || !canRun || !supported
-              }
+              disabled={busy || !saved || dirty || !canRun || !trialSupported}
               className="space-y-4"
             >
-              {fields.map((item) =>
+              {trialFields.map((item) =>
                 field(
                   item.title || item.name,
                   item.type === 'boolean' ? (

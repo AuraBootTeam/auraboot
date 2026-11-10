@@ -2,14 +2,14 @@ package com.auraboot.framework.application;
 
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 @SpringBootApplication(
     scanBasePackages = {"com.auraboot.framework", "com.auraboot.module"},
-    exclude = {RedisAutoConfiguration.class, RedisRepositoriesAutoConfiguration.class}
+    exclude = {DataRedisAutoConfiguration.class, DataRedisRepositoriesAutoConfiguration.class}
 )
 @MapperScan({
         // Covers all com.auraboot.framework.**.<anything>.mapper paths recursively,

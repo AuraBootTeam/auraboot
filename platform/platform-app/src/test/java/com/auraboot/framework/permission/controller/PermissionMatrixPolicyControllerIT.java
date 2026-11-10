@@ -115,7 +115,7 @@ class PermissionMatrixPolicyControllerIT extends BaseIntegrationTest {
 
         mvc().perform(put(policyUrl(permission))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(policyPayload("data.wd_req_days")))
+                        .content(versionedPolicyPayload(permission, "data.wd_req_days")))
                 .andExpect(status().isOk());
 
         JsonNode conditions = conditionsById(binding.getId());
@@ -132,7 +132,7 @@ class PermissionMatrixPolicyControllerIT extends BaseIntegrationTest {
 
         mvc().perform(put(policyUrl(permission))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(policyPayload("data.secret")))
+                        .content(versionedPolicyPayload(permission, "data.secret")))
                 .andExpect(status().isBadRequest());
 
         assertThat(conditionsById(binding.getId())).isNull();
@@ -151,7 +151,7 @@ class PermissionMatrixPolicyControllerIT extends BaseIntegrationTest {
 
         mvc().perform(put(policyUrl(permission))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(policyPayload("data.salary")))
+                        .content(versionedPolicyPayload(permission, "data.salary")))
                 .andExpect(status().isBadRequest());
 
         assertThat(conditionsById(binding.getId())).isNull();
@@ -225,6 +225,16 @@ class PermissionMatrixPolicyControllerIT extends BaseIntegrationTest {
         rolePermissionMapper.insert(rp);
         assertThat(rp.getId()).isNotNull();
         return rp;
+    }
+
+    private String versionedPolicyPayload(Permission permission, String fieldPath) throws Exception {
+        var read = mvc().perform(get(policyUrl(permission) + "/snapshot"))
+                .andExpect(status().isOk()).andReturn();
+        String revision = objectMapper.readTree(read.getResponse().getContentAsString())
+                .path("data").path("revision").asText();
+        assertThat(revision).isNotBlank();
+        return objectMapper.writeValueAsString(Map.of("expectedRevision", revision,
+                "values", objectMapper.readTree(policyPayload(fieldPath))));
     }
 
     private String policyPayload(String fieldPath) throws JsonProcessingException {

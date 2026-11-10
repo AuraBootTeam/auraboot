@@ -139,7 +139,9 @@ export function captureCoreWebInputs(repoRoot) {
     'Custom pnpm hooks require an explicit build-input contract');
   if(existsSync(path.join(repoRoot,'.npmrc')))need(!/^\s*(?:global-)?pnpmfile\s*=/mi.test(
     readRegularWebFile(path.join(repoRoot,'.npmrc')).bytes.toString('utf8')),'Custom pnpm hooks require an explicit build-input contract');
-  const tracked=new Set(execFileSync('git',['ls-files','-z'],{cwd:repoRoot,encoding:'utf8'}).split('\0').filter(Boolean));
+  const tracked=new Set(execFileSync('git',['ls-files','-z'],{
+    cwd:repoRoot,encoding:'utf8',maxBuffer:16*1024*1024,
+  }).split('\0').filter(Boolean));
   const entries=[];
   const walk=relative=>{
     if(!included(relative))return;

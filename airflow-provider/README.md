@@ -5,6 +5,8 @@ integrating AuraBoot data platform pipelines with Airflow DAGs.
 
 ## Installation
 
+Requires Python 3.11 or newer (Python 3.15 excluded, matching Airflow). The patched DNS dependency is included in the lockfile.
+
 ```bash
 pip install airflow-provider-auraboot
 ```

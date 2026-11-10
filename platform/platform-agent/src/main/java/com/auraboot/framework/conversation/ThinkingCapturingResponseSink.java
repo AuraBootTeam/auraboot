@@ -143,6 +143,22 @@ public class ThinkingCapturingResponseSink implements ResponseSink {
     }
 
     @Override
+    public void onWarnings(List<String> warnings) { delegate.onWarnings(warnings); }
+
+    @Override
+    public void onTurnBegin(String turnId, Long agentId, Long conversationId, Long replyToMessageId, Long initiatorUserId) {
+        delegate.onTurnBegin(turnId, agentId, conversationId, replyToMessageId, initiatorUserId);
+    }
+
+    @Override
+    public void onStreamEnd(String turnId, Long finalMessageId, Integer totalTokens) {
+        delegate.onStreamEnd(turnId, finalMessageId, totalTokens);
+    }
+
+    @Override
+    public void onTurnCancelled(String turnId) { delegate.onTurnCancelled(turnId); }
+
+    @Override
     public boolean isClientConnected() {
         return delegate.isClientConnected();
     }

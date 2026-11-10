@@ -13,7 +13,7 @@ import com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.context.ActiveProfiles;
@@ -43,7 +43,7 @@ class CommandTargetFileAppendIT {
     @Autowired DynamicDataService data;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactions;
-    @MockBean StorageProvider storage;
+    @MockitoBean StorageProvider storage;
     private final AtomicLong seq=new AtomicLong(System.currentTimeMillis());
     private String model, table, command;
 

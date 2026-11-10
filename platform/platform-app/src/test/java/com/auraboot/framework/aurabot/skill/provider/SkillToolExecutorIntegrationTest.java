@@ -18,7 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.HashSet;
@@ -55,7 +55,7 @@ class SkillToolExecutorIntegrationTest extends BaseIntegrationTest {
     @Autowired MetaModelService metaModelService;
     @Autowired DynamicDataMapper dynamicDataMapper;
 
-    @MockBean private UserPermissionService userPermissionService;
+    @MockitoBean private UserPermissionService userPermissionService;
 
     private final Set<String> currentPermissions = new HashSet<>();
     private String testModelCode;

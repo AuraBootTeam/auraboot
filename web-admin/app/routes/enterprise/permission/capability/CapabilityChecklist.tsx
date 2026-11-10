@@ -13,6 +13,8 @@ interface CapabilityChecklistProps {
   onRevokePartial?: (code: string) => void;
   onConfigureScope?: (capability: Capability) => void;
   scopeConfigurableCodes?: Set<string>;
+  onConfigurePolicy?: (capability: Capability) => void;
+  policyConfigurableCodes?: Set<string>;
 }
 
 /**
@@ -30,6 +32,8 @@ export default function CapabilityChecklist({
   onRevokePartial,
   onConfigureScope,
   scopeConfigurableCodes,
+  onConfigurePolicy,
+  policyConfigurableCodes,
 }: CapabilityChecklistProps) {
   const { t, locale } = useI18n();
   const selectedSet = new Set(selected);
@@ -173,6 +177,20 @@ export default function CapabilityChecklist({
                           </button>
                         )}
                     </span>
+                    {onConfigurePolicy && policyConfigurableCodes?.has(cap.code) && (
+                      <button
+                        type="button"
+                        data-testid={`capability-policy-configure-${cap.code}`}
+                        onClick={() => onConfigurePolicy(cap)}
+                        className="text-accent text-left text-xs hover:underline"
+                      >
+                        {t(
+                          'admin.permission.capability.rules',
+                          undefined,
+                          locale?.startsWith('zh') ? '业务规则' : 'Business rules',
+                        )}
+                      </button>
+                    )}
                     {onConfigureScope && scopeConfigurableCodes?.has(cap.code) && (
                       <button
                         type="button"

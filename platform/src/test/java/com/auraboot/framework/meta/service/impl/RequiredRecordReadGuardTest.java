@@ -36,6 +36,106 @@ class RequiredRecordReadGuardTest {
         when(permissions.canAction(43L,"fixture_member","read")).thenReturn(true);
         when(data.getById(eq("fixture_member"),anyString())).thenReturn(Map.of("pid",id(1)));
     }
+    com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal machine() {
+        MetaContext.setContext(7L,0L,"installation:installed","Installed");MetaContext.setMemberId(null);
+        return new com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal(7L,"installed","Installed",java.util.Set.of(),"app","installed",null,null);
+    }
+    Map<String,com.auraboot.framework.application.security.MachineDataAccessContext.Decision> machineReads(boolean edge,boolean target) {
+        var root=new com.auraboot.framework.application.security.MachineDataAccessContext.Decision(7L,"installed","fixture_bundle",java.util.Set.of("read"),
+                edge?java.util.Set.of("pid","members"):java.util.Set.of("pid"),java.util.Set.of(),List.of(
+                new com.auraboot.framework.application.security.MachineDataAccessContext.Constraint("pid","pid",List.of(id(9)))));
+        var member=new com.auraboot.framework.application.security.MachineDataAccessContext.Decision(7L,"installed","fixture_member",java.util.Set.of("read"),java.util.Set.of("pid"),java.util.Set.of(),List.of());
+        return target?Map.of("fixture_bundle",root,"fixture_member",member):Map.of("fixture_bundle",root);
+    }
+    @Test void legacyMachineReadScopeStillRejectsHumanReferencePolicies() {
+        var principal=machine();
+        try(var request=com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal);
+            var approved=com.auraboot.framework.application.security.MachineDataAccessContext.authorize(machineReads(true,true))) {
+            assertThatThrownBy(()->guard.require("fixture_bundle",root(9,id(1)))).isInstanceOf(AccessDeniedException.class);
+        }verifyNoInteractions(data,permissions);
+    }
+    @Test void explicitMachineClosureUsesItsOwnDecisionsWithoutBorrowingHumanPermissions() {
+        var principal=machine();when(data.getById("fixture_member",id(1))).thenReturn(root(1));
+        try(var request=com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal);
+            var approved=com.auraboot.framework.application.security.MachineDataAccessContext.authorizeRequiredReferenceReads(machineReads(true,true))) {
+            guard.require("fixture_bundle",root(9,id(1)));verify(data).getById("fixture_member",id(1));
+        }verifyNoInteractions(permissions);
+    }
+    @Test void machineClosureRequiresBothReadableEdgesAndEveryTargetModelDecision() {
+        var principal=machine();
+        for(var grants:List.of(machineReads(false,true),machineReads(true,false))) {
+            try(var request=com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal);
+                var approved=com.auraboot.framework.application.security.MachineDataAccessContext.authorizeRequiredReferenceReads(grants)) {
+                assertThatThrownBy(()->guard.require("fixture_bundle",root(9,id(1)))).isInstanceOf(AccessDeniedException.class);
+            }
+        }verifyNoInteractions(data,permissions);
+    }
+    @Test void machineClosureRetainsRootConstraintsAndEveryActualReferenceDenial() {
+        var principal=machine();when(data.getById("fixture_member",id(1))).thenThrow(new AccessDeniedException("Current target denied"));
+        try(var request=com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal);
+            var approved=com.auraboot.framework.application.security.MachineDataAccessContext.authorizeRequiredReferenceReads(machineReads(true,true))) {
+            assertThatThrownBy(()->guard.require("fixture_bundle",root(10,id(1)))).isInstanceOf(AccessDeniedException.class);
+            verifyNoInteractions(data);assertThatThrownBy(()->guard.require("fixture_bundle",root(9,id(1)))).isInstanceOf(AccessDeniedException.class);
+            verify(data).getById("fixture_member",id(1));
+        }verifyNoInteractions(permissions);
+    }
+    @Test void machineCandidateCompilerConstrainsTheSameRootAndDoesNotUseHumanDomains() {
+        var principal=machine();when(rows.selectByQuery(anyString(),anyMap())).thenAnswer(call->{
+            assertThat((Map<String,Object>)call.getArgument(1)).containsValue(id(9));return List.of(root(9,id(1)));
+        });when(data.getById("fixture_member",id(1))).thenReturn(root(1));
+        try(var request=com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal);
+            var approved=com.auraboot.framework.application.security.MachineDataAccessContext.authorizeRequiredReferenceReads(machineReads(true,true))) {
+            assertThat(guard.sqlFilter(7L,"fixture_bundle",0L,"")).contains(id(9));
+        }verifyNoInteractions(permissions,domains);
+    }
+    @Test void machineScopeReplacementEvenWithEquivalentDecisionsInvalidatesTraversal() {
+        var principal=machine();var grants=machineReads(true,true);
+        var changed=new java.util.concurrent.atomic.AtomicReference<com.auraboot.framework.application.security.MachineDataAccessContext.Scope>();
+        when(data.getById("fixture_member",id(1))).thenAnswer(call->{changed.set(com.auraboot.framework.application.security.MachineDataAccessContext.authorizeRequiredReferenceReads(grants));return root(1);});
+        try(var request=com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal);
+            var approved=com.auraboot.framework.application.security.MachineDataAccessContext.authorizeRequiredReferenceReads(grants)) {
+            try {assertThatThrownBy(()->guard.require("fixture_bundle",root(9,id(1)))).isInstanceOf(AccessDeniedException.class);}
+            finally {if(changed.get()!=null)changed.get().close();}
+        }
+    }
+    @Test void temporarilyBroadenedAndRestoredMachineReadCannotBorrowTargetAuthority() {
+        var principal=machine();var grants=new java.util.HashMap<>(machineReads(true,true));
+        var target=new com.auraboot.framework.application.security.MachineDataAccessContext.Decision(7L,"installed","fixture_member",java.util.Set.of("read"),java.util.Set.of("pid"),java.util.Set.of(),List.of(
+                new com.auraboot.framework.application.security.MachineDataAccessContext.Constraint("pid","pid",List.of(id(2)))));
+        grants.put("fixture_member",target);
+        when(data.getById("fixture_member",id(1))).thenAnswer(call->{
+            try(var borrowed=com.auraboot.framework.application.security.MachineDataAccessContext.authorizeRequiredReferenceReads(machineReads(true,true))) {
+                return root(1);
+            }
+        });
+        try(var request=com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal);
+            var approved=com.auraboot.framework.application.security.MachineDataAccessContext.authorizeRequiredReferenceReads(grants)) {
+            assertThatThrownBy(()->guard.require("fixture_bundle",root(9,id(1)))).isInstanceOf(AccessDeniedException.class);
+        }
+    }
+    @Test void nativePermissionEngineRoutesExplicitMachineReadsToBoundConstraintsWithoutHumanDenyAll() {
+        var principal=machine();
+        var engine=new DataPermissionEngineImpl(mock(com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper.class),
+                mock(com.auraboot.framework.permission.engine.evaluator.DataScopeEvaluator.class),
+                mock(com.auraboot.framework.permission.engine.evaluator.RecordShareEvaluator.class),new com.fasterxml.jackson.databind.ObjectMapper(),guard);
+        when(rows.selectByQuery(anyString(),anyMap())).thenAnswer(call->{
+            assertThat((String)call.getArgument(0)).doesNotContain("1 = 0");
+            assertThat((Map<String,Object>)call.getArgument(1)).containsValue(id(9));return List.of(root(9,id(1)));
+        });when(data.getById("fixture_member",id(1))).thenReturn(root(1));
+        try(var request=com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal);
+            var approved=com.auraboot.framework.application.security.MachineDataAccessContext.authorizeRequiredReferenceReads(machineReads(true,true))) {
+            assertThat(engine.buildRequiredReadFilterForQuery(7L,"fixture_bundle",0L,List.of(),null)).contains(id(9));
+            doReturn(List.of(root(10,id(1)))).when(rows).selectByQuery(anyString(),anyMap());
+            assertThat(engine.buildRequiredReadFilterForQuery(7L,"fixture_bundle",0L,List.of(),null)).isEqualTo("AND 1 = 0");
+            verify(data,times(1)).getById("fixture_member",id(1));
+            try(var missing=com.auraboot.framework.application.security.MachineDataAccessContext.authorizeRequiredReferenceReads(Map.of())) {
+                assertThatThrownBy(()->engine.buildRequiredReadFilterForQuery(7L,"fixture_bundle",0L,List.of(),null)).isInstanceOf(AccessDeniedException.class);
+            }
+            try(var legacy=com.auraboot.framework.application.security.MachineDataAccessContext.authorizeWithoutRequiredReferenceReads(machineReads(true,true))) {
+                assertThatThrownBy(()->engine.buildRequiredReadFilterForQuery(7L,"fixture_bundle",0L,List.of(),null)).isInstanceOf(AccessDeniedException.class);
+            }
+        }
+    }
     void diamond(boolean immutable, String sourceType) {
         var branch=RequiredReadReferencesTest.model(10); branch.setCode("fixture_member");
         branch.setExtension(Map.of(RequiredReadReferences.KEY,Map.of("version",1,"maxCandidateRecords",10,"minimumReferences",1,
@@ -381,5 +481,12 @@ class RequiredRecordReadGuardTest {
         when(rows.selectByQuery(anyString(),anyMap())).thenReturn(List.of(record));
         assertThatThrownBy(()->guard.sqlFilter(7L,"fixture_bundle",42L,"")).isInstanceOf(MetaServiceException.class).hasMessageContaining("budget");
         verifyNoInteractions(data);
+    }
+    @Test void v2MutableOwnerRetainsEveryCurrentPermissionCheckAndNeverCarriesTerminalProofAcrossReads() {
+        when(models.getModelDefinition("fixture_bundle")).thenReturn(Optional.of(RequiredReadReferencesTest.mutableDocument()));
+        allow();guard.require("fixture_bundle",root(9,id(1)));
+        doThrow(new AccessDeniedException("revoked")).when(data).getById("fixture_member",id(1));
+        assertThatThrownBy(()->guard.require("fixture_bundle",root(9,id(1)))).isInstanceOf(AccessDeniedException.class);
+        verify(data,times(2)).getById("fixture_member",id(1));
     }
 }

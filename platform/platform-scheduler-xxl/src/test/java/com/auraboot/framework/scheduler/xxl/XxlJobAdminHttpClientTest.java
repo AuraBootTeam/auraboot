@@ -4,6 +4,8 @@ import com.auraboot.framework.exception.BusinessException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -38,10 +40,12 @@ class XxlJobAdminHttpClientTest {
         properties.setExecutorAppName("auraboot-platform");
     }
 
-    @Test
-    void upsertJob_createsGroupInsertsJobAndStartsIt() {
+    @ParameterizedTest
+    @CsvSource({"300000,300", "1,1", "1000,1", "1001,2", "0,0", "-1,0", "9223372036854775807,2147483647"})
+    void upsertJob_createsGroupInsertsJobAndStartsIt(long timeoutMs, int expectedSeconds) {
         XxlJobAdminHttpClient client = new XxlJobAdminHttpClient(properties, restTemplate, new ObjectMapper());
         XxlJobAdminRequest request = cronRequest();
+        request.setTimeoutMs(timeoutMs);
 
         expectLogin();
         expectPost("/jobgroup/pageList", formContains("appname=auraboot-platform"))
@@ -67,7 +71,7 @@ class XxlJobAdminHttpClientTest {
                 "scheduleConf=0+0+2+*+*+%3F+*",
                 "executorHandler=aurabootScheduledTaskJob",
                 "executorFailRetryCount=2",
-                "executorTimeout=300"
+                "executorTimeout=" + expectedSeconds
         )).andRespond(withSuccess("""
                 {"code":200,"msg":"Success","data":"501"}
                 """, MediaType.APPLICATION_JSON));

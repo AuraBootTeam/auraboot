@@ -65,4 +65,57 @@ class IdempotencyCachedReadTest {
         phase(service,mock(RecordActionScopeAccessor.class),scope).execute(c);assertThat(c.getShortCircuitResult()).isNull();
         verifyNoInteractions(scope);
     }
+    static Map<String,Object> collectionParams() {
+        return Map.of("invocationAuthorization","handler-with-result-reads","cachedResultReadReferences",List.of(
+                Map.of("model","fixture_task","path","run.taskPids","many",true,"maxItems",1000,"countPath","run.nodeCount")));
+    }
+    @Test void boundedCompleteCollectionRechecksEveryCurrentTaskAndRejectsAnyRevocation() {
+        String other="01M5Z215Q89MM18DCZ00000002";
+        var result=Map.<String,Object>of("run",Map.of("taskPids",List.of(PID,other),"nodeCount",2));
+        var reads=mock(RecordActionScopeAccessor.class);when(reads.permits("fixture_task",PID,"read")).thenReturn(true);
+        when(reads.permits("fixture_task",other,"read")).thenReturn(true);
+        var scope=mock(CommandRecordActionScopeAccessorFactory.InvocationScope.class);var phase=phase(cached(result),reads,scope);
+        var first=context(collectionParams());phase.execute(first);assertThat(first.getShortCircuitResult().getData()).isEqualTo(result);
+        when(reads.permits("fixture_task",other,"read")).thenReturn(false);
+        var revoked=context(collectionParams());assertThatThrownBy(()->phase.execute(revoked)).isInstanceOf(AccessDeniedException.class);
+        assertThat(revoked.getShortCircuitResult()).isNull();verify(reads,times(2)).permits("fixture_task",other,"read");
+    }
+    @Test void collectionRejectsMissingLastTaskDuplicatesWrongTypesAndEmptySetsBeforePermissionChecks() {
+        for(Object value:List.of(List.of(PID),List.of(PID,PID),List.of(),List.of(PID,17),List.of(List.of(PID)),"[\""+PID+"\"]")) {
+            var result=Map.<String,Object>of("run",Map.of("taskPids",value,"nodeCount",2));
+            var reads=mock(RecordActionScopeAccessor.class);var scope=mock(CommandRecordActionScopeAccessorFactory.InvocationScope.class);
+            var c=context(collectionParams());assertThatThrownBy(()->phase(cached(result),reads,scope).execute(c)).isInstanceOf(AccessDeniedException.class);
+            assertThat(c.getShortCircuitResult()).isNull();verifyNoInteractions(reads);
+        }
+    }
+    @Test void malformedCollectionDeclarationsFailBeforeClaimingAnyRequest() {
+        var valid=new java.util.LinkedHashMap<String,Object>(Map.of("model","fixture_task","path","run.taskPids","many",true,"maxItems",1000,"countPath","run.nodeCount"));
+        for(String variant:List.of("count","max","shape","wildcard","duplicate")) {
+            var declaration=new java.util.LinkedHashMap<>(valid);
+            switch(variant){case "count" -> declaration.remove("countPath");case "max" -> declaration.put("maxItems",1001);case "shape" -> declaration.put("many",false);case "duplicate" -> declaration.put("maxItems",999);default -> declaration.put("path","run.tasks[*].pid");}
+            var descriptors=variant.equals("duplicate")?List.of(valid,declaration):List.of(declaration);
+            var parameters=Map.<String,Object>of("invocationAuthorization","handler-with-result-reads","cachedResultReadReferences",descriptors);
+            var service=mock(IdempotencyService.class);var scope=mock(CommandRecordActionScopeAccessorFactory.InvocationScope.class);
+            assertThatThrownBy(()->phase(service,mock(RecordActionScopeAccessor.class),scope).execute(context(parameters))).isInstanceOf(AccessDeniedException.class);verifyNoInteractions(service);
+        }
+    }
+    @Test void collectionCountMustBeExactPositiveIntegerAndCannotExceedDeclaredBound() {
+        for(Object count:List.of(0,-1,1,2.5,"2",1001)) {
+            var result=Map.<String,Object>of("run",Map.of("taskPids",List.of(PID,"01M5Z215Q89MM18DCZ00000002"),"nodeCount",count));
+            var reads=mock(RecordActionScopeAccessor.class);var scope=mock(CommandRecordActionScopeAccessorFactory.InvocationScope.class);
+            var c=context(collectionParams());assertThatThrownBy(()->phase(cached(result),reads,scope).execute(c)).isInstanceOf(AccessDeniedException.class);verifyNoInteractions(reads);
+        }
+        var ids=java.util.stream.IntStream.range(0,1001).mapToObj(i->PID.substring(0,PID.length()-8)+String.format("%08d",i)).toList();
+        var reads=mock(RecordActionScopeAccessor.class);var scope=mock(CommandRecordActionScopeAccessorFactory.InvocationScope.class);
+        assertThatThrownBy(()->phase(cached(Map.of("run",Map.of("taskPids",ids,"nodeCount",1001))),reads,scope).execute(context(collectionParams()))).isInstanceOf(AccessDeniedException.class);verifyNoInteractions(reads);
+    }
+    @Test void aggregateCollectionBudgetIsValidatedBeforeTheFirstPermissionDecision() {
+        var refs=new java.util.ArrayList<Map<String,Object>>();var run=new java.util.LinkedHashMap<String,Object>();run.put("count",1000);
+        var ids=java.util.stream.IntStream.range(0,1000).mapToObj(i->PID.substring(0,PID.length()-8)+String.format("%08d",i)).toList();
+        for(int i=0;i<5;i++){refs.add(Map.of("model","fixture_task","path","run.tasks"+i,"many",true,"maxItems",1000,"countPath","run.count"));run.put("tasks"+i,ids);}
+        var parameters=Map.<String,Object>of("invocationAuthorization","handler-with-result-reads","cachedResultReadReferences",refs);
+        var reads=mock(RecordActionScopeAccessor.class);var scope=mock(CommandRecordActionScopeAccessorFactory.InvocationScope.class);
+        var c=context(parameters);assertThatThrownBy(()->phase(cached(Map.of("run",run)),reads,scope).execute(c)).isInstanceOf(AccessDeniedException.class);
+        assertThat(c.getShortCircuitResult()).isNull();verifyNoInteractions(reads);verify(scope).close();
+    }
 }

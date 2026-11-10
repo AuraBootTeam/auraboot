@@ -124,7 +124,7 @@ test.describe('QuoteOps corrected BOM upload golden', () => {
       const materialRow = page.getByRole('row').filter({ hasText: path.basename(workbookPath) });
       await expect(materialRow).toBeVisible();
       const uploadedAt = materialRow.getByRole('cell').nth(4);
-      await expect(uploadedAt).toHaveText(/\d{4}\/\d{1,2}\/\d{1,2}\s+\d{1,2}:\d{2}:\d{2}/);
+      await expect(uploadedAt).toHaveText(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
       await expect(uploadedAt).not.toContainText(/\d{4}-\d{2}-\d{2}T/);
 
       const originalLink = materialRow.getByRole('link', { name: '下载文件', exact: true });

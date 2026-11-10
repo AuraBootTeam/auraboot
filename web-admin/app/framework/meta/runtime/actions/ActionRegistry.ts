@@ -1,3 +1,4 @@
+import { loadCommandInputSource, snapshotCommandInputValue } from './commandInputSource';
 import { mergeCommandInputPayload } from '~/framework/meta/utils/commandInputPayload';
 import {
   createPromptSubmissionFeedback,
@@ -1668,7 +1669,20 @@ export function downloadBase64CommandArtifact(value: any): boolean {
  */
 actionRegistry.register(
   'command.execute',
-  async ({ args, fetchResult, token, expressionEvaluator, expressionContext, t, locale }) => {
+  async ({
+    args: originalArgs,
+    fetchResult,
+    token,
+    expressionEvaluator,
+    expressionContext,
+    t,
+    locale,
+  }) => {
+    const remoteInput = originalArgs?.inputFieldsSource !== undefined;
+    const args = remoteInput ? snapshotCommandInputValue(originalArgs) : originalArgs;
+    const inputContext = remoteInput
+      ? snapshotCommandInputValue(expressionContext ?? {})
+      : (expressionContext ?? {});
     if (!fetchResult) {
       console.error('[ActionRegistry] command.execute: fetchResult not provided');
       return;
@@ -1718,22 +1732,40 @@ actionRegistry.register(
 
     mergeCommandInputPayload(payload, {}, args?.inputFieldsPayloadKey);
     const submissionFeedback = createPromptSubmissionFeedback({ t, locale });
+    let inputFields = args?.inputFields,
+      inputSignal: AbortSignal | undefined;
     try {
+      if (remoteInput) {
+        const source = expressionEvaluator
+          ? expressionEvaluator.evaluateObject(args?.inputFieldsSource, inputContext)
+          : args?.inputFieldsSource;
+        const loaded = await loadCommandInputSource(source, payload, fetchResult, {
+          staticFields: args?.inputFields,
+          token,
+          t,
+          locale,
+        });
+        inputFields = loaded.fields;
+        payload = loaded.payload;
+        inputSignal = loaded.signal;
+        mergeCommandInputPayload(payload, {}, args?.inputFieldsPayloadKey);
+      }
       // inputFields sugar: pop a small form (reusing FormDialog) to collect a few
       // fields, then merge the collected values into the command payload. Lets a DSL
       // page express "click button → small form → submit command" in one action,
       // without a page-specific React component. User cancel aborts (no submit).
-      if (Array.isArray(args?.inputFields) && args.inputFields.length > 0) {
+      if (Array.isArray(inputFields) && inputFields.length > 0) {
         const collected = await promptInputForm(
-          args.inputFields,
+          inputFields,
           args?.inputFieldsTitle,
           fetchResult,
           args?.inputFieldsSubmitLabel,
-          (expressionContext as Record<string, unknown> | undefined) ?? {},
+          inputContext,
           { t, locale },
           args.inputFieldsPresentation,
-          undefined,
+          inputSignal,
           submissionFeedback,
+          { bindingsResolved: remoteInput },
         );
         payload = mergeCommandInputPayload(payload, collected, args?.inputFieldsPayloadKey);
       }

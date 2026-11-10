@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -40,7 +40,7 @@ class FileRetentionDeletionRaceIT {
     @Autowired private FileService fileService;
     @Autowired private JdbcTemplate jdbcTemplate;
 
-    @MockBean private StorageProvider storageProvider;
+    @MockitoBean private StorageProvider storageProvider;
 
     private final AtomicLong sequence = new AtomicLong();
 

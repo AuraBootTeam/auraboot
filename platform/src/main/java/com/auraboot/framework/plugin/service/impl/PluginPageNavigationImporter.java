@@ -142,6 +142,18 @@ final class PluginPageNavigationImporter {
                     "Menu '" + dto.getCode() + "' has dynamic path '" + path
                     + "' but missing pageKey. Add pageKey to menus.json.");
         }
+        // Validate: a declared pageKey is the routing contract. The web runtime serves DSL
+        // pages at /p/<pageKey>; a menu path that disagrees silently 404s for everyone the
+        // menu reaches (the 2026-11-05 score-import finding). Fail the import instead.
+        if (dto.getPageKey() != null && !dto.getPageKey().isBlank()
+                && path != null && !path.isBlank()
+                && dto.getType() != null && dto.getType() == 2
+                && !path.equals("/p/" + dto.getPageKey())) {
+            throw new PluginException(
+                    "Menu '" + dto.getCode() + "' declares pageKey '" + dto.getPageKey()
+                    + "' but path '" + path + "' does not match the page route '/p/"
+                    + dto.getPageKey() + "'. Align the menu path with its pageKey in menus.json.");
+        }
 
         boolean exists = facadeReceiver.checkMenuExists(tenantId, dto.getCode());
 
@@ -407,12 +419,32 @@ final class PluginPageNavigationImporter {
             updateReq.setLayoutConfig(layoutConfigNode);
             updateReq.setWidgets(widgetsNode);
             updateReq.setExtension(extensionNode);
-            dashboardService.update(existing.getPid(), updateReq);
-            // Symmetry with the create path: update() only touches the working
-            // draft, so a re-imported dashboard would otherwise keep serving
-            // the stale published layout while the import reports success.
-            if (!"draft".equals(dto.getEffectiveStatus())) {
-                dashboardService.publish(existing.getPid());
+            try {
+                dashboardService.update(existing.getPid(), updateReq);
+                // Symmetry with the create path: update() only touches the working
+                // draft, so a re-imported dashboard would otherwise keep serving
+                // the stale published layout while the import reports success.
+                if (!"draft".equals(dto.getEffectiveStatus())) {
+                    dashboardService.publish(existing.getPid());
+                }
+            } catch (com.auraboot.framework.exception.ValidationException denied) {
+                // Global-flagged dashboards carry an ownership guard: a tenant that did not
+                // create the dashboard and holds no dashboard:manage permission must not
+                // rewrite it. That guard exists precisely for governed imports like this one
+                // (a fan-out into a school tenant used to abort the WHOLE tenant import here),
+                // so degrade to a read-only reference: keep the existing row untouched and
+                // record the skip instead of failing the import.
+                if (denied.getResponseCode() != com.auraboot.framework.common.constant.ResponseCode.FORBIDDEN) {
+                    throw denied;
+                }
+                log.warn("Dashboard '{}' is global-flagged and the importing context may not rewrite it — "
+                                + "kept the existing row as a read-only reference: code={}, pid={}",
+                        PluginImportSupport.logSafe(dto.getCode()),
+                        PluginImportSupport.logSafe(dto.getCode()), PluginImportSupport.logSafe(existing.getPid()));
+                return createResourceRecord(pluginPid, importId, tenantId, ResourceType.DASHBOARD,
+                        existing.getPid(), null, dto.getCode(), dto.getTitle(),
+                        ResourceAction.SKIP, null,
+                        Map.of("skipReason", "global dashboard ownership guard — kept read-only reference"));
             }
             log.info("Dashboard updated from config/dashboards/: code={}, pid={}",
                     PluginImportSupport.logSafe(dto.getCode()), PluginImportSupport.logSafe(existing.getPid()));

@@ -11,11 +11,10 @@ installBrowserTracing(
 
 installRouteRequestDiagnostics();
 
-// PDA offline shell (WMS D3): ServiceWorker registration + offline replay
-// executor. Best-effort — unsupported browsers and failed registrations
-// degrade silently (never blocks hydration).
+// Preserve shared static/offline shell registration. Inventory replay is owned
+// by the authenticated PDA route lifecycle, not every application page.
 import('./shared/pda/offlineReplay')
-  .then((m) => m.startPdaOfflineShell())
+  .then((m) => m.registerServiceWorker())
   .catch((err) => console.warn('[pda-offline] shell start failed', err));
 
 startTransition(() => {

@@ -20,6 +20,25 @@ import org.junit.jupiter.api.Test;
 class TDengineTimeSeriesPortUnitTest {
 
     @Test
+    void unsafeInlineTagsAreRejectedBeforeJdbcAccess() {
+        var source = org.mockito.Mockito.mock(javax.sql.DataSource.class);
+        var port = new TDengineTimeSeriesPort(source);
+        for (String hostile : List.of("x'); DROP TABLE iot_points; --", "x\\'", "x\n", "x\u0000", "x".repeat(65))) {
+            assertThatThrownBy(() -> port.writeBatch(7L, List.of(
+                    new TimeSeriesPoint(hostile, "temp", Instant.now(), 1.0, "GOOD"))))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> port.writeBatch(7L, List.of(
+                    new TimeSeriesPoint("device", hostile, Instant.now(), 1.0, "GOOD"))))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+        org.mockito.Mockito.verifyNoInteractions(source);
+        assertThat(TDengineTimeSeriesPort.escapeSqlString("device-1:temperature", "code"))
+                .isEqualTo("device-1:temperature");
+        assertThat(TDengineTimeSeriesPort.subTableName(7L, "device-1", "temp"))
+                .matches("t_7_[0-9a-z]+");
+    }
+
+    @Test
     void subTableName_isStableAndTenantQualified() {
         String a = TDengineTimeSeriesPort.subTableName(1L, "dev-1", "temp");
         String b = TDengineTimeSeriesPort.subTableName(1L, "dev-1", "temp");

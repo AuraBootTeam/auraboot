@@ -10,6 +10,7 @@ import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.runtime.AgentErrorFrame;
 import com.auraboot.framework.agent.runtime.AgentExecutionState;
 import com.auraboot.framework.agent.runtime.ChatTurnRuntime;
+import com.auraboot.framework.agent.runtime.ChatMessageTapeStore;
 import com.auraboot.framework.agent.runtime.LlmChatRuntimeSupport;
 import com.auraboot.framework.agent.runtime.LlmMessageTapeSupport;
 import com.auraboot.framework.agent.runtime.PendingContinuationService;
@@ -54,6 +55,7 @@ public class AuraBotPendingContinuationService implements PendingContinuationSer
     private final ChatToolResolver chatToolResolver;
     private final ChatToolExecutor chatToolExecutor;
     private final PendingToolStore pendingToolStore;
+    private final ChatMessageTapeStore chatMessageTapeStore;
     private final ObjectMapper objectMapper;
     private final AiTraceService aiTraceService;
     private final ToolLoopService toolLoopService;
@@ -62,6 +64,19 @@ public class AuraBotPendingContinuationService implements PendingContinuationSer
 
     @Value("${aurabot.max-tool-rounds:20}")
     private int maxToolRounds;
+
+    @Override
+    public void completeRejectedChatTool(PendingToolSnapshot pending, String reason) {
+        if (pending.getSessionId() == null || pending.getSessionId().isBlank()
+                || pending.getMessages() == null || pending.getMessages().isEmpty()) {
+            throw new IllegalStateException("Rejected operation has no saved conversation tape");
+        }
+        List<LlmChatRequest.Message> messages = LlmMessageTapeSupport.deserializeMessages(pending.getMessages());
+        LlmMessageTapeSupport.completeDanglingToolResults(objectMapper, messages, Map.of(
+                "success", false, "notExecuted", true, "error", reason));
+        chatMessageTapeStore.storeConversationMessages(pending.getSessionId(),
+                LlmMessageTapeSupport.serializeMessages(messages));
+    }
 
     @Override
     public TurnOutcome resumeApprovedChatTool(TurnContext ctx,
@@ -381,7 +396,8 @@ public class AuraBotPendingContinuationService implements PendingContinuationSer
 
             @Override
             public void persistMessages(String sessionId, List<LlmChatRequest.Message> messages) {
-                // Pending resume currently persists only suspended snapshots, not full session tapes.
+                chatMessageTapeStore.storeConversationMessages(sessionId,
+                        LlmMessageTapeSupport.serializeMessages(messages));
             }
 
             @Override

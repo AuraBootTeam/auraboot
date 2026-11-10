@@ -133,4 +133,28 @@ class InstalledMachineAuthorityTest {
         verifyNoInteractions(nativeData);
     }
 
+    @Test void onlyManagedBindingsEnableReferenceClosureAndLegacyInvocationCannotInheritIt() {
+        String managed=config.replace("\"installedMachineData\":", "\"installedIntegration\":{\"sourceCode\":\"source\",\"bindingLookup\":{\"version\":1}},\"installedMachineData\":");
+        try(var machine=MachineDataAccessContext.begin(principal)) {
+            InstalledIntegrationExecution.run("accept",managed,binding,false,this,()->{
+                Object scope=MachineDataAccessContext.requiredReferenceReadScope();
+                assertThat(scope).isNotNull();
+                assertThatThrownBy(()->MachineDataAccessContext.requireDecision("undeclared_target")).isInstanceOf(AccessDeniedException.class);
+                assertThatThrownBy(()->InstalledIntegrationExecution.run("legacy",config,binding,false,this,()->null))
+                        .isExactlyInstanceOf(SecurityException.class).hasMessage("Nested installed integration invocation denied");
+                assertThat(MachineDataAccessContext.requiredReferenceReadScope()).isSameAs(scope);
+                return null;
+            });
+            assertThat(MachineDataAccessContext.requiredReferenceReadScope()).isNull();
+            var outerGrant=new MachineDataAccessContext.Decision(1L,"inst","outer",Set.of("read"),Set.of("pid"),Set.of(),List.of());
+            try(var outer=MachineDataAccessContext.authorizeRequiredReferenceReads(Map.of("outer",outerGrant))) {
+                Object outerScope=MachineDataAccessContext.requiredReferenceReadScope();
+                InstalledIntegrationExecution.run("legacy",config,binding,false,this,()->{
+                    assertThat(MachineDataAccessContext.requiredReferenceReadScope()).isNull();return null;
+                });
+                assertThat(MachineDataAccessContext.requiredReferenceReadScope()).isSameAs(outerScope);
+            }
+        }
+    }
+
 }

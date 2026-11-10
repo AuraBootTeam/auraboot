@@ -29,7 +29,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.ArrayList;
@@ -73,7 +73,7 @@ import static org.mockito.Mockito.when;
  * suspension is covered by unit tests
  * ({@link com.auraboot.framework.agent.service.AgentChatPortImplToolLoopTest});
  * T6's contract is the resume
- * pipeline. A {@link MockBean LlmProviderFactory} returns a stub provider so
+ * pipeline. A {@link MockitoBean LlmProviderFactory} returns a stub provider so
  * the post-confirm continuation loop terminates with {@code end_turn} on the
  * very first call — we don't need a real LLM to verify the chokepoint.
  *
@@ -100,9 +100,9 @@ class AuraBotChatSkillResumeIntegrationTest extends BaseIntegrationTest {
     @Autowired org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
 
     // Stubs
-    @MockBean LlmProviderFactory llmProviderFactory;
-    @MockBean UserPermissionService userPermissionService;
-    @MockBean PermissionMapper permissionMapper;
+    @MockitoBean LlmProviderFactory llmProviderFactory;
+    @MockitoBean UserPermissionService userPermissionService;
+    @MockitoBean PermissionMapper permissionMapper;
 
     private final Set<String> currentPermissions = new HashSet<>();
     private String testModelCode;

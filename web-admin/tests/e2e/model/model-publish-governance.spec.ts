@@ -598,7 +598,10 @@ async function createPermissionPolicyUsageReferencingField(
   const member = await findTenantMemberForEmail(DEFAULT_TEST_ACCOUNT.email);
   await postApi<void>(page, `/api/roles/${role.pid}/members`, [member.memberPid]);
 
-  await putApi<void>(page, `/api/permissions/matrix/${role.pid}/policy/${permission.pid}`, {
+  const policyPath = `/api/permissions/matrix/${role.pid}/policy/${permission.pid}`;
+  const snapshot = await getApi<{ revision: string; values: Record<string, unknown> }>(page, policyPath + '/snapshot');
+  expect(snapshot.revision).toEqual(expect.any(String));
+  await putApi<void>(page, policyPath, { expectedRevision: snapshot.revision, values: {
     dynamicAbac: {
       fields: [policyField],
       ruleBinding: {
@@ -619,7 +622,7 @@ async function createPermissionPolicyUsageReferencingField(
         },
       },
     },
-  });
+  } });
 
   return { role, permission, permissionCode, member };
 }

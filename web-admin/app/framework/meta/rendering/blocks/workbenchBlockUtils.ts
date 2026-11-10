@@ -1,3 +1,7 @@
+import {
+  loadCommandInputSource,
+  snapshotCommandInputValue as snapshotActionValue,
+} from '~/framework/meta/runtime/actions/commandInputSource';
 import { mergeCommandInputPayload } from '~/framework/meta/utils/commandInputPayload';
 import { createPromptSubmissionFeedback } from '~/framework/meta/runtime/actions/promptSubmissionFeedback';
 import { commandExecutionError } from '~/framework/meta/utils/commandExecutionError';
@@ -433,29 +437,6 @@ export function prepareSimpleWorkbenchAction(
   return () => executePreparedWorkbenchAction(runtime, resolved);
 }
 
-function snapshotActionValue(value: any, seen = new WeakMap<object, any>()): any {
-  if (!value || typeof value !== 'object') return value;
-  // Preserve native File/Date handles while isolating mutable state records.
-  if (
-    !Array.isArray(value) &&
-    Object.getPrototypeOf(value) !== Object.prototype &&
-    Object.getPrototypeOf(value) !== null
-  )
-    return value;
-  if (seen.has(value)) return seen.get(value);
-  const copy: any = Array.isArray(value) ? [] : {};
-  seen.set(value, copy);
-  for (const [key, item] of Object.entries(value)) {
-    Object.defineProperty(copy, key, {
-      value: snapshotActionValue(item, seen),
-      enumerable: true,
-      writable: true,
-      configurable: true,
-    });
-  }
-  return copy;
-}
-
 export async function executeSimpleWorkbenchAction(
   runtime: SchemaRuntime,
   config: any,
@@ -543,26 +524,57 @@ async function executePreparedWorkbenchAction(runtime: SchemaRuntime, config: an
       locale: runtime.getContext().locale,
     });
     let collectedInputs: Record<string, any> = {};
-    if (Array.isArray(args.inputFields) && args.inputFields.length > 0) {
-      const { promptInputForm } = await import('~/framework/meta/runtime/actions/ActionRegistry');
-      try {
+    let inputFields = args.inputFields,
+      commandPayload = args.payload || {},
+      inputSignal: AbortSignal | undefined;
+    const remoteInput = args.inputFieldsSource !== undefined;
+    const inputContext = remoteInput
+      ? snapshotActionValue(runtime.getContext())
+      : runtime.getContext();
+    try {
+      if (remoteInput) {
+        const loaded = await loadCommandInputSource(
+          args.inputFieldsSource,
+          commandPayload,
+          fetchResult,
+          {
+            staticFields: args.inputFields,
+            t: inputContext.t,
+            locale: inputContext.locale,
+          },
+        );
+        inputFields = loaded.fields;
+        commandPayload = loaded.payload;
+        inputSignal = loaded.signal;
+        mergeCommandInputPayload(commandPayload, {}, args.inputFieldsPayloadKey);
+      }
+      if (Array.isArray(inputFields) && inputFields.length > 0) {
+        const { promptInputForm } = await import('~/framework/meta/runtime/actions/ActionRegistry');
         collectedInputs = await promptInputForm(
-          args.inputFields,
+          inputFields,
           args.inputFieldsTitle,
           fetchResult,
           args.inputFieldsSubmitLabel,
-          runtime.getContext(),
-          { t: runtime.getContext().t, locale: runtime.getContext().locale },
+          inputContext,
+          { t: inputContext.t, locale: inputContext.locale },
           args.inputFieldsPresentation,
-          undefined,
+          inputSignal,
           submissionFeedback,
           { bindingsResolved: true },
         );
-      } catch (error) {
-        submissionFeedback.dispose();
-        if (error instanceof ActionCancelledError) return;
-        throw error;
       }
+    } catch (error) {
+      submissionFeedback.dispose();
+      if (error instanceof ActionCancelledError) return;
+      if (remoteInput)
+        showCommandFeedback(
+          runtime,
+          feedback,
+          'errorMessage',
+          'error',
+          error instanceof Error ? error.message : 'Unable to prepare the form',
+        );
+      throw error;
     }
 
     try {
@@ -591,7 +603,7 @@ async function executePreparedWorkbenchAction(runtime: SchemaRuntime, config: an
         targetRecordPid,
         operationType,
         payload: mergeCommandInputPayload(
-          args.payload || {},
+          commandPayload,
           collectedInputs,
           args.inputFieldsPayloadKey,
         ),

@@ -28,6 +28,15 @@ final class PluginDefinitionResourceImporter {
 
     private final CaptureImportSnapshotOperation captureImportSnapshotOperation;
 
+    private final PluginSeedUpgradeContext upgrade;
+
+    PluginDefinitionResourceImporter(PluginResourceImporter resources,
+            com.auraboot.framework.meta.template.generator.DocumentCommandGenerator generator,
+            AutomationService automations, SaveOrUpdatePluginResourceOperation save,
+            CaptureImportSnapshotOperation capture) {
+        this(resources, generator, automations, save, capture, PluginSeedUpgradeContext.untracked());
+    }
+
     @FunctionalInterface
     interface SaveOrUpdatePluginResourceOperation { void execute(PluginResource resource, Long tenantId); }
 
@@ -316,7 +325,7 @@ final class PluginDefinitionResourceImporter {
         }
     }
 
-    void importAutomations(PluginManifestExtended manifest){
+    void importAutomations(PluginManifestExtended manifest, ImportRequest request, ImportExecuteResult result){
         if (manifest.getAutomations() == null || manifest.getAutomations().isEmpty()) return;
         int imported = 0;
         for (AutomationDefinitionDTO dto : manifest.getAutomations()) {
@@ -325,19 +334,34 @@ final class PluginDefinitionResourceImporter {
                         manifest.getAutomations().indexOf(dto));
                 continue;
             }
-            importAutomation(dto);
-            imported++;
+            if (importAutomation(dto, manifest.getPluginId(), request.getConflictStrategy(), result)) imported++;
         }
         if (imported > 0) {
             log.info("Imported {} automation seed(s) for plugin {}", imported, logSafe(manifest.getPluginId()));
         }
     }
 
-    void importAutomation(AutomationDefinitionDTO dto){
-        AutomationDTO existing = findExistingAutomation(dto);
+    boolean importAutomation(AutomationDefinitionDTO dto, String pluginId, ImportRequest.ConflictStrategy strategy, ImportExecuteResult result){
+        if (pluginId == null || pluginId.isBlank()) throw new PluginException("Automation seeds require plugin identity");
+        upgrade.lock(PluginSeedUpgradeContext.Kind.AUTOMATION);
+        AutomationDTO existing = automationService.findPluginSeed(pluginId, dto.getAutomationKey());
+        if (existing == null) existing = findExistingAutomation(dto);
+        if (existing != null && existing.getModelCode() != null && !dto.getModelCode().equals(existing.getModelCode())) {
+            throw new PluginException("Automation seed cannot move to another model without a reviewed migration");
+        }
+        if (existing == null && strategy != ImportRequest.ConflictStrategy.OVERWRITE
+                && automationService.hasUnidentifiedAutomations(dto.getModelCode())) {
+            PluginImportSupport.preserveExistingSeed(true, strategy,
+                    "ambiguous legacy automation:" + dto.getAutomationKey(), result::addWarning);
+            result.incrementResourceCount("AUTOMATION", ResourceAction.SKIP);
+            return false;
+        }
+        if (upgrade.preserve(PluginSeedUpgradeContext.Kind.AUTOMATION, dto.getAutomationKey(), existing != null,
+                existing == null ? null : existing.getPid(), strategy, result)) return false;
         if (existing == null) {
-            automationService.create(toAutomationCreateRequest(dto));
-            return;
+            var created = automationService.createPluginSeed(toAutomationCreateRequest(dto), pluginId, dto.getAutomationKey());
+            upgrade.record(PluginSeedUpgradeContext.Kind.AUTOMATION, dto.getAutomationKey(), created == null ? null : created.getPid());
+            return true;
         }
         AutomationUpdateRequest request = new AutomationUpdateRequest();
         request.setName(dto.getName());
@@ -348,7 +372,9 @@ final class PluginDefinitionResourceImporter {
         request.setActions(dto.getActions());
         request.setFlowConfig(dto.getFlowConfig());
         request.setEnabled(dto.getEnabled());
-        automationService.update(existing.getPid(), request);
+        automationService.updatePluginSeed(existing.getPid(), request, pluginId, dto.getAutomationKey());
+        upgrade.record(PluginSeedUpgradeContext.Kind.AUTOMATION, dto.getAutomationKey(), existing.getPid());
+        return true;
     }
 
     AutomationDTO findExistingAutomation(AutomationDefinitionDTO dto){
@@ -356,10 +382,10 @@ final class PluginDefinitionResourceImporter {
         if (automations == null || automations.isEmpty()) {
             return null;
         }
-        return automations.stream()
-                .filter(existing -> Objects.equals(existing.getName(), dto.getName()))
-                .findFirst()
-                .orElse(null);
+        List<AutomationDTO> matches = automations.stream()
+                .filter(existing -> Objects.equals(existing.getName(), dto.getName())).toList();
+        if (matches.size() > 1) throw new PluginException("Automation seed has ambiguous legacy name matches");
+        return matches.isEmpty() ? null : matches.getFirst();
     }
 
     AutomationCreateRequest toAutomationCreateRequest(AutomationDefinitionDTO dto){

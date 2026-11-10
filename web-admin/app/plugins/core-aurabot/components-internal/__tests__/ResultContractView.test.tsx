@@ -27,6 +27,16 @@ const baseContract: ResultContract = {
 };
 
 describe('ResultContractView', () => {
+  it('keeps raw command receipts and fetched records behind explicit execution details', () => {
+    render(<ResultContractView contract={{ ...baseContract, skillCode: 'cmd_tpm_create_task', renderHint: 'card',
+      data: { recordPid: 'private-record', tpm_task_inserted: 1 } }} />);
+    expect(screen.getByTestId('rc-card')).not.toBeVisible();
+    expect(screen.getByTestId('rc-diagnostics')).not.toHaveAttribute('open');
+    fireEvent.click(screen.getByText(/Execution details|执行详情/));
+    expect(screen.getByTestId('rc-card')).toBeVisible();
+    expect(screen.getByTestId('rc-card')).toHaveTextContent('private-record');
+  });
+
   it('restores created model identity without exposing the execution envelope in the business card', () => {
     render(<ResultContractView contract={{ ...baseContract, skillCode: 'aurabot:model:create', renderHint: 'card',
       data: { data: { displayName: 'Acceptance ledger', modelCode: 'acceptance_ledger', modelPid: 'internal-pid', tableName: 'mt_acceptance_ledger' }, status: 'SUCCESS' } }} />);

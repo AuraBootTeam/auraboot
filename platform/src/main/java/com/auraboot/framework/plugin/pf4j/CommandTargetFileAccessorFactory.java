@@ -66,11 +66,18 @@ public class CommandTargetFileAccessorFactory {
 
     /** Returns null when the pipeline cannot attest a synchronous authorized human target. */
     public Scope forCommand(CommandPipelineContext context) {
+        return forCommand(context, null);
+    }
+
+    /** Read-only commands may retain only their own attested new records, never append to the root. */
+    public Scope forCommand(CommandPipelineContext context, CommandCreatedDataAccessor commandCreates) {
+        boolean createOnly = commandCreates != null && !MetaContext.hasCommandPermitScope()
+                && MetaContext.getAuthorizedCommandCode() == null && commandCreates.attestsAttachmentFrame(context);
         if (ACTIVE_HANDLER.get() != null || context == null || context.getRequest() == null || context.getRequest().isDryRun()
                 || context.getCommand() == null || context.getAuthorizationVerdict() == null
                 || !context.getAuthorizationVerdict().isAuthorized() || context.getPermitPlan() == null
-                || !context.getPermitPlan().isPermitted() || !MetaContext.hasCommandPermitScope()
-                || !MetaContext.exists() || MetaContext.isImpersonating() || !MetaContext.isRootAuthorizedCommand()
+                || !context.getPermitPlan().isPermitted() || (!createOnly && !MetaContext.hasCommandPermitScope())
+                || !MetaContext.exists() || MetaContext.isImpersonating() || (!createOnly && !MetaContext.isRootAuthorizedCommand())
                 || com.auraboot.framework.meta.service.impl.AsyncTaskExecutionContext.isActive()
                 || com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
                 || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
@@ -78,14 +85,14 @@ public class CommandTargetFileAccessorFactory {
         Actor actor = current();
         String model = context.getCommand().getModelCode();
         String command = context.getCommand().getCode();
-        String target = MetaContext.getCommandPermitTargetFor(model);
+        String target = createOnly ? null : MetaContext.getCommandPermitTargetFor(model);
         if (actor.tenant() == null || actor.user() == null || actor.member() == null
                 || actor.tenant() <= 0 || actor.user() <= 0 || actor.member() <= 0
                 || actor.userPid() == null || actor.userPid().isBlank()
                 || !actor.tenant().equals(context.getTenantId()) || !actor.user().equals(context.getUserId())
                 || (target != null && (target.isBlank() || !Boolean.TRUE.equals(context.getTargetRecordReadable())))
-                || (target == null && context.getRequest().getTargetRecordId() != null)
-                || !Objects.equals(command, MetaContext.getAuthorizedCommandCode()))
+                || (!createOnly && target == null && context.getRequest().getTargetRecordId() != null)
+                || (!createOnly && !Objects.equals(command, MetaContext.getAuthorizedCommandCode())))
             return null;
         var source = sessions.getConfiguration().getEnvironment().getDataSource();
         Object resource = TransactionSynchronizationManager.getResource(source);
@@ -102,12 +109,12 @@ public class CommandTargetFileAccessorFactory {
         ACTIVE_HANDLER.set(scope);
         scope.physicalTransaction = fileMapper::currentPhysicalTransactionIdentity;
         scope.valid = () -> scope.active && scope.thread == Thread.currentThread() && writableTransaction()
-                && !MetaContext.isImpersonating() && MetaContext.isRootAuthorizedCommand()
+                && !MetaContext.isImpersonating() && (createOnly ? commandCreates.attestsAttachmentFrame(context) : MetaContext.isRootAuthorizedCommand())
                 && !com.auraboot.framework.meta.service.impl.AsyncTaskExecutionContext.isActive()
                 && !com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
                 && !com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
-                && actor.equals(current()) && command.equals(MetaContext.getAuthorizedCommandCode())
-                && Objects.equals(target, MetaContext.getCommandPermitTargetFor(model))
+                && actor.equals(current()) && (createOnly || command.equals(MetaContext.getAuthorizedCommandCode()))
+                && (createOnly || Objects.equals(target, MetaContext.getCommandPermitTargetFor(model)))
                 && TransactionSynchronizationManager.getSynchronizations().contains(lifetime)
                 && TransactionSynchronizationManager.getResource(source) == holder && holder.getConnection() == connection;
         scope.creationValid = () -> scope.valid.getAsBoolean() && !holder.isRollbackOnly() && physicalWritable(connection);
@@ -124,7 +131,9 @@ public class CommandTargetFileAccessorFactory {
             @Override public void linkAndRetainExistingToCreatedRecord(String filePid,String modelCode,String recordPid,String fieldCode) {
                 try {
                     if (!scope.creationValid.getAsBoolean()) throw denied();
-                    linkCreated(scope, actor, filePid, modelCode, recordPid, fieldCode);
+                    if (createOnly) commandCreates.withAttachmentCreateWriter(modelCode,
+                            () -> linkCreated(scope, actor, filePid, modelCode, recordPid, fieldCode));
+                    else linkCreated(scope, actor, filePid, modelCode, recordPid, fieldCode);
                 } catch (RuntimeException failure) {
                     if (scope.active && scope.thread == Thread.currentThread()) holder.setRollbackOnly();
                     throw failure;
@@ -164,13 +173,14 @@ public class CommandTargetFileAccessorFactory {
         if (!"file".equals(field.getDataType()) || field.isVirtual() || field.isJsonbVirtual()
                 || field.getExtraProps() != null && Boolean.TRUE.equals(field.getExtraProps().get("multiple"))) throw denied();
         com.auraboot.framework.meta.service.impl.ModelMutationGuard.assertCreateAllowed(model);
-        com.auraboot.framework.meta.service.impl.FieldWriterGuard.assertFieldWriteAllowed(model,fieldCode);
+        com.auraboot.framework.meta.service.impl.FieldWriterGuard.assertCreateAllowed(model,Map.of(fieldCode,filePid));
         var conditions = Map.<String,Object>of("tenant_id",actor.tenant(),"pid",pid);
         var rows = records.selectRecordWriterTargetsForUpdate(SqlSafetyUtils.requireIdentifier(model.getTableName(),"created attachment table"),
                 "pid","created_attachment",conditions);
         if (rows == null || rows.size() != 1) throw denied();
         // This exact new row was already returned by authorized CREATE. No new caller READ scope is granted.
-        var row = MetaContext.runWithCommandPermitScope("ALL", () -> data.getById(modelCode,pid));
+        var row = MetaContext.runWithCommandPermitPlan("TARGET", created.version(), modelCode, pid,
+                () -> data.getById(modelCode,pid));
         if (row == null || !pid.equals(row.get("pid")) || !filePid.equals(row.get(fieldCode))
                 || !(row.get("tenant_id") instanceof Number tenant) || tenant.longValue() != actor.tenant()
                 || !(row.get("created_by") instanceof Number owner) || owner.longValue() != actor.user()

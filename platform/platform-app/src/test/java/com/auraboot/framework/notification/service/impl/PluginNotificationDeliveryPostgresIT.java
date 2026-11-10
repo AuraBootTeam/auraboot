@@ -2,7 +2,7 @@ package com.auraboot.framework.notification.service.impl;
 
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.integration.DeclaredTestInfrastructure;
-import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisProperties;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.ReliableEventDeliveryExecutor;
@@ -61,7 +61,7 @@ class PluginNotificationDeliveryPostgresIT {
     @Autowired ApplicationContext context;
     @Autowired JdbcTemplate jdbc;
     @Autowired DataSource dataSource;
-    @Autowired RedisProperties redisProperties;
+    @Autowired DataRedisProperties redisProperties;
     @Autowired PlatformTransactionManager transactions;
     @Autowired ReliableIntegrationAccessor reliable;
     @Autowired ReliableEventDeliveryExecutor executor;

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Review-bound migration ownership. This inventory never rewrites released SQL. */
 import { createHash } from 'node:crypto';
-import { lstatSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { closeSync, constants, fstatSync, lstatSync, openSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { splitSqlStatements, stripSqlComments } from './migration-ownership.mjs';
@@ -45,7 +45,12 @@ export function inventoryPackage(root, packageId) {
       requireCondition(!versions.has(version), `duplicate migration version: ${version}`);
       versions.add(version);
     }
-    const bytes = readFileSync(path);
+    const descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    let bytes;
+    try {
+      requireCondition(fstatSync(descriptor).isFile(), `migration must be a regular file: ${file}`);
+      bytes = readFileSync(descriptor);
+    } finally { closeSync(descriptor); }
     const statements = splitSqlStatements(bytes.toString('utf8'))
       .filter(statement => stripSqlComments(statement).trim())
       .map((sql, index) => ({ index: index + 1, sha256: digest(sql), review: 'draft',

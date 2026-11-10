@@ -650,7 +650,10 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
         // 自动分配 permissions
         if (StringUtils.hasText(model.getPluginPid())) {
-            autoPermissionAssignmentService.registerPermissions(model.getCode(), null, model.getTenantId());
+            // Same first-creation semantics as the non-plugin branch: a plugin model created
+            // in this tenant for the first time gets the role-template grants; registerPermissions
+            // built the nodes but bound zero roles, so non-admin roles 403'd on fresh installs.
+            autoPermissionAssignmentService.autoAssignPermissions(model.getCode(), null, model.getTenantId());
         } else {
             autoPermissionAssignmentService.autoAssignPermissions(request.getCode(), null);
         }
@@ -1581,7 +1584,10 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
         // Auto-create hierarchical permissions for the published model
         if (StringUtils.hasText(model.getPluginPid())) {
-            autoPermissionAssignmentService.registerPermissions(model.getCode(), null, model.getTenantId());
+            // First-creation grants for plugin models too: generatePermissions applies the
+            // role template only when the resource node is newly created, so re-publishing
+            // an already-known model stays grant-neutral (no revoked-grant restoration).
+            autoPermissionAssignmentService.autoAssignPermissions(model.getCode(), null, model.getTenantId());
         } else {
             autoPermissionAssignmentService.autoAssignPermissions(model.getCode(), null);
         }

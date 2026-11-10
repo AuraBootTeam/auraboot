@@ -190,7 +190,7 @@ public class GmailApiClient {
      * @return full authorization URL including all required scopes
      */
     public String buildAuthorizationUrl(String state) {
-        return UriComponentsBuilder.fromHttpUrl(GOOGLE_AUTH_URL)
+        return UriComponentsBuilder.fromUriString(GOOGLE_AUTH_URL)
                 .queryParam("client_id",     gmailApiConfig.getClientId())
                 .queryParam("redirect_uri",  gmailApiConfig.getRedirectUri())
                 .queryParam("response_type", "code")

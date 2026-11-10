@@ -3,6 +3,13 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const root = path.resolve(__dirname, "..");
+function readRegularSource(filename) {
+  const fd = fs.openSync(filename, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
+  try {
+    if (!fs.fstatSync(fd).isFile()) throw new Error("Runtime source must be a regular file");
+    return fs.readFileSync(fd);
+  } finally { fs.closeSync(fd); }
+}
 function digest(directory) {
   const hash = crypto.createHash("sha256");
   function walk(dir, prefix = "") {
@@ -14,7 +21,7 @@ function digest(directory) {
       if (fs.statSync(filename).isDirectory()) walk(filename, relative + "/");
       else {
         hash.update(relative);
-        hash.update(fs.readFileSync(filename));
+        hash.update(readRegularSource(filename));
       }
     }
   }

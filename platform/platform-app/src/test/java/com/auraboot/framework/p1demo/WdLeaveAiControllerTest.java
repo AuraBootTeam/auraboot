@@ -68,7 +68,7 @@ class WdLeaveAiControllerTest {
         metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(null);
         ResponseEntity<ApiResponse<WdLeaveAiController.AiFillResponse>> resp = controller.aiFill(
                 new WdLeaveAiController.AiFillRequest("一周年假", null, null, null));
-        assertThat(resp.getStatusCodeValue()).isEqualTo(401);
+        assertThat(resp.getStatusCode().value()).isEqualTo(401);
         assertThat(((WdLeaveAiController.AiFillResponse) resp.getBody().getContext()).errorKey()).isEqualTo("ai.fill.tenant_required");
     }
 
@@ -181,7 +181,7 @@ class WdLeaveAiControllerTest {
     void getAnnotation_noTenant_returns401() {
         metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(null);
         ResponseEntity<Map<String, Object>> resp = controller.getAnnotation(1L);
-        assertThat(resp.getStatusCodeValue()).isEqualTo(401);
+        assertThat(resp.getStatusCode().value()).isEqualTo(401);
     }
 
     @Test

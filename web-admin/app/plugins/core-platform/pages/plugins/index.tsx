@@ -15,7 +15,7 @@
  * the same tab.
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router';
 import { useI18n } from '~/contexts/I18nContext';
 import { useAuth } from '~/contexts/AuthContext';
@@ -40,6 +40,8 @@ export default function PluginsPage() {
   const { t } = useI18n();
   const { hasPermission } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
 
   const canDiscover = hasPermission(DISCOVERY_PERMISSION);
   const canManage = hasPermission(MANAGE_PERMISSION);
@@ -99,7 +101,7 @@ export default function PluginsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl p-6" data-testid="plugins-page">
+    <div className="mx-auto max-w-7xl p-6" data-testid="plugins-page" data-hydrated={hydrated}>
       {/* Header */}
       <div className="mb-6 flex items-center gap-3">
         <PuzzlePieceSolidIcon className="h-8 w-8 text-indigo-600" />
@@ -124,6 +126,7 @@ export default function PluginsPage() {
             return (
               <button
                 key={key}
+                disabled={!hydrated}
                 onClick={() => setTab(key)}
                 data-testid={`plugins-tab-${key}`}
                 role="tab"

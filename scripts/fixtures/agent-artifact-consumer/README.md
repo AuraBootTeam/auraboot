@@ -25,8 +25,10 @@ Never overwrite an existing version or use the global Maven repository.
 
 The six executable modes check base, optional agent, full composition, core test
 fixtures, agent test fixtures and explicitly requested test-API endpoints.
-The Java probe checks actual class owners on each resolved classpath, and the
-Gradle gate rejects producer project substitution or another AuraBoot version.
+The independent compiler also consumes a public Core service signature, so a
+missing exported superinterface fails before runtime. The Java probe checks
+actual class owners on each resolved classpath, and the Gradle gate rejects
+producer project substitution or another AuraBoot version.
 Only the full mode exposes application launchers; production modes must not
 contain test fixtures. No database, external model or application service runs.
 

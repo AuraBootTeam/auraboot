@@ -3,7 +3,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiClient } from '../../src/client/api-client.js';
-import { makeAuditWrapper } from '../../src/mcp/audit.js';
+import { makeAuditWrapper, _internal as auditInternal } from '../../src/mcp/audit.js';
 import { buildToolRegistry } from '../../src/mcp/server.js';
 
 /**
@@ -24,6 +24,8 @@ describe('MCP server integration (in-memory transport)', () => {
   let apiPost: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
+    // This suite exercises the transport/remote relay, never the developer's audit journal.
+    vi.spyOn(auditInternal, 'writeLocal').mockImplementation(() => {});
     apiGet = vi.fn();
     apiPost = vi.fn();
     const fakeApi = {
@@ -50,6 +52,7 @@ describe('MCP server integration (in-memory transport)', () => {
   afterEach(async () => {
     await client.close();
     await server.close();
+    vi.restoreAllMocks();
   });
 
   it('lists all 15 registered tools over MCP', async () => {

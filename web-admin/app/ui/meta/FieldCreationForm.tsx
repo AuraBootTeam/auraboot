@@ -11,6 +11,7 @@ import { useSmartText } from '~/utils/i18n';
 interface FieldCreationFormProps {
   modelPid: string;
   modelCode: string;
+  codeError?: string;
   onValidationChange?: (isValid: boolean) => void;
   onChange?: (formData: FieldCreationFormData) => void;
 }
@@ -49,6 +50,7 @@ const DATA_TYPES_FALLBACK = [
 export function FieldCreationForm({
   modelPid,
   modelCode,
+  codeError,
   onValidationChange,
   onChange,
 }: FieldCreationFormProps) {
@@ -182,13 +184,20 @@ export function FieldCreationForm({
           value={formData.code}
           onChange={(e) => handleChange('code', e.target.value)}
           placeholder="例如: user_name, email, age"
+          aria-invalid={Boolean(errors.code || codeError)}
+          aria-describedby={errors.code || codeError ? 'new-field-code-error' : undefined}
           className={`rounded-control w-full border px-3 py-2 focus:ring-2 focus:outline-none ${
-            errors.code
+            errors.code || codeError
               ? 'border-status-red focus-visible:shadow-focus focus:outline-none'
               : 'border-border-strong focus-visible:shadow-focus focus:outline-none'
           }`}
         />
-        {errors.code && <p className="text-status-red mt-1 text-sm">{errors.code}</p>}
+        {(errors.code || codeError) && (
+          <p id="new-field-code-error" role="alert" data-testid={codeError ? 'field-create-duplicate' : undefined}
+            className="text-status-red mt-1 text-sm">
+            {errors.code || codeError}
+          </p>
+        )}
         <p className="text-text-2 mt-1 text-xs">
           字段编码必须以字母开头，只能包含字母、数字和下划线
         </p>

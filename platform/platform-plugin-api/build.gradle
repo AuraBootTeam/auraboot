@@ -32,7 +32,7 @@ dependencies {
 
     // Unit-test deps for SPI contract tests (no Spring on the test classpath
     // — these are pure interface-shape and in-memory-fake assertions).
-    testImplementation platform('org.junit:junit-bom:5.14.4')
+    testImplementation platform('org.junit:junit-bom:6.0.3')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testImplementation 'org.assertj:assertj-core:3.27.7'
     testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.22.4'

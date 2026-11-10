@@ -35,7 +35,7 @@ class PluginRuleSeedImporterTest {
         when(decisions.createDraft(eq("invoice_rule"), any())).thenReturn(draft);
         when(decisions.validate("decision-draft")).thenReturn(DecisionValidateResult.ok(List.of(), List.of()));
         var manifest = new PluginManifestExtended(); manifest.setDecisionDefinitions(List.of(seed));
-        importer.importDecisionDefinitions(manifest);
+        importer.importDecisionDefinitions(manifest, overwriteRequest(), new ImportExecuteResult());
         verify(definitions).create(argThat(request -> "invoice_rule".equals(request.getDecisionCode())));
         verify(decisions).createDraft(eq("invoice_rule"), argThat(request -> request.getContentJson().equals(seed.getContentJson())));
         verify(decisions, times(publish ? 1 : 0)).publish("decision-draft", true);
@@ -44,7 +44,7 @@ class PluginRuleSeedImporterTest {
         draft.setStatus("PUBLISHED"); draft.setKind(seed.getKind()); draft.setRuntimeAdapter(seed.getRuntimeAdapter());
         draft.setContentJson(seed.getContentJson()); when(decisions.listByCode("invoice_rule")).thenReturn(List.of(draft));
         clearInvocations(definitions, decisions);
-        importer.importDecisionDefinitions(manifest);
+        importer.importDecisionDefinitions(manifest, overwriteRequest(), new ImportExecuteResult());
         verify(definitions).update(eq("definition-42"), any());
         verify(decisions, never()).createDraft(anyString(), any());
     }
@@ -57,7 +57,7 @@ class PluginRuleSeedImporterTest {
         when(decisions.createDraft(anyString(), any())).thenReturn(draft);
         when(decisions.validate("draft-bad")).thenReturn(DecisionValidateResult.invalid(List.of(new DecisionValidateResult.Issue("BAD", "broken field"))));
         var manifest = new PluginManifestExtended(); manifest.setDecisionDefinitions(List.of(seed));
-        assertThatThrownBy(() -> importer.importDecisionDefinitions(manifest)).isInstanceOf(PluginException.class).hasMessageContaining("broken field");
+        assertThatThrownBy(() -> importer.importDecisionDefinitions(manifest, overwriteRequest(), new ImportExecuteResult())).isInstanceOf(PluginException.class).hasMessageContaining("broken field");
         verify(decisions, never()).publish(anyString(), anyBoolean());
     }
 
@@ -74,12 +74,12 @@ class PluginRuleSeedImporterTest {
         var validated = new ConditionFragmentDTO(); validated.setPid("fragment-new"); validated.setStatus("VALIDATED");
         var manifest = new PluginManifestExtended(); manifest.setConditionFragments(List.of(seed));
         if ("DRAFT".equals(status)) {
-            assertThatThrownBy(() -> importer.importConditionFragments(manifest)).isInstanceOf(PluginException.class).hasMessageContaining("editable version");
+            assertThatThrownBy(() -> importer.importConditionFragments(manifest, overwriteRequest(), new ImportExecuteResult())).isInstanceOf(PluginException.class).hasMessageContaining("editable version");
             verify(fragments, never()).publish(anyString(), anyBoolean());
         } else {
             when(fragments.createVersion(eq("amount_positive"), any())).thenReturn(draft);
             when(fragments.validate("fragment-new")).thenReturn(validated);
-            importer.importConditionFragments(manifest);
+            importer.importConditionFragments(manifest, overwriteRequest(), new ImportExecuteResult());
             verify(fragments).createVersion(eq("amount_positive"), argThat(request -> seed.getConditionSpec().equals(request.getConditionSpec())));
             verify(fragments).publish("fragment-new", true);
         }
@@ -93,7 +93,7 @@ class PluginRuleSeedImporterTest {
         var draft = new ConditionFragmentDTO(); draft.setPid("fragment-new"); draft.setStatus("VALIDATED");
         when(fragments.create(any())).thenReturn(draft);
         var manifest = new PluginManifestExtended(); manifest.setConditionFragments(List.of(seed));
-        importer.importConditionFragments(manifest);
+        importer.importConditionFragments(manifest, overwriteRequest(), new ImportExecuteResult());
         verify(fragments).create(argThat(request -> "billing".equals(request.getOwnerModule()) && "invoice".equals(request.getScopeRef())));
         verify(fragments).publish("fragment-new", true);
     }
@@ -109,7 +109,7 @@ class PluginRuleSeedImporterTest {
         when(versions.createDraft(anyString(), any(), any(), any(), any(), any(), any(), any())).thenReturn(draft);
         when(versions.validate("event-draft")).thenReturn(validated);
         var manifest = new PluginManifestExtended(); manifest.setEventPolicies(List.of(seed));
-        importer.importEventPolicies(manifest);
+        importer.importEventPolicies(manifest, overwriteRequest(), new ImportExecuteResult());
         verify(policies).create("invoice_updated", "Invoice updated", "updated", "MODEL", "invoice");
         verify(versions).createDraft("invoice_updated", PolicyPhase.AFTER_COMMIT, MatchMode.COLLECT_ALL,
                 ExecutionMode.ORDERED, FailureStrategy.FAIL_FAST, ConflictStrategy.REJECT_ON_CONFLICT,
@@ -130,8 +130,11 @@ class PluginRuleSeedImporterTest {
         published.setDedupStrategy("BY_IDEMPOTENCY_KEY"); published.setRulesJson(seed.getRulesJson());
         when(versions.listByCode("event_rule")).thenReturn(List.of(published));
         var manifest = new PluginManifestExtended(); manifest.setEventPolicies(List.of(seed));
-        importer.importEventPolicies(manifest);
+        importer.importEventPolicies(manifest, overwriteRequest(), new ImportExecuteResult());
         verify(policies).setEnabled("event_rule", false);
         verify(versions, never()).createDraft(anyString(), any(), any(), any(), any(), any(), any(), any());
+    }
+    private static ImportRequest overwriteRequest() {
+        var request = new ImportRequest();request.setConflictStrategy(ImportRequest.ConflictStrategy.OVERWRITE);return request;
     }
 }

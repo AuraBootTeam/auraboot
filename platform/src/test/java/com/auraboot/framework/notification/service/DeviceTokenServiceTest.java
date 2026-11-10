@@ -3,6 +3,7 @@ package com.auraboot.framework.notification.service;
 import com.auraboot.framework.notification.mapper.PushDeviceTokenMapper;
 import com.auraboot.framework.notification.model.PushDeviceToken;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -23,6 +24,15 @@ class DeviceTokenServiceTest {
 
     @Mock
     PushDeviceTokenMapper mapper;
+
+    @BeforeEach
+    void initMybatisPlusLambdaCache() {
+        // LambdaQueryWrapper resolves the entity's column map lazily; unit tests must seed it.
+        com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(
+                new org.apache.ibatis.builder.MapperBuilderAssistant(
+                        new com.baomidou.mybatisplus.core.MybatisConfiguration(), ""),
+                PushDeviceToken.class);
+    }
 
     @Test
     void registerToken_createsNewWhenNoExisting() {

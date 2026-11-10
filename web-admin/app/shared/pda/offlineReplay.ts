@@ -25,6 +25,19 @@ const MARK_REJECTED_COMMAND = 'inv:pda_mark_rejected';
 const QUEUE_MODEL = 'inv_pda_offline_queue';
 const COMMAND_EXECUTE_PREFIX = '/api/meta/commands/execute/';
 
+// Match the explicit offline shell routes in public/sw.js.
+export const PDA_SHELL_ROUTES = [
+  '/inventory/pda-tasks',
+  '/inventory/pda-receive',
+  '/inventory/pda-putaway',
+  '/inventory/pda-pick',
+  '/inventory/pda-stockcheck',
+] as const;
+
+export function isPdaShellPath(pathname: string): boolean {
+  return PDA_SHELL_ROUTES.some((path) => pathname === path || pathname.startsWith(path + '/'));
+}
+
 /** PDA command → queue kind (inv_pq_kind). Unknown commands stay generic. */
 function kindForCommand(commandCode: string): string {
   if (commandCode.startsWith('inv:putaway_confirm')) return 'putaway';
@@ -59,20 +72,31 @@ const status: PdaOfflineShellStatus = {
 };
 
 let started = false;
+let active = false;
 
 export function startPdaOfflineShell(): PdaOfflineShellStatus {
-  if (started || typeof window === 'undefined') return status;
+  if (typeof window === 'undefined' || !isPdaShellPath(window.location.pathname)) return status;
+  active = true;
+  if (started) return status;
   started = true;
 
   const runWhenOnline = () => {
     if (navigator.onLine) void replayNow('online-event');
   };
   window.addEventListener('online', runWhenOnline);
-  window.addEventListener('message', (event) => {
-    if ((event.data as { type?: string } | null)?.type === 'PDA_OUTBOX_STASHED') {
-      void replayNow('sw-outbox-stashed');
-    }
-  });
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      // Only the worker controlling this document may request an outbox sweep.
+      if (
+        event.origin === window.location.origin &&
+        navigator.serviceWorker.controller !== null &&
+        event.source === navigator.serviceWorker.controller &&
+        (event.data as { type?: string } | null)?.type === 'PDA_OUTBOX_STASHED'
+      ) {
+        void replayNow('sw-outbox-stashed');
+      }
+    });
+  }
   // Late sweep for rows queued while this tab was closed/reloading.
   window.setTimeout(() => {
     if (navigator.onLine) void replayNow('startup');
@@ -85,6 +109,10 @@ export function startPdaOfflineShell(): PdaOfflineShellStatus {
     replayNow,
   };
   return status;
+}
+
+export function suspendPdaOfflineShell(): void {
+  active = false;
 }
 
 export async function registerServiceWorker(): Promise<boolean> {
@@ -105,12 +133,21 @@ export async function registerServiceWorker(): Promise<boolean> {
 
 /** Drain the offline outbox, then replay queued rows once, in queue order. */
 export async function replayNow(trigger: string): Promise<PdaOfflineShellStatus> {
-  if (status.replaying) return status;
+  if (
+    !active ||
+    typeof window === 'undefined' ||
+    !isPdaShellPath(window.location.pathname) ||
+    !navigator.onLine ||
+    status.replaying
+  )
+    return status;
   status.replaying = true;
   try {
     const drained = await drainOutbox();
     if (drained > 0) {
-      console.info(`[pda-offline] drained ${drained} offline-captured enqueue(s) (trigger=${trigger})`);
+      console.info(
+        `[pda-offline] drained ${drained} offline-captured enqueue(s) (trigger=${trigger})`,
+      );
     }
     const replayed = await sweepQueue();
     if (replayed.total > 0) {
@@ -194,7 +231,9 @@ async function flushOutboxEntry(entry: OutboxEntry): Promise<boolean> {
   } catch {
     original = {};
   }
-  const payload = (original.payload && typeof original.payload === 'object' ? original.payload : {}) as Record<string, unknown>;
+  const payload = (
+    original.payload && typeof original.payload === 'object' ? original.payload : {}
+  ) as Record<string, unknown>;
   const targetPid = String(original.targetRecordPid ?? '');
   const enqueue = await executeCommand(ENQUEUE_COMMAND, {
     payload: {
@@ -224,10 +263,10 @@ interface QueueRow {
 
 async function sweepQueue(): Promise<{ total: number; replayed: number; rejected: number }> {
   const { fetchResult } = await import('~/shared/services/http-client/HttpClient');
-  const listed = await fetchResult<{ records?: QueueRow[] }>(
-    `/api/dynamic/${QUEUE_MODEL}/list`,
-    { method: 'get', params: { pageNum: 1, pageSize: 100 } },
-  );
+  const listed = await fetchResult<{ records?: QueueRow[] }>(`/api/dynamic/${QUEUE_MODEL}/list`, {
+    method: 'get',
+    params: { pageNum: 1, pageSize: 100 },
+  });
   const records = listed.data?.records ?? [];
   // Recency guard: the auto executor only claims fresh rows (last 24h). Older
   // queued rows predate the shell and are left for explicit operator action.
@@ -262,7 +301,9 @@ async function replayRow(row: QueueRow): Promise<'replayed' | 'rejected' | 'skip
     if (resolved === null) {
       // Cannot invent the operator's actual payload (e.g. picked quantity) —
       // leave the row queued instead of guessing.
-      console.warn(`[pda-offline] row ${row.pid} (${row.inv_pq_kind}) has no payload snapshot; left queued`);
+      console.warn(
+        `[pda-offline] row ${row.pid} (${row.inv_pq_kind}) has no payload snapshot; left queued`,
+      );
       return 'skipped';
     }
     payload = resolved;
@@ -293,11 +334,17 @@ async function replayRow(row: QueueRow): Promise<'replayed' | 'rejected' | 'skip
 }
 
 /** Payload-less rows: re-derive from the live task so replay stays truthful. */
-async function resolveDefaultPayload(kind: string, targetPid: string): Promise<Record<string, unknown> | null> {
+async function resolveDefaultPayload(
+  kind: string,
+  targetPid: string,
+): Promise<Record<string, unknown> | null> {
   if (kind === 'receive' || kind === 'stockcheck') return {};
   if (kind === 'putaway' && targetPid) {
     const { fetchResult } = await import('~/shared/services/http-client/HttpClient');
-    const task = await fetchResult<Record<string, unknown>>(`/api/dynamic/inv_putaway_task/${targetPid}`, { method: 'get' });
+    const task = await fetchResult<Record<string, unknown>>(
+      `/api/dynamic/inv_putaway_task/${targetPid}`,
+      { method: 'get' },
+    );
     const row = (task.data ?? {}) as Record<string, unknown>;
     const qty = row.inv_pt_remaining_qty ?? row.inv_pt_required_qty;
     const loc = row.inv_pt_suggested_location_id;

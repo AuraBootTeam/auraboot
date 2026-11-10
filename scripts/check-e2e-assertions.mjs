@@ -18,16 +18,17 @@
  * gets disabled, and a disabled check protects nobody.
  */
 import { readFileSync } from 'node:fs';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-const REPO = path.resolve(new URL('..', import.meta.url).pathname);
+const REPO = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const WEB = path.join(REPO, 'web-admin');
 const SPECS = path.join(WEB, 'tests');
 const APP = path.join(WEB, 'app');
 
 const list = (dir, ext) =>
-  execSync(`find ${dir} -name '*.${ext}' -not -path '*/node_modules/*'`, { encoding: 'utf8' })
+  execFileSync('find', [dir, '-name', `*.${ext}`, '-not', '-path', '*/node_modules/*'], { encoding: 'utf8' })
     .trim()
     .split('\n')
     .filter(Boolean);
@@ -35,8 +36,8 @@ const list = (dir, ext) =>
 const specFiles = [...list(SPECS, 'ts'), ...list(SPECS, 'tsx')];
 // Frontend source AND plugin DSL: a block's `id` in pages.json surfaces as its data-testid,
 // so a testid can be perfectly real without appearing anywhere in web-admin/app.
-const dslFiles = execSync(
-  `find ${path.join(REPO, 'plugins')} -path '*/config/*' -name '*.json'`,
+const dslFiles = execFileSync(
+  'find', [path.join(REPO, 'plugins'), '-path', '*/config/*', '-name', '*.json'],
   { encoding: 'utf8' },
 )
   .trim()

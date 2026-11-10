@@ -156,8 +156,32 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         this.contextEnvelopeFactory = contextEnvelopeFactory;
     }
 
+    @Autowired(required = false)
+    private WebConversationTurnCoordinator webTurnCoordinator;
+    @Autowired(required = false)
+    private com.auraboot.framework.aurabot.service.AuraBotConversationService webConversations;
+
     @Override
     public TurnOutcome runTurn(TurnRequest request, ResponseSink sink) {
+        if (webTurnCoordinator == null || !"web".equals(request.channel()) || request.conversationId() == null)
+            return runTurnWithScope(request, sink);
+        if (webConversations != null && !webConversations.isDirectWebConversation(request.conversationId(), request.tenantId()))
+            return runTurnWithScope(request, sink);
+        if (webConversations != null) webConversations.assertMember(request.conversationId(), request.tenantId(),
+                request.humanMemberId() != null ? request.humanMemberId() : request.userId());
+        try (var lease = webTurnCoordinator.enter(request.tenantId(), request.conversationId(), "request")) {
+            DeferredTerminalResponseSink deferred = new DeferredTerminalResponseSink(sink);
+            try { return runTurnWithScope(request, deferred); }
+            finally { lease.close(); deferred.flushTerminal(); }
+        } catch (WebConversationTurnCoordinator.ConversationBusyException busy) {
+            TurnOutcome.Failed failed = new TurnOutcome.Failed(busy.getMessage(), busy);
+            sink.onError(busy.getMessage(), null);
+            recordPreExecutionRejection(request, failed);
+            return failed;
+        }
+    }
+
+    private TurnOutcome runTurnWithScope(TurnRequest request, ResponseSink sink) {
         // Publish which conversation this turn is about, so a tool whose subject IS the conversation
         // (escalate to a human, summarise the thread) can act on it — the LLM cannot supply an id it
         // has never seen. Cleared in the finally: a leaked scope would become the next pooled
@@ -489,6 +513,25 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
 
     @Override
     public TurnOutcome resumeTurn(String pendingTurnId, ConfirmDecision decision, ResponseSink sink) {
+        if (webTurnCoordinator != null && pendingTurnId != null && !pendingTurnId.isBlank()) {
+            var route = pendingToolStore.peekRouting(pendingTurnId, MetaContext.getCurrentTenantId(), MetaContext.getCurrentUserId());
+            if (route != null && "web".equals(route.channel()) && route.conversationId() != null
+                    && (webConversations == null || webConversations.isDirectWebConversation(route.conversationId(), MetaContext.getCurrentTenantId()))) {
+                try (var lease = webTurnCoordinator.enter(MetaContext.getCurrentTenantId(), route.conversationId(), "resume")) {
+                    DeferredTerminalResponseSink deferred = new DeferredTerminalResponseSink(sink);
+                    try { return resumeTurnDispatch(pendingTurnId, decision, deferred); }
+                    finally { lease.close(); deferred.flushTerminal(); }
+                } catch (WebConversationTurnCoordinator.ConversationBusyException busy) {
+                    // Peek precedes consume: a busy retry cannot destroy the pending approval.
+                    sink.onError(busy.getMessage(), null);
+                    return new TurnOutcome.Failed(busy.getMessage(), busy);
+                }
+            }
+        }
+        return resumeTurnDispatch(pendingTurnId, decision, sink);
+    }
+
+    private TurnOutcome resumeTurnDispatch(String pendingTurnId, ConfirmDecision decision, ResponseSink sink) {
         if (pendingTurnId == null || pendingTurnId.isBlank()) {
             String msg = "resumeTurn called without pendingTurnId";
             log.warn(msg);
@@ -586,11 +629,13 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                         ctx, pending, capturingSink);
                 case DENIED -> {
                     String reason = "User denied the operation";
+                    pendingContinuationService.completeRejectedChatTool(pending, reason);
                     capturingSink.onDone("", null);
                     yield new TurnOutcome.Interrupted(reason, "user_denied");
                 }
                 case CANCELLED -> {
                     String reason = "User cancelled the operation";
+                    pendingContinuationService.completeRejectedChatTool(pending, reason);
                     capturingSink.onDone("", null);
                     yield new TurnOutcome.Interrupted(reason, "user_cancelled");
                 }

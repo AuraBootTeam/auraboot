@@ -1,7 +1,7 @@
 import { goldenStackState } from './golden-stack-state.mjs';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, realpathSync, readdirSync, statSync, mkdirSync, writeFileSync, renameSync } from 'node:fs';
+import { closeSync, constants, existsSync, fstatSync, openSync, readFileSync, realpathSync, readdirSync, statSync, mkdirSync, writeFileSync, renameSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { liveEnvironment } from './golden-product-identity.mjs';
@@ -29,7 +29,13 @@ export function fingerprintDirectory(root) {
       for (const name of readdirSync(real).sort()) visit(join(real, name), `${relative}/${name}`);
     } else {
       need(info.isFile(), 'Unsupported retained dependency entry');
-      digest.update(hash(readFileSync(real)) + '\n');
+      const descriptor = openSync(real, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+      try {
+        const opened = fstatSync(descriptor);
+        need(opened.isFile() && opened.dev === info.dev && opened.ino === info.ino && opened.mode === info.mode,
+          'Retained dependency changed while opening');
+        digest.update(hash(readFileSync(descriptor)) + '\n');
+      } finally { closeSync(descriptor); }
     }
   }
   visit(root, '.');
@@ -181,5 +187,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       console.log(state.backend); console.log(state.llmStubMode); console.log(state.loggingConfig || ''); console.log(state.redisHost);
       console.log(state.redisPort); console.log(state.isolatedRedisPort ?? '');
     } else throw new Error('Unknown resume action');
-  } catch { console.error('Retained golden launch identity refused; no database initialization performed'); process.exitCode = 1; }
+  } catch (error) {
+    // Surface the fixed predicate message (never process/env payloads) so an operator
+    // can tell a stale-plan refusal from an identity drift without re-deriving it.
+    console.error(`Retained golden launch identity refused: ${error.message}`);
+    process.exitCode = 1;
+  }
 }

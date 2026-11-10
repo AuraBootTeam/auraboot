@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * No-op email sender used when SMTP is not configured.
- * Logs the email content instead of sending.
+ * Logs delivery metadata without recording recipients or message content.
  * <p>
  * Always registered as a fallback. When the enterprise-comm module provides
  * SmtpEmailSender with @Primary, that takes precedence.
@@ -19,6 +19,6 @@ public class NoOpEmailSender implements EmailSender {
 
     @Override
     public void send(String to, String subject, String htmlBody) {
-        log.info("Email send (no-op, SMTP not configured): to={}, subject={}", to, subject);
+        log.info("Email send skipped (no-op, SMTP not configured)");
     }
 }

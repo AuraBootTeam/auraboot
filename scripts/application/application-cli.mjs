@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { closeSync, constants, fstatSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 import {
@@ -177,9 +177,15 @@ async function main() {
   if (['publish-release', 'upgrade-tenant'].includes(options.command)) {
     let token = process.env.AURA_RELEASE_TOKEN?.trim();
     if (options.tokenFile) {
-      const mode = statSync(options.tokenFile).mode & 0o777;
-      if ((mode & 0o077) !== 0) throw new Error('--token-file must not grant group or other permissions');
-      token = readFileSync(options.tokenFile, 'utf8').trim();
+      const descriptor = openSync(options.tokenFile, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+      try {
+        const stat = fstatSync(descriptor);
+        if (!stat.isFile()) throw new Error('--token-file must be a regular file');
+        if ((stat.mode & 0o077) !== 0) throw new Error('--token-file must not grant group or other permissions');
+        token = readFileSync(descriptor, 'utf8').trim();
+      } finally {
+        closeSync(descriptor);
+      }
     }
     if (options.command === 'upgrade-tenant') {
       const plan = JSON.parse(readFileSync(required(options, 'upgradePlan'), 'utf8'));

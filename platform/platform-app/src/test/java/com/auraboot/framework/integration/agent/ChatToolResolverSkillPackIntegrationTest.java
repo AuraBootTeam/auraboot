@@ -11,7 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.Commit;
 import org.springframework.transaction.annotation.Propagation;
@@ -38,8 +38,8 @@ class ChatToolResolverSkillPackIntegrationTest extends BaseIntegrationTest {
     @Autowired private ChatToolResolver resolver;
     @Autowired private JdbcTemplate jdbc;
 
-    @MockBean private GroundingPort groundingPort;
-    @MockBean private ToolDiscoveryPort toolDiscoveryPort;
+    @MockitoBean private GroundingPort groundingPort;
+    @MockitoBean private ToolDiscoveryPort toolDiscoveryPort;
 
     private Long tenantId;
 

@@ -9,7 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.HashSet;
@@ -35,7 +35,7 @@ class AuraBotSkillToolProviderIntegrationTest extends BaseIntegrationTest {
 
     @Autowired AuraBotSkillToolProvider provider;
 
-    @MockBean private UserPermissionService userPermissionService;
+    @MockitoBean private UserPermissionService userPermissionService;
 
     /** Per-test effective permission codes. */
     private final Set<String> currentPermissions = new HashSet<>();

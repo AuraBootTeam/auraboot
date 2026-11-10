@@ -151,6 +151,18 @@ class PluginCustomizationProtectionTest {
         verify(resources).findModificationState(42L,"dashboard","invoice");
     }
 
+    @Test void previewNamesChangesWithoutPromisingAnOverwriteAndKeepsItsWireContract() throws Exception {
+        var result = ImportPreviewResult.builder().isUpgrade(true).build();
+        var change = ImportPreviewResult.ResourceChange.builder().resourceType(ResourceType.PAGE).resourceCode("invoice")
+                .action(ResourceAction.UPDATE).userModified(true).build();
+        result.addChange(ResourceType.PAGE, change);
+        new PluginImportChangePreview(resources, null, null, null, null).summarizeUserModifiedConflicts(result);
+        assertThat(result.getWarnings()).singleElement().asString().contains("customer changes").doesNotContain("will be overwritten");
+        var wire = new ObjectMapper().valueToTree(result);
+        assertThat(wire.path("upgrade").asBoolean()).isTrue();
+        assertThat(wire.path("actionCounts").path("UPDATE").asInt()).isEqualTo(1);
+    }
+
     @Test void previewCannotHideUnknownProtectionState() {
         var failure=new IllegalStateException("preview unavailable");
         when(resources.findModificationState(42L,"page","invoice")).thenThrow(failure);

@@ -39,7 +39,7 @@ export class InspectorSchemaRegistry {
 }
 
 const defaultFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
   { key: 'region', label: 'Region', type: 'text' },
 ];
@@ -63,7 +63,7 @@ const aiLockField: PropertySchema<string> = {
 };
 
 const modelContainerFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'dataSource.model', label: 'Model', type: 'model' },
   { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
@@ -71,7 +71,7 @@ const modelContainerFields: PropertySchema<string>[] = [
 const formPresentationFields: PropertySchema<string>[] = [...modelContainerFields, ...formPresentationProperties];
 
 const formSectionFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'props.description', label: 'Description', type: 'text' },
   { key: 'props.collapsible', label: 'Collapsible', type: 'boolean' },
   { key: 'props.defaultCollapsed', label: 'Default collapsed', type: 'boolean' },
@@ -81,14 +81,14 @@ const formSectionFields: PropertySchema<string>[] = [
 ];
 
 const columnsContainerFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'layout.columns', label: 'Columns', type: 'number' },
   { key: 'layout.gap', label: 'Gap', type: 'number' },
   { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 const listFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'dataSource.model', label: 'Model', type: 'model' },
   {
     key: 'props.selectionMode',
@@ -103,7 +103,7 @@ const listFields: PropertySchema<string>[] = [
 ];
 
 const dashboardFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
   { key: 'layout.cols', label: 'Columns', type: 'number' },
   { key: 'layout.rowHeight', label: 'Row height', type: 'number' },
@@ -400,14 +400,14 @@ const columnFields: PropertySchema<string>[] = [
 ];
 
 const tableFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'dataSource.model', label: 'Model', type: 'model' },
   { key: 'props.rows', label: 'Preview rows JSON', type: 'json' },
   { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 const subTableFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'dataSource.model', label: 'Model', type: 'model' },
   { key: 'dataSource.parentField', label: 'Parent field', type: 'text' },
   { key: 'dataSource.childField', label: 'Child field', type: 'text' },
@@ -416,13 +416,13 @@ const subTableFields: PropertySchema<string>[] = [
 ];
 
 const repeaterFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'props.rows', label: 'Preview rows JSON', type: 'json' },
   { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
 const subformFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'props.rows', label: 'Preview rows JSON', type: 'json' },
   { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
@@ -456,7 +456,7 @@ const helperDataSourceFields: PropertySchema<string>[] = [
 ];
 
 const aiFillBannerFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'props.description', label: 'Description', type: 'text' },
   { key: 'props.suggestedFields', label: 'Suggested fields JSON', type: 'json' },
   { key: 'props.feedback', label: 'Apply feedback', type: 'text' },
@@ -466,7 +466,7 @@ const aiFillBannerFields: PropertySchema<string>[] = [
 ];
 
 const bpmPanelFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'props.description', label: 'Description', type: 'text' },
   {
     key: 'props.status',
@@ -489,7 +489,7 @@ const bpmPanelFields: PropertySchema<string>[] = [
 ];
 
 const activityTimelineFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'props.items', label: 'Items JSON', type: 'json' },
   { key: 'props.emptyText', label: 'Empty text', type: 'text' },
   ...helperDataSourceFields,
@@ -497,7 +497,7 @@ const activityTimelineFields: PropertySchema<string>[] = [
 ];
 
 const fieldHistoryFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'props.entries', label: 'Entries JSON', type: 'json' },
   { key: 'props.emptyText', label: 'Empty text', type: 'text' },
   ...helperDataSourceFields,
@@ -518,7 +518,7 @@ const fieldHistoryFields: PropertySchema<string>[] = [
 // invented fields, only props that are actually consumed.
 
 const metricStripFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   // dataSource is a string id on workbench blocks (the named data source the
   // page binds), so it is a plain text field rather than the model selector.
   { key: 'dataSource', label: 'Data source', type: 'text' },
@@ -539,7 +539,7 @@ const metricStripFields: PropertySchema<string>[] = [
 ];
 
 const statusBannerFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'dataSource', label: 'Data source', type: 'text' },
   // statusField/errorField select which record paths drive the banner.
   { key: 'statusField', label: 'Status field', type: 'text' },
@@ -569,7 +569,7 @@ const statusBannerFields: PropertySchema<string>[] = [
 // block.detailPlacement / block.density / block.align / block.title. Each action
 // is { code|id, label, variant, visibleWhen, activeWhen, disabledWhen, onClick }.
 const workbenchActionBarFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   {
     key: 'surface',
     label: 'Surface',
@@ -607,7 +607,7 @@ const workbenchActionBarFields: PropertySchema<string>[] = [
 // StageRailBlockRenderer reads the current record from block.context, resolves
 // block.stageField, then displays ordered stages plus optional terminal outcomes.
 const stageRailFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'context', label: 'Context expression', type: 'text' },
   { key: 'stageField', label: 'Stage field', type: 'text', required: true },
   { key: 'stages', label: 'Stages JSON', type: 'json', required: true },
@@ -620,7 +620,7 @@ const stageRailFields: PropertySchema<string>[] = [
 // format, items? }. items maps paths inside a JSON section into semantic
 // operation cards instead of raw JSON pre blocks.
 const evidencePanelFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'dataSource', label: 'Data source', type: 'text' },
   { key: 'context', label: 'Context expression', type: 'text' },
   // sections: array of { key, field, label, format } — the renderer iterates it.
@@ -633,7 +633,7 @@ const evidencePanelFields: PropertySchema<string>[] = [
 // and renders block.blocks (child blocks) below the field grid. Field: { field,
 // path, label, span }.
 const recordInspectorFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'context', label: 'Context expression', type: 'text' },
   // fields: array of { field, path, label, span } — the renderer iterates it.
   { key: 'fields', label: 'Fields JSON', type: 'json' },
@@ -645,7 +645,7 @@ const recordInspectorFields: PropertySchema<string>[] = [
 // block.selection / block.actions / block.maxHeight. item: { titleField,
 // subtitleField, descriptionField, scoreField, detailFields[], maxHeight }.
 const candidateListFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'dataSource', label: 'Data source', type: 'text' },
   // item: { titleField, subtitleField, descriptionField, scoreField,
   // detailFields }. Authored as JSON.
@@ -661,7 +661,7 @@ const candidateListFields: PropertySchema<string>[] = [
 // block.title / block.empty. item: { keyField, titleField, subtitleField,
 // revisionField, statusField, hashField, fileIdField }.
 const artifactTimelineFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'dataSource', label: 'Data source', type: 'text' },
   // item: { keyField, titleField, subtitleField, revisionField, statusField,
   // hashField, fileIdField }. Authored as JSON.
@@ -683,7 +683,7 @@ const artifactTimelineFields: PropertySchema<string>[] = [
 // (the named data source whose first row supplies the live value); block.title is
 // the card heading. statCard is authored as JSON (a small object editor).
 const statCardFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   // dataSource is a string id on display blocks (the named data source the page
   // binds), so it is a plain text field rather than the model selector.
   { key: 'dataSource', label: 'Data source', type: 'text' },
@@ -697,7 +697,7 @@ const statCardFields: PropertySchema<string>[] = [
 // The BARE `content` path wins, so the inspector exposes it directly (LocalizedText
 // or string; HTML is sanitized before render). No other authorable props.
 const descriptionFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'content', label: 'Content', type: 'text' },
   { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
@@ -709,7 +709,7 @@ const descriptionFields: PropertySchema<string>[] = [
 // fields: surfacing modelCode/recordPid here would be invented (the live renderer
 // ignores them).
 const recordCommentsFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
 
@@ -718,7 +718,7 @@ const recordCommentsFields: PropertySchema<string>[] = [
 // block.title, block.pageSize, block.searchable, block.filterable. The parent
 // record id is resolved from the detail route, so this is a DETAIL-only block.
 const embeddedListFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'modelCode', label: 'Model code', type: 'text', required: true },
   { key: 'parentField', label: 'Parent field (foreign key)', type: 'text' },
   // columns: array of { field, label, dataType?, dictCode?, width?, align? }.
@@ -736,7 +736,7 @@ const embeddedListFields: PropertySchema<string>[] = [
 // exportImpact / source / empty / title. Nested objects (compare, candidates,
 // exportImpact, source) are authored as JSON.
 const reviewDrawerFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'titleTemplate', label: 'Title template', type: 'text' },
   // context expression resolves the selected record (e.g. ${state.selectedRow}).
   { key: 'context', label: 'Context expression', type: 'text' },
@@ -959,7 +959,7 @@ const widgetFields: PropertySchema<string>[] = [
 // the common ones — any unsupported value surfaces a clear "Unsupported chart type"
 // message on the live page (never silent).
 const chartFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   {
     key: 'chartType',
     label: 'Chart type',
@@ -1058,7 +1058,7 @@ const traceGraphFields: PropertySchema<string>[] = [
 // (block.selection.bind || block.bind || 'selectedRows'). The inspector exposes the
 // simpler bare `bind` text path the renderer reads directly.
 const selectionInfoFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'bind', label: 'Selection state key', type: 'text' },
   { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
 ];
@@ -1069,7 +1069,7 @@ const selectionInfoFields: PropertySchema<string>[] = [
 // board canvas + CPL inspection render on the live /p/ page (it fetches gerber
 // artifacts with the auth token); the designer shows a representative preview.
 const gerberViewerFields: PropertySchema<string>[] = [
-  { key: 'title', label: 'Title', type: 'text' },
+  { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'dataSource', label: 'Data source', type: 'text' },
   { key: 'inspection', label: 'Inspection expression', type: 'text' },
   { key: 'inspectionUrl', label: 'Inspection URL', type: 'text' },
@@ -1087,6 +1087,12 @@ export function createDefaultInspectorSchemaRegistry(): InspectorSchemaRegistry 
     detail: modelContainerFields,
     'detail-section': formSectionFields,
     list: listFields,
+    text: [
+      { key: 'contentKey', label: 'Content key', type: 'text' },
+      { key: 'content', label: 'Content', type: 'localizedText' },
+      { key: 'visibleWhen', label: 'Visible when', type: 'text' },
+      { key: 'layout.span', label: 'Span', type: 'number', min: 1, max: 24 },
+    ],
     dashboard: dashboardFields,
     columns: columnsContainerFields,
     field: fieldFields,

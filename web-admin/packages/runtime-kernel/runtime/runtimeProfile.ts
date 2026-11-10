@@ -26,7 +26,9 @@ export function normalizeRuntimePathname(pathname: string): string {
   if (!pathname) return '/';
   const [pathWithoutQuery] = pathname.split('?');
   const absolutePath = pathWithoutQuery.startsWith('/') ? pathWithoutQuery : `/${pathWithoutQuery}`;
-  return absolutePath.replace(/\/+$/, '') || '/';
+  let end = absolutePath.length;
+  while (end > 0 && absolutePath.charCodeAt(end - 1) === 47) end--;
+  return absolutePath.slice(0, end) || '/';
 }
 
 export function getRuntimeProfileFromPathname(pathname: string): RuntimeProfile {

@@ -91,6 +91,8 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
         'widget',
         'filters',
         'toolbar',
+        'form-buttons',
+        'text',
         'divider',
       ],
       inspector: toInspectorSchema('list'),
@@ -514,6 +516,14 @@ export function createDefaultBlockRegistryV3(): BlockRegistryV3 {
       icon: 'gauge',
       category: 'dashboard',
       inspector: toInspectorSchema('stat-card'),
+      layoutCapability: 'span',
+    },
+    {
+      blockType: 'text',
+      label: { 'en-US': 'Text', 'zh-CN': '文本' },
+      icon: 'text',
+      category: 'list',
+      inspector: toInspectorSchema('text'),
       layoutCapability: 'span',
     },
     {

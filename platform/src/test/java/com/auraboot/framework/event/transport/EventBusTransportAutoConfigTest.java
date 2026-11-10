@@ -7,8 +7,8 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
-import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
-import org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
+import org.springframework.boot.jackson2.autoconfigure.Jackson2AutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,7 +22,7 @@ class EventBusTransportAutoConfigTest {
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withBean(ThreadContextScopes.class, () -> new ThreadContextScopes(List.of()))
             .withConfiguration(AutoConfigurations.of(
-                    JacksonAutoConfiguration.class,
+                    Jackson2AutoConfiguration.class,
                     EventConfiguration.class
             ));
 
@@ -51,7 +51,7 @@ class EventBusTransportAutoConfigTest {
     @DisplayName("redis config should create RedisStreamTransport when Redis is available")
     void redisShouldCreateRedisTransport() {
         contextRunner
-                .withConfiguration(AutoConfigurations.of(RedisAutoConfiguration.class))
+                .withConfiguration(AutoConfigurations.of(DataRedisAutoConfiguration.class))
                 .withPropertyValues("aura.event.transport=redis")
                 .run(context -> {
                     assertThat(context).hasSingleBean(EventBusTransport.class);
@@ -76,7 +76,7 @@ class EventBusTransportAutoConfigTest {
     @DisplayName("EventBusProperties should bind transport=redis correctly")
     void propertiesShouldBind() {
         contextRunner
-                .withConfiguration(AutoConfigurations.of(RedisAutoConfiguration.class))
+                .withConfiguration(AutoConfigurations.of(DataRedisAutoConfiguration.class))
                 .withPropertyValues("aura.event.transport=redis")
                 .run(context -> {
                     EventBusProperties props = context.getBean(EventBusProperties.class);

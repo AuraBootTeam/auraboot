@@ -8,6 +8,10 @@
  */
 
 import { AlertTriangle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { get } from '~/shared/services/http-client';
+import { ResultHelper } from '~/utils/type';
+import { useBusinessFieldPresentation } from './useBusinessFieldPresentation';
 import { useI18n } from '~/contexts/I18nContext';
 import { formatToolDisplayName } from './toolDisplayName';
 
@@ -87,17 +91,40 @@ export function ConfirmCard({
   const isApproval = toolName === 'agent_approval_gate';
   const businessInput = isApproval && input.input && typeof input.input === 'object' && !Array.isArray(input.input)
     ? input.input as Record<string, unknown> : input;
+  const actualToolName = isApproval && typeof input.toolName === 'string' ? input.toolName : toolName;
+  const isCommand = /^cmd[:_]/.test(actualToolName);
+  const metadataKey = JSON.stringify([actualToolName, locale]);
+  const [metadata, setMetadata] = useState<{key: string; status: 'ready' | 'error'; tool?: { toolName?: string; modelCode?: string }}>({key: '', status: 'ready'});
+  const tool = metadata.key === metadataKey ? metadata.tool : undefined;
+  const metadataStatus = !isCommand ? 'ready' : metadata.key !== metadataKey ? 'loading' : metadata.status;
+  useEffect(() => {
+    let active = true;
+    if (isCommand) {
+      get<{ tools: Array<{ toolCode: string; toolName?: string; modelCode?: string }> }>('/api/agent/tools/registry')
+        .then((response) => {
+          if (!active) return;
+          const normalize = (code: string) => code.replace(/[:.]/g, '_');
+          const resolved = ResultHelper.isSuccess(response) ? response.data?.tools.find((candidate) => normalize(candidate.toolCode) === normalize(actualToolName)) : undefined;
+          setMetadata({key: metadataKey, status: resolved ? 'ready' : 'error', tool: resolved});
+        }).catch(() => { if (active) setMetadata({key: metadataKey, status: 'error'}); });
+    }
+    return () => { active = false; };
+  }, [actualToolName, locale, isCommand, metadataKey]);
+  const fields = useBusinessFieldPresentation(tool?.modelCode, [businessInput]);
   const isAnalyticsSuggestion = [
     'cmd_core_dashboard_propose_suggestion',
     'cmd:core_dashboard:propose_suggestion',
   ].includes(toolName);
+  const reviewStatus = isCommand && !isAnalyticsSuggestion
+    ? metadataStatus !== 'ready' ? metadataStatus : tool?.modelCode ? fields.status : 'ready'
+    : 'ready';
   const displayName = isApproval
     ? t('ai.approval.operation', undefined, isZh ? '审批业务操作' : 'Approve business operation')
     : isAnalyticsSuggestion
     ? isZh
       ? '保存建议版本'
       : 'Save suggestion version'
-    : formatToolDisplayName(toolName, isZh);
+    : tool?.toolName || formatToolDisplayName(toolName, isZh);
 
   // Filter input params for display
   const visibleParams = Object.entries(businessInput).filter(([key]) =>
@@ -134,7 +161,14 @@ export function ConfirmCard({
           <p className="text-sm text-amber-700 dark:text-amber-300/80">{safeDescription}</p>
 
           {/* Params */}
-          {visibleParams.length > 0 && (
+          {reviewStatus !== 'ready' && (
+            <p role={reviewStatus === 'error' ? 'alert' : 'status'} className="text-sm text-amber-700 dark:text-amber-300" data-testid="confirm-parameters-status">
+              {reviewStatus === 'error'
+                ? t('ai.approval.parametersUnavailable', undefined, isZh ? '无法读取业务参数，请取消后重试或联系管理员。' : 'Business parameters are unavailable. Cancel and try again or contact an administrator.')
+                : t('ai.approval.parametersLoading', undefined, isZh ? '正在读取业务参数…' : 'Loading business parameters…')}
+            </p>
+          )}
+          {reviewStatus === 'ready' && visibleParams.length > 0 && (
             <div className="space-y-1">
               {visibleParams.map(([key, value]) => (
                 <div key={key} className="flex items-start gap-2 text-xs">
@@ -147,7 +181,7 @@ export function ConfirmCard({
                         ? isZh
                           ? '建议内容'
                           : 'Suggestion'
-                        : formatParamName(key, isZh)}
+                        : fields.label(key) || formatParamName(key, isZh)}
                     :
                   </span>
                   <span className="break-all text-amber-700 dark:text-amber-300/70">
@@ -155,7 +189,7 @@ export function ConfirmCard({
                       ? String((value as { goal?: string })?.goal ?? '')
                       : typeof value === 'object'
                         ? JSON.stringify(value)
-                        : String(value)}
+                        : String(fields.value(key, value, businessInput))}
                   </span>
                 </div>
               ))}
@@ -175,7 +209,7 @@ export function ConfirmCard({
           </button>
           <button
             onClick={() => onConfirm(toolId)}
-            disabled={disabled}
+            disabled={disabled || reviewStatus !== 'ready'}
             data-testid="aurabot-confirm-approve"
             className="rounded-lg bg-amber-500 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
           >

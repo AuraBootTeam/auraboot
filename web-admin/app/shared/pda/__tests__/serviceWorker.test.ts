@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
+import { PDA_SHELL_ROUTES } from '../offlineReplay';
 
 function worker() {
   const listeners = new Map<string, (event: any) => void>();
@@ -91,18 +92,21 @@ describe('service worker document navigation boundary', () => {
     },
   );
 
-  it('preserves the explicit PDA network-first shell and offline fallback', async () => {
-    const { listeners, caches, fetch } = worker();
-    fetch.mockRejectedValueOnce(new TypeError('offline'));
-    let response: Promise<Response> | undefined;
-    listeners.get('fetch')!({
-      request: { url: 'https://example.test/inventory/pda-pick', mode: 'navigate', method: 'GET' },
-      respondWith: (promise: Promise<Response>) => {
-        response = promise;
-      },
-    });
-    expect(await (await response)!.text()).toBe('stale anonymous shell');
-    expect(fetch).toHaveBeenCalledOnce();
-    expect(caches.match).toHaveBeenCalledOnce();
-  });
+  it.each(PDA_SHELL_ROUTES)(
+    'preserves the %s network-first shell and offline fallback',
+    async (path) => {
+      const { listeners, caches, fetch } = worker();
+      fetch.mockRejectedValueOnce(new TypeError('offline'));
+      let response: Promise<Response> | undefined;
+      listeners.get('fetch')!({
+        request: { url: `https://example.test${path}`, mode: 'navigate', method: 'GET' },
+        respondWith: (promise: Promise<Response>) => {
+          response = promise;
+        },
+      });
+      expect(await (await response)!.text()).toBe('stale anonymous shell');
+      expect(fetch).toHaveBeenCalledOnce();
+      expect(caches.match).toHaveBeenCalledOnce();
+    },
+  );
 });

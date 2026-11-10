@@ -50,6 +50,9 @@ interface SortableFieldItemProps {
  */
 function SortableFieldItem({ field, onConfigure, onUnbind, onDictConfig }: SortableFieldItemProps) {
   const { hasPermission } = usePermissions();
+  const smartText = useSmartText();
+  const code = field.code || field.fieldCode;
+  const name = field.displayName || field.fieldName;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: field.id,
     disabled: !hasPermission('meta.model.update'),
@@ -90,15 +93,22 @@ function SortableFieldItem({ field, onConfigure, onUnbind, onDictConfig }: Sorta
       </td>
 
       {/* Field Code */}
-      <td className="text-text max-w-48 px-6 py-4 break-all font-mono text-sm whitespace-normal">
-        {field.code || field.fieldCode}
+      <td data-testid="model-field-identity" className="text-text w-72 max-w-72 px-4 py-3 text-sm">
+        {name && name !== code && (
+          <span className="mb-1 block max-w-64 truncate font-medium" title={smartText(name)}>
+            {smartText(name)}
+          </span>
+        )}
+        <span data-testid="model-field-code" className="text-text-2 block max-w-64 truncate font-mono text-xs" title={code}>
+          {code}
+        </span>
       </td>
 
       {/* Data Type */}
-      <td className="text-text px-6 py-4 text-sm whitespace-nowrap">{field.dataType}</td>
+      <td className="text-text px-3 py-3 text-sm whitespace-nowrap">{field.dataType}</td>
 
       {/* Required */}
-      <td className="text-text px-6 py-4 text-sm whitespace-nowrap">
+      <td className="text-text px-3 py-3 text-sm whitespace-nowrap">
         {field.required ? (
           <span className="rounded-pill inline-flex bg-red-100 px-2 py-1 text-xs font-medium text-red-800">
             必填
@@ -109,7 +119,7 @@ function SortableFieldItem({ field, onConfigure, onUnbind, onDictConfig }: Sorta
       </td>
 
       {/* Readonly */}
-      <td className="text-text px-6 py-4 text-sm whitespace-nowrap">
+      <td className="text-text px-3 py-3 text-sm whitespace-nowrap">
         {field.readonly ? (
           <span className="rounded-pill bg-subtle text-text inline-flex px-2 py-1 text-xs font-medium">
             只读
@@ -120,7 +130,7 @@ function SortableFieldItem({ field, onConfigure, onUnbind, onDictConfig }: Sorta
       </td>
 
       {/* Visible */}
-      <td className="text-text px-6 py-4 text-sm whitespace-nowrap">
+      <td className="text-text px-3 py-3 text-sm whitespace-nowrap">
         {field.visible !== false ? (
           <span className="rounded-pill inline-flex bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
             显示
@@ -133,7 +143,7 @@ function SortableFieldItem({ field, onConfigure, onUnbind, onDictConfig }: Sorta
       </td>
 
       {/* Dictionary */}
-      <td className="px-6 py-4 text-sm whitespace-nowrap">
+      <td className="px-3 py-3 text-sm whitespace-nowrap">
         {field.dictCode ? (
           <div className="flex items-center gap-2">
             <span className="text-text font-mono">{field.dictCode}</span>
@@ -175,10 +185,10 @@ function SortableFieldItem({ field, onConfigure, onUnbind, onDictConfig }: Sorta
       </td>
 
       {/* Display Order */}
-      <td className="text-text-2 px-6 py-4 text-sm whitespace-nowrap">{field.displayOrder}</td>
+      <td className="text-text-2 px-3 py-3 text-sm whitespace-nowrap">{field.displayOrder}</td>
 
       {/* Actions */}
-      <td className="px-6 py-4 text-sm whitespace-nowrap">
+      <td className="px-3 py-3 text-sm whitespace-nowrap">
         <PermissionGuard permission="meta.model.update">
           <button
             data-testid="model-field-configure"
@@ -385,7 +395,7 @@ export function FieldListManager({
         )}
 
         {/* Field Table */}
-        <div className="ring-opacity-5 rounded-card overflow-x-auto shadow ring-1 ring-black">
+        <div className="border-border rounded-card overflow-x-auto border">
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -397,28 +407,28 @@ export function FieldListManager({
                   <th className="text-text-2 px-4 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
                     排序
                   </th>
-                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
-                    字段编码
+                  <th className="text-text-2 px-3 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
+                    {smartText({ 'zh-CN': '字段 / 编码', en: 'Field / code' })}
                   </th>
-                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
+                  <th className="text-text-2 px-3 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
                     数据类型
                   </th>
-                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
+                  <th className="text-text-2 px-3 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
                     必填
                   </th>
-                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
+                  <th className="text-text-2 px-3 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
                     只读
                   </th>
-                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
+                  <th className="text-text-2 px-3 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
                     可见
                   </th>
-                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
+                  <th className="text-text-2 px-3 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
                     字典
                   </th>
-                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
+                  <th className="text-text-2 px-3 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
                     顺序
                   </th>
-                  <th className="text-text-2 px-6 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
+                  <th className="text-text-2 px-3 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap uppercase">
                     操作
                   </th>
                 </tr>

@@ -36,6 +36,26 @@ Page 使用 `ResourceType.PAGE/page`，Dashboard 使用 `ResourceType.DASHBOARD/
 
 **升级影响**：旧页面和看板在安全导入下可能保留，即使实际上未修改；需检查差异后显式选择 OVERWRITE。新安装/新导入在此迁移后正常形成未修改基线，后续安全升级可更新。迁移不修改页面/看板内容，不自动发布，也不需要用户重新创建页面。
 
+## 模块自有 seed 的重导入
+
+Automation、决策、条件片段和事件策略复用同一导入请求的 conflictStrategy，但保留各模块版本/发布机制，不并入另一套版本库。新定义正常创建；既有定义在 ERROR 下拒绝，SKIP 保留；OVERWRITE_SAFE 仅在当前模块状态与本插件上次成功导入基线一致时更新，否则保留并在 warnings 说明。显式 OVERWRITE 进入模块原有更新/新版本/校验/发布流程。OVERWRITE 不绕过不可变版本、冲突 draft 或其他模块校验。
+
+成功导入历史的 result.moduleSeedBaselines 保存实际模块状态（含定义和版本/草稿身份），不新增版本库或跟踪表。顶层审计时间、发布人和触发计数不参与比较，JSON 业务载荷不作递归删字段。基线缺失的历史定义仍保守保留；读取失败中止导入。SKIP/SAFE 冲突沿用旧基线，只有成功写入才更新基线；失败随原导入事务回滚。整包 OVERWRITE 不应作为单资源冲突的默认处理方式。元数据定义/版本表在导入事务中使用有界写锁串行化状态比较和更新（等待上限三秒，读取不阻塞），防止新 draft 插入绕过比较。这是保守配置更新边界，不承诺无写入停顿或自动三方合并。条件片段查找仅明确 NOT_FOUND 可按不存在处理，其余异常中止导入。
+
+Automation 的 pluginId/automationKey 身份保存在模块自有 ab_automation.seed_plugin_id/seed_key；用户可改显示名称，导入仍定位同 PID。来源字段不从公共 CRUD 请求接收，数据库约束其成对存在、租户内有效定义唯一，已建立的来源不可修改。显式覆盖可以接管唯一同名 legacy 定义；旧记录不自动猜测来源。若同模型有未知来源且无法唯一匹配，ERROR 拒绝，SKIP/SAFE 保留并警告，避免把改名后的旧定义当作新定义重复启用。跨模型移动和来源冲突需要单独迁移。
+
+所有现有调用修改 tracker 的控制面写入都在同一 Spring 事务中保存内容和标记。Command/Field 的真实 Spring 回归需证明标记故障时内容、字段版本与原标记一起回滚，正常保存仍可提交。
+
+## 双客户升级的操作口径
+
+插件管理的上传确认默认使用 OVERWRITE_SAFE。页面默认导入为草稿，不自动发布流程；导入完成不等于全部资源均已替换，也不等于草稿已进入运行态。客户 A 的页面和规则已修改时保留当前配置，客户 B 的同源未改定义可吸收共享更新；插件包版本可以前进，而被保留资源继续沿用原内容和基线。
+
+执行结果显示保留配置数与业务说明，原始资源标识和诊断可展开。历史接口仅投影 warnings 与 preservedResourceCount，不能把内部 moduleSeedBaselines 原样暴露给客户端；刷新后保留说明和失败原因仍可查询。四类模块的保留也计入资源 SKIP 数量，不能只统计 Page/Dashboard。未知基线与可证实的客户修改都会保守保留，当前提示不承诺自动辨别或三方合并。
+
+晚阶段定义校验失败时，复用原导入事务回滚本次数据库修改；已有页面、有效规则和业务记录仍可使用，修正包后可再次导入。这不覆盖任意破坏性 DDL、外部消息撤回、运行中自动化补偿、卸载及删除后重装。
+
+双客户实栈入口为 PluginTwoCustomerUpgradeIntegrationTest，覆盖重复升级、失败后业务读写、隔离、历史回显以及独立连接下的配置读写锁边界。浏览器入口为 web-admin/playwright.plugin-upgrade.config.ts（two-customer-upgrade.spec.ts）：使用新建的 A/B 测试空间，从插件管理上传/预览/确认，再验证失败后的标准 CRUD 修改、重开、修正包与无权导入。空间、定制和测试记录通过现有 API 布置，不将其冒充设计器的全操作验收。PW_UPGRADE_ACCOUNT_FILE 指向本地私有账号 JSON（email/password）；凭据须置于独立的私有证据目录，不能只存于换代时会清除的 runtime 目录。
+
 ## 普通字段删除
 
 物理删除入口 `SchemaManagementServiceImpl.removeFieldFromModel` 复用 `FieldDeletionGuard`：

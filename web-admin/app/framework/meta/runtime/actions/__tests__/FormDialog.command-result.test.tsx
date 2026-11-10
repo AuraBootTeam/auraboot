@@ -472,7 +472,7 @@ describe('actual FormDialog and native executor result handshake', () => {
   });
 });
 
-function Registry({ refresh }: { refresh: () => Promise<void> }) {
+function Registry({ refresh, remote = false }: { refresh: () => Promise<void>; remote?: boolean }) {
   const [error, setError] = useState('');
   return (
     <>
@@ -486,7 +486,14 @@ function Registry({ refresh }: { refresh: () => Promise<void> }) {
                 expectedVersion: 7,
                 operationType: 'UPDATE',
                 idempotent: true,
-                inputFields,
+                ...(remote
+                  ? {
+                      inputFieldsSource: {
+                        endpoint: '/api/forms/case/A',
+                        payloadBindings: { expectedRevision: 'revision' },
+                      },
+                    }
+                  : { inputFields }),
                 inputFieldsTitle: 'Registry',
                 inputFieldsPresentation: presentation,
               },
@@ -505,7 +512,13 @@ function Registry({ refresh }: { refresh: () => Promise<void> }) {
     </>
   );
 }
-function Workbench({ refresh }: { refresh: () => Promise<void> }) {
+function Workbench({
+  refresh,
+  remote = false,
+}: {
+  refresh: () => Promise<void>;
+  remote?: boolean;
+}) {
   const rt = useMemo(() => runtime(row(), refresh), [refresh]),
     [error, setError] = useState('');
   return (
@@ -519,7 +532,14 @@ function Workbench({ refresh }: { refresh: () => Promise<void> }) {
               targetRecordPid: 'A',
               expectedVersion: 7,
               operationType: 'UPDATE',
-              inputFields,
+              ...(remote
+                ? {
+                    inputFieldsSource: {
+                      endpoint: '/api/forms/case/A',
+                      payloadBindings: { expectedRevision: 'revision' },
+                    },
+                  }
+                : { inputFields }),
               inputFieldsTitle: 'Workbench',
               inputFieldsPresentation: presentation,
               reload: ['list'],
@@ -771,6 +791,49 @@ describe('all native command prompt consumers acknowledge the same UI protocol',
       expect(screen.queryByTestId('form-dialog')).not.toBeInTheDocument();
       expect(closedBeforeRead).toEqual([true]);
       expect(io.fetch).toHaveBeenCalledOnce();
+    },
+  );
+});
+
+describe('dynamic command source through the actual shared form', () => {
+  it.each([Registry, Workbench].map((Component) => ({ name: Component.name, Component })))(
+    '$name keeps the exact draft after a stale source revision is rejected',
+    async ({ Component }) => {
+      const refresh = vi.fn().mockResolvedValue(undefined);
+      io.fetch.mockImplementation(async (url: string) =>
+        url === '/api/forms/case/A'
+          ? { code: '0', data: { inputFields, revision: 'clicked-revision' } }
+          : conflict,
+      );
+      render(
+        <Root>
+          <Component refresh={refresh} remote />
+        </Root>,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Open action' }));
+      await fill();
+      expect(io.fetch.mock.calls.map((call) => call[0])).toEqual(['/api/forms/case/A']);
+      fireEvent.click(screen.getByTestId('form-dialog-submit'));
+      await waitFor(() =>
+        expect(screen.getByTestId('form-dialog-submit-feedback')).toHaveAttribute(
+          'data-http-status',
+          '409',
+        ),
+      );
+      expect(screen.getByTestId('form-dialog-field-note')).toHaveValue('Retain this exact note');
+      expect(screen.getByTestId('form-dialog-submit')).toBeDisabled();
+      expect(io.fetch.mock.calls.map((call) => call[0])).toEqual([
+        '/api/forms/case/A',
+        '/api/meta/commands/execute/case:close',
+      ]);
+      expect(io.fetch.mock.calls[1][1].params.payload).toMatchObject({
+        expectedRevision: 'clicked-revision',
+        note: 'Retain this exact note',
+      });
+      expect(refresh).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByTestId('form-dialog-cancel'));
+      await waitFor(() => expect(screen.queryByTestId('form-dialog')).not.toBeInTheDocument());
+      expect(io.fetch).toHaveBeenCalledTimes(2);
     },
   );
 });

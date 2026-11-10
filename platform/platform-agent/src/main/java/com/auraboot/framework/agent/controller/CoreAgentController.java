@@ -49,7 +49,7 @@ public class CoreAgentController {
         status.put("enabled", agentProperties.isEnabled());
         status.put("enterpriseAvailable", agentExecutionService.isAvailable());
         try {
-            var configured = providerFactory.listConfiguredProviders(null);
+            var configured = providerFactory.listConfiguredProviders(MetaContext.getCurrentTenantId());
             status.put("configuredProviders", configured.size());
             status.put("providers", configured.stream()
                 .map(p -> Map.of("code", p.getProviderCode(), "name", p.getDisplayName()))
@@ -68,7 +68,7 @@ public class CoreAgentController {
 
     @GetMapping("/providers/configured")
     public ResponseEntity<?> listConfiguredProviders() {
-        return ResponseEntity.ok(providerFactory.listConfiguredProviders(null));
+        return ResponseEntity.ok(providerFactory.listConfiguredProviders(MetaContext.getCurrentTenantId()));
     }
 
     /**

@@ -40,6 +40,7 @@ class TeamMemberServiceImplTest {
     @Mock private UserService userService;
     @Mock private TenantMemberService tenantMemberService;
     @Mock private TeamGovernanceService teamGovernanceService;
+    @Mock private com.auraboot.framework.permission.service.impl.DataScopeCacheEvictor dataScopeCacheEvictor;
 
     private TeamMemberServiceImpl service;
     private TeamMemberServiceImpl spyService;
@@ -53,6 +54,7 @@ class TeamMemberServiceImplTest {
         injectField(service, "userService", userService);
         injectField(service, "tenantMemberService", tenantMemberService);
         injectField(service, "teamGovernanceService", teamGovernanceService);
+        injectField(service, "dataScopeCacheEvictor", dataScopeCacheEvictor);
         spyService = spy(service);
         lenient().when(teamGovernanceService.requireTeam(any(), anyString())).thenAnswer(invocation -> {
             String pid = invocation.getArgument(1);
@@ -156,6 +158,7 @@ class TeamMemberServiceImplTest {
         TeamMemberResponse resp = spyService.addMember("p1", req, 5L);
         assertEquals("Alice", resp.getUserName());
         assertEquals("LEADER", resp.getRole());
+        verify(dataScopeCacheEvictor).evictAfterCommit();
     }
 
     @Test
@@ -205,6 +208,7 @@ class TeamMemberServiceImplTest {
 
         spyService.removeMember("p1", "mp1");
         verify(spyService).removeById(99L);
+        verify(dataScopeCacheEvictor).evictAfterCommit();
     }
 
     @Test

@@ -604,6 +604,22 @@ $$;
 
 
 --
+-- Name: ab_automation_seed_identity_guard(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_automation_seed_identity_guard() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF OLD.seed_plugin_id IS NOT NULL AND
+       (NEW.seed_plugin_id IS DISTINCT FROM OLD.seed_plugin_id OR NEW.seed_key IS DISTINCT FROM OLD.seed_key) THEN
+        RAISE EXCEPTION 'Automation seed identity is immutable' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END $$;
+
+
+--
 -- Name: ab_guard_announcement_reminder_batch(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -918,6 +934,20 @@ $$;
 
 
 --
+-- Name: ab_role_permission_advance_policy_revision(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_role_permission_advance_policy_revision() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    NEW.policy_revision := OLD.policy_revision + 1;
+    RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: ab_tenant_binding_guard(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -999,6 +1029,24 @@ BEGIN
         NEW.current_release_id, NEW.status, NEW.updated_at, current_user, actor, operation);
     RETURN NEW;
 END $_$;
+
+
+--
+-- Name: agent_task_metadata_v1(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.agent_task_metadata_v1(value text) RETURNS jsonb
+    LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE
+    AS $$
+DECLARE parsed JSONB;
+BEGIN
+    parsed := value::JSONB;
+    IF jsonb_typeof(parsed) <> 'object' THEN RETURN NULL; END IF;
+    RETURN parsed;
+EXCEPTION WHEN data_exception THEN
+    RETURN NULL;
+END;
+$$;
 
 
 --
@@ -6015,6 +6063,9 @@ CREATE TABLE public.ab_automation (
     created_by character varying(26),
     updated_by character varying(26),
     flow_config jsonb,
+    seed_plugin_id text,
+    seed_key text,
+    CONSTRAINT chk_automation_seed_identity CHECK ((((seed_plugin_id IS NULL) AND (seed_key IS NULL)) OR ((seed_plugin_id IS NOT NULL) AND (length(btrim(seed_plugin_id)) > 0) AND (seed_key IS NOT NULL) AND (length(btrim(seed_key)) > 0)))),
     CONSTRAINT chk_automation_trigger_type CHECK (((trigger_type)::text = ANY ((ARRAY['on_record_create'::character varying, 'on_record_update'::character varying, 'on_field_change'::character varying, 'on_state_change'::character varying, 'scheduled'::character varying, 'webhook'::character varying, 'on_workflow_event'::character varying, 'on_inactivity'::character varying, 'external_event'::character varying])::text[])))
 );
 
@@ -16513,6 +16564,8 @@ CREATE TABLE public.ab_role_permission (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     created_by bigint,
     updated_by bigint,
+    policy_revision bigint DEFAULT 1 NOT NULL,
+    CONSTRAINT ab_role_permission_policy_revision_check CHECK ((policy_revision > 0)),
     CONSTRAINT chk_ab_role_permission_grant_type CHECK ((grant_type = ANY (ARRAY['grant'::text, 'deny'::text])))
 );
 
@@ -31583,6 +31636,13 @@ CREATE UNIQUE INDEX uq_authoring_identity_simulation_active_session ON public.ab
 
 
 --
+-- Name: uq_automation_seed_identity; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_automation_seed_identity ON public.ab_automation USING btree (tenant_id, seed_plugin_id, seed_key) WHERE ((deleted_flag IS NOT TRUE) AND (seed_plugin_id IS NOT NULL));
+
+
+--
 -- Name: uq_billing_rc_resource_code; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -32255,6 +32315,13 @@ CREATE TRIGGER trg_authoring_validation_run_append_only BEFORE DELETE OR UPDATE 
 
 
 --
+-- Name: ab_automation trg_automation_seed_identity; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_automation_seed_identity BEFORE UPDATE OF seed_plugin_id, seed_key ON public.ab_automation FOR EACH ROW EXECUTE FUNCTION public.ab_automation_seed_identity_guard();
+
+
+--
 -- Name: ab_subject_permission trg_check_group_logic_type_consistency; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -32308,6 +32375,13 @@ CREATE TRIGGER trg_platform_registry_validate BEFORE INSERT ON public.ab_platfor
 --
 
 CREATE TRIGGER trg_promotion_drift_event_append_only BEFORE DELETE OR UPDATE ON public.ab_promotion_drift_event FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
+
+
+--
+-- Name: ab_role_permission trg_role_permission_policy_revision; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_role_permission_policy_revision BEFORE UPDATE ON public.ab_role_permission FOR EACH ROW EXECUTE FUNCTION public.ab_role_permission_advance_policy_revision();
 
 
 --

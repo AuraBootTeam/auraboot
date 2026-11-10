@@ -32,6 +32,7 @@ public class RecordShareServiceImpl implements RecordShareService {
 
     private final RecordShareMapper recordShareMapper;
     private final UserRoleService userRoleService;
+    private final RecordSharePresenceCache sharePresenceCache;
 
     @Override
     public void shareRecord(Long tenantId, String resourceCode, Long recordId,
@@ -81,6 +82,7 @@ public class RecordShareServiceImpl implements RecordShareService {
         share.setCreatedBy(MetaContext.getCurrentUserId());
 
         recordShareMapper.upsertByPublicPids(share);
+        sharePresenceCache.evictRecord(tenantId, resourceCode, recordPid.trim());
         log.info("Shared record {}/{} with {}:{} (mask={}, expires={})",
                 resourceCode, recordPid, subjectType,
                 StringUtils.hasText(subjectPid) ? subjectPid : subjectId,
@@ -140,8 +142,7 @@ public class RecordShareServiceImpl implements RecordShareService {
         }
         // Absence is a necessary-condition rejection, never an authorization grant.
         // Recheck on every invocation and retain the original subject/action checks below.
-        if (!recordShareMapper.hasActiveSharesByRecordPid(
-                tenantId, resourceCode, normalizedRecordPid, now)) {
+        if (!sharePresenceCache.hasActiveShares(tenantId, resourceCode, normalizedRecordPid, now)) {
             return false;
         }
 

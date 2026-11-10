@@ -6,7 +6,7 @@ import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.environment.dao.mapper.EnvironmentMapper;
 import com.auraboot.framework.environment.service.impl.EnvironmentServiceImpl;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
-import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean;
+import com.baomidou.mybatisplus.spring.MybatisSqlSessionFactoryBean;
 import java.util.ArrayList;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;

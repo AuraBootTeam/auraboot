@@ -40,11 +40,11 @@ public class ApiRateLimiter {
      * @param max maximum allowed attempts per window
      * @return true if allowed, false if rate limited
      */
-    public boolean isAllowed(String key, int max) {
+    public synchronized boolean isAllowed(String key, int max) {
         long now = System.currentTimeMillis();
 
         if (windows.size() >= MAX_KEYS && !windows.containsKey(key)) {
-            log.warn("Rate limiter map full ({} keys), rejecting new key: {}", windows.size(), key.split(":")[0]);
+            log.warn("API rate limiter map full ({} keys), rejecting new key", windows.size());
             return false;
         }
 
@@ -56,7 +56,7 @@ public class ApiRateLimiter {
         }
 
         if (timestamps.size() >= max) {
-            log.warn("Rate limit exceeded for key: {}", key);
+            log.warn("API rate limit exceeded");
             return false;
         }
 
@@ -65,7 +65,7 @@ public class ApiRateLimiter {
     }
 
     @Scheduled(fixedRate = 300_000)
-    void evictStaleEntries() {
+    synchronized void evictStaleEntries() {
         long cutoff = System.currentTimeMillis() - WINDOW_MS;
         Iterator<Map.Entry<String, Deque<Long>>> it = windows.entrySet().iterator();
         int removed = 0;

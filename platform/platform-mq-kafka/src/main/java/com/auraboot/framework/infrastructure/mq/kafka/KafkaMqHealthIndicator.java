@@ -5,8 +5,8 @@ import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.DescribeClusterOptions;
 import org.apache.kafka.clients.admin.DescribeClusterResult;
-import org.springframework.boot.actuate.health.AbstractHealthIndicator;
-import org.springframework.boot.actuate.health.Health;
+import org.springframework.boot.health.contributor.AbstractHealthIndicator;
+import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -17,7 +17,7 @@ import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Kafka-specific {@link org.springframework.boot.actuate.health.HealthIndicator}.
+ * Kafka-specific {@link org.springframework.boot.health.contributor.HealthIndicator}.
  * <p>
  * Probes the broker via an {@link AdminClient#describeCluster} call with a 5s timeout.
  * Activated only when {@code aura.mq.type=kafka}. Reports {@code DOWN} on any

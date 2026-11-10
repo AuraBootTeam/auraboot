@@ -5,6 +5,13 @@
 @source './plugins/**/*.tsx';
 @source './plugins/**/*.ts';
 @source './plugins/**/*.css';
+/* Explicit framework sources: auto-detection missed block-renderer utilities in
+   worktree checkouts (h-44 / lg:flex-1 absent from the generated CSS), so the
+   dynamic-route renderers are pinned here like the plugins above. */
+@source './framework/**/*.tsx';
+@source './framework/**/*.ts';
+@source './routes/**/*.tsx';
+@source './routes/**/*.ts';
 
 /* RTL/LTR direction variants — enables rtl:pl-4 / ltr:ml-2 utility classes */
 @variant rtl ([dir="rtl"] &);

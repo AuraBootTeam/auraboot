@@ -1,3 +1,8 @@
+---
+type: system-reference
+status: active
+---
+
 # Report design templates
 
 The report designer exchanges **definitions**, separately from PDF/Excel/JSON result downloads. The template actions appear below the editing toolbar. They require report management access and are disabled while the host is saving or loading. Read-only report views do not expose them.
