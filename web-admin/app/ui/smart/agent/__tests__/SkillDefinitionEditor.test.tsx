@@ -91,6 +91,8 @@ describe('SkillDefinitionEditor governance', () => {
       ).toBeEnabled(),
     );
     fireEvent.click(screen.getByLabelText('I reviewed the input and allow this real execution.'));
+    await waitFor(() => expect(run).toBeEnabled());
+    expect(screen.getByLabelText('I reviewed the input and allow this real execution.')).toBeChecked();
     fireEvent.click(run);
     expect(await screen.findByTestId('skill-trial-result')).toHaveTextContent(
       'Reviewed 3 current parts',
