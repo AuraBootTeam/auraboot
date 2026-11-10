@@ -249,6 +249,10 @@ export function collectDetailDictCodes(
       ) {
         collectFromFields(block.fields);
       }
+      if (block.blockType === 'sub-table' || block.blockType === 'table') {
+        const columns = Array.isArray(block.columns) ? block.columns : block.table?.columns;
+        if (Array.isArray(columns)) collectFromFields(columns as FieldConfig[]);
+      }
       if ((block as any).tabs) {
         for (const tab of (block as any).tabs) {
           if (tab.blocks) walkBlocks(tab.blocks);
