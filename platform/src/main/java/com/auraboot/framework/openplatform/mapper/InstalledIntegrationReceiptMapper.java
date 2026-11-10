@@ -30,11 +30,14 @@ public interface InstalledIntegrationReceiptMapper {
     Receipt find(@Param("tenant") long tenant, @Param("installation") String installation,
                  @Param("source") String source, @Param("event") String event);
 
+    record Delivery(String status, boolean failedAttempt) {}
+
     @Select("""
-        SELECT status FROM ab_outbox WHERE tenant_id=#{tenant} AND event_id=#{event}
+        SELECT status, (retry_count > 0 AND last_error IS NOT NULL) AS failed_attempt
+        FROM ab_outbox WHERE tenant_id=#{tenant} AND event_id=#{event}
           AND schema_version IS NOT NULL
         """)
-    String deliveryStatus(@Param("tenant") long tenant, @Param("event") String durableEventId);
+    Delivery delivery(@Param("tenant") long tenant, @Param("event") String durableEventId);
 
     @Update("""
         UPDATE ab_installed_integration_receipt SET request_pid=#{pid},state='accepted',updated_at=NOW()

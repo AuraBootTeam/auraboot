@@ -269,11 +269,15 @@ public class InstalledIntegrationService {
                     || !providerMatches(resolved,r) || !validRequestPid(r.requestPid())) throw denied();
             Map<String,Object> result = new LinkedHashMap<>(execute(resolved,resolved.registration().resultCommand(),Map.of("requestId",eventId),null,true));
             if (!r.requestPid().equals(result.get("recordPid"))) throw denied();
-            String delivery = receipts.deliveryStatus(r.tenantId(),r.durableEventId());
-            if (delivery == null) delivery = "unavailable";
+            var observation = receipts.delivery(r.tenantId(),r.durableEventId());
+            String delivery = observation == null ? "unavailable" : observation.status();
             if (!Set.of("pending","processing","delivered","failed","unavailable").contains(delivery)) throw denied();
             result.put("deliveryStatus",delivery);
-            if ("failed".equals(delivery)) result.put("deliveryFailureCode","integration_delivery_failed");
+            result.remove("deliveryFailureCode");
+            // A queued retry must not hide its preceding failed attempt. Never expose raw last_error.
+            if ("failed".equals(delivery) || observation != null && observation.failedAttempt()
+                    && Set.of("pending","processing").contains(delivery))
+                result.put("deliveryFailureCode","integration_delivery_failed");
             return Collections.unmodifiableMap(result);
         });
     }

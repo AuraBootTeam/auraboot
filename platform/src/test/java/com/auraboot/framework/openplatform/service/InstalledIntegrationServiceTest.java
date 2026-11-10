@@ -121,7 +121,7 @@ class InstalledIntegrationServiceTest {
         order.verify(executor).execute(eq(process), any());
         order.verify(executor).execute(eq(result), any());
         order.verify(receipts).completed(42L, "inst", source, "evt-1", "request-pid");
-        verify(receipts, never()).deliveryStatus(anyLong(), anyString());
+        verify(receipts, never()).delivery(anyLong(), anyString());
     }
 
     @Test void synchronousProcessingFailureDoesNotRecordCompletionOrReadAResult() {
@@ -149,7 +149,7 @@ class InstalledIntegrationServiceTest {
         verify(executor, never()).execute(eq(accept), any());
         verify(executor, never()).execute(eq(process), any());
         verify(executor).execute(eq(result), any());
-        verify(receipts, never()).deliveryStatus(anyLong(), anyString());
+        verify(receipts, never()).delivery(anyLong(), anyString());
     }
 
     @Test void synchronousCallCannotTakeOverAnAcceptedAsynchronousRequest() {
@@ -433,16 +433,65 @@ class InstalledIntegrationServiceTest {
         assertEquals("completed",service.result(principal,source,"evt-1").get("state"));
     }
 
+    @Test void failedAttemptIsVisibleWhilePendingOrProcessingAndClearsAfterDelivery() {
+        service.accept(principal,source,event());var r=acceptedReceipt();when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(r);
+        when(executor.execute(eq(result),any())).thenReturn(CommandExecuteResult.builder().phaseReached("completed")
+                .data(Map.of("recordPid","request-pid","state","accepted")).build());
+        when(receipts.delivery(42L,r.durableEventId())).thenReturn(
+                new InstalledIntegrationReceiptMapper.Delivery("pending",true),
+                new InstalledIntegrationReceiptMapper.Delivery("processing",true),
+                new InstalledIntegrationReceiptMapper.Delivery("delivered",true));
+        var pending=service.result(principal,source,"evt-1");
+        assertEquals("accepted",pending.get("state"));assertEquals("pending",pending.get("deliveryStatus"));
+        assertEquals("integration_delivery_failed",pending.get("deliveryFailureCode"));
+        var retry=service.result(principal,source,"evt-1");
+        assertEquals("processing",retry.get("deliveryStatus"));assertEquals("integration_delivery_failed",retry.get("deliveryFailureCode"));
+        var delivered=service.result(principal,source,"evt-1");
+        assertEquals("delivered",delivered.get("deliveryStatus"));assertFalse(delivered.containsKey("deliveryFailureCode"));
+        assertEquals(Set.of("recordPid","state","deliveryStatus"),delivered.keySet());
+        verify(receipts,times(3)).delivery(42L,r.durableEventId());
+    }
+
+    @Test void firstAttemptAndUnavailableDeliveryDoNotInventAnExecutionFailure() {
+        service.accept(principal,source,event());var r=acceptedReceipt();when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(r);
+        when(executor.execute(eq(result),any())).thenReturn(CommandExecuteResult.builder().phaseReached("completed")
+                .data(Map.of("recordPid","request-pid","state","accepted")).build());
+        when(receipts.delivery(42L,r.durableEventId())).thenReturn(
+                new InstalledIntegrationReceiptMapper.Delivery("pending",false),
+                new InstalledIntegrationReceiptMapper.Delivery("processing",false),null);
+        for(String state:List.of("pending","processing","unavailable")) {
+            var answer=service.result(principal,source,"evt-1");assertEquals(state,answer.get("deliveryStatus"));
+            assertEquals(Set.of("recordPid","state","deliveryStatus"),answer.keySet());
+        }
+    }
+
+    @Test void unknownDeliveryStatesStillRejectEvenWithAnEarlierFailedAttempt() {
+        service.accept(principal,source,event());var r=acceptedReceipt();when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(r);
+        when(executor.execute(eq(result),any())).thenReturn(CommandExecuteResult.builder().phaseReached("completed")
+                .data(Map.of("recordPid","request-pid","state","accepted")).build());
+        when(receipts.delivery(42L,r.durableEventId())).thenReturn(new InstalledIntegrationReceiptMapper.Delivery("forged",true));
+        assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"));
+    }
+
+    @Test void hostOwnedFailureCodeCannotLeakStaleBusinessReaderDetailsAfterSuccess() {
+        service.accept(principal,source,event());var r=acceptedReceipt();when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(r);
+        when(executor.execute(eq(result),any())).thenReturn(CommandExecuteResult.builder().phaseReached("completed")
+                .data(Map.of("recordPid","request-pid","state","completed","deliveryFailureCode","stale internal error text")).build());
+        when(receipts.delivery(42L,r.durableEventId())).thenReturn(new InstalledIntegrationReceiptMapper.Delivery("delivered",true));
+        var answer=service.result(principal,source,"evt-1");assertEquals("completed",answer.get("state"));
+        assertEquals(Set.of("recordPid","state","deliveryStatus"),answer.keySet());
+    }
+
     @Test void ownerScopedResultAlwaysExecutesReadAndNeverCachesInitialAcceptedState() {
         service.accept(principal,source,event());var r=acceptedReceipt();when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(r);
         when(executor.execute(eq(result),any())).thenReturn(
             CommandExecuteResult.builder().phaseReached("completed").data(Map.of("recordPid","request-pid","state","accepted")).build(),
             CommandExecuteResult.builder().phaseReached("completed").data(Map.of("recordPid","request-pid","state","completed","taskPid","task")).build());
-        when(receipts.deliveryStatus(42L,r.durableEventId())).thenReturn("failed");
+        when(receipts.delivery(42L,r.durableEventId())).thenReturn(new InstalledIntegrationReceiptMapper.Delivery("failed",true));
         var failed=service.result(principal,source,"evt-1");
         assertEquals("accepted",failed.get("state"));assertEquals("failed",failed.get("deliveryStatus"));
         assertEquals("integration_delivery_failed",failed.get("deliveryFailureCode"));
-        when(receipts.deliveryStatus(42L,r.durableEventId())).thenReturn("delivered");
+        when(receipts.delivery(42L,r.durableEventId())).thenReturn(new InstalledIntegrationReceiptMapper.Delivery("delivered",true));
         assertEquals("completed",service.result(principal,source,"evt-1").get("state"));
         var requests=ArgumentCaptor.forClass(CommandExecuteRequest.class);verify(executor,times(2)).execute(eq(result),requests.capture());
         requests.getAllValues().forEach(request -> {assertNull(request.getClientRequestId());assertNull(request.getTargetRecordPid());assertEquals(Map.of("requestId","evt-1"),request.getPayload());});
