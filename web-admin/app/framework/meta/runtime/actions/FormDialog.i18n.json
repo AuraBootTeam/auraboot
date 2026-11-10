@@ -2,5 +2,9 @@
   "invalidDateTime": {
     "zh-CN": "所选时间在当前时区不存在，请重新选择。",
     "en-US": "This time does not exist in the current time zone. Choose another time."
+  },
+  "invalidAddress": {
+    "zh-CN": "请补齐地址信息，并检查地区名称和详细地址长度。",
+    "en-US": "Complete the address and check the region names and street-address length."
   }
 }
