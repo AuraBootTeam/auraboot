@@ -33,13 +33,13 @@ public class ExternalEventIngressController {
     }
 
     @PostMapping("/{sourceCode}/events")
-    public ResponseEntity<ExternalEventIngressService.IngressResult> accept(
+    public ResponseEntity<Map<String,Object>> accept(
             @AuthenticationPrincipal MachinePrincipal principal,
             @PathVariable String sourceCode,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @RequestBody String rawBody) {
         return ResponseEntity.accepted().body(
-                ingressService.accept(principal, sourceCode, idempotencyKey, rawBody));
+                ingressService.accept(principal, sourceCode, idempotencyKey, rawBody).publicReceipt());
     }
 
     @ExceptionHandler(SecurityException.class)

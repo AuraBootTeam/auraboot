@@ -64,4 +64,29 @@ class InstalledIntegrationRegistryTest {
         assertThrows(IllegalArgumentException.class,()->new Registration("kingdee-procurement","procurement.inquiry.ingress",
             registration.eventTypes(),"scope","permission","provider","owner","arbitrary command","qo_request:process","qo_request:result"));
     }
+    @Test void businessAdapterRequiresTheSameArtifactAndARegisteredEvent() {
+        var provider=mock(ExternalEventIngressExtension.class);when(provider.registration()).thenReturn(registration);
+        when(plugins.getExtensionsOfType(ExternalEventIngressExtension.class)).thenReturn(List.of(provider));
+        when(plugins.observeLoadedArtifact(provider.getClass())).thenReturn(Optional.of(
+            new AuraPluginManager.LoadedPluginArtifact(registration.providerPluginId(),Path.of("provider.jar"),"sha256:"+"a".repeat(64))));
+        var request=new ExternalEventIngressExtension.BusinessRequest(registration.eventTypes().iterator().next(),
+            "purchase-requisition","100001",java.time.Instant.EPOCH,Map.of("snapshot",Map.of("data",Map.of())));
+        when(provider.prepareBusinessRequest(anyMap())).thenReturn(Optional.of(request));
+        var registry=new InstalledIntegrationRegistry(plugins);
+        assertEquals(request,registry.prepareBusinessRequest(registration.sourceCode(),Map.of()).orElseThrow());
+        when(provider.prepareBusinessRequest(anyMap())).thenReturn(Optional.of(new ExternalEventIngressExtension.BusinessRequest(
+            "external.foreign.changed.v2","purchase-requisition","100001",java.time.Instant.EPOCH,Map.of())));
+        assertThrows(SecurityException.class,()->registry.prepareBusinessRequest(registration.sourceCode(),Map.of()));
+        when(plugins.observeLoadedArtifact(provider.getClass())).thenReturn(Optional.empty());
+        assertThrows(SecurityException.class,()->registry.prepareBusinessRequest(registration.sourceCode(),Map.of()));
+        verify(provider,times(2)).prepareBusinessRequest(anyMap());
+    }
+    @Test void legacyProviderDoesNotImplicitlyAcceptBusinessBodiesAndDuplicatesAreDenied() {
+        var registry=registry();assertTrue(registry.prepareBusinessRequest(registration.sourceCode(),Map.of()).isEmpty());
+        when(plugins.getExtensionsOfType(ExternalEventIngressExtension.class)).thenReturn(List.of(extension,extension));
+        assertThrows(SecurityException.class,()->registry.prepareBusinessRequest(registration.sourceCode(),Map.of()));
+        when(plugins.getExtensionsOfType(ExternalEventIngressExtension.class)).thenReturn(List.of());
+        assertThrows(SecurityException.class,()->registry.prepareBusinessRequest(registration.sourceCode(),Map.of()));
+    }
+
 }

@@ -144,6 +144,10 @@ public class InstalledIntegrationService {
                         .map(previous -> commandHash(previous,configs)).collect(java.util.stream.Collectors.toUnmodifiableSet()), common.path("conflictMessageKey").asText(null));
     }
 
+    public Optional<ExternalEventIngressExtension.BusinessRequest> prepareBusinessRequest(String source,Map<String,Object> input) {
+        return registry.prepareBusinessRequest(source,input);
+    }
+
     @Transactional
     public Acceptance accept(MachinePrincipal principal, String source, IntegrationEventEnvelope envelope) {
         return inTenant(principal.tenantId(), principal.installationPid(), () -> {

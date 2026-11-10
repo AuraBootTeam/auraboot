@@ -30,6 +30,24 @@ public class InstalledIntegrationRegistry {
         return matches.stream().findFirst();
     }
 
+    /** Adapt only through the exact discovered provider and its loaded artifact. */
+    public Optional<ExternalEventIngressExtension.BusinessRequest> prepareBusinessRequest(String source,Map<String,Object> input) {
+        record Provider(ExternalEventIngressExtension extension,Registration registration) {}
+        var matches=new ArrayList<Provider>();
+        for(var extension:plugins.getExtensionsOfType(ExternalEventIngressExtension.class)) {
+            var declared=Objects.requireNonNull(extension.registration());
+            if(!source.equals(declared.sourceCode()))continue;
+            var artifact=plugins.observeLoadedArtifact(extension.getClass()).orElseThrow(InstalledIntegrationRegistry::denied);
+            if(!declared.providerPluginId().equals(artifact.pluginId()))throw denied();
+            matches.add(new Provider(extension,declared));
+        }
+        if(matches.size()!=1)throw denied();
+        var provider=matches.getFirst();
+        var result=Objects.requireNonNull(provider.extension().prepareBusinessRequest(Collections.unmodifiableMap(new LinkedHashMap<>(input))));
+        if(result.isPresent() && !provider.registration().eventTypes().contains(result.get().eventType()))throw denied();
+        return result;
+    }
+
     public Set<Registration> completedReceiptRegistrations(String source) {
         var current = registration(source).orElseThrow(InstalledIntegrationRegistry::denied).getKey();
         var matches = plugins.getExtensionsOfType(ExternalEventIngressExtension.class).stream()

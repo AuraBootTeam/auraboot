@@ -7,6 +7,24 @@ import java.util.Set;
 public interface ExternalEventIngressExtension extends ExtensionPoint {
     Registration registration();
 
+    /** Optional pure adapter for this provider's fixed business contract. No IO or side effects. */
+    default java.util.Optional<BusinessRequest> prepareBusinessRequest(java.util.Map<String,Object> input) {
+        return java.util.Optional.empty();
+    }
+
+    /** Internal normalized event; no routing fields are added to the public request. */
+    record BusinessRequest(String eventType, String subjectType, String subjectPid,
+                           java.time.Instant occurredAt, java.util.Map<String,Object> payload) {
+        public BusinessRequest {
+            if(eventType==null || !eventType.matches("external\\.[a-z0-9.-]+\\.v[1-9][0-9]*")
+                    || subjectType==null || !subjectType.matches("[a-z][a-z0-9-]{1,63}")
+                    || subjectPid==null || !subjectPid.matches("[A-Za-z0-9_.:-]{1,128}")
+                    || occurredAt==null || payload==null)
+                throw new IllegalArgumentException("Invalid business request identity");
+            payload=java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(payload));
+        }
+    }
+
     /** Explicit historical event sets allowed only for terminal receipt queries/replays.
      * No command, binding, permission or provider identity compatibility is implied. */
     default Set<Set<String>> completedReceiptEventTypeSets() { return Set.of(); }
