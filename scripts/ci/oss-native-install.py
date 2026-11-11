@@ -346,6 +346,7 @@ def main():
         assert_attachment()
         check('delivered-oci-authentication-business-and-attachment', source=receipt['source']['commit'],
               loadedImageId=image['Id'], amount=68000, attachmentSha256=hashlib.sha256(attachment_bytes).hexdigest())
+        security_module.verify_sms_mobile_window(request, check, require, 'oci')
         labels = json.loads(subprocess.check_output(['docker', 'inspect', image_container], text=True))[0]['Config']['Labels']
         require(labels.get('aura.ci.job') == job, 'runtime OCI ownership changed; retained')
         run(['docker', 'stop', image_container], 'oci-stop')
