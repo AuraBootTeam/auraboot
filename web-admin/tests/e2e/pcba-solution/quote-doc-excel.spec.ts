@@ -1,3 +1,4 @@
+import type { APIResponse, Page } from '@playwright/test';
 import * as XLSX from 'xlsx';
 import { readFile, writeFile } from 'node:fs/promises';
 import { test, expect } from '../../fixtures';
@@ -10,14 +11,53 @@ import { saveWorkbookDownload } from './workbook-download-evidence';
 
 const uid = uniqueId('qod');
 let sales: QuoteRoleUser;
+let filePolicyRole: { pid: string; code: string };
+
+async function unwrap(response: APIResponse) {
+  const body = await response.json();
+  expect(response.status(), JSON.stringify(body)).toBe(200);
+  expect(String(body.code), JSON.stringify(body)).toBe('0');
+  return body.data;
+}
+
+async function setDocumentCodeVisibility(admin: Page, access: 'hidden' | 'inherit') {
+  const draftUrl = `/api/permission/roles/${filePolicyRole.pid}/draft`;
+  const snapshot = await unwrap(await admin.request.get(draftUrl));
+  const selected = snapshot.groups.flatMap((group: any) => group.capabilities)
+    .filter((capability: any) => capability.granted).map((capability: any) => capability.code);
+  await unwrap(await admin.request.put(draftUrl, { data: {
+    expectedRevision: snapshot.revision,
+    selectedCapabilityCodes: selected,
+    revokedPartialCapabilityCodes: [],
+    defaultScopeChanged: false,
+    applyDefaultToCurrentGrants: false,
+    scopeChanges: [],
+    fieldChanges: [{ modelCode: 'qo_quote_common', fieldCode: 'qo_quote_code', access }],
+  } }));
+}
+
 
 test.describe('Quote pricing + document excel (QO-04 / QO-07 / XLS-Q) @smoke', () => {
   test.describe.configure({ timeout: 180_000 });
   test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     try {
-      sales = makeQuoteRoleUser('qo_sales', uid, ['qo_sales']);
-      await ensureQuoteRoleUser(await context.newPage(), sales);
+      const admin = await context.newPage();
+      const roles = await unwrap(await admin.request.get('/api/roles/all'));
+      const source = roles.find((role: any) => role.code === 'qo_sales');
+      expect(source, 'Existing sales source role is required').toBeTruthy();
+      filePolicyRole = await unwrap(await admin.request.post('/api/roles', { data: {
+        code: `e2e_doc_fields_${uid}`, name: `Document fields ${uid}`, type: 'custom',
+        description: 'Owned document field-policy fixture; original sales role is unchanged',
+      } }));
+      await unwrap(await admin.request.post(`/api/roles/${source.pid}/copy-permissions`, {
+        data: { targetRolePid: filePolicyRole.pid },
+      }));
+      await unwrap(await admin.request.put(`/api/permissions/matrix/${filePolicyRole.pid}/default-scope`, {
+        data: { scopeType: 'self' },
+      }));
+      sales = makeQuoteRoleUser('qo_sales', uid, [filePolicyRole.code]);
+      await ensureQuoteRoleUser(admin, sales);
     } finally { await context.close(); }
   });
 
@@ -188,6 +228,39 @@ test.describe('Quote pricing + document excel (QO-04 / QO-07 / XLS-Q) @smoke', (
       await expect(page.getByText('正式文档', { exact: true }).first()).toBeVisible();
       await expect(page.getByRole('link', { name: '下载', exact: true }).first()).toBeVisible();
       await page.screenshot({ path: info.outputPath('quote-job-center.png'), fullPage: true });
+      // Immutable files may retain bytes, but current source-field visibility must
+      // still govern the same known URL after generation. Restrict only our copied role.
+      let restricted = false;
+      try {
+        await setDocumentCodeVisibility(admin, 'hidden');
+        restricted = true;
+        const visible = await readDynamicRecord(page, 'qo_quote_common', created.quoteId);
+        expect(visible.qo_quote_code == null, 'The copied role must really lose the source field').toBe(true);
+        const oldXlsx = await page.request.get(String(generatedOutput.url));
+        const oldPdf = await page.request.get(String(generatedOutput.pdfUrl));
+        let xlsxStillContainsHiddenCode = false;
+        if (oldXlsx.status() === 200) {
+          const oldWorkbook = XLSX.read(await oldXlsx.body(), { type: 'buffer' });
+          xlsxStillContainsHiddenCode = oldWorkbook.SheetNames.some(name =>
+            XLSX.utils.sheet_to_csv(oldWorkbook.Sheets[name]).includes(created.quoteCode));
+        }
+        await info.attach('existing-document-current-field-policy', {
+          body: JSON.stringify({ rolePid: filePolicyRole.pid, quoteId: created.quoteId,
+            sourceFieldHidden: visible.qo_quote_code == null,
+            xlsxStatus: oldXlsx.status(), pdfStatus: oldPdf.status(), xlsxStillContainsHiddenCode }),
+          contentType: 'application/json',
+        });
+        expect(oldXlsx.status(), 'Old XLSX must not bypass the current hidden source field').toBe(403);
+        expect(oldPdf.status(), 'Old PDF must not bypass the current hidden source field').toBe(403);
+      } finally {
+        if (restricted) await setDocumentCodeVisibility(admin, 'inherit');
+      }
+      const restoredXlsx = await page.request.get(String(generatedOutput.url));
+      const restoredPdf = await page.request.get(String(generatedOutput.pdfUrl));
+      expect(restoredXlsx.status()).toBe(200);
+      expect(restoredPdf.status()).toBe(200);
+      expect(await restoredXlsx.body()).toEqual(await readFile(target));
+      expect(await restoredPdf.body()).toEqual(pdfBytes);
       await info.attach('priced-document-persistence', { body: JSON.stringify({ before, priced, generated, sheets: wb.SheetNames }), contentType: 'application/json' });
     } catch (error) {
       await info.attach('priced-document-failure-browser', { body: await page.screenshot(), contentType: 'image/png' });
