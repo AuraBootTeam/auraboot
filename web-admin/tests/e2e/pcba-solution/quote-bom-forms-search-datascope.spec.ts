@@ -3,6 +3,8 @@ import { test, expect } from '../../fixtures';
 import { uniqueId, clickRowActionByLocator } from '../helpers';
 import {
   searchBusinessList,
+  executeCommand,
+  clickSidebarPage,
   makeQuoteRoleUser,
   ensureQuoteRoleUser,
   openQuoteRolePage,
@@ -228,7 +230,7 @@ test.describe('Quote/BOM forms + search + dropdown + linkage + project data-scop
         const labels = await options.allTextContents();
         expect(labels.length, `${field} needs positive and negative search options`).toBeGreaterThan(1);
         const target = labels[0].trim();
-        const search = page.getByTestId(`select-search-${field}`);
+        const search = page.getByTestId(`select-trigger-${field}`);
         await search.fill(target);
         await expect(options).toHaveCount(labels.filter((label) => label.toLowerCase().includes(target.toLowerCase())).length);
         await expect(page.getByRole('option', { name: target, exact: true })).toBeVisible();
@@ -237,7 +239,7 @@ test.describe('Quote/BOM forms + search + dropdown + linkage + project data-scop
         await expect(page.getByText(/无匹配结果|暂无匹配|No results|未找到结果/i).first()).toBeVisible();
         await search.fill(target);
         await page.getByRole('option', { name: target, exact: true }).click();
-        await expect(trigger).toContainText(target);
+        await expect(trigger).toHaveValue(target);
         await expect(page.locator(`input[type="hidden"][name="${field}"]`)).not.toHaveValue('');
       }
 
@@ -319,4 +321,67 @@ test.describe('Quote/BOM forms + search + dropdown + linkage + project data-scop
       await adminCtx.close();
     }
   });
+});
+
+// Inline search is a platform interaction; exercise it through the actual BOM form.
+test('DD-INLINE BOM customer and project search in the select itself', async ({ page }) => {
+  test.setTimeout(120_000);
+  const marker = `CIN-${Date.now()}`;
+  const accountName = `${marker}-新光维`;
+  const secondName = `${marker}-歌风智能`;
+  const account = await executeCommand(page, 'crm:create_account', { crm_acc_name: accountName }, undefined, 'create');
+  const other = await executeCommand(page, 'crm:create_account', { crm_acc_name: secondName }, undefined, 'create');
+  const customerId = String(account.recordId);
+  const otherId = String(other.recordId);
+  expect(customerId).not.toBe('undefined');
+  const projectName = `${marker}-控制板`;
+  const project = await executeCommand(page, 'bom:create_project', {
+    bom_project_name: projectName, bom_project_customer_id: customerId,
+  }, undefined, 'create');
+  const projectId = String(project.recordId);
+  expect(projectId).not.toBe('undefined');
+
+  await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
+  await clickSidebarPage(page, '/p/bom_conversion_task_pcba_workbench', /BOM/);
+  await page.getByTestId('toolbar-btn-upload_bom').click();
+  const customer = page.getByTestId('select-trigger-bom_task_customer_id');
+  const projectInput = page.getByTestId('select-trigger-bom_task_project_id');
+  await expect(customer).toBeVisible();
+  await expect(projectInput).toBeDisabled();
+  await customer.click();
+  await customer.fill(marker.toLowerCase());
+  const customerOption = page.locator(`[role="option"][data-value="${customerId}"]`);
+  await expect(customerOption).toBeVisible();
+  await expect(page.locator('[role="listbox"] input')).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath('inline-customer-search.png'), fullPage: true });
+  await customer.fill('光维');
+  await expect(customerOption).toBeVisible();
+  await expect(page.locator(`[role="option"][data-value="${otherId}"]`)).toHaveCount(0);
+  await customer.press('ArrowDown');
+  await customer.press('Enter');
+  await expect(customer).toHaveValue(accountName);
+  await expect(page.locator('input[type="hidden"][name="bom_task_customer_id"]')).toHaveValue(customerId);
+
+  await projectInput.click();
+  await projectInput.fill('控制');
+  await page.locator(`[role="option"][data-value="${projectId}"]`).click();
+  await expect(projectInput).toHaveValue(projectName);
+  await expect(page.locator('input[type="hidden"][name="bom_task_project_id"]')).toHaveValue(projectId);
+
+  await customer.click();
+  await customer.fill(`NO-MATCH-${marker}`);
+  await expect(page.getByRole('status').filter({ hasText: '无匹配结果' })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('inline-no-results.png'), fullPage: true });
+  await customer.press('Enter');
+  await expect(page.locator('input[type="hidden"][name="bom_task_customer_id"]')).toHaveValue(customerId);
+  await customer.press('Escape');
+  await expect(customer).toHaveValue(accountName);
+  await expect(projectInput).toHaveValue(projectName);
+
+  await customer.click();
+  await customer.fill('歌风');
+  await page.locator(`[role="option"][data-value="${otherId}"]`).click();
+  await expect(customer).toHaveValue(secondName);
+  await expect(page.locator('input[type="hidden"][name="bom_task_project_id"]')).toHaveValue('');
+  await page.screenshot({ path: test.info().outputPath('inline-customer-changed.png'), fullPage: true });
 });

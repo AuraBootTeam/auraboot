@@ -33,14 +33,14 @@ async function selectCustomer(page: Page, accountId: string, accountName: string
   const option = page.locator(`[role="option"][data-value="${accountId}"]`).first();
   await trigger.click();
   // 客户表随门禁持续增长:用下拉自带搜索框(客户端过滤)定位新客户
-  const search = page.getByTestId('select-search-qo_quote_crm_account_id');
+  const search = page.getByTestId('select-trigger-qo_quote_crm_account_id');
   await expect(search, 'dropdown search box renders').toBeVisible({ timeout: 10_000 }).catch(() => {});
   await search.fill(accountName).catch(() => {});
   await expect(option, `customer option ${accountId} should be loaded`).toBeVisible({
     timeout: 30_000,
   });
   await option.click();
-  await expect(trigger).toContainText(accountName, { timeout: 5_000 });
+  await expect(trigger).toHaveValue(accountName, { timeout: 5_000 });
 }
 
 async function selectProject(page: Page, projectId: string, projectName: string): Promise<void> {
@@ -53,7 +53,7 @@ async function selectProject(page: Page, projectId: string, projectName: string)
     timeout: 15_000,
   });
   await option.click();
-  await expect(trigger).toContainText(projectName, { timeout: 5_000 });
+  await expect(trigger).toHaveValue(projectName, { timeout: 5_000 });
 }
 
 async function uploadSmartUploadFile(

@@ -84,7 +84,7 @@ describe('SmartSelect create affordance', () => {
     fireEvent.click(screen.getByTestId('select-trigger-customer_id'));
     fireEvent.click(screen.getByTestId('select-create-new-customer_id'));
 
-    expect(screen.getByTestId('select-trigger-customer_id')).toHaveTextContent('Acme');
+    expect(screen.getByTestId('select-trigger-customer_id')).toHaveValue('Acme');
     expect(changes).not.toContain('');
   });
 });
