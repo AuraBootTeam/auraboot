@@ -27,9 +27,6 @@ public class CommandExecutionTransaction {
     private com.auraboot.framework.meta.mapper.CommandDefinitionMapper definitions;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.auraboot.framework.permission.service.impl.PermissionSnapshotCache snapshots;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    @org.springframework.context.annotation.Lazy
-    private com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization authorization;
 
     private java.util.Map<String,Object> commandConfiguration(String commandCode) {
         if (definitions == null) return java.util.Map.of();
@@ -98,18 +95,8 @@ public class CommandExecutionTransaction {
         }
         return template.execute(status -> {
             if (dryRun) status.setRollbackOnly();
-            // Document generation already owns one physical snapshot transaction. Reuse only
-            // authorization configuration; every source row and field remains evaluated.
-            boolean document = config.get("handlerParams") instanceof java.util.Map<?,?> params
-                    && params.get("documentDefinition") instanceof java.util.Map<?,?>;
-            if (authorization != null && domain && document
-                    && com.auraboot.framework.application.tenant.MetaContext.getCurrentMemberId() != null
-                    && com.auraboot.framework.application.tenant.MetaContext.getCurrentUserId() != null
-                    && com.auraboot.framework.application.tenant.MetaContext.getExternalCommandPermission() == null
-                    && !com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
-                    && !com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()) {
-                return authorization.withReadProjectionSnapshot(operation);
-            }
+            // Boundary phases may suspend this transaction for their own isolated authorization.
+            // Handler-local projection caches must start after those boundaries, not around them.
             return operation.get();
         });
     }

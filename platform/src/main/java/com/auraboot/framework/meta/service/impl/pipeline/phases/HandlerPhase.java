@@ -156,6 +156,8 @@ public class HandlerPhase implements CommandPhase {
     @Autowired private com.auraboot.framework.plugin.extension.CommandMembershipLockAccessor commandMembershipLockAccessor;
     @Autowired(required = false)
     private com.auraboot.framework.plugin.pf4j.CommandRecordActionScopeAccessorFactory recordScopeFactory;
+    @Autowired(required=false)
+    private com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization documentAuthorization;
     @Autowired private IdentityDirectoryAccessorImpl identityDirectoryAccessor;
     @Autowired private RoleMapper roleMapper;
     @Autowired private UserRoleService userRoleService;
@@ -167,18 +169,26 @@ public class HandlerPhase implements CommandPhase {
     @Override
     public void execute(CommandPipelineContext ctx) {
         var handlerRules = ctx.getRulesByType().getOrDefault("handler", Collections.emptyList());
-        Map<String, Object> handlerResults = withCommandAggregate(ctx, () ->
+        Map<String, Object> handlerResults = withHandlerReadProjection(ctx, () -> withCommandAggregate(ctx, () ->
                 withCommandAuthority(ctx, () -> executeHandlerPhase(
                         handlerRules, ctx.getCommand(), ctx.getPayload(), ctx.getFieldMapResults(),
                         ctx.getTenantId(), ctx.getUserId(), ctx.getRequest(), ctx.getExecConfig(),
                         Boolean.TRUE.equals(ctx.getTargetRecordReadable())
                             && ctx.getPermitPlan() != null && ctx.getPermitPlan().isPermitted()
-                            && ctx.getAuthorizationVerdict() != null && ctx.getAuthorizationVerdict().isAuthorized(), ctx)));
+                            && ctx.getAuthorizationVerdict() != null && ctx.getAuthorizationVerdict().isAuthorized(), ctx))));
         ctx.setHandlerResults(handlerResults);
         if (!ctx.isHandlerOwnedMutation()) {
             persistHandlerResults(ctx.getCommand().getModelCode(), ctx.getPayload(),
                     handlerResults, ctx.getTenantId(), ctx.getRequest(), ctx.getFieldMapResults());
         }
+    }
+
+    <T> T withHandlerReadProjection(CommandPipelineContext context, java.util.function.Supplier<T> execution) {
+        if(documentAuthorization!=null && context.getBusinessTargetAuthorization()!=null && context.getCommand()!=null
+                && com.auraboot.framework.meta.security.DocumentArtifactContract.from(
+                        context.getExecConfig(),context.getCommand().getModelCode())!=null)
+            return documentAuthorization.withReadProjectionSnapshot(execution);
+        return execution.get();
     }
 
     // ==================== Inlined delegate methods ====================

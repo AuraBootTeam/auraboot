@@ -52,13 +52,12 @@ class CommandExecutionTransactionTest {
         } finally {com.auraboot.framework.application.tenant.MetaContext.clear();}
     }
 
-    @Test void documentDomainReusesConfigurationOnlyInsideItsPhysicalTransaction() {
+    @Test void documentDomainDoesNotCarryAHandlerSnapshotAcrossIsolatedBoundaryPhases() {
         var definitions=mock(com.auraboot.framework.meta.mapper.CommandDefinitionMapper.class);
         var snapshots=mock(com.auraboot.framework.permission.service.impl.PermissionSnapshotCache.class);
         var authorization=mock(com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization.class);
         org.springframework.test.util.ReflectionTestUtils.setField(transaction,"definitions",definitions);
         org.springframework.test.util.ReflectionTestUtils.setField(transaction,"snapshots",snapshots);
-        org.springframework.test.util.ReflectionTestUtils.setField(transaction,"authorization",authorization);
         var command=new com.auraboot.framework.meta.entity.CommandDefinition();
         command.setExecutionConfig("{\"permissions\":[\"example.cap.read\"],\"handlerParams\":{\"documentDefinition\":{}}}");
         when(definitions.findCurrentByCode("example:export")).thenReturn(command);
@@ -67,15 +66,11 @@ class CommandExecutionTransactionTest {
         permission.setExtension(java.util.Map.of("domainModels",java.util.Map.of("example",java.util.List.of("read"))));
         when(snapshots.resolvePermissionDefinition(100L,"example.cap.read")).thenReturn(permission);
         when(manager.getTransaction(any())).thenReturn(status);
-        when(authorization.withReadProjectionSnapshot(any())).thenAnswer(call -> {
-            verify(manager,atLeastOnce()).getTransaction(argThat(value -> value.getIsolationLevel()==TransactionDefinition.ISOLATION_REPEATABLE_READ));
-            return ((java.util.function.Supplier<?>)call.getArgument(0)).get();
-        });
         com.auraboot.framework.application.tenant.MetaContext.setContext(100L,1L,"actor","actor");
         com.auraboot.framework.application.tenant.MetaContext.setMemberId(5L);
         try {
             assertThat(transaction.execute("example:export",false,()->"document")).isEqualTo("document");
-            verify(authorization).withReadProjectionSnapshot(any());
+            verifyNoInteractions(authorization);
             clearInvocations(authorization);
             command.setExecutionConfig("{\"permissions\":[\"example.cap.read\"]}");
             assertThat(transaction.execute("example:export",false,()->"ordinary")).isEqualTo("ordinary");
