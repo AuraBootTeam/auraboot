@@ -145,4 +145,131 @@ class CommandExecutionTransactionTest {
         verify(manager).rollback(status);
         verify(manager, never()).commit(any());
     }
+
+    @Test void currentStateLockConflictRestartsAfterRollbackWithAFreshInvocationAndMetadata() {
+        var domains = mock(com.auraboot.framework.permission.service.DomainCommandAuthorization.class);
+        var definitions = mock(com.auraboot.framework.meta.mapper.CommandDefinitionMapper.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(transaction, "domains", domains);
+        org.springframework.test.util.ReflectionTestUtils.setField(transaction, "definitions", definitions);
+        when(domains.withinInvocation(any())).thenAnswer(call -> ((java.util.function.Supplier<?>) call.getArgument(0)).get());
+        var first = mock(TransactionStatus.class);
+        var second = mock(TransactionStatus.class);
+        when(manager.getTransaction(any())).thenReturn(first, second);
+        var handler = mock(CommandHandlerExtension.class);
+        when(extensions.getCommandHandler("bom:cancel_task")).thenReturn(Optional.of(handler));
+        when(handler.commandReadIsolation()).thenReturn(BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ);
+        var conflict = new com.auraboot.framework.meta.exception.CurrentStateTargetLockConflictException(
+                new org.springframework.dao.CannotSerializeTransactionException("concurrent chunk committed"));
+        var attempts = new java.util.concurrent.atomic.AtomicInteger();
+
+        assertThat(transaction.execute("bom:cancel_task", false, () -> {
+            if (attempts.incrementAndGet() == 1) throw conflict;
+            verify(manager).rollback(first);
+            return "cancelled";
+        })).isEqualTo("cancelled");
+
+        assertThat(attempts).hasValue(2);
+        verify(domains, times(2)).withinInvocation(any());
+        verify(definitions, times(2)).findCurrentByCode("bom:cancel_task");
+        verify(manager, times(2)).getTransaction(argThat(definition ->
+                definition.getIsolationLevel() == TransactionDefinition.ISOLATION_REPEATABLE_READ));
+        verify(manager).commit(second);
+        verify(manager, never()).commit(first);
+    }
+
+    @Test void anOrdinarySerializationConflictIsNeverReexecuted() {
+        when(manager.getTransaction(any())).thenReturn(status);
+        var conflict = new org.springframework.dao.CannotSerializeTransactionException("ordinary edit conflict");
+        assertThatThrownBy(() -> transaction.execute("orders:update", false, () -> { throw conflict; }))
+                .isSameAs(conflict);
+        verify(manager).getTransaction(any());
+        verify(manager).rollback(status);
+    }
+
+    @Test void aGrantRevokedBetweenAttemptsCannotSurviveInThePreviousInvocationCache() {
+        var snapshots = mock(com.auraboot.framework.permission.service.impl.PermissionSnapshotCache.class);
+        var bindings = mock(com.auraboot.framework.rbac.mapper.RolePermissionMapper.class);
+        var domains = new com.auraboot.framework.permission.service.DomainCommandAuthorization(snapshots, bindings);
+        org.springframework.test.util.ReflectionTestUtils.setField(transaction, "domains", domains);
+        var permission = new com.auraboot.framework.permission.entity.Permission();
+        permission.setResourceType("operation");
+        permission.setAction("write");
+        permission.setExtension(java.util.Map.of("domainModels", java.util.Map.of("bom_task", java.util.List.of("read", "update"))));
+        when(snapshots.resolvePermissionDefinition(100L, "bom.cap.write")).thenReturn(permission);
+        var grant = new com.auraboot.framework.rbac.mapper.RolePermissionMapper.BusinessGrantRow();
+        grant.setId(10L);
+        grant.setGrantType("grant");
+        when(bindings.findBusinessGrants(100L, 1L, 5L, "bom.cap.write"))
+                .thenReturn(java.util.List.of(grant), java.util.List.of());
+        when(manager.getTransaction(any())).thenReturn(status);
+        var attempts = new java.util.concurrent.atomic.AtomicInteger();
+        var denied = new AccessDeniedException("grant revoked before the fresh attempt");
+        com.auraboot.framework.application.tenant.MetaContext.setContext(100L, 1L, "actor", "actor");
+        com.auraboot.framework.application.tenant.MetaContext.setMemberId(5L);
+        try {
+            assertThatThrownBy(() -> transaction.execute("bom:cancel_task", false, () -> {
+                if (attempts.incrementAndGet() == 1) {
+                    assertThat(domains.authorize("bom.cap.write")).isTrue();
+                    throw new com.auraboot.framework.meta.exception.CurrentStateTargetLockConflictException(
+                            new org.springframework.dao.CannotSerializeTransactionException("chunk commit"));
+                }
+                assertThat(domains.authorize("bom.cap.write")).isFalse();
+                throw denied;
+            })).isSameAs(denied);
+            verify(bindings, times(2)).findBusinessGrants(100L, 1L, 5L, "bom.cap.write");
+            verify(manager, never()).commit(any());
+        } finally { com.auraboot.framework.application.tenant.MetaContext.clear(); }
+    }
+
+    @Test void currentStateLockConflictIsReexecutedAtMostOnce() {
+        when(manager.getTransaction(any())).thenReturn(status);
+        var conflict = new com.auraboot.framework.meta.exception.CurrentStateTargetLockConflictException(
+                new org.springframework.dao.CannotSerializeTransactionException("another writer committed"));
+        assertThatThrownBy(() -> transaction.execute("bom:cancel_task", false, () -> { throw conflict; }))
+                .isSameAs(conflict);
+        verify(manager, times(2)).getTransaction(any());
+        verify(manager, times(2)).rollback(status);
+        verify(manager, never()).commit(any());
+    }
+
+    @Test void nestedCurrentStateConflictCannotReplayAnAlreadyStartedOuterHandler() {
+        when(manager.getTransaction(any())).thenReturn(status);
+        var conflict = new com.auraboot.framework.meta.exception.CurrentStateTargetLockConflictException(
+                new org.springframework.dao.CannotSerializeTransactionException("nested target changed"));
+        var outerInvocations = new java.util.concurrent.atomic.AtomicInteger();
+        assertThatThrownBy(() -> transaction.execute("bom:cancel_task", false, () -> {
+            outerInvocations.incrementAndGet();
+            TransactionSynchronizationManager.setActualTransactionActive(true);
+            try {
+                return transaction.execute("bom:cancel_task", false, () -> { throw conflict; });
+            } finally { TransactionSynchronizationManager.setActualTransactionActive(false); }
+        })).isInstanceOf(org.springframework.dao.CannotSerializeTransactionException.class)
+                .isNotInstanceOf(com.auraboot.framework.meta.exception.CurrentStateTargetLockConflictException.class)
+                .hasCause(conflict);
+        assertThat(outerInvocations).hasValue(1);
+        verify(manager, never()).commit(any());
+    }
+
+    @Test void currentStateLockConflictCannotReplayInsideACallersTransactionOrDryRun() {
+        var conflict = new com.auraboot.framework.meta.exception.CurrentStateTargetLockConflictException(
+                new org.springframework.dao.CannotSerializeTransactionException("concurrent update"));
+        for (boolean outer : new boolean[]{false, true}) {
+            for (boolean dryRun : new boolean[]{false, true}) {
+                if (!outer && !dryRun) continue;
+                clearInvocations(manager, status);
+                when(manager.getTransaction(any())).thenReturn(status);
+                TransactionSynchronizationManager.setActualTransactionActive(outer);
+                var failure = assertThatThrownBy(() -> transaction.execute("bom:cancel_task", dryRun, () -> { throw conflict; }));
+                if (outer) {
+                    failure.isInstanceOf(org.springframework.dao.CannotSerializeTransactionException.class)
+                            .isNotInstanceOf(com.auraboot.framework.meta.exception.CurrentStateTargetLockConflictException.class)
+                            .hasCause(conflict);
+                } else {
+                    failure.isSameAs(conflict);
+                }
+                verify(manager).getTransaction(any());
+                verify(manager).rollback(status);
+            }
+        }
+    }
 }

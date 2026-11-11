@@ -361,6 +361,17 @@ class CommandTargetVersionLockPhaseTest {
         return ctx;
     }
 
+    @Test void onlyCurrentStateTargetLockSerializationReceivesTheSafeRestartSignal() {
+        givenPhysicalModel();
+        var conflict = new org.springframework.dao.CannotSerializeTransactionException("concurrent target update");
+        when(dynamicDataMapper.selectTargetVersionForUpdate("dq_quote_request", "pid", 41L, "REQ-1"))
+                .thenThrow(conflict);
+        assertThatThrownBy(() -> phase.execute(currentStateContext(7)))
+                .isInstanceOf(com.auraboot.framework.meta.exception.CurrentStateTargetLockConflictException.class)
+                .hasCause(conflict);
+        assertThatThrownBy(() -> phase.execute(context(7))).isSameAs(conflict);
+    }
+
     private CommandPipelineContext currentStateContext(Integer expectedVersion) {
         CommandPipelineContext ctx = context(expectedVersion);
         ctx.getCommand().setExecutionConfig("""

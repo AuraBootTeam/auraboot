@@ -15,6 +15,7 @@ import java.util.function.Supplier;
 /** Establish the physical command transaction before loading metadata or running any pipeline phase. */
 @Component
 @RequiredArgsConstructor
+@lombok.extern.slf4j.Slf4j
 public class CommandExecutionTransaction {
     private final PlatformTransactionManager transactions;
     private final ExtensionRegistry extensions;
@@ -43,6 +44,27 @@ public class CommandExecutionTransaction {
     }
 
     public <T> T execute(String commandCode, boolean dryRun, Supplier<T> operation) {
+        boolean ownsTransaction = !TransactionSynchronizationManager.isActualTransactionActive();
+        try {
+            return invoke(commandCode, dryRun, operation);
+        } catch (com.auraboot.framework.meta.exception.CurrentStateTargetLockConflictException conflict) {
+            // CATCH: only the pre-handler current-state row lock emits this signal. The owned
+            // physical transaction has rolled back, including its idempotency claim. Re-enter
+            // once with fresh metadata and authorization; never replay a caller's atomic unit.
+            if (!ownsTransaction) {
+                // Consume the restart signal at its own invocation. A nested command must
+                // not cause an already-started outer handler to be replayed, even at the
+                // same command code. Preserve the ordinary serialization-conflict outcome.
+                throw new org.springframework.dao.CannotSerializeTransactionException(
+                        "Current-state target lock conflicted inside the caller transaction", conflict);
+            }
+            if (dryRun) throw conflict;
+            log.info("Re-executing current-state command {} after target-lock serialization rollback", commandCode);
+            return invoke(commandCode, false, operation);
+        }
+    }
+
+    private <T> T invoke(String commandCode, boolean dryRun, Supplier<T> operation) {
         return domains == null ? executeTransaction(commandCode, dryRun, operation)
                 : domains.withinInvocation(() -> executeTransaction(commandCode, dryRun, operation));
     }
