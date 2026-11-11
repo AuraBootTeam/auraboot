@@ -51,8 +51,9 @@ class PermissionCatalogLookupPostgresIT {
         String sql = String.join("\n", PermissionMapper.class.getMethod(method, types).getAnnotation(Select.class).value())
                 .replace("#{tenantId}", "?").replace("#{code}", "?");
         try (var statement = connection.prepareStatement(sql)) {
-            statement.setLong(1, tenant);
-            if (code != null) statement.setString(2, code);
+            int tenantBindings = sql.length() - sql.replace("?", "").length() - (code == null ? 0 : 1);
+            for (int parameter = 1; parameter <= tenantBindings; parameter++) statement.setLong(parameter, tenant);
+            if (code != null) statement.setString(tenantBindings + 1, code);
             try (var rows = statement.executeQuery()) {
                 List<Long> ids = new ArrayList<>();
                 while (rows.next()) ids.add(rows.getLong("id"));
