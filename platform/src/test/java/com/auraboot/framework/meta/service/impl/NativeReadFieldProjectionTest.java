@@ -24,6 +24,7 @@ class NativeReadFieldProjectionTest {
             FieldDefinition.builder().code("name").columnName("stored_name").build(),
             FieldDefinition.builder().code("secret").columnName("stored_secret").build())).build();
     @BeforeEach void context() {
+        when(authorization.withReadProjectionSnapshot(any())).thenAnswer(call -> ((java.util.function.Supplier<?>)call.getArgument(0)).get());
         MetaContext.setContext(100L,1L,"actor","actor"); MetaContext.setMemberId(5L);
         org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
         org.springframework.transaction.support.TransactionSynchronizationManager.setCurrentTransactionReadOnly(true);
@@ -82,7 +83,7 @@ class NativeReadFieldProjectionTest {
     @Test void missingHostFactsAndUnpublishedFieldsDoNotBecomeReadable() {
         var raw = Map.<String,Object>of("pid","record","rogue","PRIVATE");
         assertThatThrownBy(() -> projection.project(model,List.of(raw))).isInstanceOf(AccessDeniedException.class);
-        verifyNoInteractions(authorization);
+        verify(authorization,never()).resolveOrdinaryRead(any(),anyString(),anyMap());
         when(authorization.resolveOrdinaryRead(eq(5L),eq("project"),anyMap())).thenReturn(allow("record","rogue"));
         assertThat(projection.project(model,List.of(row(raw)))).containsExactly(Map.of("pid","record"));
     }

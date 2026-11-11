@@ -66,7 +66,7 @@ public class NativeReadFieldProjection {
                 || MetaContext.hasCommandPermitScopeFor(model.getCode())) throw denied();
         // Background execution without a human member retains its separate authorization path.
         if (!MetaContext.exists() || MetaContext.getCurrentMemberId() == null) return records;
-        if (coherentSnapshot()) return projectInSnapshot(model, records);
+        if (coherentSnapshot()) return authorization.withReadProjectionSnapshot(() -> projectInSnapshot(model, records));
         // Starting a new transaction here could combine an already-loaded row with newer grants.
         // Physical callers must enter readWithinSnapshot before selecting the record.
         throw denied();

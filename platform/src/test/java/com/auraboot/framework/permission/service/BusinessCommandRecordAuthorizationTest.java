@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -33,14 +34,16 @@ class BusinessCommandRecordAuthorizationTest {
     private final PermissionFieldVocabulary vocabulary = mock(PermissionFieldVocabulary.class);
     private final ObjectMapper json = new ObjectMapper();
     private final RecordShareEvaluator recordShares = mock(RecordShareEvaluator.class);
+    private final RecordShareRowSurfaceResolver rowSurfaces = mock(RecordShareRowSurfaceResolver.class);
     private final BusinessCommandRecordAuthorization authorization = new BusinessCommandRecordAuthorization(
             snapshots, bindings, policies, scopes,
-            new DataScopeEvaluator(scopes, mock(RecordShareService.class), mock(RecordShareRowSurfaceResolver.class)),
+            new DataScopeEvaluator(scopes, mock(RecordShareService.class), rowSurfaces),
             new PolicyEvaluator(policies, vocabulary, json, mock(ObjectProvider.class)), json, recordShares);
     private static final String CODE = "inventory.receipt.confirm";
     private static final String MODEL = "receipt";
 
     @BeforeEach void context() {
+        TransactionSynchronizationManager.bindResource("business-grant-test-connection",new org.springframework.jdbc.datasource.ConnectionHolder(mock(Connection.class)));
         MetaContext.setContext(100L, 1L, "actor-pid", "actor"); MetaContext.setMemberId(5L);
         TransactionSynchronizationManager.setActualTransactionActive(true);
         TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(Connection.TRANSACTION_REPEATABLE_READ);
@@ -53,6 +56,7 @@ class BusinessCommandRecordAuthorizationTest {
     }
 
     @AfterEach void clear() {
+        TransactionSynchronizationManager.unbindResourceIfPossible("business-grant-test-connection");
         MetaContext.clear(); TransactionSynchronizationManager.clear();
     }
 
@@ -372,6 +376,71 @@ class BusinessCommandRecordAuthorizationTest {
                 new com.auraboot.framework.permission.engine.model.EvaluationStep("RecordShare",
                         com.auraboot.framework.permission.engine.model.EvaluationVerdict.NOT_APPLICABLE,"not shared"));
         assertThat(authorization.resolveOrdinaryRead(5L,MODEL,record(999,"Shanghai")).result().granted()).isFalse();
+    }
+
+    @Test void projectionReusesOnlyConfigurationAndEvaluatesEachRecordAgain() throws Exception {
+        var definition = permission(CODE); definition.setResourceCode("domain"); definition.setAction("read");
+        definition.setExtension(Map.of("domainModels", Map.of(MODEL,List.of("read"))));
+        when(snapshots.resourcePermissionCodes(100L,MODEL,"read")).thenReturn(List.of(CODE));
+        when(snapshots.resolvePermissionDefinition(100L,CODE)).thenReturn(definition);
+        var function=grant(11,101,CODE); grants(function); guards(CODE,guard(11,"Shanghai"));
+        when(scopes.resolveObjectBoundScopeForRole(5L,101L,MODEL,"read",MODEL)).thenReturn(DataScopeCondition.all());
+        when(recordShares.evaluate(eq(5L),eq(MODEL),eq("read"),any())).thenReturn(
+                new com.auraboot.framework.permission.engine.model.EvaluationStep("RecordShare",
+                        com.auraboot.framework.permission.engine.model.EvaluationVerdict.NOT_APPLICABLE,"not shared"));
+        authorization.withReadProjectionSnapshot(() -> {
+            assertThat(authorization.resolveOrdinaryRead(5L,MODEL,record(1,"Shanghai")).result().granted()).isTrue();
+            assertThat(authorization.resolveOrdinaryRead(5L,MODEL,record(1,"Beijing")).result().granted()).isFalse();
+            return null;
+        });
+        verify(bindings,times(1)).findBusinessGrants(100L,1L,5L,CODE);
+        verify(policies,times(1)).getConditionGuards(5L,CODE);
+        verify(scopes,times(1)).resolveObjectBoundScopeForRole(5L,101L,MODEL,"read",MODEL);
+        verify(recordShares,never()).evaluate(any(),anyString(),anyString(),any());
+        when(scopes.resolveObjectBoundScopeForRole(5L,101L,MODEL,"read",MODEL)).thenReturn(DataScopeCondition.none());
+        assertThat(authorization.resolveOrdinaryRead(5L,MODEL,record(1,"Shanghai")).result().granted()).isFalse();
+        verify(scopes,times(2)).resolveObjectBoundScopeForRole(5L,101L,MODEL,"read",MODEL);
+    }
+
+    @Test void projectionCannotReuseConfigurationAfterActorOrPhysicalSnapshotChange() {
+        authorization.withReadProjectionSnapshot(() -> {
+            MetaContext.setMemberId(6L);
+            assertThatThrownBy(() -> authorization.resolveOrdinaryRead(6L,MODEL,record(1,"Shanghai")))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            MetaContext.setMemberId(5L);
+            Object connection=TransactionSynchronizationManager.unbindResource("business-grant-test-connection");
+            TransactionSynchronizationManager.bindResource("business-grant-test-connection",new org.springframework.jdbc.datasource.ConnectionHolder(mock(Connection.class)));
+            assertThatThrownBy(() -> authorization.resolveOrdinaryRead(5L,MODEL,record(1,"Shanghai")))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            TransactionSynchronizationManager.unbindResource("business-grant-test-connection");
+            TransactionSynchronizationManager.bindResource("business-grant-test-connection",connection);
+            return null;
+        });
+    }
+
+    @Test void currentDomainReadsRetainDeclaredSharedChildrenAndRevocationWithoutBorrowingFields() throws Exception {
+        var definition = permission(CODE); definition.setResourceCode("domain"); definition.setAction("write");
+        definition.setExtension(Map.of("domainModels", Map.of(MODEL, List.of("read", "update"))));
+        when(snapshots.resolvePermissionDefinition(100L,CODE)).thenReturn(definition);
+        var function=grant(11,101,CODE); function.setFieldScopeJson(fieldScope("label")); grants(function);
+        guards(CODE,new PermissionPolicyService.ConditionGuard(11L,null));
+        when(scopes.resolveObjectBoundScopeForRole(5L,101L,MODEL,"read",MODEL))
+                .thenReturn(new DataScopeCondition("self","created_by",1L,null,List.of(),List.of()));
+        when(snapshots.resourcePermissionCodes(100L,MODEL,"read")).thenReturn(List.of(CODE));
+        when(recordShares.evaluate(eq(5L),eq(MODEL),eq("read"),any())).thenReturn(
+                new com.auraboot.framework.permission.engine.model.EvaluationStep("RecordShare",
+                        com.auraboot.framework.permission.engine.model.EvaluationVerdict.NOT_APPLICABLE,"not directly shared"));
+        var child = new java.util.HashMap<String,Object>(record(999,"Shanghai")); child.put("quote_id","shared-quote");
+        when(rowSurfaces.resolveSharedRootReferences(100L,5L,MODEL,"read")).thenReturn(List.of(
+                new com.auraboot.framework.permission.engine.model.SharedRootReference("quote_id",List.of("shared-quote"))));
+        var result=authorization.resolveOrdinaryRead(5L,MODEL,child);
+        assertThat(result.result().granted()).as(result.toString()).isTrue(); assertThat(result.canRead("label")).isTrue();
+        assertThat(result.canRead("cost")).isFalse();
+        child.put("quote_id","unshared-quote");
+        assertThat(authorization.resolveOrdinaryRead(5L,MODEL,child).result().granted()).isFalse();
+        child.put("quote_id","shared-quote");
+        when(rowSurfaces.resolveSharedRootReferences(100L,5L,MODEL,"read")).thenReturn(List.of());
+        assertThat(authorization.resolveOrdinaryRead(5L,MODEL,child).result().granted()).isFalse();
     }
 
     @Test void domainReadSharesDoNotReapplyObjectScopeButRetainFieldsAndConditions() throws Exception {

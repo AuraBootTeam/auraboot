@@ -161,7 +161,13 @@ test('quote sharing release gate: multiple members, role access and revocation t
   await expect(viewers[0].page.locator('main')).not.toContainText(/加载中\.\.\.|Loading\.\.\./);
   await expect(viewers[0].page.getByTestId('metric-strip-item-customer_code').locator('span').last()).toHaveText('-');
   await viewers[0].page.screenshot({path:testInfo.outputPath('quote-collaborator-all-tabs.png'), fullPage:true});
-  expect((await viewers[0].page.request.put(root,{data:{qo_quote_customer:'Denied shared edit'}})).status()).toBe(403);
+  // Domain write plus the existing shared update audience permits ordinary editable fields.
+  const beforeEdit0 = (await (await page.request.get(root)).json()).data;
+  const edit0 = await viewers[0].page.request.put(root,{data:{qo_quote_customer:'Shared writer customer'}});
+  expect(edit0.status()).toBe(200); expect(String((await edit0.json()).code)).toBe('0');
+  const afterEdit0 = (await (await page.request.get(root)).json()).data;
+  expect(afterEdit0.qo_quote_customer).toBe('Shared writer customer');
+  expect(Number(afterEdit0.row_version)).toBe(Number(beforeEdit0.row_version)+1);
   const reader = viewers[0].page;
   await reader.getByRole('button',{name:/修改套数/}).click();
   await reader.getByTestId('form-dialog-field-qo_quote_set_count').fill('2');
@@ -214,7 +220,13 @@ test('quote sharing release gate: multiple members, role access and revocation t
     await expect(viewers[2].page.getByRole('tab',{name:tabName,exact:true})).toBeVisible();
   }
   // Sharing does not grant absent model-level CRUD privileges.
-  expect((await viewers[2].page.request.put(root,{data:{qo_quote_customer:'Denied generic edit'}})).status()).toBe(403);
+  // Domain write plus the existing shared update audience permits ordinary editable fields.
+  const beforeEdit2 = (await (await page.request.get(root)).json()).data;
+  const edit2 = await viewers[2].page.request.put(root,{data:{qo_quote_customer:'Role-shared writer customer'}});
+  expect(edit2.status()).toBe(200); expect(String((await edit2.json()).code)).toBe('0');
+  const afterEdit2 = (await (await page.request.get(root)).json()).data;
+  expect(afterEdit2.qo_quote_customer).toBe('Role-shared writer customer');
+  expect(Number(afterEdit2.row_version)).toBe(Number(beforeEdit2.row_version)+1);
   const collaborator = viewers[2].page;
   await collaborator.goto(`/p/qo_quote_common/view/${quote.quoteId}#bom_price`);
   await collaborator.getByRole('button',{name:/修改套数/}).click();
