@@ -14,17 +14,9 @@ import {
 } from './quote-e2e-helpers';
 
 /**
- * Focused-runtime menu + permission matrix against the CURRENT owner role model
- * (business-roles.json, owner-confirmed 2026-06-28, applied to source in #199):
- *
- *   | role            | BOM 转化 (view rules/library) | 报价全套 | 物料/规则写 + 金蝶同步 |
- *   | qo_sales        | ✓                             | ✓        | ✗ (admin-tier)        |
- *   | qo_procurement  | ✓ (= sales)                   | ✓        | ✗                     |
- *   | bom_engineering | ✓ (+ material library manage) | ✓        | library ✓ / rules ✗   |
- *   | no business role| ✗                             | ✗        | ✗                     |
- *
- * The retired 5-role model (qo_quoter / bom_operator / bom_admin) no longer exists on
- * delivery stacks — creating users against those codes silently yields assignedRoles=[].
+ * Approved domain model: sales/procurement/engineering have BOM write + Quote write.
+ * Only domain managers may maintain shared materials/rules or trigger live sync.
+ * Navigation assignments remain independent from business grants.
  */
 const QUOTE_MENU_PATH = '/p/qo_quote_common';
 const PRICE_LIBRARY_MENU_PATH = '/p/qo_offline_material_price_common';
@@ -39,34 +31,11 @@ const PERMISSION_ROLES_PATH = '/enterprise/permissions';
 const BOM_MATERIAL_SYNC_COMMAND = 'bom:sync_material_incremental_now';
 const BOM_MATERIAL_SYNC_DRY_RUN = { dryRun: true };
 
-const PLATFORM_BASE_CAPABILITY = 'sys.cap.member_base';
 const COMMAND_EXECUTE_PERMISSION = 'meta.command.execute';
 
-// full quote-business permission set (all granted to sales/procurement via qo.cap.*)
-const QUOTE_PERMISSIONS = [
-  'qo.quote.read',
-  'qo.quote.create',
-  'qo.quote.manage',
-  'qo.rfq.upload',
-  'qo.bom.import',
-  'qo.price.manage',
-  'qo.process_fee.manage',
-  'qo.document.generate',
-];
-
-// BOM read/execute surface every business role holds (bom.cap.project/convert/*_view)
-const BOM_BUSINESS_PERMISSIONS = [
-  'bom.project.read',
-  'bom.project.manage',
-  'bom.convert.execute',
-  'bom.library.read',
-  'bom.rule.read',
-];
-
-// Privileged BOM writes. Engineering has the owner-approved material-library exception;
-// sales/procurement remain view-only and no business role may manage validation rules.
-const BOM_ADMIN_PERMISSIONS = ['bom.library.manage', 'bom.rule.manage'];
-const BOM_ENGINEERING_MANAGE_PERMISSIONS = ['bom.library.manage'];
+const QUOTE_PERMISSIONS = ['qo.cap.read', 'qo.cap.write'];
+const BOM_BUSINESS_PERMISSIONS = ['bom.cap.read', 'bom.cap.write'];
+const BOM_ADMIN_PERMISSIONS = ['bom.cap.manage', 'qo.cap.manage'];
 
 const BUSINESS_MENU_PATHS = [
   BOM_PROJECTS_PATH,
@@ -162,7 +131,7 @@ async function createCustomRole(page: Page, roleCode: string): Promise<string> {
     data: {
       code: roleCode,
       name: `E2E No Business ${roleCode.slice(-12)}`,
-      description: 'E2E negative role with platform base only, no Quote/BOM business capabilities',
+      description: 'E2E negative role with no Quote/BOM business capabilities',
       type: 'custom',
       status: 'active',
       scopeType: 'tenant',
@@ -179,18 +148,18 @@ async function createCustomRole(page: Page, roleCode: string): Promise<string> {
   return rolePid;
 }
 
-async function grantPlatformBaseOnly(request: APIRequestContext, rolePid: string): Promise<void> {
+async function grantNoBusinessCapabilities(request: APIRequestContext, rolePid: string): Promise<void> {
   const resp = await request.put(
     `/api/permission/capabilities?rolePid=${encodeURIComponent(rolePid)}`,
     {
-      data: [PLATFORM_BASE_CAPABILITY],
+      data: [],
       timeout: 15_000,
     },
   );
   const body = await resp.json().catch(() => ({}));
   expect(
     resp.ok(),
-    `grant platform base capability to ${rolePid} HTTP ${resp.status()}: ${JSON.stringify(body).slice(0, 800)}`,
+    `clear business capabilities to ${rolePid} HTTP ${resp.status()}: ${JSON.stringify(body).slice(0, 800)}`,
   ).toBe(true);
 }
 
@@ -214,7 +183,7 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
     const page = await context.newPage();
     try {
       const noBusinessRolePid = await createCustomRole(page, noBusinessRoleCode);
-      await grantPlatformBaseOnly(page.context().request, noBusinessRolePid);
+      await grantNoBusinessCapabilities(page.context().request, noBusinessRolePid);
       for (const user of Object.values(users)) {
         await ensureQuoteRoleUser(page, user);
       }
@@ -281,11 +250,10 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
           COMMAND_EXECUTE_PERMISSION,
           ...QUOTE_PERMISSIONS,
           ...BOM_BUSINESS_PERMISSIONS,
-          ...BOM_ENGINEERING_MANAGE_PERMISSIONS,
         ],
         'bom_engineering permissions',
       );
-      expectExcludes(snapshot.permissionCodes, ['bom.rule.manage'], 'bom_engineering permissions');
+      expectExcludes(snapshot.permissionCodes, BOM_ADMIN_PERMISSIONS, 'bom_engineering permissions');
       expectIncludes(
         snapshot.menuPaths,
         [...QUOTE_MENU_PATHS, ...BUSINESS_MENU_PATHS, BOM_MATERIAL_LIBRARY_PATH, BOM_FORMAT_PROFILE_PATH],
@@ -378,9 +346,8 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
       await expectCommandNotDenied(page, 'qo_offline_material_price_common:import_excel', {});
       await expectCommandNotDenied(page, 'bom:create_project', bomProjectPayload(`${uid}-eng`));
       await expectCommandNotDenied(page, 'qo_quote_common:import_corrected_bom', {}, 'quote-id', 'update');
-      // bom.library.manage is already proven by the permission snapshot and create-material gate.
-      // Do not invoke even a dry-run Kingdee command from this role-boundary test.
-      await expectCommandNotDenied(page, 'bom:create_material', {
+      // Domain write does not grant shared-library management or live connector sync.
+      await expectCommandDenied(page, 'bom:create_material', {
         bom_mm_material_code: `X-${uid}-eng`,
       });
       await expectCommandDenied(page, 'bom:create_validation_rule', {});

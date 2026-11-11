@@ -170,6 +170,7 @@ test.describe('BOM & Quote domain levels', () => {
           ? { bom_project_name: `LEVEL-${Date.now()}`, bom_project_quality_level: 'industrial' }
           : { qo_quote_discount_pct: 0.05 };
       let createdPid: string | undefined;
+      let foreignQuotePid: string | undefined;
       const setHiddenFixture = async (recordPid: string) => {
         const { client, database } = await openPgClient();
         try {
@@ -190,6 +191,8 @@ test.describe('BOM & Quote domain levels', () => {
         await reassignRecordOwnerByEmail(seeded.rows, user.email);
         createdPid = seeded.quoteId;
         await setHiddenFixture(createdPid);
+        // A separate admin-owned fixture proves domain manage does not widen SELF.
+        foreignQuotePid = (await seedQuoteScaffold(page, 'DOMAIN-FOREIGN', [])).quoteId;
       }
       try {
         await page.goto('/enterprise/permissions');
@@ -304,6 +307,18 @@ test.describe('BOM & Quote domain levels', () => {
               expect(raw.rows[0].value).toBe('Domain-level hidden fixture');
             } finally {
               await client.end();
+            }
+          }
+          if (domain === 'qo') {
+            for (const query of ['qo_quote_bom_price_metrics', 'qo_quote_process_fee_metrics', 'qo_quote_output_readiness']) {
+              const queryUrl = (quoteId: string) => `/api/datasource/list?${new URLSearchParams({
+                datasourceId: `nq:${query}`, valueField: 'pid', labelField: 'name', format: 'records', quoteId,
+              })}`;
+              const own = await actor.request.get(queryUrl(createdPid!));
+              if (level === 'none') expect(own.status()).toBe(403);
+              else await unwrap(own);
+              const foreign = await actor.request.get(queryUrl(foreignQuotePid!));
+              expect(foreign.status(), `${query} must preserve SELF even at ${level}`).toBe(403);
             }
           }
           const other = domain === 'bom' ? 'qo_quote_common:create' : 'bom:create_project';

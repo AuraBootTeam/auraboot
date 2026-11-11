@@ -5,7 +5,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { utils as XLSXUtils, write } from 'xlsx';
 import { expect, test } from '../../fixtures';
-import { FixtureCleanupJournal, immutableQuoteArtifactCleanup, type FixtureRow } from './fixture-cleanup';
+import { FixtureCleanupJournal, immutableQuoteArtifactCleanup, internalQuoteSnapshotCleanup, type FixtureRow } from './fixture-cleanup';
 import { loginViaUI } from '../../helpers/auth-fixtures';
 import {
   clickRowActionByLocator,
@@ -803,6 +803,27 @@ export async function cleanupRows(page: Page, created: CreatedRows): Promise<voi
     rows.push({ model: 'qo_quote_common', pid: created.quoteId });
   }
   for (const row of rows) journal.track(row);
+  const snapshots = rows.filter(row => ['qo_bom_import_row_common', 'qo_bom_import_common'].includes(row.model));
+  if (snapshots.length) {
+    const { client, database } = await openPgClient();
+    try {
+      await client.query('BEGIN');
+      try {
+        // Purge rows before their import headers, independently of fixture insertion order.
+        for (const row of [...snapshots].sort((a, b) =>
+          Number(a.model === 'qo_bom_import_common') - Number(b.model === 'qo_bom_import_common'))) {
+          const query = internalQuoteSnapshotCleanup(database, created.quoteId, row);
+          await client.query(query.text, query.values);
+          const remaining = await client.query(query.absenceText, [row.pid]);
+          expect(remaining.rows, 'Exact internal fixture must be absent; foreign quote/tenant rows are never purged').toHaveLength(0);
+        }
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      }
+    } finally { await client.end(); }
+  }
   await journal.cleanup(page.request, rows);
 }
 

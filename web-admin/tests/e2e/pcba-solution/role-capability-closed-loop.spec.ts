@@ -248,12 +248,12 @@ test('BOM domain management authors rules and downgrades to read without Quote a
   );
   const ruleMenus = new Set<string>(
     baseline.navigation.menus
-      .filter((menu: any) => menu.enabled && !menu.directory && menu.permissionCode === 'bom.rule.read')
+      .filter((menu: any) => menu.enabled && !menu.directory && menu.permissionCode === 'bom.cap.read' && /表头别名|Header Aliases/i.test(menu.name))
       .map((menu: any) => menu.pid),
   );
   expect(ruleMenus.size).toBeGreaterThan(0);
   const ruleMenuLabels: string[] = [];
-  let aliasMenu = baseline.navigation.menus.find((menu: any) => menu.permissionCode === 'bom.rule.read' && /表头别名|Header Aliases/i.test(menu.name));
+  let aliasMenu = baseline.navigation.menus.find((menu: any) => menu.permissionCode === 'bom.cap.read' && /表头别名|Header Aliases/i.test(menu.name) && /表头别名|Header Aliases/i.test(menu.name));
   expect(aliasMenu).toBeDefined();
   while (aliasMenu) {
     ruleMenuLabels.unshift(aliasMenu.name);

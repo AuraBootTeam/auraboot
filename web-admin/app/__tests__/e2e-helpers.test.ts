@@ -6,7 +6,7 @@ import type { APIRequestContext } from '@playwright/test';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { FixtureCleanupJournal, immutableQuoteArtifactCleanup } from '../../tests/e2e/pcba-solution/fixture-cleanup';
+import { FixtureCleanupJournal, immutableQuoteArtifactCleanup, internalQuoteSnapshotCleanup } from '../../tests/e2e/pcba-solution/fixture-cleanup';
 
 function mockPage(reload: ReturnType<typeof vi.fn>): Page {
   return {
@@ -182,5 +182,27 @@ describe('immutable document fixture purge boundaries', () => {
     expect(query.text).toContain("artifact.ab_da_source_model = 'qo_quote_common'");
     expect(query.text).not.toContain('owned-quote');
     expect(query.text).not.toContain('owned-artifact');
+  });
+});
+
+describe('internal Quote snapshot fixture purge boundaries', () => {
+  it('rejects production databases, public models, and malformed identities', () => {
+    const row = { model: 'qo_bom_import_row_common', pid: 'owned-snapshot' };
+    expect(() => internalQuoteSnapshotCleanup('production', 'owned-quote', row)).toThrow('isolated');
+    expect(() => internalQuoteSnapshotCleanup('enterprise_169', 'owned-quote', { ...row, model: 'qo_quote_common' })).toThrow('allowed snapshot');
+    expect(() => internalQuoteSnapshotCleanup('enterprise_169', '', row)).toThrow('exact quote');
+    expect(() => internalQuoteSnapshotCleanup('enterprise_169', 'owned-quote', { ...row, pid: "x' OR true" })).toThrow('Invalid fixture');
+  });
+  it.each([
+    ['qo_bom_import_row_common', 'qo_bir_quote_id'],
+    ['qo_bom_import_common', 'qo_bi_quote_id'],
+  ])('requires exact quote and tenant ownership for %s', (model, column) => {
+    const query = internalQuoteSnapshotCleanup('enterprise_169', 'owned-quote', { model, pid: 'owned-snapshot' });
+    expect(query.values).toEqual(['owned-quote', 'owned-snapshot']);
+    expect(query.text).toContain('snapshot.tenant_id = quote.tenant_id');
+    expect(query.text).toContain(`snapshot.${column} = quote.pid`);
+    expect(query.text).toContain('snapshot.pid = $2');
+    expect(query.text).not.toContain('owned-quote');
+    expect(query.absenceText).toBe(`SELECT pid FROM mt_${model} WHERE pid = $1`);
   });
 });
