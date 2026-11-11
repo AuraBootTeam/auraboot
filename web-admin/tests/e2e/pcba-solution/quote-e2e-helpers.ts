@@ -1642,25 +1642,17 @@ export async function seedBomWorkbench(
       created.rows,
     );
 
-    created.exportRevisionId = await dynamicCreate(
-      page,
-      'bom_export_revision',
-      {
-        bom_er_task_id: created.taskId,
-        bom_er_revision_no: 1,
-        bom_er_source_state_hash: `state-${suffix}-r1`,
-        bom_er_source_decision_version: 0,
-        bom_er_file_id: `export-${suffix}-r1`,
-        bom_er_filename: `${marker}-standard-bom-r1.xlsx`,
-        bom_er_generated_by: 'e2e',
-        bom_er_generated_at: new Date().toISOString(),
-        bom_er_green_count: 1,
-        bom_er_yellow_count: 1,
-        bom_er_red_count: 0,
-        bom_er_status: 'current',
-      },
-      created.rows,
-    );
+    // Export revisions are internal artifacts of the admitted export command, not public CRUD.
+    const exportResult = await executeCommand(page, 'bom:regenerate_export',
+      { sourceRecordId: created.taskId }, created.taskId, 'update');
+    expect(exportResult.exportFileId, 'seed export must produce a real file').toBeTruthy();
+    const revisions = await queryDynamicRecords(page, 'bom_export_revision', [
+      { fieldName: 'bom_er_task_id', operator: 'EQ', value: created.taskId },
+    ]);
+    expect(revisions, 'seed export must persist one controlled revision').toHaveLength(1);
+    expect(revisions[0].bom_er_file_id).toBe(exportResult.exportFileId);
+    created.exportRevisionId = String(revisions[0].pid);
+    trackFixtureRow(page, created.rows, { model: 'bom_export_revision', pid: created.exportRevisionId });
 
     // Optionally hand ownership of the SELF-scoped records (task + project + account) to a
     // business role so a non-admin (e.g. bom_engineering) can see the seeded conversion task
