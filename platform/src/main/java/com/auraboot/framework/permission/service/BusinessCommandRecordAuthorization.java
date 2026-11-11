@@ -125,9 +125,10 @@ public class BusinessCommandRecordAuthorization {
         if (!MetaContext.exists() || record == null || MetaContext.getCurrentUserId() == null
                 || !Objects.equals(MetaContext.getCurrentUserId(), record.get("created_by")))
             return decision(denied("Native creation ownership is unavailable", List.of()), memberId, model, record, List.of());
-        return resolveInternal(memberId,
-                snapshots.resourcePermissionCodes(MetaContext.getCurrentTenantId(), model, "create"),
-                model, record, "create", true);
+        var codes = new java.util.LinkedHashSet<>(snapshots.resourcePermissionCodes(MetaContext.getCurrentTenantId(), model, "create"));
+        String documentAuthority = com.auraboot.framework.meta.security.DocumentArtifactCommandScope.authorityFor(model, record, "create");
+        if (documentAuthority != null) codes.add(documentAuthority);
+        return resolveInternal(memberId, List.copyOf(codes), model, record, "create", true);
     }
 
     private BusinessGrantDecision resolveInternal(Long memberId, List<String> declaredPermissions,
@@ -182,9 +183,10 @@ public class BusinessCommandRecordAuthorization {
         for (String code : new java.util.LinkedHashSet<>(codes)) {
             var permission = snapshots.resolvePermissionDefinition(tenant, code);
             boolean modelRead = "read".equals(nativeAction);
-            boolean domain = DomainPermissionPolicy.owns(permission, model);
+            boolean documentEffect = com.auraboot.framework.meta.security.DocumentArtifactCommandScope.permits(permission, model, record, nativeAction);
+            boolean domain = DomainPermissionPolicy.owns(permission, model) || documentEffect;
             if (!DomainPermissionPolicy.models(permission).isEmpty() && !DomainPermissionPolicy.permits(permission, model, nativeAction)
-                    && !DomainPermissionPolicy.isCurrentCommandMutation(permission, model, nativeAction)) {
+                    && !DomainPermissionPolicy.isCurrentCommandMutation(permission, model, nativeAction) && !documentEffect) {
                 trace.add(step(EvaluationVerdict.DENY, "Domain level does not own this model/action", code, null, null));
                 continue;
             }

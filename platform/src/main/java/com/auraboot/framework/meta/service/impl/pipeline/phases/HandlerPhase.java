@@ -838,8 +838,10 @@ public class HandlerPhase implements CommandPhase {
                         log.info("Dry-run: skipping primary handler {} for command {} (supportsDryRun()=false)",
                                 handler.getClass().getName(), handlerCode);
                     } else {
-                        Object result = inventoryReceiptProvenance == null ? handler.execute(pluginContext)
-                                : inventoryReceiptProvenance.route(handler, pluginContext);
+                        CommandHandlerExtension selectedHandler = handler;
+                        Object result = com.auraboot.framework.meta.security.DocumentArtifactCommandScope.within(pipelineContext,
+                                () -> inventoryReceiptProvenance == null ? selectedHandler.execute(pluginContext)
+                                        : inventoryReceiptProvenance.route(selectedHandler, pluginContext));
                         if(businessScope!=null)result=businessScope.projectResult(result);
                         if (result instanceof Map) {
                             @SuppressWarnings("unchecked")

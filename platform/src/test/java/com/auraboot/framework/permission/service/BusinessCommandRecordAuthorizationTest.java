@@ -418,6 +418,50 @@ class BusinessCommandRecordAuthorizationTest {
         assertThat(evaluate(record(1,"Shanghai")).granted()).isFalse();
     }
 
+    @Test void documentRegistrationReusesTheDutyWithoutRemovingChildScopeOrFieldRestrictions() {
+        var definition=permission(CODE);definition.setResourceCode("domain");definition.setAction("write");
+        definition.setExtension(Map.of("domainModels",Map.of(MODEL,List.of("read","update"))));
+        when(snapshots.resolvePermissionDefinition(100L,CODE)).thenReturn(definition);
+        var binding=grant(11,101,CODE);grants(binding);guards(CODE,new PermissionPolicyService.ConditionGuard(11L,null));
+        String child="ab_document_artifact";
+        when(scopes.resolveObjectBoundScopeForRole(5L,101L,child,"create",child))
+                .thenReturn(new DataScopeCondition("self","created_by",1L,null,List.of(),List.of()));
+        var artifact=Map.<String,Object>of("pid","artifact-pid","tenant_id",100L,"created_by",1L,
+                "ab_da_source_model",MODEL,"ab_da_source_record_pid","receipt-pid","ab_da_definition_code","example.standard",
+                "ab_da_definition_version","1.0.0","ab_da_format","xlsx","ab_da_filename","example.xlsx");
+        assertThat(authorization.resolveOrdinaryCreate(5L,child,artifact).result().granted()).isFalse();
+        withDocumentEffect(()->{
+            var allowed=authorization.resolveOrdinaryCreate(5L,child,artifact);
+            assertThat(allowed.result().granted()).isTrue();assertThat(allowed.canWrite("ab_da_filename")).isTrue();
+            binding.setFieldScopeJson("{\"version\":2,\"models\":{\"ab_document_artifact\":{\"readFields\":[\"ab_da_filename\"],\"writeFields\":[]}}}");
+            var limited=authorization.resolveOrdinaryCreate(5L,child,artifact);
+            assertThat(limited.result().granted()).isTrue();assertThat(limited.canWrite("ab_da_filename")).isFalse();
+            binding.setFieldScopeJson(null);
+            when(scopes.resolveObjectBoundScopeForRole(5L,101L,child,"create",child)).thenReturn(DataScopeCondition.none());
+            assertThat(authorization.resolveOrdinaryCreate(5L,child,artifact).result().granted()).isFalse();
+            return null;
+        });
+        assertThat(authorization.resolveOrdinaryCreate(5L,child,artifact).result().granted()).isFalse();
+    }
+
+    private <T>T withDocumentEffect(Supplier<T> body) {
+        var context=mock(com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext.class);
+        var command=new com.auraboot.framework.meta.entity.CommandDefinition();command.setModelCode(MODEL);
+        var request=new com.auraboot.framework.meta.dto.CommandExecuteRequest();request.setTargetRecordPid("receipt-pid");
+        when(context.getCommand()).thenReturn(command);when(context.getRequest()).thenReturn(request);
+        when(context.getCommandCode()).thenReturn(CODE);when(context.getTenantId()).thenReturn(100L);when(context.getUserId()).thenReturn(1L);
+        when(context.getTargetRecordReadable()).thenReturn(true);
+        when(context.getAuthorizationVerdict()).thenReturn(com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict.authorized(CODE));
+        when(context.getExecConfig()).thenReturn(Map.of("handlerParams",Map.of("documentDefinition",Map.of(
+                "code","example.standard","version","1.0.0","dataset",MODEL+":snapshot_v1",
+                "versionPolicy","immutable-artifact","outputs",List.of("xlsx","pdf")))));
+        return MetaContext.runWithCommandPermitPlan("TARGET",null,MODEL,"receipt-pid",()->MetaContext.runWithCommandAuthority(CODE,()->
+                MetaContext.runWithCommandAggregate("receipt-pid",()->MetaContext.runWithAuthorizedCommandCode(CODE,()->{
+                    try{return com.auraboot.framework.meta.security.DocumentArtifactCommandScope.within(context,body::get);}
+                    catch(RuntimeException failure){throw failure;}catch(Exception failure){throw new AssertionError(failure);}
+                }))));
+    }
+
     private void grants(RolePermissionMapper.BusinessGrantRow... rows) {
         when(bindings.findBusinessGrants(100L, 1L, 5L, CODE)).thenReturn(List.of(rows));
     }
