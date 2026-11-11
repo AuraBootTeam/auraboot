@@ -53,9 +53,6 @@ test.describe('Quote pricing + document excel (QO-04 / QO-07 / XLS-Q) @smoke', (
       await unwrap(await admin.request.post(`/api/roles/${source.pid}/copy-permissions`, {
         data: { targetRolePid: filePolicyRole.pid },
       }));
-      await unwrap(await admin.request.put(`/api/permissions/matrix/${filePolicyRole.pid}/default-scope`, {
-        data: { scopeType: 'self' },
-      }));
       // Role creation starts with an explicit menu selection. Copy navigation
       // separately; copying business grants must never grant menus implicitly.
       const sourceDraft = await unwrap(await admin.request.get(`/api/permission/roles/${source.pid}/draft`));
@@ -65,10 +62,15 @@ test.describe('Quote pricing + document excel (QO-04 / QO-07 / XLS-Q) @smoke', (
         expectedRevision: targetDraft.revision,
         selectedCapabilityCodes: targetDraft.groups.flatMap((group: any) => group.capabilities)
           .filter((capability: any) => capability.granted && !capability.conventionDerived).map((capability: any) => capability.code),
-        revokedPartialCapabilityCodes: [], defaultScopeChanged: false,
+        revokedPartialCapabilityCodes: [], defaultScopeChanged: true,
+        defaultScopeType: sourceDraft.defaultScopeType,
         applyDefaultToCurrentGrants: false, scopeChanges: [],
         menuPids: sourceDraft.navigation.selectedMenuPids,
       } }));
+      const copied = await unwrap(await admin.request.get(targetDraftUrl));
+      const scopes = (rows: any[]) => rows.map(row => JSON.stringify(row)).sort();
+      expect(copied.defaultScopeType).toBe(sourceDraft.defaultScopeType);
+      expect(scopes(copied.scopes), 'Copy must preserve every original scope rather than apply a new default').toEqual(scopes(sourceDraft.scopes));
       sales = makeQuoteRoleUser('qo_sales', uid, [filePolicyRole.code]);
       await ensureQuoteRoleUser(admin, sales);
     } finally { await context.close(); }
