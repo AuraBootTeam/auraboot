@@ -378,6 +378,38 @@ class BusinessCommandRecordAuthorizationTest {
         assertThat(authorization.resolveOrdinaryRead(5L,MODEL,record(999,"Shanghai")).result().granted()).isFalse();
     }
 
+    @Test void loadedBindingConditionsAvoidRescanningMembershipButRejectStaleDefinitions() throws Exception {
+        var definition=permission(CODE);definition.setId(90L);definition.setResourceCode("domain");definition.setAction("read");
+        definition.setExtension(Map.of("domainModels",Map.of(MODEL,List.of("read"))));
+        when(snapshots.resolvePermissionDefinition(100L,CODE)).thenReturn(definition);
+        when(snapshots.resourcePermissionCodes(100L,MODEL,"read")).thenReturn(List.of(CODE));
+        var row=grant(11,101,CODE);row.setPermissionId(90L);row.setConditionLoaded(true);row.setConditionAstJson(guard(11,"Shanghai").conditionAstJson());
+        row.setFieldScopeJson(fieldScope("label"));grants(row);
+        when(policies.loadedConditionGuard(eq(definition),eq(11L),eq(row.getConditionAstJson()),isNull())).thenReturn(guard(11,"Shanghai"));
+        when(scopes.resolveObjectBoundScopeForRole(5L,101L,MODEL,"read",MODEL)).thenReturn(DataScopeCondition.all());
+        var allowed=authorization.resolveOrdinaryRead(5L,MODEL,record(1,"Shanghai"));
+        assertThat(allowed.result().granted()).isTrue();assertThat(allowed.canRead("cost")).isFalse();
+        assertThat(authorization.resolveOrdinaryRead(5L,MODEL,record(1,"Beijing")).result().granted()).isFalse();
+        verify(policies,never()).getConditionGuards(any(),anyString());
+        row.setPermissionId(89L);
+        assertThat(authorization.resolveOrdinaryRead(5L,MODEL,record(1,"Shanghai")).result().granted()).isFalse();
+    }
+
+    @Test void sensitiveModelReadRetainsItsOwnGrantAndDeclaredSharedChildAudience() throws Exception {
+        String code="model."+MODEL+".read";var definition=permission(code);definition.setResourceType("model");definition.setResourceCode(MODEL);definition.setAction("read");
+        when(snapshots.resolvePermissionDefinition(100L,code)).thenReturn(definition);
+        when(snapshots.resourcePermissionCodes(100L,MODEL,"read")).thenReturn(List.of(code));
+        var row=grant(11,101,code);row.setFieldScopeJson(fieldScope("label"));
+        when(bindings.findBusinessGrants(100L,1L,5L,code)).thenReturn(List.of(row));guards(code,guard(11,"Shanghai"));
+        when(scopes.resolveOrdinaryReadScopeForRole(5L,101L,MODEL)).thenReturn(new DataScopeCondition("self","created_by",1L,null,List.of(),List.of()));
+        var child=new java.util.HashMap<String,Object>(record(999,"Shanghai"));child.put("quote_id","shared-quote");
+        when(rowSurfaces.resolveSharedRootReferences(100L,5L,MODEL,"read")).thenReturn(List.of(new com.auraboot.framework.permission.engine.model.SharedRootReference("quote_id",List.of("shared-quote"))));
+        var allowed=authorization.resolveOrdinaryRead(5L,MODEL,child);assertThat(allowed.result().granted()).isTrue();assertThat(allowed.canRead("cost")).isFalse();
+        child.put("quote_id","other-quote");assertThat(authorization.resolveOrdinaryRead(5L,MODEL,child).result().granted()).isFalse();
+        child.put("quote_id","shared-quote");when(bindings.findBusinessGrants(100L,1L,5L,code)).thenReturn(List.of());
+        assertThat(authorization.resolveOrdinaryRead(5L,MODEL,child).result().granted()).isFalse();
+    }
+
     @Test void domainCommandUsesExistingSharedUpdateAudienceWithoutBypassingFieldsOrConditions() throws Exception {
         var definition=permission(CODE);definition.setResourceCode("domain");definition.setAction("write");
         definition.setExtension(Map.of("domainModels",Map.of(MODEL,List.of("read","update"))));

@@ -84,6 +84,18 @@ public class BusinessCommandRecordAuthorization {
     private List<PermissionPolicyService.ConditionGuard> conditionGuards(Long member,String code) {
         return readConfiguration(List.of("guards",member,code),() -> policies.getConditionGuards(member,code));
     }
+    private PermissionPolicyService.ConditionGuard conditionGuard(Long member,RolePermissionMapper.BusinessGrantRow binding) {
+        return readConfiguration(List.of("binding-guard",member,binding.getId(),binding.getPermissionCode()),() -> {
+            if(Boolean.TRUE.equals(binding.getConditionLoaded())) {
+                var definition=snapshots.resolvePermissionDefinition(MetaContext.getCurrentTenantId(),binding.getPermissionCode());
+                // An older/global duplicate definition cannot lend a newer definition's guard.
+                if(definition==null || binding.getPermissionId()==null || !Objects.equals(definition.getId(),binding.getPermissionId()))return null;
+                return policies.loadedConditionGuard(definition,binding.getId(),binding.getConditionAstJson(),binding.getConditionsJson());
+            }
+            var guards=conditionGuards(member,binding.getPermissionCode());
+            return guards==null?null:guards.stream().filter(guard -> binding.getId().equals(guard.grantId())).findFirst().orElse(null);
+        });
+    }
     private com.auraboot.framework.permission.engine.model.DataScopeCondition objectScope(Long member,Long role,String resource,String action,String model) {
         return readConfiguration(List.of("object-scope",member,role,resource,action,model),
                 () -> scopes.resolveObjectBoundScopeForRole(member,role,resource,action,model));
@@ -219,7 +231,6 @@ public class BusinessCommandRecordAuthorization {
         var tenant = MetaContext.getCurrentTenantId();
         List<EvaluationStep> trace = new ArrayList<>();
         List<BusinessGrantDecision.Grant> matched = new ArrayList<>();
-        Map<String, Map<Long, PermissionPolicyService.ConditionGuard>> guardsByCode = new HashMap<>();
         java.util.function.Supplier<Boolean> sharedRecord = new java.util.function.Supplier<>() {
             Boolean shared;
             public Boolean get() {
@@ -291,17 +302,12 @@ public class BusinessCommandRecordAuthorization {
                             permission.getAction(), model));
                 var scopeStep = (ordinaryModelAction || objectBoundScope) && scope != null && "not_configured".equals(scope.scopeType())
                         ? step(EvaluationVerdict.NOT_APPLICABLE, "Legacy native-model scope is not configured", code, grant.getRoleId(), grant.getId())
-                        : domain ? scopeEvaluator.evaluateCurrentGrantScope(scope, member, model, Objects.requireNonNullElse(nativeAction, permission.getAction()), record)
+                        : domain || ordinaryModelAction ? scopeEvaluator.evaluateCurrentGrantScope(scope, member, model, Objects.requireNonNullElse(nativeAction, permission.getAction()), record)
                         : scopeEvaluator.evaluateGrantScope(scope, member, model, permission.getAction(), record);
                 if (scopeStep == null || scopeStep.verdict() == null) continue;
                 trace.add(scopeStep);
                 if (scopeStep.verdict() == EvaluationVerdict.DENY && !sharedRecord.get()) continue;
-                var guards = guardsByCode.computeIfAbsent(grant.getPermissionCode(), actual -> {
-                    Map<Long, PermissionPolicyService.ConditionGuard> result = new LinkedHashMap<>();
-                    for (var guard : conditionGuards(member, actual)) result.put(guard.grantId(), guard);
-                    return result;
-                });
-                var policy = policyEvaluator.evaluateGrant(member, grant.getPermissionCode(), model, record, guards.get(grant.getId()));
+                var policy = policyEvaluator.evaluateGrant(member, grant.getPermissionCode(), model, record, conditionGuard(member,grant));
                 if (policy == null || policy.verdict() == null) continue;
                 trace.add(policy);
                 if (policy.verdict() == EvaluationVerdict.DENY) continue;
@@ -364,8 +370,7 @@ public class BusinessCommandRecordAuthorization {
                 if (!"grant".equals(row.getGrantType())) return java.util.Optional.empty();
                 String sourceCode = row.getPermissionCode();
                 if (!(code.equals(sourceCode) || "*".equals(sourceCode))) return java.util.Optional.empty();
-                var guards = conditionGuards(member, sourceCode);
-                var guard = guards == null ? null : guards.stream().filter(value -> row.getId().equals(value.grantId())).findFirst().orElse(null);
+                var guard = conditionGuard(member,row);
                 if (policyEvaluator.evaluateGrant(member, sourceCode, model, record, guard).verdict() == EvaluationVerdict.DENY)
                     return java.util.Optional.empty();
                 if (row.getDataScopeAstJson() != null && !row.getDataScopeAstJson().isBlank() && !"null".equals(row.getDataScopeAstJson().strip())

@@ -58,6 +58,12 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
     @Override
+    public ConditionGuard loadedConditionGuard(Permission permission, Long bindingId, String conditionAstJson, String conditionsJson) {
+        if (permission == null || bindingId == null) throw new IllegalArgumentException("Loaded permission binding is required");
+        return new ConditionGuard(bindingId,conditionAstJson,conditionsJson,runtimeValidationError(permission,conditionsJson));
+    }
+
+    @Override
     public List<ConditionGuard> getConditionGuards(Long memberId, String permissionCode) {
         Long tenantId = MetaContext.getCurrentTenantId();
         List<Long> roleIds = resolveRoleIds(memberId, tenantId);
