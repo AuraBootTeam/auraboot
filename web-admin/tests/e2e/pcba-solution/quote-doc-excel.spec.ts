@@ -24,7 +24,7 @@ async function setDocumentCodeVisibility(admin: Page, access: 'hidden' | 'inheri
   const draftUrl = `/api/permission/roles/${filePolicyRole.pid}/draft`;
   const snapshot = await unwrap(await admin.request.get(draftUrl));
   const selected = snapshot.groups.flatMap((group: any) => group.capabilities)
-    .filter((capability: any) => capability.granted).map((capability: any) => capability.code);
+    .filter((capability: any) => capability.granted && !capability.conventionDerived).map((capability: any) => capability.code);
   await unwrap(await admin.request.put(draftUrl, { data: {
     expectedRevision: snapshot.revision,
     selectedCapabilityCodes: selected,
@@ -64,7 +64,7 @@ test.describe('Quote pricing + document excel (QO-04 / QO-07 / XLS-Q) @smoke', (
       await unwrap(await admin.request.put(targetDraftUrl, { data: {
         expectedRevision: targetDraft.revision,
         selectedCapabilityCodes: targetDraft.groups.flatMap((group: any) => group.capabilities)
-          .filter((capability: any) => capability.granted).map((capability: any) => capability.code),
+          .filter((capability: any) => capability.granted && !capability.conventionDerived).map((capability: any) => capability.code),
         revokedPartialCapabilityCodes: [], defaultScopeChanged: false,
         applyDefaultToCurrentGrants: false, scopeChanges: [],
         menuPids: sourceDraft.navigation.selectedMenuPids,
