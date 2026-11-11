@@ -133,8 +133,17 @@ jobs:
         run: node --test scripts/ci/codeql-state-boundaries.test.mjs
 
       - name: Unit tests (vitest)
+        id: unit_tests
         working-directory: web-admin
         run: pnpm test:unit
+
+      - name: Retain unit test results
+        if: always() && (steps.unit_tests.outcome == 'success' || steps.unit_tests.outcome == 'failure')
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-unit-results
+          path: web-admin/test-results/results.json
+          if-no-files-found: error
 
       - name: Validate dashboard contracts
         run: node scripts/validate-plugin-dashboards.mjs
