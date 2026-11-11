@@ -1,7 +1,10 @@
-import React, { forwardRef, useCallback, useMemo, useState } from 'react';
+import React, { forwardRef, useCallback, useState } from 'react';
 import { useActionData } from 'react-router';
 import clsx from 'clsx';
-import type { SelectProps, OptionItem } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+import type {
+  SelectProps,
+  OptionItem,
+} from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
 import { useSmartField } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
 import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
 import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';
@@ -28,6 +31,7 @@ import {
   SelectItem,
 } from '~/ui/ui/select';
 import { sanitizeSmartDomProps } from './domProps';
+import { EditableSelect } from './EditableSelect';
 
 const baseStyles = `${fieldControlBase} focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed`;
 
@@ -166,7 +170,6 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       context,
     });
     const [radixOpen, setRadixOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
 
     // 批量翻译 options 的 label 字段
     if (valueType !== undefined && valueType !== 'boolean')
@@ -176,18 +179,13 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         throw new Error('Boolean Select supports static single choices only');
       validateBooleanChoices(staticOptions, field.value);
     }
-    const options = translateArray(valueType === 'boolean' ? staticOptions : (rawOptions || []), ['label'], locale, t);
+    const options = translateArray(
+      valueType === 'boolean' ? staticOptions : rawOptions || [],
+      ['label'],
+      locale,
+      t,
+    );
     const dataSourceDependenciesMet = areDataSourceDependenciesMet(dataSource, context);
-    const filteredOptions = useMemo(() => {
-      const query = searchQuery.trim().toLowerCase();
-      if (!query) return options;
-      return options.filter((option) => {
-        const label = String(option.label ?? '').toLowerCase();
-        const value = String(option.value ?? '').toLowerCase();
-        return label.includes(query) || value.includes(query);
-      });
-    }, [options, searchQuery]);
-
     // 验证处理
     // 从 useActionData 获取错误信息
     const actionData = useActionData();
@@ -208,14 +206,15 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         ? Array.from(event.target.selectedOptions, (option) => option.value)
         : event.target.value;
 
-      field.setValue(valueType === 'boolean' ? decodeBooleanChoice(String(newValue), options) : newValue);
+      field.setValue(
+        valueType === 'boolean' ? decodeBooleanChoice(String(newValue), options) : newValue,
+      );
     };
 
     // Radix Select value change handler (single-select mode)
     const handleRadixValueChange = (newValue: string) => {
       if (valueType === 'boolean') {
         const selected = decodeBooleanChoice(newValue, options);
-        setSearchQuery('');
         field.setValue(selected);
         return;
       }
@@ -226,7 +225,6 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       if (newValue === '' && field.value != null && String(field.value) !== '') {
         return;
       }
-      setSearchQuery('');
       field.setValue(newValue);
     };
 
@@ -237,9 +235,6 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           return;
         }
         setRadixOpen(open);
-        if (!open) {
-          setSearchQuery('');
-        }
         if (open && dataSource && !disabledValue) {
           void refetch();
         }
@@ -281,6 +276,48 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         return locale === 'zh-CN' ? '请选择' : 'Select';
       })();
 
+      if (valueType !== 'boolean') {
+        return (
+          <FieldBase
+            id={name}
+            label={labelText}
+            required={requiredValue}
+            inline={inline}
+            error={meta.showError ? errorText : undefined}
+            helpText={helpText}
+          >
+            <EditableSelect
+              name={name}
+              label={accessibleLabel}
+              value={currentValue}
+              options={options}
+              placeholder={
+                placeholderText ||
+                st({ 'zh-CN': '输入关键词搜索或选择', en: 'Type to search or select' })
+              }
+              disabled={disabledValue || !dataSourceDependenciesMet}
+              loading={loading}
+              error={dataSourceError}
+              invalid={meta.showError}
+              required={requiredValue}
+              clearable={clearable}
+              clearLabel={clearLabel}
+              className={clsx(fieldSizeStyles[size], fieldInputHeightStyles[size], className)}
+              onOpen={() => {
+                if (dataSource) void refetch();
+              }}
+              onChange={handleRadixValueChange}
+              onBlur={field.onBlur}
+              onClear={handleClearClick}
+              canCreateNew={canCreateNew}
+              createLabel={createNewLabel ?? st({ 'zh-CN': '+ 新建', en: '+ New' })}
+              onCreateNew={onCreateNew}
+            />
+            <input type="hidden" name={name} value={currentValue} />
+          </FieldBase>
+        );
+      }
+
       const radixSelectElement = (
         <div className="relative">
           <BaseSelect
@@ -312,25 +349,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             </SelectTrigger>
             {hasDropdownContent && (
               <SelectContent>
-                <div className="border-border bg-panel sticky top-0 z-10 border-b p-2">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    onKeyDown={(event) => event.stopPropagation()}
-                    onPointerDown={(event) => event.stopPropagation()}
-                    placeholder={
-                      t('common.search') !== 'common.search'
-                        ? t('common.search')
-                        : locale === 'zh-CN'
-                          ? '搜索'
-                          : 'Search'
-                    }
-                    data-testid={`select-search-${name}`}
-                    className="border-border-strong focus:border-accent focus-visible:shadow-focus bg-panel text-text placeholder:text-text-3 h-8 w-full rounded-md border px-2 text-sm focus:outline-none"
-                  />
-                </div>
-                {filteredOptions.length === 0 && !loading && (
+                {options.length === 0 && !loading && (
                   <div className="text-text-3 px-3 py-2 text-sm">
                     {t('common.noResults') !== 'common.noResults'
                       ? t('common.noResults')
@@ -339,7 +358,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                         : 'No results'}
                   </div>
                 )}
-                {filteredOptions.map((option) => (
+                {options.map((option) => (
                   <SelectItem
                     key={option.key || option.value}
                     value={String(option.value)}
@@ -417,7 +436,12 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         rightSlot={
           <FieldActionGroup>
             {clearable && field.value && !multiple && !disabledValue && !loading && (
-              <FieldActionButton type="button" onClick={handleClearClick} aria-label={clearLabel} iconOnly>
+              <FieldActionButton
+                type="button"
+                onClick={handleClearClick}
+                aria-label={clearLabel}
+                iconOnly
+              >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
@@ -532,10 +556,7 @@ export function SelectSideBar({
 
       <div className="space-y-5">
         <div className="flex items-center">
-          <label
-            htmlFor="props.label"
-            className="text-text-2 w-1/4 text-sm font-medium"
-          >
+          <label htmlFor="props.label" className="text-text-2 w-1/4 text-sm font-medium">
             标签：
           </label>
           <input
@@ -547,10 +568,7 @@ export function SelectSideBar({
         </div>
 
         <div className="flex items-center">
-          <label
-            htmlFor="props.placeholder"
-            className="text-text-2 w-1/4 text-sm font-medium"
-          >
+          <label htmlFor="props.placeholder" className="text-text-2 w-1/4 text-sm font-medium">
             占位符：
           </label>
           <input
@@ -562,10 +580,7 @@ export function SelectSideBar({
         </div>
 
         <div className="flex items-center">
-          <label
-            htmlFor="props.size"
-            className="text-text-2 w-1/4 text-sm font-medium"
-          >
+          <label htmlFor="props.size" className="text-text-2 w-1/4 text-sm font-medium">
             尺寸：
           </label>
           <select
@@ -581,10 +596,7 @@ export function SelectSideBar({
         </div>
 
         <div className="flex items-center">
-          <label
-            htmlFor="props.variant"
-            className="text-text-2 w-1/4 text-sm font-medium"
-          >
+          <label htmlFor="props.variant" className="text-text-2 w-1/4 text-sm font-medium">
             样式：
           </label>
           <select
@@ -600,10 +612,7 @@ export function SelectSideBar({
         </div>
 
         <div className="flex items-center">
-          <label
-            htmlFor="props.inline"
-            className="text-text-2 w-1/4 text-sm font-medium"
-          >
+          <label htmlFor="props.inline" className="text-text-2 w-1/4 text-sm font-medium">
             内联显示：
           </label>
           <input
@@ -616,10 +625,7 @@ export function SelectSideBar({
         </div>
 
         <div className="flex items-center">
-          <label
-            htmlFor="props.multiple"
-            className="text-text-2 w-1/4 text-sm font-medium"
-          >
+          <label htmlFor="props.multiple" className="text-text-2 w-1/4 text-sm font-medium">
             多选：
           </label>
           <input
@@ -632,10 +638,7 @@ export function SelectSideBar({
         </div>
 
         <div className="flex items-center">
-          <label
-            htmlFor="props.clearable"
-            className="text-text-2 w-1/4 text-sm font-medium"
-          >
+          <label htmlFor="props.clearable" className="text-text-2 w-1/4 text-sm font-medium">
             可清除：
           </label>
           <input
@@ -648,10 +651,7 @@ export function SelectSideBar({
         </div>
 
         <div className="flex items-center">
-          <label
-            htmlFor="props.required"
-            className="text-text-2 w-1/4 text-sm font-medium"
-          >
+          <label htmlFor="props.required" className="text-text-2 w-1/4 text-sm font-medium">
             必填：
           </label>
           <input
@@ -664,9 +664,7 @@ export function SelectSideBar({
         </div>
 
         <div>
-          <label className="text-text-2 mb-2 block text-sm font-medium">
-            选项配置：
-          </label>
+          <label className="text-text-2 mb-2 block text-sm font-medium">选项配置：</label>
           <textarea
             name="props.optionsJson"
             onChange={onChange}

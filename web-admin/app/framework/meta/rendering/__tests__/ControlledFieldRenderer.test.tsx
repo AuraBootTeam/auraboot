@@ -32,10 +32,12 @@ describe('ControlledFieldRenderer', () => {
     fireEvent.keyDown(select, { key: 'ArrowDown' });
     fireEvent.click(await screen.findByRole('option', { name: 'Resistors' }));
     expect(screen.getByTestId('filter-values')).toHaveTextContent('resistors');
-    expect(screen.getByRole('combobox', { name: 'Category' })).toHaveTextContent('Resistors');
+    expect(screen.getByRole('combobox', { name: 'Category' })).toHaveValue('Resistors');
+    expect(document.querySelector('input[name="category"]')).toHaveValue('resistors');
     fireEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
     expect(screen.getByTestId('filter-values')).toHaveTextContent('{}');
-    expect(screen.getByRole('combobox', { name: 'Category' })).toHaveTextContent('Choose a category');
+    expect(screen.getByRole('combobox', { name: 'Category' })).toHaveValue('');
+    expect(screen.getByRole('combobox', { name: 'Category' })).toHaveAttribute('placeholder', 'Choose a category');
     expect(document.querySelector('input[name="category"]')).toHaveValue('');
   });
 
