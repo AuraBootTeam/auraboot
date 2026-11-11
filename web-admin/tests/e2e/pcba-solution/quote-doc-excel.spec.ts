@@ -56,6 +56,19 @@ test.describe('Quote pricing + document excel (QO-04 / QO-07 / XLS-Q) @smoke', (
       await unwrap(await admin.request.put(`/api/permissions/matrix/${filePolicyRole.pid}/default-scope`, {
         data: { scopeType: 'self' },
       }));
+      // Role creation starts with an explicit menu selection. Copy navigation
+      // separately; copying business grants must never grant menus implicitly.
+      const sourceDraft = await unwrap(await admin.request.get(`/api/permission/roles/${source.pid}/draft`));
+      const targetDraftUrl = `/api/permission/roles/${filePolicyRole.pid}/draft`;
+      const targetDraft = await unwrap(await admin.request.get(targetDraftUrl));
+      await unwrap(await admin.request.put(targetDraftUrl, { data: {
+        expectedRevision: targetDraft.revision,
+        selectedCapabilityCodes: targetDraft.groups.flatMap((group: any) => group.capabilities)
+          .filter((capability: any) => capability.granted).map((capability: any) => capability.code),
+        revokedPartialCapabilityCodes: [], defaultScopeChanged: false,
+        applyDefaultToCurrentGrants: false, scopeChanges: [],
+        menuPids: sourceDraft.navigation.selectedMenuPids,
+      } }));
       sales = makeQuoteRoleUser('qo_sales', uid, [filePolicyRole.code]);
       await ensureQuoteRoleUser(admin, sales);
     } finally { await context.close(); }
