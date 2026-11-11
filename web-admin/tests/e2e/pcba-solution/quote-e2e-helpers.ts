@@ -1694,20 +1694,22 @@ export async function seedDownloadableQuote(page: Page): Promise<CreatedRows> {
     },
   ]);
   try {
-    // This export fixture supplies persisted board counts, independently of BOM line quantities.
-    // Parser geometry is exercised by the fixed-count sidecar suite.
-    for (const [stage, quantity, pointsEach] of [['SMT', 3, 0.5], ['DIP', 2, 1]] as const) {
-      await dynamicCreate(page, 'qo_process_fee_rule_hit_common', {
-        qo_pfrh_quote_id: created.quoteId,
-        qo_pfrh_process_stage: stage,
-        qo_pfrh_match_status: 'matched',
-        qo_pfrh_point_source: 'SIMPLE_COUNT_V1',
-        qo_pfrh_metering_qty: quantity,
-        qo_pfrh_unit_points: pointsEach,
-        qo_pfrh_total_points: quantity * pointsEach,
-        qo_pfrh_point_basis: 'SIMPLE_COUNT_V1',
-      }, created.rows);
-    }
+    await attachFixedCountSource(page, created);
+    await executeCommand(page, 'qo_quote_common:compute_process_fee', {
+      count_hole_mode: 'selected',
+      count_drill_text: 'M48\nMETRIC\nT01C0.800\n%\nT01\nX0.000Y0.000\nX1.500Y0.000\nM30\n',
+    }, created.quoteId, 'update');
+    const hits = await queryDynamicRecords(page, 'qo_process_fee_rule_hit_common', [
+      { fieldName: 'qo_pfrh_quote_id', operator: 'EQ', value: created.quoteId },
+    ]);
+    expect(hits.filter(row => row.qo_pfrh_process_stage === 'SMT')
+      .reduce((sum, row) => sum + Number(row.qo_pfrh_metering_qty), 0)).toBe(3);
+    expect(hits.filter(row => row.qo_pfrh_process_stage === 'DIP')
+      .reduce((sum, row) => sum + Number(row.qo_pfrh_metering_qty), 0)).toBe(2);
+    expect(hits.reduce((sum, row) => sum + Number(row.qo_pfrh_total_points), 0)).toBe(3.5);
+    for (const row of hits) trackFixtureRow(page, created.rows, {
+      model: 'qo_process_fee_rule_hit_common', pid: String(row.pid),
+    });
     await executeCommand(
       page,
       'qo_quote_common:override_process_fee',
@@ -2354,6 +2356,15 @@ export async function seedFixedCountQuote(
   opts: { withDrillFile?: boolean } = {},
 ): Promise<CreatedRows> {
   const created = await seedQuoteScaffold(page, 'FIXEDCOUNT', []);
+  await attachFixedCountSource(page, created, opts);
+  return created;
+}
+
+async function attachFixedCountSource(
+  page: Page,
+  created: CreatedRows,
+  opts: { withDrillFile?: boolean } = {},
+): Promise<void> {
   const rfq = created.rows.find((row) => row.model === 'crm_customer_request_pcba_rfq');
   expect(rfq, 'quote scaffold must retain its RFQ').toBeTruthy();
   const geometry = '%FSLAX24Y24*%\n%MOMM*%\n%TF.FileFunction,Paste,Top*%\n%ADD10C,0.600*%\nD10*\nX000000Y000000D03*\nX020000Y000000D03*\nX040000Y000000D03*\nM02*\n';
@@ -2378,7 +2389,6 @@ export async function seedFixedCountQuote(
     qo_rsa_version_no: 2, qo_rsa_uploaded_at: new Date().toISOString(),
     qo_rsa_parse_status: 'uploaded', qo_rsa_validation_status: 'pending',
   }, created.rows);
-  return created;
 }
 
 
