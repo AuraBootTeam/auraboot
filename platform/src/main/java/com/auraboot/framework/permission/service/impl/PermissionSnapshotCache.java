@@ -129,6 +129,8 @@ public class PermissionSnapshotCache {
         }
         String normalized = normalizePermissionCode(permissionCode);
         if (freshReadValues.get() != null) {
+            Permission domain = getDomainPermissionCatalog(tenantId).definitionsByNormalizedCode().get(normalized);
+            if (domain != null) return domain;
             return getOrLoad(PERMISSION_CATALOG_CACHE, new PermissionDefinitionKey(tenantId, normalized),
                     () -> permissionMapper.findByTenantIdAndCode(tenantId, normalized));
         }

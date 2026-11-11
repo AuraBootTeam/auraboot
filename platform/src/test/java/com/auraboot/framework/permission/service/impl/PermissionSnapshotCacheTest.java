@@ -516,7 +516,6 @@ class PermissionSnapshotCacheTest {
         read.setResourceType("operation"); read.setResourceCode("example"); read.setAction("read");
         read.setExtension(Map.of("domainModels", Map.of("example_record", List.of("read"))));
         when(permissionMapper.findResolvableDomainDefinitions(100L)).thenReturn(List.of(read), List.of());
-        when(permissionMapper.findByTenantIdAndCode(100L, "example.cap.read")).thenReturn(read);
         cache.withFreshReads(() -> {
             assertThat(cache.hasDomainModel(100L, "example_record")).isTrue();
             assertThat(cache.resourcePermissionCodes(100L, "example_record", "read")).containsExactly("example.cap.read");
@@ -526,6 +525,7 @@ class PermissionSnapshotCacheTest {
         assertThat(cache.withFreshReads(() -> cache.hasDomainModel(100L, "example_record"))).isFalse();
         verify(permissionMapper, times(2)).findResolvableDomainDefinitions(100L);
         verify(permissionMapper, never()).findResolvableDefinitions(any());
+        verify(permissionMapper, never()).findByTenantIdAndCode(100L, "example.cap.read");
     }
 
     @Test
