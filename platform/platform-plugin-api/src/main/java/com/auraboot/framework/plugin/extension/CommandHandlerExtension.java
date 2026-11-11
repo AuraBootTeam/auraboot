@@ -34,6 +34,14 @@ public interface CommandHandlerExtension extends ExtensionPoint {
     default BusinessResourceAuthorization.ReadIsolation commandReadIsolation() { return null; }
 
     /**
+     * Opt in to host authorization-configuration reuse within one physical snapshot transaction.
+     * This never caches record or field decisions. Independent transactions and authorization
+     * authoring inside this callback are rejected; ordinary handlers retain their existing path.
+     */
+    default boolean usesSingleAuthorizationSnapshot() { return false; }
+
+
+    /**
      * Explicit server-metadata opt-in for a handler-owned target authorization boundary.
      * Invoked after command permission and before idempotency; never grants raw model reads.
      * An older handler fails closed when its command opts in without implementing this contract.

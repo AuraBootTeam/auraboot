@@ -33,6 +33,14 @@ public interface CommandHandlerExtension extends ExtensionPoint {
     /** Server-owned transaction requirement; metadata and callers cannot relax it. */
     default BusinessResourceAuthorization.ReadIsolation commandReadIsolation() { return null; }
 
+    /**
+     * Opt in to host authorization-configuration reuse within one physical snapshot transaction.
+     * This never caches record or field decisions. Independent transactions and authorization
+     * authoring inside this callback are rejected; ordinary handlers retain their existing path.
+     */
+    default boolean usesSingleAuthorizationSnapshot() { return false; }
+
+
     /** Well-known key for DataAccessor in the settings map. */
     String DATA_ACCESSOR_KEY = "__dataAccessor";
 

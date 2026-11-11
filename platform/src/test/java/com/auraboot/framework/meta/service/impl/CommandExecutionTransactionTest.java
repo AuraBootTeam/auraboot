@@ -68,7 +68,7 @@ class CommandExecutionTransactionTest {
         when(snapshots.resolvePermissionDefinition(100L,"example.cap.read")).thenReturn(permission);
         when(manager.getTransaction(any())).thenReturn(status);
         when(authorization.withReadProjectionSnapshot(any())).thenAnswer(call -> {
-            verify(manager).getTransaction(argThat(value -> value.getIsolationLevel()==TransactionDefinition.ISOLATION_REPEATABLE_READ));
+            verify(manager,atLeastOnce()).getTransaction(argThat(value -> value.getIsolationLevel()==TransactionDefinition.ISOLATION_REPEATABLE_READ));
             return ((java.util.function.Supplier<?>)call.getArgument(0)).get();
         });
         com.auraboot.framework.application.tenant.MetaContext.setContext(100L,1L,"actor","actor");
@@ -80,6 +80,11 @@ class CommandExecutionTransactionTest {
             command.setExecutionConfig("{\"permissions\":[\"example.cap.read\"]}");
             assertThat(transaction.execute("example:export",false,()->"ordinary")).isEqualTo("ordinary");
             verifyNoInteractions(authorization);
+            var handler=mock(CommandHandlerExtension.class);
+            when(extensions.getCommandHandler("example:export")).thenReturn(Optional.of(handler));
+            when(handler.usesSingleAuthorizationSnapshot()).thenReturn(true);
+            assertThat(transaction.execute("example:export",false,()->"preview")).isEqualTo("preview");
+            verify(authorization).withReadProjectionSnapshot(any());
         } finally {com.auraboot.framework.application.tenant.MetaContext.clear();}
     }
 

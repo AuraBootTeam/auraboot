@@ -337,10 +337,9 @@ test('quote sharing release gate: multiple members, role access and revocation t
       .filter((capability: { conventionDerived: boolean }) => !capability.conventionDerived);
     const fixtureLevels = ['qo.cap.read', 'qo.cap.write'];
     for (const code of fixtureLevels) expect(declared.some((capability: { code: string }) => capability.code === code), code).toBe(true);
-    const explicitRead = await foreign.page.request.put(capabilityUrl, { data: [...new Set([
-      ...declared.filter((capability: { granted: boolean }) => capability.granted).map((capability: { code: string }) => capability.code),
-      ...fixtureLevels,
-    ])] });
+    // Configure only the new fixture's Quote duties. Replaying wildcard-derived
+    // capabilities from unrelated products may reference uninstalled definitions.
+    const explicitRead = await foreign.page.request.put(capabilityUrl, { data: fixtureLevels });
     expect(explicitRead.status()).toBe(200);
     expect(String((await explicitRead.json()).code)).toBe('0');
     // A valid own-record read prevents an uninitialized foreign product or a
