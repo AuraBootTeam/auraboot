@@ -228,6 +228,8 @@ test.describe('PCBA quote minimal create regression', () => {
       expect(persistedProject.bom_project_name).toBe(projectName);
       await page.screenshot({ path: testInfo.outputPath('quote-inline-customer-project-selected.png'), fullPage: true });
     } finally {
+      // Keep the business deadline; fixture teardown receives its own bounded allowance.
+      testInfo.setTimeout(testInfo.timeout + 60_000);
       await cleanupRows(page, created);
     }
   });
@@ -577,6 +579,8 @@ test.describe('PCBA quote minimal create regression', () => {
       await expect(main).not.toContainText('PCBA RFQ');
       await expect(main).not.toContainText('PCBA数量');
     } finally {
+      // Keep the business deadline; fixture teardown receives its own bounded allowance.
+      testInfo.setTimeout(testInfo.timeout + 60_000);
       await cleanupRows(page, created);
     }
   });
