@@ -144,6 +144,8 @@ the original review behavior; pause idle services through their product owner.
 | `billing-it-run.sh` | 0 | 2026-07-31 | Exact-class billing integration-test runner with non-zero XML evidence checks. |
 | `ci/prepare-library-candidate.sh` | 1 | 2026-10-23 | Prepare native runtime-library candidates under a frozen Jenkins context without application assembly or remote publication. |
 | `ci/verify-oss-native-candidate.sh` | 1 | 2026-11-04 | Build, export and unpack an unpublished native package under frozen CI inputs; retain exact legal notices without publication. |
+| `ci/verify-oss-full-codeql.sh` | 1 | 2026-11-11 | Run the original full Java and JavaScript CodeQL policy on frozen source; retain findings for individual review without suppression. |
+| `command-input-source-contract.mjs` | 1 | 2026-11-11 | Validate the existing command input source contract. |
 | `ci/oss-native-install.py` | Verify cold initialization, old-to-new upgrade, backup recovery and corrupt-candidate rejection using packaged lifecycle and an attempt-owned Linux database. |
 | `deploy/prod-deploy.sh` | 0 | 2026-06-18 | Production deploy orchestrator. Runs the schema migration + release ledger |
 | `dev/ci-env-export.sh` | 0 | 2026-05-09 | ci-env-export.sh — env contract for generic CI runners. Defaults are |

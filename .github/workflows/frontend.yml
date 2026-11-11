@@ -129,6 +129,9 @@ jobs:
           AURA_NPM_COMPAT_ARTIFACTS: ${{ runner.temp }}/npm-toolchain-compatibility
         run: node --test scripts/ci/npm-toolchain-compat.test.mjs
 
+      - name: CodeQL state boundary regressions
+        run: node --test scripts/ci/codeql-state-boundaries.test.mjs
+
       - name: Unit tests (vitest)
         working-directory: web-admin
         run: pnpm test:unit
