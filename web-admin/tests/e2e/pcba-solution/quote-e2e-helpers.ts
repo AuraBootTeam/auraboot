@@ -2360,7 +2360,7 @@ export async function seedFixedCountQuote(
   return created;
 }
 
-async function attachFixedCountSource(
+export async function attachFixedCountSource(
   page: Page,
   created: CreatedRows,
   opts: { withDrillFile?: boolean } = {},
