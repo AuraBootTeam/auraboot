@@ -223,7 +223,9 @@ public class BusinessCommandRecordAuthorization {
         java.util.function.Supplier<Boolean> sharedRecord = new java.util.function.Supplier<>() {
             Boolean shared;
             public Boolean get() {
-                if (!ordinaryModelAction || "create".equals(nativeAction)) return false;
+                if (nativeAction == null || "create".equals(nativeAction)) return false;
+                if (!ordinaryModelAction && codes.stream().noneMatch(code ->
+                        !DomainPermissionPolicy.models(snapshots.resolvePermissionDefinition(tenant,code)).isEmpty())) return false;
                 if (shared == null) {
                     var share=recordShares.evaluate(member,model,nativeAction,record);
                     if(share!=null)trace.add(share);

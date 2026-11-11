@@ -378,6 +378,27 @@ class BusinessCommandRecordAuthorizationTest {
         assertThat(authorization.resolveOrdinaryRead(5L,MODEL,record(999,"Shanghai")).result().granted()).isFalse();
     }
 
+    @Test void domainCommandUsesExistingSharedUpdateAudienceWithoutBypassingFieldsOrConditions() throws Exception {
+        var definition=permission(CODE);definition.setResourceCode("domain");definition.setAction("write");
+        definition.setExtension(Map.of("domainModels",Map.of(MODEL,List.of("read","update"))));
+        when(snapshots.resolvePermissionDefinition(100L,CODE)).thenReturn(definition);
+        var function=grant(11,101,CODE);function.setFieldScopeJson(fieldScope("label"));grants(function);guards(CODE,guard(11,"Shanghai"));
+        when(scopes.resolveObjectBoundScopeForRole(5L,101L,MODEL,"update",MODEL))
+                .thenReturn(new DataScopeCondition("self","created_by",1L,null,List.of(),List.of()));
+        when(recordShares.evaluate(eq(5L),eq(MODEL),eq("update"),any())).thenReturn(
+                new com.auraboot.framework.permission.engine.model.EvaluationStep("RecordShare",
+                        com.auraboot.framework.permission.engine.model.EvaluationVerdict.ALLOW,"shared update"));
+        var result=authorization.resolveNative(5L,List.of(CODE),MODEL,record(999,"Shanghai"),"update");
+        assertThat(result.result().granted()).isTrue();assertThat(result.canWrite("cost")).isFalse();
+        assertThat(authorization.resolveNative(5L,List.of(CODE),MODEL,record(999,"Beijing"),"update").result().granted()).isFalse();
+        when(recordShares.evaluate(eq(5L),eq(MODEL),eq("update"),any())).thenReturn(
+                new com.auraboot.framework.permission.engine.model.EvaluationStep("RecordShare",
+                        com.auraboot.framework.permission.engine.model.EvaluationVerdict.NOT_APPLICABLE,"revoked"));
+        assertThat(authorization.resolveNative(5L,List.of(CODE),MODEL,record(999,"Shanghai"),"update").result().granted()).isFalse();
+        grants();
+        assertThat(authorization.resolveNative(5L,List.of(CODE),MODEL,record(1,"Shanghai"),"update").result().granted()).isFalse();
+    }
+
     @Test void projectionReusesOnlyConfigurationAndEvaluatesEachRecordAgain() throws Exception {
         var definition = permission(CODE); definition.setResourceCode("domain"); definition.setAction("read");
         definition.setExtension(Map.of("domainModels", Map.of(MODEL,List.of("read"))));
