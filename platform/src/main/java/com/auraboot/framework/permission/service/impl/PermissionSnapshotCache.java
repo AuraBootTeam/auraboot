@@ -127,8 +127,12 @@ public class PermissionSnapshotCache {
         if (tenantId == null || permissionCode == null || permissionCode.isBlank()) {
             return null;
         }
-        return getPermissionCatalog(tenantId).definitionsByNormalizedCode()
-                .get(normalizePermissionCode(permissionCode));
+        String normalized = normalizePermissionCode(permissionCode);
+        if (freshReadValues.get() != null) {
+            return getOrLoad(PERMISSION_CATALOG_CACHE, new PermissionDefinitionKey(tenantId, normalized),
+                    () -> permissionMapper.findByTenantIdAndCode(tenantId, normalized));
+        }
+        return getPermissionCatalog(tenantId).definitionsByNormalizedCode().get(normalized);
     }
 
     public Set<String> resolvePermissionCodes(Long tenantId, Set<Long> permissionIds) {
@@ -299,32 +303,34 @@ public class PermissionSnapshotCache {
      * silently invalidates that tenant's role bindings.
      */
     private PermissionCatalog getPermissionCatalog(Long tenantId) {
-        return getOrLoad(PERMISSION_CATALOG_CACHE, new PermissionCatalogKey(tenantId), () -> {
-            List<Permission> permissions = permissionMapper.findResolvableDefinitions(tenantId);
-            if (permissions == null || permissions.isEmpty()) {
-                return new PermissionCatalog(Map.of(), Map.of());
-            }
-            Map<String, Permission> definitionsByCode = new LinkedHashMap<>();
-            Map<Long, String> codesById = new LinkedHashMap<>();
-            for (Permission permission : permissions) {
-                if (permission == null || permission.getId() == null || permission.getCode() == null) {
-                    continue;
-                }
-                // Query order is newest first, matching PermissionMapper.findByCode semantics.
-                definitionsByCode.putIfAbsent(normalizePermissionCode(permission.getCode()), permission);
-                codesById.putIfAbsent(permission.getId(), permission.getCode());
-            }
-            return new PermissionCatalog(
-                    Collections.unmodifiableMap(definitionsByCode),
-                    Collections.unmodifiableMap(codesById));
-        });
+        return getOrLoad(PERMISSION_CATALOG_CACHE, new PermissionCatalogKey(tenantId),
+                () -> catalog(permissionMapper.findResolvableDefinitions(tenantId)));
+    }
+
+    private PermissionCatalog getDomainPermissionCatalog(Long tenantId) {
+        if (freshReadValues.get() == null) return getPermissionCatalog(tenantId);
+        return getOrLoad(PERMISSION_CATALOG_CACHE, new DomainCatalogKey(tenantId),
+                () -> catalog(permissionMapper.findResolvableDomainDefinitions(tenantId)));
+    }
+
+    private static PermissionCatalog catalog(List<Permission> permissions) {
+        if (permissions == null || permissions.isEmpty()) return new PermissionCatalog(Map.of(), Map.of());
+        Map<String, Permission> definitionsByCode = new LinkedHashMap<>();
+        Map<Long, String> codesById = new LinkedHashMap<>();
+        for (Permission permission : permissions) {
+            if (permission == null || permission.getId() == null || permission.getCode() == null) continue;
+            // Both queries preserve the original newest-first resolution, including archived rows.
+            definitionsByCode.putIfAbsent(permission.getCode().toLowerCase(Locale.ROOT), permission);
+            codesById.putIfAbsent(permission.getId(), permission.getCode());
+        }
+        return new PermissionCatalog(Collections.unmodifiableMap(definitionsByCode), Collections.unmodifiableMap(codesById));
     }
 
     public List<String> domainPermissionAlternatives(Long tenantId, String code) {
         var required = resolvePermissionDefinition(tenantId, code);
         if (com.auraboot.framework.permission.service.DomainPermissionPolicy.models(required).isEmpty()) return List.of(code);
         var levels = List.of("read", "write", "manage");
-        return getPermissionCatalog(tenantId).definitionsByNormalizedCode().values().stream()
+        return getDomainPermissionCatalog(tenantId).definitionsByNormalizedCode().values().stream()
                 .filter(permission -> !com.auraboot.framework.permission.service.DomainPermissionPolicy.models(permission).isEmpty()
                     && java.util.Objects.equals(required.getResourceCode(), permission.getResourceCode())
                     && levels.indexOf(permission.getAction()) >= levels.indexOf(required.getAction()))
@@ -332,13 +338,13 @@ public class PermissionSnapshotCache {
     }
 
     public boolean hasDomainModel(Long tenantId, String model) {
-        return getPermissionCatalog(tenantId).definitionsByNormalizedCode().values().stream()
+        return getDomainPermissionCatalog(tenantId).definitionsByNormalizedCode().values().stream()
                 .anyMatch(permission -> com.auraboot.framework.permission.service.DomainPermissionPolicy.owns(permission, model));
     }
 
     /** Published domain policies replace model-operation grants only for explicitly owned resources. */
     public List<String> resourcePermissionCodes(Long tenantId, String model, String action) {
-        var policies = getPermissionCatalog(tenantId).definitionsByNormalizedCode().values().stream()
+        var policies = getDomainPermissionCatalog(tenantId).definitionsByNormalizedCode().values().stream()
                 .filter(permission -> com.auraboot.framework.permission.service.DomainPermissionPolicy.owns(permission, model)).toList();
         if (policies.isEmpty() || "read".equals(action) && policies.stream().anyMatch(permission ->
                 permission.getExtension() instanceof Map<?,?> extension
@@ -384,6 +390,12 @@ public class PermissionSnapshotCache {
     }
 
     private record FreshLookupKey(String cacheName, Object key) {
+    }
+
+    private record PermissionDefinitionKey(Long tenantId, String normalizedCode) {
+    }
+
+    private record DomainCatalogKey(Long tenantId) {
     }
 
     private record PermissionCatalogKey(Long tenantId) {

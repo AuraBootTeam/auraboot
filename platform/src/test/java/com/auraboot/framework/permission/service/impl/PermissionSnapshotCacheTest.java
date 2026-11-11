@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
@@ -407,7 +408,8 @@ class PermissionSnapshotCacheTest {
 
     @Test
     void nestedFreshScopesAndExceptionalExitRestoreTheOriginalCacheMode() {
-        when(permissionMapper.findResolvableDefinitions(100L)).thenReturn(List.of(permission(50L,"code")),List.of(permission(60L,"code")));
+        when(permissionMapper.findResolvableDefinitions(100L)).thenReturn(List.of(permission(50L,"code")));
+        when(permissionMapper.findByTenantIdAndCode(100L,"code")).thenReturn(permission(60L,"code"));
         assertThat(cache.resolvePermissionId(100L,"code")).isEqualTo(50L);
         cache.withFreshReads(()->{
             assertThatThrownBy(()->cache.withFreshReads(()->{assertThat(cache.resolvePermissionId(100L,"code")).isEqualTo(60L);throw new IllegalStateException("fixture");}))
@@ -416,12 +418,14 @@ class PermissionSnapshotCacheTest {
             return null;
         });
         assertThat(cache.resolvePermissionId(100L,"code")).isEqualTo(50L);
-        verify(permissionMapper,times(3)).findResolvableDefinitions(100L);
+        verify(permissionMapper,times(1)).findResolvableDefinitions(100L);
+        verify(permissionMapper,times(2)).findByTenantIdAndCode(100L,"code");
     }
 
     @Test
     void freshScopeIsNotInheritedByWorkersOrOtherTenantCachedReaders() throws Exception {
-        when(permissionMapper.findResolvableDefinitions(100L)).thenReturn(List.of(permission(50L,"code")),List.of(permission(60L,"code")));
+        when(permissionMapper.findResolvableDefinitions(100L)).thenReturn(List.of(permission(50L,"code")));
+        when(permissionMapper.findByTenantIdAndCode(100L,"code")).thenReturn(permission(60L,"code"));
         when(permissionMapper.findResolvableDefinitions(200L)).thenReturn(List.of(permission(70L,"other")));
         assertThat(cache.resolvePermissionId(100L,"code")).isEqualTo(50L);
         assertThat(cache.resolvePermissionId(200L,"other")).isEqualTo(70L);
@@ -440,14 +444,16 @@ class PermissionSnapshotCacheTest {
     }
 
     @Test
-    void freshCallbackLoadsEachTenantCatalogOnceIncludingNegativeLookups() {
-        when(permissionMapper.findResolvableDefinitions(100L))
-                .thenReturn(List.of(permission(50L, "read")), List.of(permission(60L, "read")));
-        when(permissionMapper.findResolvableDefinitions(200L))
-                .thenReturn(List.of(permission(70L, "read")));
+    void freshCallbackReadsOnlyRequestedDefinitionsIncludingNegativeLookups() {
+        when(permissionMapper.findByTenantIdAndCode(100L, "read"))
+                .thenReturn(permission(50L, "read"), permission(60L, "read"));
+        when(permissionMapper.findByTenantIdAndCode(200L, "read"))
+                .thenReturn(permission(70L, "read"));
+        when(permissionMapper.findByTenantIdAndCode(100L, "missing")).thenReturn(null);
 
         cache.withFreshReads(() -> {
             assertThat(cache.resolvePermissionId(100L, "read")).isEqualTo(50L);
+            assertThat(cache.resolvePermissionId(100L, "missing")).isNull();
             assertThat(cache.resolvePermissionId(100L, "missing")).isNull();
             assertThat(cache.resolvePermissionId(100L, "READ")).isEqualTo(50L);
             assertThat(cache.resolvePermissionId(200L, "read")).isEqualTo(70L);
@@ -455,15 +461,17 @@ class PermissionSnapshotCacheTest {
         });
         assertThat(cache.withFreshReads(() -> cache.resolvePermissionId(100L, "read")))
                 .isEqualTo(60L);
-        verify(permissionMapper, times(2)).findResolvableDefinitions(100L);
-        verify(permissionMapper, times(1)).findResolvableDefinitions(200L);
+        verify(permissionMapper, times(2)).findByTenantIdAndCode(100L, "read");
+        verify(permissionMapper, times(1)).findByTenantIdAndCode(100L, "missing");
+        verify(permissionMapper, times(1)).findByTenantIdAndCode(200L, "read");
+        verify(permissionMapper, never()).findResolvableDefinitions(any());
     }
 
     @Test
     void nestedFreshCallbackReadsAgainAndRestoresTheOuterSnapshotAfterFailure() {
-        when(permissionMapper.findResolvableDefinitions(100L))
-                .thenReturn(List.of(permission(50L, "read")), List.of(permission(60L, "read")),
-                        List.of(permission(70L, "read")));
+        when(permissionMapper.findByTenantIdAndCode(100L, "read"))
+                .thenReturn(permission(50L, "read"), permission(60L, "read"));
+        when(permissionMapper.findResolvableDefinitions(100L)).thenReturn(List.of(permission(70L, "read")));
         cache.withFreshReads(() -> {
             assertThat(cache.resolvePermissionId(100L, "read")).isEqualTo(50L);
             assertThatThrownBy(() -> cache.withFreshReads(() -> {
@@ -474,7 +482,8 @@ class PermissionSnapshotCacheTest {
             return null;
         });
         assertThat(cache.resolvePermissionId(100L, "read")).isEqualTo(70L);
-        verify(permissionMapper, times(3)).findResolvableDefinitions(100L);
+        verify(permissionMapper, times(1)).findResolvableDefinitions(100L);
+        verify(permissionMapper, times(2)).findByTenantIdAndCode(100L, "read");
     }
 
     @Test
@@ -499,6 +508,33 @@ class PermissionSnapshotCacheTest {
                 .findEffectiveByMemberIdAndTenantId(eq(5L), eq(100L), any(LocalDate.class));
         verify(rolePermissionMapper, times(2)).findPermissionIdsByRole(7L);
         verify(rolePermissionMapper, times(2)).findPermissionIdsByRole(8L);
+    }
+
+    @Test
+    void freshDomainOwnershipUsesOnlyDomainDefinitionsAndReloadsNextCallback() {
+        Permission read = permission(901L, "example.cap.read");
+        read.setResourceType("operation"); read.setResourceCode("example"); read.setAction("read");
+        read.setExtension(Map.of("domainModels", Map.of("example_record", List.of("read"))));
+        when(permissionMapper.findResolvableDomainDefinitions(100L)).thenReturn(List.of(read), List.of());
+        when(permissionMapper.findByTenantIdAndCode(100L, "example.cap.read")).thenReturn(read);
+        cache.withFreshReads(() -> {
+            assertThat(cache.hasDomainModel(100L, "example_record")).isTrue();
+            assertThat(cache.resourcePermissionCodes(100L, "example_record", "read")).containsExactly("example.cap.read");
+            assertThat(cache.domainPermissionAlternatives(100L, "example.cap.read")).containsExactly("example.cap.read");
+            return null;
+        });
+        assertThat(cache.withFreshReads(() -> cache.hasDomainModel(100L, "example_record"))).isFalse();
+        verify(permissionMapper, times(2)).findResolvableDomainDefinitions(100L);
+        verify(permissionMapper, never()).findResolvableDefinitions(any());
+    }
+
+    @Test
+    void freshDomainOwnershipStillRejectsMalformedPublishedPolicies() {
+        Permission invalid = permission(901L, "example.cap.read");
+        invalid.setExtension(Map.of("domainModels", "invalid"));
+        when(permissionMapper.findResolvableDomainDefinitions(100L)).thenReturn(List.of(invalid));
+        assertThatThrownBy(() -> cache.withFreshReads(() -> cache.hasDomainModel(100L, "example_record")))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
     }
 
     private void stubUserRole(Long tenantId, Long memberId, Long roleId) {

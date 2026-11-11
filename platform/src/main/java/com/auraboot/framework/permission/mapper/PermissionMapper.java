@@ -39,6 +39,21 @@ public interface PermissionMapper extends BaseMapper<Permission> {
     @ResultMap("mybatis-plus_Permission")
     List<Permission> findResolvableDefinitions(@Param("tenantId") Long tenantId);
 
+    /** Fresh domain ownership lookup without materializing unrelated model definitions. */
+    @Select("""
+        SELECT * FROM (
+            SELECT DISTINCT ON (LOWER(code)) *
+            FROM ab_permission
+            WHERE tenant_id = #{tenantId}
+              AND (deleted_flag = false OR deleted_flag IS NULL)
+            ORDER BY LOWER(code), created_at DESC
+        ) current_definitions
+        WHERE jsonb_exists(extension, 'domainModels')
+        ORDER BY created_at DESC
+        """)
+    @ResultMap("mybatis-plus_Permission")
+    List<Permission> findResolvableDomainDefinitions(@Param("tenantId") Long tenantId);
+
     /**
      * Find permission by code
      *
