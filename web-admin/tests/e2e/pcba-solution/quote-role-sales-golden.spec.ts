@@ -479,7 +479,6 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         bom_project_customer_id: accountId,
         bom_project_quality_level: 'industrial',
         bom_pcba_code: `SSG-${suffix}`.slice(0, 24),
-        bom_project_library_source: 'excel_current_library',
       });
       const projectId = String(project.recordId ?? '');
       expect(projectId, 'sales creates own BOM project').toBeTruthy();
