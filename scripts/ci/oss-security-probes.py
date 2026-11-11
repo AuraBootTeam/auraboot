@@ -25,8 +25,13 @@ def verify_sms_mobile_window(request, check, require, delivery):
                 and not (value.get('data') or {}).get('jwt'),
                 'invalid SMS login succeeded, issued JWT or errored')
         message = str(value.get('message', ''))
-        is_limited = 'Too many login attempts' in message
-        require(is_limited or 'Invalid or expired verification code' in message,
+        code = str(value.get('code'))
+        # GlobalExceptionHandler keeps the generic label in message and the
+        # actual business reason in context (production string / dev detail).
+        context = value.get('context')
+        detail = context.get('detail') if isinstance(context, dict) else context
+        is_limited = code == '35000' and 'Too many login attempts' in message
+        require(is_limited or (code == '10000' and detail == 'Invalid or expired verification code'),
                 'SMS positive control did not reach the real OTP verifier')
         limited.append(is_limited)
     require(limited == [False] * 10 + [True],

@@ -24,8 +24,9 @@ class SmsProbeTest(unittest.TestCase):
                                         require, 'test')
 
     def test_exact_mobile_window_and_no_sms_send(self):
-        self.run_probe(lambda n: {'code': 35000, 'message': 'Too many login attempts' if n == 11
-                                 else 'Invalid or expired verification code'})
+        self.run_probe(lambda n: {'code': 35000, 'message': 'Too many login attempts'} if n == 11
+                       else {'code': 10000, 'message': 'Validation failed',
+                             'context': 'Invalid or expired verification code'})
         self.assertEqual(len(self.checks), 1)
         self.assertEqual(len({c[2]['mobile'] for c in self.calls}), 1)
         self.assertEqual(len({c[2]['email'] for c in self.calls}), 11)
@@ -34,12 +35,25 @@ class SmsProbeTest(unittest.TestCase):
 
     def test_missing_limit_is_red(self):
         with self.assertRaisesRegex(RuntimeError, 'budget bypassed'):
-            self.run_probe(lambda n: {'code': 35000, 'message': 'Invalid or expired verification code'})
+            self.run_probe(lambda n: {'code': 10000, 'message': 'Validation failed',
+                                     'context': 'Invalid or expired verification code'})
         self.assertEqual(self.checks, [])
 
     def test_premature_ip_limit_is_red(self):
         with self.assertRaisesRegex(RuntimeError, 'budget bypassed'):
             self.run_probe(lambda n: {'code': 35000, 'message': 'Too many login attempts'})
+
+    def test_development_context_detail_contract(self):
+        self.run_probe(lambda n: {'code': 35000, 'message': 'Too many login attempts'} if n == 11
+                       else {'code': 10000, 'message': 'Validation failed',
+                             'context': {'detail': 'Invalid or expired verification code'}})
+        self.assertEqual(len(self.checks), 1)
+
+    def test_wrong_code_or_wrong_context_field_is_red(self):
+        for value in [{'code': 35000, 'context': 'Invalid or expired verification code'},
+                      {'code': 10000, 'context': {'messageKey': 'Invalid or expired verification code'}}]:
+            with self.subTest(value=value), self.assertRaisesRegex(RuntimeError, 'real OTP verifier'):
+                self.run_probe(lambda n: value)
 
     def test_disabled_sms_or_server_error_cannot_pass(self):
         for value in [{'code': 35000, 'message': 'channel disabled'},
