@@ -200,9 +200,12 @@ export async function openQuoteDetailFromList(page: Page, created: CreatedRows):
   expect(created.quoteId, 'quote id is required to open quote detail').toBeTruthy();
   expect(created.quoteCode, 'quote code is required to find the quote row').toBeTruthy();
 
-  await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
-  await ensureSidebarExpanded(page);
-  await clickSidebarPage(page, '/p/qo_quote_common', /报价单|Quotes/i);
+  // A caller already on the list must use its visible row, without repeating the home journey.
+  if (new URL(page.url()).pathname !== '/p/qo_quote_common') {
+    await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
+    await ensureSidebarExpanded(page);
+    await clickSidebarPage(page, '/p/qo_quote_common', /报价单|Quotes/i);
+  }
 
   const row = await findRowInPaginatedList(page, created.quoteCode, 20_000);
   await Promise.all([

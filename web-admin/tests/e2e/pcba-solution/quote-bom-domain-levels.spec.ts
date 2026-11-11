@@ -316,7 +316,10 @@ test.describe('BOM & Quote domain levels', () => {
               })}`;
               const own = await actor.request.get(queryUrl(createdPid!));
               if (level === 'none') expect(own.status()).toBe(403);
-              else await unwrap(own);
+              else {
+                expect(own.status(), `${query}: own quote must remain readable at ${level}`).toBe(200);
+                await unwrap(own);
+              }
               const foreign = await actor.request.get(queryUrl(foreignQuotePid!));
               expect(foreign.status(), `${query} must preserve SELF even at ${level}`).toBe(403);
             }

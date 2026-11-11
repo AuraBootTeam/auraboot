@@ -502,6 +502,7 @@ test.describe('PCBA quote minimal create regression', () => {
         if (pid) created.rows.push({ model: 'qo_bom_import_common', pid });
       }
 
+      console.info('[quote-minimal-phase] list', Date.now());
       await navigateToDynamicPage(page, 'qo_quote_common');
       expect(await tableHeaders(page)).toEqual([
         '客户',
@@ -527,6 +528,7 @@ test.describe('PCBA quote minimal create regression', () => {
       await expect(page.locator('thead, [role="rowgroup"]').first()).not.toContainText('折扣%');
       await expect(page.locator('thead, [role="rowgroup"]').first()).not.toContainText('有效期至');
 
+      console.info('[quote-minimal-phase] detail', Date.now());
       await openQuoteDetailFromList(page, created);
       await expect(page.getByRole('tab', { name: /资料上传|Source Upload/ })).toBeVisible({
         timeout: 20_000,
@@ -553,8 +555,10 @@ test.describe('PCBA quote minimal create regression', () => {
       expect(fs.readFileSync(downloadedPath)).toEqual(fs.readFileSync(cplFixture));
       expect(page.url()).toBe(detailUrlBeforeDownload);
       expect(page.context().pages()).toHaveLength(openPagesBeforeDownload);
+      console.info('[quote-minimal-phase] download-complete', Date.now());
       await page.screenshot({ path: testInfo.outputPath('created-quote-upload-readback.png'), fullPage: true });
 
+      console.info('[quote-minimal-phase] price-tab', Date.now());
       await page.getByRole('tab', { name: /BOM价格计算|BOM Price/i }).click();
       const priceTable = page.getByTestId('table-block').filter({
         has: page.getByTestId(`table-row-${String(quoteLines[0].pid)}`),
