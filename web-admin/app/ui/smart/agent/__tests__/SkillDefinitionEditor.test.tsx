@@ -94,7 +94,6 @@ describe('SkillDefinitionEditor governance', () => {
     );
     await user.click(screen.getByLabelText('I reviewed the input and allow this real execution.'));
     await waitFor(() => expect(run).toBeEnabled());
-    expect(screen.getByLabelText('I reviewed the input and allow this real execution.')).toBeChecked();
     await user.click(run);
     expect(await screen.findByTestId('skill-trial-result')).toHaveTextContent(
       'Reviewed 3 current parts',
@@ -199,6 +198,24 @@ describe('SkillDefinitionEditor governance', () => {
     render(<SkillDefinitionEditor runtime={{ recordPid: record.pid }} />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Permission denied');
     await waitFor(() => expect(screen.getByRole('button', { name: 'Save skill' })).toBeDisabled());
+    expect(mocks.post).not.toHaveBeenCalled();
+  });
+  it('revokes permission to run when reviewed consent is cleared before execution', async () => {
+    const user = userEvent.setup();
+    render(<SkillDefinitionEditor runtime={{ recordPid: record.pid }} />);
+    await screen.findByDisplayValue('BOM review');
+    const consent = screen.getByLabelText('I reviewed the input and allow this real execution.');
+    const run = screen.getByRole('button', { name: 'Run once' });
+    await waitFor(() => expect(consent).toBeEnabled());
+    expect(consent).not.toBeChecked();
+    expect(run).toBeDisabled();
+    await user.click(consent);
+    expect(consent).toBeChecked();
+    await waitFor(() => expect(run).toBeEnabled());
+    await user.click(consent);
+    expect(consent).not.toBeChecked();
+    await waitFor(() => expect(run).toBeDisabled());
+    await user.click(run);
     expect(mocks.post).not.toHaveBeenCalled();
   });
 });
