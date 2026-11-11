@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SkillDefinitionEditor } from '../SkillDefinitionEditor';
 const mocks = vi.hoisted(() => ({
@@ -73,6 +74,7 @@ beforeEach(() => {
 });
 describe('SkillDefinitionEditor governance', () => {
   it('uses no nested form inside its DSL form host and requires fresh consent for every real run', async () => {
+    const user = userEvent.setup();
     mocks.post.mockResolvedValue(
       ok({ status: 'SUCCESS', textSummary: 'Reviewed 3 current parts' }),
     );
@@ -90,8 +92,9 @@ describe('SkillDefinitionEditor governance', () => {
         screen.getByLabelText('I reviewed the input and allow this real execution.'),
       ).toBeEnabled(),
     );
-    fireEvent.click(screen.getByLabelText('I reviewed the input and allow this real execution.'));
-    fireEvent.click(run);
+    await user.click(screen.getByLabelText('I reviewed the input and allow this real execution.'));
+    await waitFor(() => expect(run).toBeEnabled());
+    await user.click(run);
     expect(await screen.findByTestId('skill-trial-result')).toHaveTextContent(
       'Reviewed 3 current parts',
     );
@@ -103,6 +106,7 @@ describe('SkillDefinitionEditor governance', () => {
     expect(run).toBeDisabled();
   });
   it('does not describe an approval stop as success and never retries it automatically', async () => {
+    const user = userEvent.setup();
     mocks.post.mockResolvedValue(
       ok({ status: 'FAILED', data: { approvalRequired: true, approvalPid: 'approval' } }),
     );
@@ -113,13 +117,50 @@ describe('SkillDefinitionEditor governance', () => {
         screen.getByLabelText('I reviewed the input and allow this real execution.'),
       ).toBeEnabled(),
     );
-    fireEvent.click(screen.getByLabelText('I reviewed the input and allow this real execution.'));
-    fireEvent.click(screen.getByRole('button', { name: 'Run once' }));
+    await user.click(screen.getByLabelText('I reviewed the input and allow this real execution.'));
+    const run = screen.getByRole('button', { name: 'Run once' });
+    await waitFor(() => expect(run).toBeEnabled());
+    await user.click(run);
     expect(await screen.findByTestId('skill-trial-result')).toHaveTextContent(
       'Paused for confirmation or approval',
     );
     expect(mocks.post).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: 'Run once' })).toBeDisabled();
+  });
+  it('cannot execute while the effective contract is pending and needs consent after it resolves', async () => {
+    const user = userEvent.setup();
+    const defaultGet = mocks.get.getMockImplementation()!;
+    let resolveContract: ((value: ReturnType<typeof ok>) => void) | undefined;
+    mocks.get.mockImplementation((path: string) =>
+      path.includes('trial-definition')
+        ? new Promise((resolve) => { resolveContract = resolve; })
+        : defaultGet(path),
+    );
+    mocks.post.mockResolvedValue(ok({ status: 'SUCCESS', textSummary: 'Explicit run completed' }));
+    render(<SkillDefinitionEditor runtime={{ recordPid: record.pid }} />);
+    await screen.findByDisplayValue('BOM review');
+    const consent = screen.getByLabelText('I reviewed the input and allow this real execution.');
+    const run = screen.getByRole('button', { name: 'Run once' });
+    expect(consent).toBeDisabled();
+    expect(run).toBeDisabled();
+    await user.click(run);
+    expect(mocks.post).not.toHaveBeenCalled();
+    await waitFor(() => expect(resolveContract).toBeTypeOf('function'));
+    await act(async () => {
+      resolveContract!(ok({
+        available: true,
+        definitionHash: 'reviewed',
+        inputSchema: record.skill_input_schema,
+        executionMode: 'template',
+      }));
+    });
+    await waitFor(() => expect(consent).toBeEnabled());
+    expect(run).toBeDisabled();
+    await user.click(consent);
+    await waitFor(() => expect(run).toBeEnabled());
+    await user.click(run);
+    expect(await screen.findByTestId('skill-trial-result')).toHaveTextContent('Explicit run completed');
+    expect(mocks.post).toHaveBeenCalledTimes(1);
   });
   it('blocks running unsaved edits and viewers without runtime permission', async () => {
     mocks.allowed.delete('acp.runtime.manage');
