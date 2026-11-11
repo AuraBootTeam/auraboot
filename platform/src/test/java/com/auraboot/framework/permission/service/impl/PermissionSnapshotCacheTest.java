@@ -120,6 +120,30 @@ class PermissionSnapshotCacheTest {
     }
 
     @Test
+    void hiddenCommandEffectCandidatesNeverLeakFromTheCachedCatalog() {
+        var write = permission(901L, "example.cap.write");
+        write.setResourceType("operation"); write.setResourceCode("example"); write.setAction("write");
+        String child = "crm_customer_request_common";
+        write.setExtension(Map.of("domainModels", Map.of("quote_root", List.of("read", "create")),
+                "commandEffects", Map.of(child, List.of("read", "create"))));
+        when(permissionMapper.findResolvableDefinitions(100L)).thenReturn(List.of(write));
+        var ordinary = com.auraboot.framework.permission.engine.evaluator.PermissionCodeCandidates.forResourceAction(child, "create");
+        assertThat(cache.resourcePermissionCodes(100L, child, "create")).isEqualTo(ordinary);
+        com.auraboot.framework.application.tenant.MetaContext.setContext(100L, 1L, "actor", "actor");
+        try {
+            com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitPlan("SELF", null, "quote_root", null, () ->
+                com.auraboot.framework.application.tenant.MetaContext.runWithAuthorizedCommandCode("example:create", () ->
+                    com.auraboot.framework.application.tenant.MetaContext.runWithCommandAuthority("example.cap.write", () -> {
+                        assertThat(cache.resourcePermissionCodes(100L, child, "create")).containsExactly("example.cap.write");
+                        assertThat(cache.resourcePermissionCodes(100L, child, "read")).containsExactly("example.cap.write");
+                        assertThat(cache.resourcePermissionCodes(100L, child, "delete")).doesNotContain("example.cap.write");
+                    })));
+            assertThat(cache.resourcePermissionCodes(100L, child, "create")).isEqualTo(ordinary);
+        } finally { com.auraboot.framework.application.tenant.MetaContext.clear(); }
+        verify(permissionMapper, times(1)).findResolvableDefinitions(100L);
+    }
+
+    @Test
     void passiveExpiryRefreshesNegativeCatalogWithoutAnEvent() {
         when(permissionMapper.findResolvableDefinitions(100L))
                 .thenReturn(List.of())

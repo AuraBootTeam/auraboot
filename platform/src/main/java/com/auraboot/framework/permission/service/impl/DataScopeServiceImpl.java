@@ -64,6 +64,12 @@ public class DataScopeServiceImpl implements DataScopeService {
     @Autowired @Lazy
     private com.auraboot.framework.organization.service.TeamMemberService teamMemberService;
 
+    @Autowired @Lazy
+    private PermissionSnapshotCache snapshots;
+
+    @Autowired @Lazy
+    private com.auraboot.framework.permission.service.DomainCommandAuthorization domains;
+
     @Override
     @Cacheable(value = "dataScopeCondition",
             cacheManager = "permissionCacheManager",
@@ -174,9 +180,10 @@ public class DataScopeServiceImpl implements DataScopeService {
         // 2. Query matching data scope entries
         List<RoleDataScope> scopes = roleDataScopeMapper.findByRoleIdsAndResource(roleIds, resourceCode, actionCode);
         if (scopes == null || scopes.isEmpty()) {
-            // No data scope configured for this resource/action — NOT_APPLICABLE, not ALL.
-            // This preserves deny-by-default: "not configured" != "explicitly allowed all".
-            return DataScopeCondition.notConfigured();
+            // Physical-row checks already use the owning business grant's role default.
+            // Query the same audience instead of selecting rows those checks must reject.
+            DataScopeCondition domainDefault = strict ? null : domainDefaultAudience(memberId, resourceCode, actionCode);
+            return domainDefault != null ? domainDefault : DataScopeCondition.notConfigured();
         }
 
         // 3. Merge across roles
@@ -184,6 +191,35 @@ public class DataScopeServiceImpl implements DataScopeService {
 
         // 4. Resolve concrete condition (pass resourceCode for model-specific field config)
         return resolveCondition(memberId, merged, resourceCode, strict);
+    }
+
+    /** Preserve explicit scopes and legacy absence; defaults belong only to effective read-grant owners. */
+    private DataScopeCondition domainDefaultAudience(Long member, String model, String action) {
+        if (!"read".equals(action) || snapshots == null || domains == null || !MetaContext.exists()
+                || MetaContext.getCurrentMemberId() == null || !member.equals(MetaContext.getCurrentMemberId())) return null;
+        var defaults = new java.util.ArrayList<RoleDataScope>();
+        var visited = new java.util.HashSet<Long>();
+        boolean domain = false;
+        for (String code : snapshots.resourcePermissionCodes(MetaContext.getCurrentTenantId(), model, action)) {
+            var definition = snapshots.resolvePermissionDefinition(MetaContext.getCurrentTenantId(), code);
+            // Command-local technical effects must not populate a shared query-scope configuration.
+            if (!com.auraboot.framework.permission.service.DomainPermissionPolicy.models(definition).containsKey(model)) continue;
+            domain = true;
+            var bindings = domains.grants(code);
+            if (bindings == null || bindings.stream().anyMatch(binding -> !"grant".equals(binding.getGrantType()))) continue;
+            for (var binding : bindings) {
+                if (binding.getRoleId() == null || !visited.add(binding.getRoleId())) continue;
+                var condition = resolveObjectBoundScopeForRole(member, binding.getRoleId(), model, action, model);
+                // An absent legacy scope remains absent; never persist or relabel it as ALL.
+                if (condition != null && "not_configured".equals(condition.scopeType())) return null;
+                var entry = new RoleDataScope();
+                entry.setScopeType(condition == null ? "none" : condition.scopeType());
+                entry.setMergeStrategy("MAX");
+                defaults.add(entry);
+            }
+        }
+        if (!domain) return null;
+        return defaults.isEmpty() ? DataScopeCondition.none() : resolveCondition(member, mergeScopes(defaults), model, true);
     }
 
     @Override

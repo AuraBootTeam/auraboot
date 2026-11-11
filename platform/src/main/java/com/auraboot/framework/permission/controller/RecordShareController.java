@@ -157,7 +157,7 @@ public class RecordShareController {
 
     /** Validate every recipient before writing any grant; a batch is atomic. */
     @PostMapping
-    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.transaction.annotation.Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     @Operation(summary = "Share a record with tenant members or roles")
     public ApiResponse<Void> shareRecord(@Valid @RequestBody RecordShareRequest request) {
         Long tenantId = MetaContext.getCurrentTenantId();

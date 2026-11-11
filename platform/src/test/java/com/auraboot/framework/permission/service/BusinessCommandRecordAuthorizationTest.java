@@ -444,6 +444,31 @@ class BusinessCommandRecordAuthorizationTest {
         assertThat(authorization.resolveOrdinaryCreate(5L,child,artifact).result().granted()).isFalse();
     }
 
+    @Test void hiddenTechnicalCreationRetainsItsOwnObjectAndFieldPolicies() {
+        String child = "crm_customer_request_common";
+        var definition = permission(CODE); definition.setResourceCode("domain"); definition.setAction("write");
+        definition.setExtension(Map.of("domainModels", Map.of(MODEL, List.of("read", "create")),
+                "commandEffects", Map.of(child, List.of("read", "create"))));
+        when(snapshots.resolvePermissionDefinition(100L, CODE)).thenReturn(definition);
+        when(snapshots.resourcePermissionCodes(100L, child, "create")).thenReturn(List.of(CODE));
+        var binding = grant(11, 101, CODE); grants(binding);
+        guards(CODE, new PermissionPolicyService.ConditionGuard(11L, null));
+        when(scopes.resolveObjectBoundScopeForRole(5L, 101L, child, "create", child))
+                .thenReturn(new DataScopeCondition("self", "created_by", 1L, null, List.of(), List.of()));
+        var row = Map.<String,Object>of("pid", "new-request", "tenant_id", 100L, "created_by", 1L, "title", "Quote request");
+        assertThat(authorization.resolveOrdinaryCreate(5L, child, row).result().granted()).isFalse();
+        MetaContext.runWithCommandPermitPlan("SELF", null, MODEL, null, () ->
+                MetaContext.runWithAuthorizedCommandCode("example:create", () -> MetaContext.runWithCommandAuthority(CODE, () -> {
+                    assertThat(authorization.resolveOrdinaryCreate(5L, child, row).result().granted()).isTrue();
+                    binding.setFieldScopeJson("{\"version\":2,\"models\":{\"crm_customer_request_common\":{\"readFields\":[\"title\"],\"writeFields\":[]}}}");
+                    assertThat(authorization.resolveOrdinaryCreate(5L, child, row).canWrite("title")).isFalse();
+                    binding.setFieldScopeJson(null);
+                    when(scopes.resolveObjectBoundScopeForRole(5L, 101L, child, "create", child)).thenReturn(DataScopeCondition.none());
+                    assertThat(authorization.resolveOrdinaryCreate(5L, child, row).result().granted()).isFalse();
+                })));
+        assertThat(authorization.resolveOrdinaryCreate(5L, child, row).result().granted()).isFalse();
+    }
+
     private <T>T withDocumentEffect(Supplier<T> body) {
         var context=mock(com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext.class);
         var command=new com.auraboot.framework.meta.entity.CommandDefinition();command.setModelCode(MODEL);
