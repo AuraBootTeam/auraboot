@@ -11,6 +11,36 @@ import urllib.parse
 import urllib.request
 
 
+def verify_sms_mobile_window(request, check, require, delivery):
+    """Probe the shipped controller without requesting or sending an SMS code."""
+    mobile = '199' + str(secrets.randbelow(100000000)).zfill(8)
+    limited = []
+    for index in range(11):
+        value = request('/api/auth/login/sms', 'POST', {
+            'mobile': mobile, 'code': 'invalid-never-issued',
+            'email': f'sms-decoy-{secrets.token_hex(8)}@example.invalid',
+        }, {'X-Forwarded-For': f'198.51.100.{index + 1}',
+            'X-Real-IP': f'203.0.113.{index + 1}'})
+        require(value.get('_httpStatus', 200) < 500 and str(value.get('code')) != '0'
+                and not (value.get('data') or {}).get('jwt'),
+                'invalid SMS login succeeded, issued JWT or errored')
+        message = str(value.get('message', ''))
+        code = str(value.get('code'))
+        # GlobalExceptionHandler keeps the generic label in message and the
+        # actual business reason in context (production string / dev detail).
+        context = value.get('context')
+        detail = context.get('detail') if isinstance(context, dict) else context
+        is_limited = code == '35000' and 'Too many login attempts' in message
+        require(is_limited or (code == '10000' and detail == 'Invalid or expired verification code'),
+                'SMS positive control did not reach the real OTP verifier')
+        limited.append(is_limited)
+    require(limited == [False] * 10 + [True],
+            'SMS mobile budget bypassed by changing email/forwarding headers')
+    check('security-sms-mobile-window-' + delivery, attempts=11, decoyEmails=11,
+          invalidOtpReachedVerifier=10, rejectedAttempt=11, issuedJwt=False,
+          smsSendEndpointCalled=False)
+
+
 def verify(base, request, login, admin, password, check, require, publish_tenant, web_base):
     def call(token, path, method='GET', body=None, extra=None):
         headers = dict(extra or {})
@@ -268,6 +298,7 @@ def verify(base, request, login, admin, password, check, require, publish_tenant
     require(bff_before[0] == 302 and bff_before[2] and 'invalidCredentials' not in bff_before[1],
             'BFF correct-credential positive control failed')
 
+    verify_sms_mobile_window(request, check, require, 'native')
     identifier = 'limit-' + secrets.token_hex(8) + '@example.invalid'
     attempts = [login_attempt(identifier if index % 2 else identifier.upper(), index) for index in range(11)]
     require(attempts == [False] * 10 + [True], 'real login identifier window/normalization differs')

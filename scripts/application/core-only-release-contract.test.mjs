@@ -24,6 +24,14 @@ const audit = readFileSync(resolve(root, 'scripts/application/audit-core-only-sc
 const oci = readFileSync(resolve(root, 'scripts/application/oci-layout.mjs'), 'utf8');
 const productImageGate = readFileSync(resolve(root, 'scripts/application/run-product-release-image-gate.sh'), 'utf8');
 
+test('native and OCI SMS budget probes reject missing, premature and non-OTP controls', () => {
+  execFileSync('python3', ['-B', join(root, 'scripts/ci/oss-security-probes.test.py')], { encoding: 'utf8' });
+  const native = readFileSync(join(root, 'scripts/ci/oss-native-install.py'), 'utf8');
+  const probes = readFileSync(join(root, 'scripts/ci/oss-security-probes.py'), 'utf8');
+  assert.match(native, /security_module\.verify_sms_mobile_window\(request, check, require, 'oci'\)/);
+  assert.match(probes, /verify_sms_mobile_window\(request, check, require, 'native'\)/);
+});
+
 test('product image reentry preserves the existing work root and refuses implicit replacement', t => {
   const directory = mkdtempSync(join(tmpdir(), 'product-work-root-'));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
