@@ -179,6 +179,14 @@ public class DynamicDataAccessorImpl implements DataAccessor {
     }
 
     @Override
+    public void createWithoutResult(String modelCode, Map<String, Object> data) {
+        withCommandAuthority(() -> {
+            dynamicDataService.createWithoutResult(modelCode, mutableCopy(data));
+            return null;
+        });
+    }
+
+    @Override
     public Optional<Map<String, Object>> tryCreate(String modelCode, Map<String, Object> data) {
         log.debug("Plugin DataAccessor: tryCreate({}, {} fields)", modelCode, data != null ? data.size() : 0);
         try {

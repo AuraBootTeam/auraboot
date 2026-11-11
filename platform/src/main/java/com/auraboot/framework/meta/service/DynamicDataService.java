@@ -75,6 +75,11 @@ public interface DynamicDataService {
      */
     Map<String, Object> create(String modelCode, Map<String, Object> data);
 
+    /** Ordinary creation lifecycle with no caller-facing record projection. */
+    default void createWithoutResult(String modelCode, Map<String, Object> data) {
+        create(modelCode, data);
+    }
+
     /**
      * 更新数据
      * @param modelCode 模型编码

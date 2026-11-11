@@ -204,6 +204,8 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
         readonlyName();
         assertThatThrownBy(()->service.create(MODEL_CODE,new HashMap<>(Map.of("name","forbidden"))))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThatThrownBy(()->service.createWithoutResult(MODEL_CODE,new HashMap<>(Map.of("name","forbidden"))))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
         assertThatThrownBy(()->service.bulkCreate(MODEL_CODE,List.of(new HashMap<>(Map.of("name","forbidden")))))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
         assertThatThrownBy(()->service.bulkCreateForProcessing(MODEL_CODE,List.of(new HashMap<>(Map.of("name","forbidden")))))
@@ -245,6 +247,19 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
     }
 
     @Test
+    void createWithoutResultRetainsWriteBoundaryAndAuditWithoutPublicProjection() {
+        stubReadVerdict(false);
+        when(dynamicDataMapper.insert(anyString(), anyMap())).thenReturn(1);
+        service.createWithoutResult(MODEL_CODE,
+                new HashMap<>(Map.of("pid", RECORD_ID, "name", "written-value")));
+        verify(applicationContext.getBean(NativeRecordFieldAuthorization.class))
+                .requireCreated(eq(MODEL_CODE), eq(RECORD_ID), anyMap());
+        verify(changeTracker).recordChange(argThat(change ->
+                "create".equals(change.getOperation()) && RECORD_ID.equals(change.getRecordId())));
+        verify(nativeReadFields, never()).publicWriteResult(any(), anyMap(), any());
+    }
+
+    @Test
     void realCreateInvalidatesPredicatesForDependentModelsInsideTheSameCommand() {
         stubReadVerdict(false);
         var visible=new java.util.concurrent.atomic.AtomicBoolean(false);
@@ -263,7 +278,17 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
     @Test
     void observerFailureStillDiscardsIntermediatePredicatesAndPropagates() { assertObserverInvalidation(true); }
 
+    @Test
+    void createWithoutResultPreservesObserverInvalidation() { assertObserverInvalidation(false, true); }
+
+    @Test
+    void createWithoutResultPropagatesObserverFailure() { assertObserverInvalidation(true, true); }
+
     private void assertObserverInvalidation(boolean fail) {
+        assertObserverInvalidation(fail, false);
+    }
+
+    private void assertObserverInvalidation(boolean fail, boolean withoutResult) {
         stubReadVerdict(false);
         var version=new java.util.concurrent.atomic.AtomicInteger();
         java.util.function.Supplier<String> filter=()->"AND version = "+version.get();
@@ -276,7 +301,11 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
         when(applicationContext.getBeansOfType(ModelMutationObserver.class)).thenReturn(Map.of("fixture",observer));
         try (DynamicDataQueryScope scope=DynamicDataQueryScope.open()) {
             assertThat(DynamicDataQueryScope.rowFilter(TENANT_ID,"dependent_bundle",USER_ID,filter)).isEqualTo("AND version = 0");
-            Runnable create=()->service.create(MODEL_CODE,new HashMap<>(Map.of("pid",RECORD_ID,"name","written-value")));
+            Runnable create=()-> {
+                var data = new HashMap<String,Object>(Map.of("pid",RECORD_ID,"name","written-value"));
+                if (withoutResult) service.createWithoutResult(MODEL_CODE, data);
+                else service.create(MODEL_CODE, data);
+            };
             if(fail)org.assertj.core.api.Assertions.assertThatThrownBy(create::run).isInstanceOf(IllegalStateException.class).hasMessage("observer failed");
             else create.run();
             assertThat(DynamicDataQueryScope.rowFilter(TENANT_ID,"dependent_bundle",USER_ID,filter)).isEqualTo("AND version = 2");

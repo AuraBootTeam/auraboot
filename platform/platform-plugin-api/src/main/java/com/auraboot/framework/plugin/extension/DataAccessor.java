@@ -165,6 +165,14 @@ public interface DataAccessor extends RecordReadAccessor {
     Map<String, Object> create(String modelCode, Map<String, Object> data);
 
     /**
+     * Create with the ordinary write checks and lifecycle, without returning record contents.
+     * Does not provide a created-record file-link proof. Older hosts may perform extra readback.
+     */
+    default void createWithoutResult(String modelCode, Map<String, Object> data) {
+        create(modelCode, data);
+    }
+
+    /**
      * Insert a record idempotently.
      *
      * <p>The default preserves source compatibility for plugin test doubles. Runtime accessors

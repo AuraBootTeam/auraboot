@@ -973,6 +973,17 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public Map<String, Object> create(String modelCode, Map<String, Object> data) {
+        return createInternal(modelCode, data, true);
+    }
+
+    @Override
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public void createWithoutResult(String modelCode, Map<String, Object> data) {
+        createInternal(modelCode, data, false);
+    }
+
+    private Map<String, Object> createInternal(String modelCode, Map<String, Object> data,
+                                               boolean returnPublicRecord) {
         requireDomainAction(modelCode, "create");
         BusinessResourceDataScope.create(modelCode, data);
         if (MachineDataAccessContext.isActive()) MachineDataAccessContext.requireDecision(modelCode).requireAction("create");
@@ -1103,6 +1114,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
         }
 
+        if (!returnPublicRecord) return null;
         return nativeReadFields.publicWriteResult(model, createdRecord,
                 () -> getById(modelCode, recordIdValue));
     }

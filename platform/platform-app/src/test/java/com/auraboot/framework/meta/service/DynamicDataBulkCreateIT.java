@@ -174,6 +174,35 @@ class DynamicDataBulkCreateIT extends BaseIntegrationTest {
         assertThat(Objects.toString(row2.get(qtyField))).isEqualTo("7");
     }
 
+    @Test
+    @Order(3)
+    void creationWithoutResultPersistsWithoutReadGrantAndRollsBackForbiddenFields() throws Exception {
+        Long tenant = getTestTenant().getId();
+        Long role = getTestRole().getId();
+        assertThat(jdbcTemplate.update("""
+                DELETE FROM ab_role_permission WHERE tenant_id=? AND role_id=?
+                AND permission_id IN (SELECT id FROM ab_permission WHERE code=?)
+                """, tenant, role, "model." + modelCode + ".read")).isEqualTo(1);
+        dynamicDataService.createWithoutResult(modelCode,
+                new HashMap<>(Map.of(nameField, "no-result", qtyField, 11, cellsField, List.of("kept"))));
+        var stored = jdbcTemplate.queryForMap("SELECT pid," + qtyField + "," + cellsField
+                + "::text AS cells FROM mt_" + modelCode + " WHERE " + nameField + "=?", "no-result");
+        createdPids.add(stored.get("pid").toString());
+        assertThat(stored.get(qtyField).toString()).isEqualTo("11");
+        assertThat(stored.get("cells").toString()).contains("kept");
+        String fieldScope = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(
+                Map.of("modelCode", modelCode, "readFields", List.of(), "writeFields", List.of(qtyField)));
+        assertThat(jdbcTemplate.update("""
+                UPDATE ab_role_permission SET field_scope=?::jsonb WHERE tenant_id=? AND role_id=?
+                AND permission_id IN (SELECT id FROM ab_permission WHERE code=?)
+                """, fieldScope, tenant, role, "model." + modelCode + ".create")).isEqualTo(1);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> dynamicDataService.createWithoutResult(
+                modelCode, new HashMap<>(Map.of(nameField, "forbidden-no-result", qtyField, 12))))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM mt_" + modelCode
+                + " WHERE " + nameField + "=?", Integer.class, "forbidden-no-result")).isZero();
+    }
+
     // ── Helpers (mirror DynamicDataJsonbUpdateIT) ──────────────────────────────
 
     private void dropIfExists() {
