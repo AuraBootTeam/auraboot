@@ -43,7 +43,9 @@ public class InstalledIntegrationService {
     }
 
     record Resolved(Registration registration, String artifact, InstalledIntegrationBinding binding,
-                    Map<String,String> configs, Map<String,Object> handlers, String bindingHash, String commandHash, Set<String> completedCommandHashes, String conflictMessageKey) {}
+                    Map<String,String> configs, Map<String,Object> handlers, String bindingHash, String commandHash,
+                    String legacyCommandHash, Set<String> completedCommandHashes,
+                    Set<Registration> completedRegistrations, String conflictMessageKey) {}
     public record Acceptance(String recordPid, boolean duplicate) {}
 
     public boolean registered(String source) { return registry.registration(source).isPresent(); }
@@ -138,10 +140,13 @@ public class InstalledIntegrationService {
         }
         InstalledIntegrationBinding binding = new InstalledIntegrationBinding(principal.tenantId(), principal.applicationPid(),
                 principal.installationPid(), source, eventId, durableId, bindingRevision, parameters);
+        var previousRegistrations=registry.completedReceiptRegistrations(source);
         return new Resolved(registration, entry.getValue(), binding, Map.copyOf(configs), Map.copyOf(approvedHandlers), hash(binding),
-                commandHash(registration,configs),
-                registry.completedReceiptRegistrations(source).stream()
-                        .map(previous -> commandHash(previous,configs)).collect(java.util.stream.Collectors.toUnmodifiableSet()), common.path("conflictMessageKey").asText(null));
+                scopedCommandHash(registration,configs,principal.installationPid()), commandHash(registration,configs),
+                previousRegistrations.stream().flatMap(previous -> java.util.stream.Stream.of(
+                        commandHash(previous,configs),scopedCommandHash(previous,configs,principal.installationPid())))
+                        .collect(java.util.stream.Collectors.toUnmodifiableSet()),
+                Set.copyOf(previousRegistrations),common.path("conflictMessageKey").asText(null));
     }
 
     public Optional<ExternalEventIngressExtension.BusinessRequest> prepareBusinessRequest(String source,Map<String,Object> input) {
@@ -343,9 +348,18 @@ public class InstalledIntegrationService {
                 || !r.durableEventId().equals(event.eventId())) throw denied();
     }
     private boolean commandMatches(Resolved resolved, InstalledIntegrationReceiptMapper.Receipt receipt) {
-        return receipt.commandSha256().equals(resolved.commandHash())
-                || ("completed".equals(receipt.state()) && validRequestPid(receipt.requestPid())
-                    && resolved.completedCommandHashes().contains(receipt.commandSha256()));
+        if(receipt.commandSha256().equals(resolved.commandHash())
+                || receipt.commandSha256().equals(resolved.legacyCommandHash())
+                || legacyCommandPrefixMatches(resolved.registration(),resolved,receipt.commandSha256()))return true;
+        if(!"completed".equals(receipt.state()) || !validRequestPid(receipt.requestPid()))return false;
+        return resolved.completedCommandHashes().contains(receipt.commandSha256())
+                || resolved.completedRegistrations().stream()
+                        .anyMatch(previous -> legacyCommandPrefixMatches(previous,resolved,receipt.commandSha256()));
+    }
+    private boolean legacyCommandPrefixMatches(Registration registration, Resolved resolved, String original) {
+        return InstalledIntegrationCommandFingerprint.legacyPrefixMatches(json,resolved.configs(),
+                resolved.binding().installationPid(),commandHash(registration,resolved.configs()),original,
+                candidate -> commandHash(registration,candidate));
     }
     private boolean providerMatches(Resolved resolved, InstalledIntegrationReceiptMapper.Receipt receipt) {
         // Terminal replay never invokes old business code; the current result query is PID-bound.
@@ -386,6 +400,12 @@ public class InstalledIntegrationService {
         // Sets have no stable JVM iteration order; preserve legacy record layout and sort only this set.
         declaration.set("eventTypes",json.valueToTree(registration.eventTypes().stream().sorted().toList()));
         return hash(Map.of("registration",declaration,"configs",configs));
+    }
+    String scopedCommandHash(Registration registration,Map<String,String> configs,String installation) {
+        var declaration=(com.fasterxml.jackson.databind.node.ObjectNode)json.valueToTree(registration);
+        declaration.set("eventTypes",json.valueToTree(registration.eventTypes().stream().sorted().toList()));
+        return hash(Map.of("scheme","installation-command-v1","registration",declaration,
+                "configs",InstalledIntegrationCommandFingerprint.scoped(json,configs,installation)));
     }
     private boolean bindingDeclaration(JsonNode declaration) {
         Set<String> fields=keys(declaration);

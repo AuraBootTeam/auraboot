@@ -278,6 +278,50 @@ class InstalledIntegrationServiceTest {
         when(plugins.observeLoadedArtifact(any())).thenReturn(Optional.of(new AuraPluginManager.LoadedPluginArtifact(
                 registration.providerPluginId(),java.nio.file.Path.of("provider-new.jar"),digest)));
     }
+    @Test void unrelatedInstallationAppendDoesNotRevokeTheOriginalCompletedRequest() throws Exception {
+        // Authorization-shape check only; durable replay is qualified against real HTTP/PostgreSQL.
+        service.accept(principal,source,event());var original=acceptedReceipt();
+        when(receipts.claim(any())).thenReturn(0);
+        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(receiptWith(original,
+                "completed","request-pid",original.bindingSha256(),original.commandSha256()));
+        appendUnrelatedInstallation();
+        clearInvocations(executor);
+        assertEquals(new InstalledIntegrationService.Acceptance("request-pid",true),service.accept(principal,source,event()));
+        verifyNoInteractions(executor);
+    }
+
+    @Test void legacyFullConfigurationReceiptSurvivesProvenUnrelatedSuffixOnly() throws Exception {
+        // This is a command-authorization test, not a substitute for real stored receipt replay.
+        Map<String,String> originalConfigs=new HashMap<>();
+        metadata.forEach((code,command)->originalConfigs.put(code,command.getExecutionConfig()));
+        String legacyHash=service.commandHash(registration,originalConfigs);
+        service.accept(principal,source,event());var original=acceptedReceipt();
+        when(receipts.claim(any())).thenReturn(0);
+        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(receiptWith(original,
+                "completed","request-pid",original.bindingSha256(),legacyHash));
+        appendUnrelatedInstallation();
+        clearInvocations(executor);
+        assertEquals(new InstalledIntegrationService.Acceptance("request-pid",true),service.accept(principal,source,event()));
+        verifyNoInteractions(executor);
+        for(var command:metadata.values()) {
+            var config=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(command.getExecutionConfig());
+            config.put("machineDataScope","changed");command.setExecutionConfig(json.writeValueAsString(config));
+        }
+        assertThrows(SecurityException.class,()->service.accept(principal,source,event()));
+        verifyNoInteractions(executor);
+    }
+
+    void appendUnrelatedInstallation() throws Exception {
+        for(var command:metadata.values()) {
+            var config=json.readTree(command.getExecutionConfig());
+            ((com.fasterxml.jackson.databind.node.ArrayNode)config.path("handlerParams")
+                    .path("installedIntegration").path("bindings")).add(json.valueToTree(Map.of(
+                            "installationPid","other-installation","revision",1,
+                            "parameters",Map.of("ownerUserPid","another-owner","connectionPid","another-connection"))));
+            command.setExecutionConfig(json.writeValueAsString(config));
+        }
+    }
+
     @Test void commandFingerprintDoesNotDependOnEventSetIterationOrderAndPreservesLegacySingleTypeHashes() {
         var configs=Map.of(accept,"accept-config",process,"process-config",result,"result-config");
         var expanded=spy(new Registration(source,registration.capability(),Set.of(event().eventType(),"external."+source+".inquiry.changed.v1"),
