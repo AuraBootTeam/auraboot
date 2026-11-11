@@ -748,6 +748,12 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     @Override
+    public Map<String,Object> getByIdForProcessing(String modelCode, String recordId) {
+        requireDomainAction(modelCode,"read");
+        return getByIdInternal(modelCode,recordId,false);
+    }
+
+    @Override
     @Observed(name = "dynamic_data.get_by_id", contextualName = "dynamic-data-get-for-authorization")
     public Map<String, Object> getByIdForAuthorization(String modelCode, String recordId) {
         return getByIdInternal(modelCode, recordId, false);

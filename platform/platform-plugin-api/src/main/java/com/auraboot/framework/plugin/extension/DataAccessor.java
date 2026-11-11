@@ -30,6 +30,12 @@ public interface DataAccessor extends RecordReadAccessor {
      */
     Map<String, Object> getById(String modelCode, String recordId);
 
+    /** Read authorized, masked business fields without expanding display-only reference labels. */
+    default Map<String,Object> getByIdForProcessing(String modelCode, String recordId) {
+        return getById(modelCode,recordId);
+    }
+
+
     /**
      * Get a single record by ID, mapping a record-not-found outcome to
      * {@code null} without relying on the platform exception's message text.

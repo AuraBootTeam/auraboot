@@ -117,19 +117,19 @@ public class DataScopeEvaluator {
 
         Map<String, Object> recordMap = (Map<String, Object>) record;
 
-        condition = strict ? condition
-                : enrichWithSharedRootSurface(condition, memberId, resource, action);
-
+        EvaluationStep base;
         if ("self".equals(scopeType)) {
-            return allowWithinSharedRootSurfaceOr(condition, recordMap, evaluateSelf(condition, recordMap));
+            base=evaluateSelf(condition,recordMap);
+        } else if ("dept".equals(scopeType) || "dept_and_sub".equals(scopeType) || "team".equals(scopeType)) {
+            base=evaluateDept(condition,recordMap,strict);
+        } else {
+            return new EvaluationStep(NAME,EvaluationVerdict.NOT_APPLICABLE,"Unknown scope type: "+scopeType);
         }
-
-        if ("dept".equals(scopeType) || "dept_and_sub".equals(scopeType) || "team".equals(scopeType)) {
-            return allowWithinSharedRootSurfaceOr(condition, recordMap, evaluateDept(condition, recordMap, strict));
-        }
-
-        return new EvaluationStep(NAME, EvaluationVerdict.NOT_APPLICABLE,
-                "Unknown scope type: " + scopeType);
+        // Sharing only adds an alternative audience. It cannot change an already allowed
+        // original scope, so do not load model declarations or sharing metadata in that case.
+        if (base.verdict()!=EvaluationVerdict.DENY) return base;
+        var withSurface=strict ? condition : enrichWithSharedRootSurface(condition,memberId,resource,action);
+        return allowWithinSharedRootSurfaceOr(withSurface,recordMap,base);
     }
 
     /**

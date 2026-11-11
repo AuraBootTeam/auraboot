@@ -76,12 +76,11 @@ public class CommandExecutionTransaction {
         }
         return template.execute(status -> {
             if (dryRun) status.setRollbackOnly();
-            // Declared single-transaction processing owns one physical snapshot. Reuse only
+            // Document generation already owns one physical snapshot transaction. Reuse only
             // authorization configuration; every source row and field remains evaluated.
             boolean document = config.get("handlerParams") instanceof java.util.Map<?,?> params
                     && params.get("documentDefinition") instanceof java.util.Map<?,?>;
-            boolean singleSnapshot = document || handler != null && handler.usesSingleAuthorizationSnapshot();
-            if (authorization != null && domain && singleSnapshot
+            if (authorization != null && domain && document
                     && com.auraboot.framework.application.tenant.MetaContext.getCurrentMemberId() != null
                     && com.auraboot.framework.application.tenant.MetaContext.getCurrentUserId() != null
                     && com.auraboot.framework.application.tenant.MetaContext.getExternalCommandPermission() == null

@@ -42,6 +42,12 @@ public interface DynamicDataService {
      */
     Map<String, Object> getById(String modelCode, String recordId);
 
+    /** Same public business/read/field gates, without display-only reference expansion. */
+    default Map<String,Object> getByIdForProcessing(String modelCode, String recordId) {
+        return getById(modelCode,recordId);
+    }
+
+
     /** Read through every normal authorization and masking gate, without display-only reference expansion. */
     Map<String, Object> getByIdForAuthorization(String modelCode, String recordId);
 

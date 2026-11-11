@@ -288,13 +288,15 @@ test('quote sharing release gate: multiple members, role access and revocation t
     const quoteRoot = process.env.AURA_QUOTE_ROOT;
     expect(quoteRoot, 'The gate must provide its manifest-bound AURA_QUOTE_ROOT').toBeTruthy();
     expect(path.isAbsolute(quoteRoot!)).toBe(true);
+    const coreRoot = process.env.AURA_CORE_PROJECT_ROOT;
     const crmRoot = process.env.AURA_CRM_ROOT;
     const pluginsRoot = process.env.AURA_PLUGINS_PROJECT_ROOT;
-    for (const sourceRoot of [crmRoot, pluginsRoot]) {
+    for (const sourceRoot of [coreRoot, crmRoot, pluginsRoot]) {
       expect(sourceRoot, 'The gate must provide each manifest-bound dependency root').toBeTruthy();
       expect(path.isAbsolute(sourceRoot!)).toBe(true);
     }
     const dependencies = [
+      [path.join(coreRoot!, 'plugins', 'core-data-exchange'), 'com.auraboot.core-data-exchange'],
       [path.join(crmRoot!, 'plugin-aura', 'crm'), 'com.auraboot.crm'],
       [path.join(pluginsRoot!, 'pcba-crm'), 'com.auraboot.pcba-crm'],
       [path.join(pluginsRoot!, 'customer-pcba-integration'), 'com.auraboot.customer-pcba-integration'],

@@ -80,11 +80,6 @@ class CommandExecutionTransactionTest {
             command.setExecutionConfig("{\"permissions\":[\"example.cap.read\"]}");
             assertThat(transaction.execute("example:export",false,()->"ordinary")).isEqualTo("ordinary");
             verifyNoInteractions(authorization);
-            var handler=mock(CommandHandlerExtension.class);
-            when(extensions.getCommandHandler("example:export")).thenReturn(Optional.of(handler));
-            when(handler.usesSingleAuthorizationSnapshot()).thenReturn(true);
-            assertThat(transaction.execute("example:export",false,()->"preview")).isEqualTo("preview");
-            verify(authorization).withReadProjectionSnapshot(any());
         } finally {com.auraboot.framework.application.tenant.MetaContext.clear();}
     }
 

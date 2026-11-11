@@ -141,7 +141,9 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
      *   <li>{@code dynamicDataMapper.selectByQuery} → one-record result</li>
      * </ul>
      */
-    private void wireHappyPathDbStubs() {
+    private void wireHappyPathDbStubs() { wireHappyPathDbStubs(true); }
+
+    private void wireHappyPathDbStubs(boolean reachesSql) {
         // Virtual-model executor: not present → fall through to physical path
         when(executorRegistry.resolve(any())).thenReturn(Optional.empty());
 
@@ -161,12 +163,12 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
 
         // QueryBuilder stub
         when(queryBuilderService.buildConditionQuery(eq(model), anyList())).thenReturn(queryBuilder);
-        when(queryBuilder.getSql()).thenReturn("SELECT * FROM mt_test_model WHERE pid = :pid AND tenant_id = :tenant_id");
-        when(queryBuilder.getParameterMap()).thenReturn(Map.of("pid", RECORD_ID, "tenant_id", TENANT_ID));
-
-        // DB returns one record
-        Map<String, Object> rawRecord = Map.of("pid", RECORD_ID, "name", "secret-value");
-        when(dynamicDataMapper.selectByQuery(anyString(), anyMap())).thenReturn(List.of(rawRecord));
+        if(reachesSql) {
+            when(queryBuilder.getSql()).thenReturn("SELECT * FROM mt_test_model WHERE pid = :pid AND tenant_id = :tenant_id");
+            when(queryBuilder.getParameterMap()).thenReturn(Map.of("pid", RECORD_ID, "tenant_id", TENANT_ID));
+            Map<String, Object> rawRecord=Map.of("pid",RECORD_ID,"name","secret-value");
+            when(dynamicDataMapper.selectByQuery(anyString(),anyMap())).thenReturn(List.of(rawRecord));
+        }
     }
 
     private void wireRuleCenterPermissionAllows() {
@@ -387,8 +389,9 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
         org.assertj.core.api.Assertions.assertThat(RequiredRecordReadGuard.isResolvingReference()).isFalse();
     }
 
-    @Test
-    void explicitAuthorizationReadKeepsGatesAndMaskedShapeWithoutReferencePresentation() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false,true})
+    void explicitAuthorizationReadKeepsGatesAndMaskedShapeWithoutReferencePresentation(boolean processing) {
         wireHappyPathDbStubs();
         wireRuleCenterPermissionAllows();
         when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap())).thenReturn(true);
@@ -402,7 +405,7 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
         when(dynamicDataMapper.selectByQuery(anyString(), anyMap())).thenAnswer(call -> List.of(
                 new java.util.LinkedHashMap<>(Map.of("pid", RECORD_ID, "name", "secret-value", "related", "policy-1"))));
 
-        var record = service.getByIdForAuthorization(MODEL_CODE, RECORD_ID);
+        var record = readWithoutReferencePresentation(processing);
         org.assertj.core.api.Assertions.assertThat(record).containsEntry("pid", RECORD_ID).containsEntry("related", "policy-1").doesNotContainKey("name");
         verify(permissionFacade).canOperate(eq(USER_ID), eq(MODEL_CODE), eq("read"), anyMap());
         verify(dataPermissionEngine).canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap());
@@ -414,23 +417,25 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
         verify(permissionFacade).canAction(USER_ID, "fixture_policy", "read");
     }
 
-    @Test
-    void explicitAuthorizationReadStillRejectsDeniedRows() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false,true})
+    void explicitAuthorizationReadStillRejectsDeniedRows(boolean processing) {
         wireHappyPathDbStubs();
         wireRuleCenterPermissionAllows();
         when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap())).thenReturn(false);
-        assertThatThrownBy(() -> service.getByIdForAuthorization(MODEL_CODE, RECORD_ID))
+        assertThatThrownBy(() -> readWithoutReferencePresentation(processing))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
         verifyNoInteractions(fieldMaskService);
     }
 
-    @Test
-    void explicitAuthorizationReadDoesNotReturnUnmaskedDataWhenMaskingFails() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false,true})
+    void explicitAuthorizationReadDoesNotReturnUnmaskedDataWhenMaskingFails(boolean processing) {
         wireHappyPathDbStubs();
         wireRuleCenterPermissionAllows();
         when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap())).thenReturn(true);
         when(dataPermissionEngine.getFieldMaskRules(TENANT_ID, MODEL_CODE, USER_ID)).thenThrow(new IllegalStateException("mask lookup failed"));
-        assertThatThrownBy(() -> service.getByIdForAuthorization(MODEL_CODE, RECORD_ID))
+        assertThatThrownBy(() -> readWithoutReferencePresentation(processing))
                 .isInstanceOf(MetaServiceException.class).hasMessageContaining("Field masking evaluation failed");
     }
 
@@ -647,27 +652,18 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
         verify(dataPermissionEngine, never()).canAccessRecord(anyLong(), anyString(), anyLong(), anyMap());
     }
 
-    @Test
-    @DisplayName("Rule Center permission resolves tenant member id when MetaContext memberId is missing")
-    void getById_ruleCenterPermissionResolvesTenantMemberWhenContextMemberMissing() {
-        wireHappyPathDbStubs();
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false,true})
+    void publicAndProcessingReadsRejectIncompleteHumanIdentityBeforeAuthorization(boolean processing) {
+        wireHappyPathDbStubs(false);
         MetaContext.setMemberId(null);
-
-        when(applicationContext.getBean(TenantMemberService.class)).thenReturn(tenantMemberService);
-        when(tenantMemberService.findByTenantIdAndUserId(TENANT_ID, USER_ID))
-                .thenReturn(tenantMember(FALLBACK_MEMBER_ID));
-        when(applicationContext.getBean(PermissionFacade.class)).thenReturn(permissionFacade);
-        when(permissionFacade.canOperate(eq(FALLBACK_MEMBER_ID), eq(MODEL_CODE), eq("read"), anyMap()))
-                .thenReturn(PermissionResult.deny(
-                        "Condition guard not satisfied",
-                        List.of(new EvaluationStep("Policy", EvaluationVerdict.DENY, "Condition guard not satisfied"))));
-
-        assertThatThrownBy(() -> service.getById(MODEL_CODE, RECORD_ID))
+        assertThatThrownBy(() -> {
+            if(processing) service.getByIdForProcessing(MODEL_CODE,RECORD_ID);
+            else service.getById(MODEL_CODE,RECORD_ID);
+        })
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
-                .hasMessageContaining("Access denied");
-
-        verify(permissionFacade).canOperate(eq(FALLBACK_MEMBER_ID), eq(MODEL_CODE), eq("read"), anyMap());
-        verify(dataPermissionEngine, never()).canAccessRecord(anyLong(), anyString(), anyLong(), anyMap());
+                .hasMessageContaining("NATIVE_ACTOR_INCOMPLETE");
+        verifyNoInteractions(permissionFacade,tenantMemberService,dataPermissionEngine,fieldMaskService);
     }
     @Test void commandAllPermitCannotSkipRequiredMemberReadRestriction() {
         wireHappyPathDbStubs();
@@ -680,4 +676,9 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
         verify(dataPermissionEngine).requireRecordReads(eq(MODEL_CODE),anyMap());
         verify(dataPermissionEngine,never()).canAccessRecord(anyLong(),anyString(),anyLong(),anyMap());
     }
+    private Map<String,Object> readWithoutReferencePresentation(boolean processing) {
+        return processing ? service.getByIdForProcessing(MODEL_CODE,RECORD_ID)
+                : service.getByIdForAuthorization(MODEL_CODE,RECORD_ID);
+    }
+
 }

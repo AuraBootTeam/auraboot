@@ -54,6 +54,11 @@ public class DynamicDataAccessorImpl implements DataAccessor {
     }
 
     @Override
+    public Map<String,Object> getByIdForProcessing(String modelCode, String recordId) {
+        return withReadCommandAuthority(modelCode,recordId,false);
+    }
+
+    @Override
     public Map<String, Object> getByIdOrNull(String modelCode, String recordId) {
         log.debug("Plugin DataAccessor: getByIdOrNull({}, {})", modelCode, recordId);
         try {
@@ -279,15 +284,20 @@ public class DynamicDataAccessorImpl implements DataAccessor {
     }
 
     private Map<String, Object> withReadCommandAuthority(String modelCode, String recordId) {
+        return withReadCommandAuthority(modelCode,recordId,true);
+    }
+
+    private Map<String,Object> withReadCommandAuthority(String modelCode,String recordId,boolean enrichDisplay) {
         String root = MetaContext.getCommandPermitTargetFor(modelCode);
         boolean relatedRead = !MachineDataAccessContext.isActive()
                 && "TARGET".equals(MetaContext.getCommandPermitScopeFor(modelCode)) && root != null && !root.isBlank()
                 && recordId != null && !recordId.isBlank() && !root.equals(recordId);
         // Another record never inherits the root's mutation permit. Reuse the actor's
         // ordinary read path, including current function/TEAM/required-reference checks.
-        return withCommandAuthority(() -> relatedRead
-                ? MetaContext.runWithoutCommandPermit(() -> dynamicDataService.getById(modelCode, recordId))
-                : dynamicDataService.getById(modelCode, recordId));
+        java.util.function.Supplier<Map<String,Object>> reader=() -> enrichDisplay
+                ? dynamicDataService.getById(modelCode,recordId)
+                : dynamicDataService.getByIdForProcessing(modelCode,recordId);
+        return withCommandAuthority(() -> relatedRead ? MetaContext.runWithoutCommandPermit(reader) : reader.get());
     }
 
     /** The authoritative permit context is installed outside this adapter. */
