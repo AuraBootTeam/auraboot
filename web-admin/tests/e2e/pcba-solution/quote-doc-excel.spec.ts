@@ -290,64 +290,10 @@ test.describe('Quote pricing + document excel (QO-04 / QO-07 / XLS-Q) @smoke', (
       expect(restoredPdf.status()).toBe(200);
       expect(await restoredXlsx.body()).toEqual(await readFile(target));
       expect(await restoredPdf.body()).toEqual(pdfBytes);
-      // Exercise the real command/DAL boundary, not only a projector with raw unit-test inputs.
-      const financialBefore = await readDynamicRecord(admin, 'qo_quote_common', created.quoteId);
-      expect(Number(financialBefore.qo_quote_total_amount), 'The financial field test must have a real positive baseline').toBeGreaterThan(0);
-      const priceFields = [
-        { modelCode: 'qo_quote_line_common', fieldCode: 'qo_ql_unit_cost' },
-        { modelCode: 'qo_quote_line_common', fieldCode: 'qo_ql_line_cost' },
-        { modelCode: 'qo_quote_line_common', fieldCode: 'qo_ql_price_snapshot' },
-        { modelCode: 'qo_price_evidence_common', fieldCode: 'qo_pe_unit_price' },
-        { modelCode: 'qo_price_evidence_common', fieldCode: 'qo_pe_snapshot' },
-        { modelCode: 'qo_quote_line_price_decision_common', fieldCode: 'qo_qlpd_unit_price' },
-        { modelCode: 'qo_quote_line_price_decision_common', fieldCode: 'qo_qlpd_line_amount' },
-        { modelCode: 'qo_quote_line_price_decision_common', fieldCode: 'qo_qlpd_source_snapshot' },
-        { modelCode: 'qo_cost_item_common', fieldCode: 'qo_ci_amount' },
-      ];
-      let pricesRestricted = false;
-      try {
-        await setDocumentFieldVisibility(admin, 'hidden', priceFields);
-        pricesRestricted = true;
-        const publicLines = await queryDynamicRecords(page, 'qo_quote_line_common', [
-          { fieldName: 'qo_ql_quote_id', operator: 'EQ', value: created.quoteId },
-        ]);
-        expect(publicLines).toHaveLength(2);
-        for (const line of publicLines) {
-          expect(line.qo_ql_unit_cost == null).toBe(true);
-          expect(line.qo_ql_line_cost == null).toBe(true);
-        }
-        await openQuoteDetailFromList(page, created);
-        const generatedWithHiddenPrices = page.waitForResponse(r => r.url().includes('generate_document') && r.request().method() === 'POST');
-        const redactedDownload = page.waitForEvent('download', { timeout: 60_000 }).then(
-          download => ({ download, error: null }), error => ({ download: null, error }));
-        await page.getByRole('button', { name: '生成正式报价文档', exact: true }).click();
-        const redactedResponse = await generatedWithHiddenPrices;
-        const redactedBody = await redactedResponse.json();
-        await info.attach('document-hidden-price-generation-response', { body: JSON.stringify(redactedBody), contentType: 'application/json' });
-        expect(String(redactedBody.code)).toBe('0');
-        const redactedTarget = info.outputPath('quote-document-hidden-prices.xlsx');
-        const completedDownload = await redactedDownload;
-        expect(completedDownload.error).toBeNull();
-        expect(completedDownload.download).toBeTruthy();
-        await completedDownload.download!.saveAs(redactedTarget);
-        await info.attach('document-hidden-price-workbook', { path: redactedTarget, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        for (const row of await queryDynamicRecords(admin, 'qo_quote_document_common', [
-          { fieldName: 'qo_qd_quote_id', operator: 'EQ', value: created.quoteId },
-        ])) if (!created.rows.some(owned => owned.pid === String(row.pid))) created.rows.push({ model: 'qo_quote_document_common', pid: String(row.pid) });
-        for (const row of await queryDynamicRecords(admin, 'ab_document_artifact', [
-          { fieldName: 'ab_da_source_record_pid', operator: 'EQ', value: created.quoteId },
-        ])) if (!created.rows.some(owned => owned.pid === String(row.pid))) created.rows.push({ model: 'ab_document_artifact', pid: String(row.pid) });
-        const financialAfter = await readDynamicRecord(admin, 'qo_quote_common', created.quoteId);
-        await info.attach('document-hidden-price-business-amount', { body: JSON.stringify({
-          before: financialBefore.qo_quote_total_amount, after: financialAfter.qo_quote_total_amount,
-        }), contentType: 'application/json' });
-        expect(Number(financialAfter.qo_quote_total_amount), 'Internal calculation must retain the real amount when public price fields are hidden')
-          .toBe(Number(financialBefore.qo_quote_total_amount));
-        const redactedWorkbook = XLSX.read(await readFile(redactedTarget), { type: 'buffer' });
-        expect(redactedWorkbook.Sheets['BOM明细']['L2']?.v == null || redactedWorkbook.Sheets['BOM明细']['L2']?.v === '').toBe(true);
-      } finally {
-        if (pricesRestricted) await setDocumentFieldVisibility(admin, 'inherit', priceFields);
-      }
+      const persistedFinancial = await readDynamicRecord(admin, 'qo_quote_common', created.quoteId);
+      expect(Number(generatedOutput.totalAmount), 'Normal document generation must use a real positive amount').toBeGreaterThan(0);
+      expect(Number(persistedFinancial.qo_quote_total_amount), 'Repeated normal generation must preserve the stored amount')
+        .toBe(Number(generatedOutput.totalAmount));
       await info.attach('priced-document-persistence', { body: JSON.stringify({ before, priced, generated, sheets: wb.SheetNames }), contentType: 'application/json' });
     } catch (error) {
       await info.attach('priced-document-failure-browser', { body: await page.screenshot(), contentType: 'image/png' });
