@@ -142,11 +142,12 @@ const CONTRACTS: RoleContract[] = [
       MENU_CODE.customer,
       MENU_CODE.project,
       MENU_CODE.workbench,
+      MENU_CODE.kingdeeSync,
       MENU_CODE.quote,
       MENU_CODE.priceLibrary,
     ],
-    forbiddenCodes: [MENU_CODE.kingdeeSync, ...ORG_SYSTEM_ADMIN_CODES],
-    deniedDirectPaths: ['/p/bom_material_master'],
+    forbiddenCodes: ORG_SYSTEM_ADMIN_CODES,
+    deniedDirectPaths: [],
   },
   {
     user: SMOKE_USERS[2],
@@ -155,11 +156,12 @@ const CONTRACTS: RoleContract[] = [
       MENU_CODE.customer,
       MENU_CODE.project,
       MENU_CODE.workbench,
+      MENU_CODE.kingdeeSync,
       MENU_CODE.quote,
       MENU_CODE.priceLibrary,
     ],
-    forbiddenCodes: [MENU_CODE.kingdeeSync, ...ORG_SYSTEM_ADMIN_CODES],
-    deniedDirectPaths: ['/p/bom_material_master'],
+    forbiddenCodes: ORG_SYSTEM_ADMIN_CODES,
+    deniedDirectPaths: [],
   },
 ];
 
@@ -225,6 +227,7 @@ async function traverseMenus(
   page: Page,
   menus: LeafMenu[],
   setMenu: (m: string) => void,
+  sharedManagementDenied = false,
 ): Promise<string[]> {
   const problems: string[] = [];
   // land once and let the SPA hydrate before driving sidebar clicks
@@ -269,6 +272,10 @@ async function traverseMenus(
       continue;
     }
     await settle(page);
+    if (sharedManagementDenied && menu.code === MENU_CODE.kingdeeSync) {
+      await expect(page.getByTestId('toolbar-btn-sync_kingdee_incremental_now')).toHaveCount(0);
+      await expect(page.getByTestId('toolbar-btn-sync_kingdee_full_reconcile_now')).toHaveCount(0);
+    }
     // custom pages (/p/c/...) hydrate content after networkidle — poll instead of instant read
     let text = '';
     await expect
@@ -379,7 +386,7 @@ test.describe('Quote/BOM per-role menu smoke @smoke', () => {
         }
         // 3. walk EVERY visible menu via the sidebar; assert page renders, no forbidden text
         // (soft: keep going so a single run reports the FULL gap inventory)
-        const problems = await traverseMenus(page, await fetchLeafMenus(page), collector.setMenu);
+        const problems = await traverseMenus(page, await fetchLeafMenus(page), collector.setMenu, true);
         expect
           .soft(problems, `${contract.user.key} traversal problems:\n${problems.join('\n')}`)
           .toEqual([]);
