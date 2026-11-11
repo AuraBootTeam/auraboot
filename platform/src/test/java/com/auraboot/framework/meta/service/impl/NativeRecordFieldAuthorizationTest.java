@@ -50,6 +50,21 @@ class NativeRecordFieldAuthorizationTest {
                 new BusinessGrantDecision.Grant(10L,11L,"model.project.update",
                         new BusinessGrantDecision.Fields(false,Set.of(),Set.of("name")))));
     }
+    @Test void batchSnapshotStillEvaluatesEveryRecordAndStopsOnALaterDenial() {
+        when(authorization.withReadProjectionSnapshot(any())).thenAnswer(call ->
+                ((java.util.function.Supplier<?>)call.getArgument(0)).get());
+        when(authorization.resolveOrdinaryUpdate(eq(5L),eq("project"),anyMap())).thenReturn(
+                allowed("record"),new BusinessGrantDecision(PermissionResult.deny("later row denied",List.of()),
+                        100L,1L,5L,"project","record",List.of()));
+        assertThatThrownBy(() -> boundary.withConfigurationSnapshot("project",() -> {
+            boundary.requireUpdate("project","record",Map.of("name","first"));
+            boundary.requireUpdate("project","record",Map.of("name","second"));
+            return "must not finish";
+        })).isInstanceOf(AccessDeniedException.class);
+        verify(authorization,times(2)).resolveOrdinaryUpdate(eq(5L),eq("project"),anyMap());
+        verify(authorization).withReadProjectionSnapshot(any());
+    }
+
     @Test void allowedLogicalAndPhysicalNamesUseTheUnprojectedLockedRecord() {
         when(authorization.resolveOrdinaryUpdate(eq(5L),eq("project"),anyMap())).thenReturn(allowed("record"));
         boundary.requireUpdate("project","record",Map.of("name","after"));

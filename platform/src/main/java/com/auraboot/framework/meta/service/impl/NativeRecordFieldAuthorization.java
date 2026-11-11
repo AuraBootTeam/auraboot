@@ -24,6 +24,16 @@ public class NativeRecordFieldAuthorization {
     private final DynamicDataMapper rows;
     private final BusinessCommandRecordAuthorization authorization;
 
+    /** Reuse configuration in a pure batch validation/projection loop, never record decisions. */
+    public <T> T withConfigurationSnapshot(String modelCode,java.util.function.Supplier<T> checks) {
+        NativeHumanActor.requireCompleteIdentity();
+        if (!MetaContext.exists() || MetaContext.getCurrentMemberId()==null
+                || com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
+                || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
+                || MetaContext.hasCommandPermitScopeFor(modelCode) && !AsyncTaskExecutionContext.isActive()) return checks.get();
+        return authorization.withReadProjectionSnapshot(checks);
+    }
+
     public void requireUpdate(String modelCode, String recordId, Map<String,Object> submitted) {
         require("update", modelCode, recordId, submitted, Set.of());
     }

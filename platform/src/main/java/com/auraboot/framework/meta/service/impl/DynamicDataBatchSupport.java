@@ -261,16 +261,19 @@ final class DynamicDataBatchSupport extends BaseMetaService {
                     "Bulk create expected " + dataList.size() + " rows inserted but got " + inserted);
         }
 
-        // Authorize every physical row before invoking any observer. A later denied row must
-        // roll back the complete insert without letting earlier rows produce side effects.
-        for (int i = 0; i < createdRecords.size(); i++) {
-            nativeFields.requireCreated(modelCode, createdRecords.get(i).get(primaryKey.getCode()).toString(), submittedRows.get(i));
-        }
-        var publicRecords = new ArrayList<Map<String, Object>>(createdRecords.size());
-        for (var row : createdRecords) {
-            String recordId = row.get(primaryKey.getCode()).toString();
-            publicRecords.add(nativeReadFields.publicWriteResult(model,row,() -> publicReader.execute(modelCode,recordId)));
-        }
+        // Complete all canonical record decisions in one immutable configuration snapshot.
+        // No observer runs until every inserted row and every public result is checked.
+        var publicRecords=nativeFields.withConfigurationSnapshot(modelCode,() -> {
+            for (int i=0;i<createdRecords.size();i++) {
+                nativeFields.requireCreated(modelCode,createdRecords.get(i).get(primaryKey.getCode()).toString(),submittedRows.get(i));
+            }
+            var projected=new ArrayList<Map<String,Object>>(createdRecords.size());
+            for (var row:createdRecords) {
+                String recordId=row.get(primaryKey.getCode()).toString();
+                projected.add(nativeReadFields.publicWriteResult(model,row,() -> publicReader.execute(modelCode,recordId)));
+            }
+            return projected;
+        });
         for (var row : createdRecords) {
             mutationObserver.observe(model, row.get(primaryKey.getCode()).toString(), ModelMutationObserver.Operation.CREATED);
         }
