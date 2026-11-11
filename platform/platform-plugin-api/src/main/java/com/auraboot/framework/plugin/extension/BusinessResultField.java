@@ -3,7 +3,7 @@ package com.auraboot.framework.plugin.extension;
 /** Server-owned result classification. Model data is never an acknowledgement. */
 public record BusinessResultField(Kind kind, String sourceField, Object constant, int maximum,
                                  java.util.List<String> sourcePath) {
-    public enum Kind { ROOT_FIELD, ROOT_ID, CONSTANT, BOOLEAN, COUNT, DERIVED_ROOT_FIELD, ROOT_JSON_PATH }
+    public enum Kind { ROOT_FIELD, ROOT_ID, CONSTANT, BOOLEAN, COUNT, DERIVED_ROOT_FIELD, ROOT_JSON_PATH, DOCUMENT_ARTIFACT }
     public BusinessResultField(Kind kind, String sourceField, Object constant, int maximum) {
         this(kind, sourceField, constant, maximum, java.util.List.of());
     }
@@ -13,6 +13,10 @@ public record BusinessResultField(Kind kind, String sourceField, Object constant
         if (kind == Kind.ROOT_JSON_PATH) {
             if (sourcePath.isEmpty() || sourcePath.size() > 8) throw new IllegalArgumentException("Finite JSON source path required");
             sourcePath.forEach(BusinessResourceAuthorization::identifier);
+        } else if (kind == Kind.DOCUMENT_ARTIFACT) {
+            if (sourcePath.size() != 2 || !java.util.Set.of("xlsx", "pdf").contains(sourcePath.get(0))
+                    || !java.util.Set.of("fileId", "filename", "bytes", "url").contains(sourcePath.get(1)))
+                throw new IllegalArgumentException("Exact document format and artifact property required");
         } else if (!sourcePath.isEmpty()) throw new IllegalArgumentException("Unexpected JSON source path");
         if (kind == Kind.ROOT_FIELD || kind == Kind.DERIVED_ROOT_FIELD || kind == Kind.ROOT_JSON_PATH) BusinessResourceAuthorization.identifier(sourceField);
         else if (sourceField != null) throw new IllegalArgumentException("Unexpected result source");
@@ -38,4 +42,8 @@ public record BusinessResultField(Kind kind, String sourceField, Object constant
     public static BusinessResultField constant(Object value) { return new BusinessResultField(Kind.CONSTANT,null,value,0); }
     public static BusinessResultField flag() { return new BusinessResultField(Kind.BOOLEAN,null,null,0); }
     public static BusinessResultField count(int maximum) { return new BusinessResultField(Kind.COUNT,null,null,maximum); }
+    /** Values must match a host-persisted immutable file belonging to this exact document root. */
+    public static BusinessResultField documentArtifact(String format, String property) {
+        return new BusinessResultField(Kind.DOCUMENT_ARTIFACT,null,null,0,java.util.List.of(format,property));
+    }
 }

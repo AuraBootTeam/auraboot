@@ -101,6 +101,17 @@ public record BusinessResultProjectionPlan(BusinessTargetAuthorization target,
                             || value instanceof java.time.temporal.TemporalAccessor || value instanceof java.util.Date))throw denied();
                 }
                 case ROOT_JSON_PATH -> value=jsonBudget.copy(value,0);
+                case DOCUMENT_ARTIFACT -> {
+                    if ("bytes".equals(field.sourcePath().get(1))) {
+                        if (!(value instanceof Number number)) throw denied();
+                        try {
+                            long size=new java.math.BigDecimal(number.toString()).longValueExact();
+                            if(size<1 || size>67_108_864)throw denied();
+                        } catch(ArithmeticException | NumberFormatException invalid) {throw denied();}
+                    } else if(!(value instanceof String text) || text.isBlank() || text.length()>4096)throw denied();
+                    // Shape is necessary, not authority. The host verifies the persisted file and
+                    // current source policy before fresh completion and again on cached replay.
+                }
             }
             result.put(key,value);
         }

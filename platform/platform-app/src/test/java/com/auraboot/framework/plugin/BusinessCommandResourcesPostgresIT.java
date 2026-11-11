@@ -298,6 +298,24 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
         })).isInstanceOf(UnexpectedRollbackException.class);
         assertThat(storedQty()).isEqualTo("2");assertThat(ledgerCount()).isZero();
     }
+    @Test void boundedInReadReturnsOnlyApprovedChildrenWithoutGenericModelReadGrant() {
+        command(scope->{
+            var rows=scope.accessor().queryIn(lineModel,parent,List.of(rootPid,rootPid));
+            assertThat(rows).hasSize(1);assertThat(rows.getFirst()).containsEntry("pid",linePid).doesNotContainKey(cost);
+            assertThat(rows.getFirst()).doesNotContainValue("FOREIGN-COST");return null;
+        });
+        assertThat(permissions.canAction(getTestTenantMember().getId(),lineModel,"read")).isFalse();
+    }
+    @Test void unapprovedInCandidatePoisonsAndRollsBackActualEarlierBusinessWrites() {
+        assertThatThrownBy(()->command(scope->{
+            scope.accessor().update(lineModel,linePid,Map.of(qty,"3"));
+            scope.accessor().create(ledgerModel,Map.of(ledgerParent,rootPid,ledgerQty,"1"));
+            assertThatThrownBy(()->scope.accessor().queryIn(lineModel,parent,List.of(rootPid,"other-root")))
+                    .isInstanceOf(DataAccessorException.class);
+            return null;
+        })).isInstanceOf(UnexpectedRollbackException.class);
+        assertThat(storedQty()).isEqualTo("2");assertThat(ledgerCount()).isZero();
+    }
     @Test void anotherRootRecordIsDeniedUsingRealStoredRelationships() {
         assertThatThrownBy(()->command(scope->{scope.accessor().getById(lineModel,foreignLinePid);return null;})).isInstanceOf(DataAccessorException.class);
         assertThat(storedQty()).isEqualTo("2");assertThat(ledgerCount()).isZero();

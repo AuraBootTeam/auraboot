@@ -86,4 +86,52 @@ class DocumentArtifactProjectionServiceTest {
         assertThatThrownBy(()->service.authorize(file,stamp)).isInstanceOf(AccessDeniedException.class);
         verifyNoInteractions(commands,data,authorization,projections);
     }
+    private CommandPipelineContext resultContext() {
+        var request=new com.auraboot.framework.meta.dto.CommandExecuteRequest();request.setTargetRecordId(PID);
+        var context=CommandPipelineContext.builder().commandCode(COMMAND).command(command).request(request)
+                .tenantId(7L).userId(20L).execConfig(config).targetRecordReadable(true).build();
+        context.setAuthorizationVerdict(com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict.authorized("qo.cap.write"));
+        var grant=new BusinessGrantDecision(PermissionResult.allow(List.of()),7L,20L,30L,"quote",PID,
+                List.of(new BusinessGrantDecision.Grant(1L,2L,"qo.cap.write",BusinessGrantDecision.Fields.legacy())));
+        context.setBusinessGrantDecision(grant);
+        context.setBusinessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization(COMMAND,"quote",PID,"update",7L,20L,30L));
+        var fields=new HashMap<String,com.auraboot.framework.plugin.extension.BusinessResultField>();
+        for(String property:List.of("fileId","filename","bytes","url"))fields.put(property,
+                com.auraboot.framework.plugin.extension.BusinessResultField.documentArtifact("xlsx",property));
+        context.setBusinessResultProjection(new BusinessResultProjectionPlan(context.getBusinessTargetAuthorization(),grant,
+                fields,Map.of(),Set.of(),List.of(),List.of()));
+        var files=mock(com.auraboot.framework.file.dao.mapper.FileMapper.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service,"files",files);
+        file.setPid(PID);file.setOriginalName("Q-001.xlsx");file.setFileSize(12L);
+        file.setMimeType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");file.setArtifactAuthorization(stamp.encode());
+        when(files.selectOne(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(file);
+        return context;
+    }
+    private Map<String,Object> result() {return Map.of("fileId",PID,"filename","Q-001.xlsx","bytes",12,"url","/api/file/download/"+PID);}
+    @Test void freshAndReplayedResultsRequireTheSameHostFileFacts() {
+        var context=resultContext();service.verifyResults(context,result());service.verifyResults(context,new HashMap<>(result()));
+        assertThat(context.getBusinessResultProjection().validateEnvelope(result())).containsAllEntriesOf(result());
+    }
+    @Test void fileNameSizeAndLinkCannotCarryArbitraryHiddenSourceValues() {
+        var context=resultContext();
+        for(var change:List.of(Map.entry("filename","private-cost.xlsx"),Map.entry("url","https://other.invalid/private"),Map.entry("bytes",99))) {
+            var forged=new HashMap<>(result());forged.put(change.getKey(),change.getValue());
+            assertThatThrownBy(()->service.verifyResults(context,forged)).isInstanceOf(AccessDeniedException.class);
+        }
+    }
+    @Test void sameTenantOtherRootArtifactCannotBeReturnedByThisDocumentCommand() {
+        var context=resultContext();
+        var other=new BusinessArtifactAuthorization(2,7L,COMMAND,"quote","01ARZ3NDEKTSV4RRFFQ69G5FAW",
+                stamp.rootField(),stamp.fingerprint(),stamp.models(),Map.of(),stamp.document());
+        file.setArtifactAuthorization(other.encode());
+        assertThatThrownBy(()->service.verifyResults(context,result())).isInstanceOf(AccessDeniedException.class);
+    }
+    @Test void replayRechecksCurrentFieldPolicyAndCannotReuseAnUnstampedFile() {
+        var context=resultContext();service.verifyResults(context,result());
+        when(projections.prepareDocument(any(),any())).thenReturn(plan(Set.of()));
+        assertThatThrownBy(()->service.verifyResults(context,result())).isInstanceOf(AccessDeniedException.class);
+        when(projections.prepareDocument(any(),any())).thenReturn(visible);
+        service.verifyResults(context,result());file.setArtifactAuthorization(null);
+        assertThatThrownBy(()->service.verifyResults(context,result())).isInstanceOf(AccessDeniedException.class);
+    }
 }

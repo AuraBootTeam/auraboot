@@ -28,6 +28,55 @@ public class DocumentArtifactProjectionService {
     private final BusinessCommandRecordAuthorization authorization;
     private final CommandPublicOutputProjectionService projections;
     private final ObjectMapper json;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.auraboot.framework.file.dao.mapper.FileMapper files;
+
+    /** Validate fresh and replayed file references against host-owned provenance, never DTO claims. */
+    public void verifyResults(CommandPipelineContext context, Map<String,Object> values) {
+        CommandResultProjectionService.requireActor(context);
+        var result=context.getBusinessResultProjection();
+        var contract=DocumentArtifactContract.from(context.getExecConfig(),context.getCommand().getModelCode());
+        if(result==null || contract==null || files==null)throw DocumentArtifactContract.denied();
+        Map<String,Map<String,String>> formats=new LinkedHashMap<>();
+        result.fields().forEach((key,field)-> {
+            if(field.kind()==com.auraboot.framework.plugin.extension.BusinessResultField.Kind.DOCUMENT_ARTIFACT) {
+                var properties=formats.computeIfAbsent(field.sourcePath().get(0),ignored->new LinkedHashMap<>());
+                if(properties.putIfAbsent(field.sourcePath().get(1),key)!=null)throw DocumentArtifactContract.denied();
+            }
+        });
+        var current=prepare(context);
+        for(var entry:formats.entrySet()) {
+            String format=entry.getKey();var properties=entry.getValue();
+            if(!properties.keySet().equals(Set.of("fileId","filename","bytes","url"))
+                    || !contract.outputs().contains(format))throw DocumentArtifactContract.denied();
+            Object id=values.get(properties.get("fileId"));
+            if(!(id instanceof String pid) || !pid.matches("[0-9A-HJKMNP-TV-Z]{26}"))throw DocumentArtifactContract.denied();
+            var file=files.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<FileEntity>()
+                    .eq(FileEntity::getTenantId,context.getTenantId()).eq(FileEntity::getPid,pid).eq(FileEntity::getDeletedFlag,false));
+            if(file==null || !pid.equals(file.getPid()) || !context.getTenantId().equals(file.getTenantId())
+                    || Boolean.TRUE.equals(file.getDeletedFlag()) || !"success".equals(file.getStatus())
+                    || !Boolean.TRUE.equals(file.getRetentionLocked()) || file.getFileSize()==null
+                    || file.getFileSize()<1 || file.getFileSize()>67_108_864 || file.getOriginalName()==null
+                    || !file.getOriginalName().toLowerCase(Locale.ROOT).endsWith("."+format)
+                    || !("xlsx".equals(format)?"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":"application/pdf").equals(file.getMimeType()))
+                throw DocumentArtifactContract.denied();
+            var stamp=BusinessArtifactAuthorization.parse(file.getArtifactAuthorization());
+            var descriptor=stamp.document();
+            if(descriptor==null || !context.getTenantId().equals(stamp.tenantId())
+                    || !context.getCommandCode().equals(stamp.commandCode())
+                    || !context.getCommand().getModelCode().equals(stamp.rootModel())
+                    || !context.getRequest().getTargetRecordId().equals(stamp.rootPid())
+                    || !contract.relation().equals(stamp.rootField()) || !stamp.rootBinding().isEmpty()
+                    || !contract.code().equals(descriptor.code()) || !contract.version().equals(descriptor.version())
+                    || !contract.fingerprint().equals(descriptor.definitionHash()) || !format.equals(descriptor.format())
+                    || !stamp.permits(current))throw DocumentArtifactContract.denied();
+            if(!Objects.equals(file.getOriginalName(),values.get(properties.get("filename")))
+                    || !Objects.equals("/api/file/download/"+pid,values.get(properties.get("url")))
+                    || !(values.get(properties.get("bytes")) instanceof Number size)
+                    || new java.math.BigDecimal(size.toString()).compareTo(java.math.BigDecimal.valueOf(file.getFileSize()))!=0)
+                throw DocumentArtifactContract.denied();
+        }
+    }
 
     public CommandPublicOutputProjectionPlan prepare(CommandPipelineContext context) {
         var contract=DocumentArtifactContract.from(context.getExecConfig(),context.getCommand().getModelCode());

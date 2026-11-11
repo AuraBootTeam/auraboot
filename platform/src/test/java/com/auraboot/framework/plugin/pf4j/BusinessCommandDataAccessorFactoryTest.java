@@ -101,6 +101,25 @@ class BusinessCommandDataAccessorFactoryTest {
         verify(data, never()).getByIdForAuthorization(eq("foreign"), anyString());
         assertThat(holder.isRollbackOnly()).isTrue();
     }
+    @Test void approvedInCandidatesUseOneBoundedNativeQueryAndStillProjectEachRow() {
+        when(data.list(eq("line"),any())).thenAnswer(call->{
+            DynamicQueryRequest request=call.getArgument(1);
+            assertThat(request.getPageSize()).isEqualTo(2);
+            assertThat(request.getConditions()).hasSize(1);
+            assertThat(request.getConditions().getFirst().getOperator()).isEqualTo(QueryCondition.Operator.IN);
+            assertThat(request.getConditions().getFirst().getValues()).containsExactly("root-1");
+            return PaginationResult.of(List.of(line),1L,1,2);
+        });
+        command(scope->{
+            var result=scope.accessor().queryIn("line","parent",List.of("root-1","root-1"));
+            assertThat(result).hasSize(1);assertThat(result.getFirst()).containsEntry("qty",2).doesNotContainKey("secret_cost");return null;
+        });
+        verify(data,times(1)).list(eq("line"),any());assertThat(holder.isRollbackOnly()).isFalse();
+    }
+    @Test void oneUnapprovedInCandidateRejectsTheWholeBatchBeforeReading() {
+        command(scope->{denied(()->scope.accessor().queryIn("line","parent",List.of("root-1","other-root")));return null;});
+        verify(data,never()).list(anyString(),any());assertThat(holder.isRollbackOnly()).isTrue();
+    }
     @Test void foreignParentAndForeignTenantAreRejectedAndPoisonTheOriginalTransaction() {
         line = row("line-1", Map.of("parent", "other-root", "qty", 2));
         command(scope -> { denied(() -> scope.accessor().getById("line", "line-1")); return null; });

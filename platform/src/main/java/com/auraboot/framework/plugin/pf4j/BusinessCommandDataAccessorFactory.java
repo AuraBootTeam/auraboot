@@ -34,6 +34,9 @@ public class BusinessCommandDataAccessorFactory {
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionService publicProjection;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    @org.springframework.context.annotation.Lazy
+    private com.auraboot.framework.meta.service.impl.DocumentArtifactProjectionService documentProjection;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.auraboot.framework.file.service.FileService artifactFiles;
@@ -270,6 +273,10 @@ public class BusinessCommandDataAccessorFactory {
                         context.setBusinessResultProjection(projection);
                     }
                     var values=projection.validateEnvelope(map);
+                    if(projection.fields().values().stream().anyMatch(field->field.kind()==BusinessResultField.Kind.DOCUMENT_ARTIFACT)) {
+                        if(documentProjection==null)throw denied();
+                        documentProjection.verifyResults(context,values);
+                    }
                     projection.verifyRootDocuments(values);
                     return values;
                 }
@@ -508,6 +515,41 @@ public class BusinessCommandDataAccessorFactory {
         }
 
         private final class Accessor implements DataAccessor {
+            @Override public List<Map<String,Object>> queryIn(String model,String field,Collection<?> candidates) {
+                return operation(() -> {
+                    model(model);BusinessResourceAuthorization.identifier(field);
+                    if(candidates==null || candidates.isEmpty())return List.of();
+                    if(candidates.size()>1000)throw denied();
+                    var values=candidates.stream().filter(Objects::nonNull).distinct().toList();
+                    if(values.isEmpty())return List.of();
+                    Set<String> readable=null;int maximum=1000;
+                    for(var value:values) {
+                        var grant=authorize(new BusinessResourceAuthorization.Request(BusinessResourceAuthorization.Action.QUERY,
+                                model,null,null,null,Map.of(field,value)));
+                        if(!grant.readableFields().contains(field))throw denied();
+                        if(readable==null)readable=new HashSet<>(grant.readableFields());else readable.retainAll(grant.readableFields());
+                        maximum=Math.min(maximum,grant.maximumRows());
+                    }
+                    var request=DynamicQueryRequest.builder().pageNum(1).pageSize(maximum)
+                            .conditions(List.of(QueryCondition.builder().fieldName(field).operator(QueryCondition.Operator.IN)
+                                    .values(new ArrayList<>(values)).build())).build();
+                    var page=nativeCall(BusinessResourceAuthorization.Action.QUERY,model,null,null,request,()->data.list(model,request));
+                    if(page==null || page.getRecords()==null || page.getTotal()==null || page.getTotal()>maximum
+                            || page.getTotal()!=page.getRecords().size())throw denied();
+                    rowsRead+=page.getRecords().size();if(rowsRead>10_000)throw denied();
+                    List<Map<String,Object>> result=new ArrayList<>();Set<String> identities=new HashSet<>();
+                    for(var row:page.getRecords()) {
+                        if(!tenant.toString().equals(String.valueOf(row.get("tenant_id")))
+                                || !(row.get("pid") instanceof String pid) || !identities.add(pid)
+                                || Boolean.TRUE.equals(row.get("deleted_flag")) || !values.contains(row.get(field)))throw denied();
+                        var individual=authorize(new BusinessResourceAuthorization.Request(BusinessResourceAuthorization.Action.READ,
+                                model,pid,row,null,null));
+                        Set<String> intersection=new HashSet<>(readable);intersection.retainAll(individual.readableFields());
+                        result.add(remember(model,row,new BusinessResourceAuthorization.Grant(intersection,Set.of(),1)));
+                    }
+                    return List.copyOf(result);
+                });
+            }
             @Override public Map<String, Object> getById(String model, String pid) {
                 return read(model, pid, false);
             }

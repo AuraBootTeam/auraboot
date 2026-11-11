@@ -22,6 +22,9 @@ public class CommandResultProjectionService {
     private final DataPermissionEngine policies;
     private final FieldMaskService masks;
     private final PermissionSnapshotCache snapshots;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    @org.springframework.context.annotation.Lazy
+    private DocumentArtifactProjectionService documentArtifacts;
 
     /** The native writer returns identity and affected-row count, never unclassified model data. */
     public BusinessResultProjectionPlan prepareNative(CommandPipelineContext ctx,
@@ -108,6 +111,10 @@ public class CommandResultProjectionService {
         if(plan==null || plan.grant()!=ctx.getBusinessGrantDecision() || !Boolean.TRUE.equals(ctx.getTargetRecordReadable())
                 || !Objects.equals(plan.target(),ctx.getBusinessTargetAuthorization()))throw BusinessResultProjectionPlan.denied();
         var values=plan.validateEnvelope(internal);
+        if(plan.fields().values().stream().anyMatch(field->field.kind()==BusinessResultField.Kind.DOCUMENT_ARTIFACT)) {
+            if(documentArtifacts==null)throw BusinessResultProjectionPlan.denied();
+            documentArtifacts.verifyResults(ctx,values);
+        }
         plan.verifyRootDocuments(values);
         Map<String,Object> data=new LinkedHashMap<>();
         for(var source:plan.sources().entrySet()) {

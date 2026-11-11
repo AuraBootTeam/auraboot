@@ -821,9 +821,13 @@ public class HandlerPhase implements CommandPhase {
                 if (businessScope != null) {
                     // Only the constrained resource capability and authenticated invocation facts
                     // enter business handlers; other host capabilities require their own contract.
-                    Set<String> controls=Set.of("__commandCode","__handlerCode","__currentUser",
+                    Set<String> controls=new java.util.HashSet<>(Set.of("__commandCode","__handlerCode","__currentUser",
                             CommandHandlerExtension.CURRENT_USER_PID_KEY,CommandHandlerExtension.CLIENT_REQUEST_ID_KEY,
-                            CommandHandlerExtension.EXPECTED_VERSION_KEY,CommandHandlerExtension.DATA_ACCESSOR_KEY);
+                            CommandHandlerExtension.EXPECTED_VERSION_KEY,CommandHandlerExtension.DATA_ACCESSOR_KEY));
+                    if(com.auraboot.framework.meta.security.DocumentArtifactContract.from(execConfig,modelCode)!=null) {
+                        controls.add(com.auraboot.framework.plugin.extension.FileAccessor.SETTINGS_KEY);
+                        controls.add(com.auraboot.framework.plugin.extension.DocumentOutputAccessor.SETTINGS_KEY);
+                    }
                     pluginSettings.keySet().removeIf(key->key.startsWith("__") && !controls.contains(key));
                     pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,businessScope.accessor());
                 }
