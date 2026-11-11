@@ -12,6 +12,7 @@ import com.auraboot.framework.meta.mapper.MetaFieldMapper;
 import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
 import com.auraboot.framework.meta.dto.SchemaOperationResult;
+import com.auraboot.framework.permission.service.AutoPermissionAssignmentService;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +50,7 @@ class DynamicDataBulkCreateIT extends BaseIntegrationTest {
     @Autowired private MetaModelFieldBindingMapper fieldBindingMapper;
     @Autowired private SchemaManagementService schemaManagementService;
     @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private AutoPermissionAssignmentService permissionAssignmentService;
 
     private String modelCode;
     private String nameField;
@@ -76,7 +78,16 @@ class DynamicDataBulkCreateIT extends BaseIntegrationTest {
             bindField(cellsField, "jsonb", 2);
             bindField(qtyField, "integer", 3);
             createPhysicalTable();
+            // Raw metadata inserts above bypass normal model publication and its action catalog.
+            // Register definitions only; the fixture's existing role grants remain unchanged.
+            permissionAssignmentService.registerPermissions(modelCode, null, getTestTenant().getId());
             modelReady = true;
+        }
+        // The base fixture is an ordinary role, not an administrator. These committed grants
+        // are removed by BaseIntegrationTest after each case and never touch business roles.
+        for (String action : List.of("create", "read", "delete")) {
+            grantCommittedPermissionToTestRole("model." + modelCode + "." + action,
+                    "model", modelCode, action, "Bulk fixture " + action);
         }
     }
 
