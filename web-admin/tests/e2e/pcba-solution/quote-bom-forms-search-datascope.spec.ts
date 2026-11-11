@@ -364,9 +364,15 @@ test('DD-INLINE BOM customer and project search in the select itself', async ({ 
 
   await projectInput.click();
   await projectInput.fill('控制');
+  await page.screenshot({ path: test.info().outputPath('inline-project-search.png'), fullPage: true });
   await page.locator(`[role="option"][data-value="${projectId}"]`).click();
   await expect(projectInput).toHaveValue(projectName);
   await expect(page.locator('input[type="hidden"][name="bom_task_project_id"]')).toHaveValue(projectId);
+
+  await customer.click();
+  await customer.fill(accountName);
+  await customerOption.click();
+  await expect(projectInput).toHaveValue(projectName);
 
   await customer.click();
   await customer.fill(`NO-MATCH-${marker}`);
