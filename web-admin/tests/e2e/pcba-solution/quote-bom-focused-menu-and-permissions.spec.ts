@@ -195,7 +195,7 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
         await ensureQuoteRoleUser(page, user);
       }
       for (const key of ['qoSales', 'qoProcurement', 'bomEngineering'] as const) {
-        const fixture = await seedQuoteScaffold(page, `ROLE-BOUNDARY-${key}`, []);
+        const fixture = await seedQuoteScaffold(page, `RB-${key.slice(0, 3)}`, []);
         fixtures[key] = fixture;
         await reassignRecordOwnerByEmail(fixture.rows, users[key].email);
       }
