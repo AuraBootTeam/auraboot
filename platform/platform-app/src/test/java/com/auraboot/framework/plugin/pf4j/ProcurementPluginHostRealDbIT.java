@@ -416,7 +416,7 @@ class ProcurementPluginHostRealDbIT {
     }
     private Map<String,Object> foreignDirectorySnapshots(Long tenantA,Long tenantB) throws Exception {
         var snapshots=new LinkedHashMap<String,Object>();var modelService=application.getBean(com.auraboot.framework.meta.service.MetaModelService.class);
-        for(String code:ProcurementLinkedForeignNativeFixture.foreignSnapshotModels()) {
+        for(String code:ProcurementForeignSnapshotModels.all()) {
             String table=modelService.getTableName(code);assertTrue(table.matches("[a-z][a-z0-9_]*"));
             var tenantsSnapshot=new LinkedHashMap<String,Object>();
             try(var c=source.getConnection()) {
