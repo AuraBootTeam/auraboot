@@ -653,7 +653,10 @@ final class ProcurementLinkedForeignNativeFixture extends ProcurementPublicSourc
             "qo_procurement_allocation_common","qo_procurement_execution_common","qo_procurement_address_common","qo_procurement_shipment_common",
             "qo_procurement_shipment_line_common","qo_procurement_receipt_common","qo_procurement_reminder_common","qo_procurement_submission_common",
             "qo_procurement_submission_line_common","qo_procurement_category_policy_common","qo_procurement_category_supplier_common",
-            "qo_procurement_inquiry_request_common");
+            "qo_procurement_inquiry_request_common","qo_procurement_deletion_scope_common","qo_procurement_deletion_notice_common",
+            "qo_procurement_order_notice_common","qo_procurement_logistics_common","qo_procurement_branding_common",
+            "qo_procurement_supplier_category_common","qo_procurement_supplier_categories_common","qo_procurement_material_type_common",
+            "qo_procurement_receiving_address_common");
     static List<String> foreignSnapshotModels() { return FOREIGN_MODELS; }
     static Map<String,Object> foreignSnapshotMetadata(Map<String,Object> actualModel,String table) {
         assertTrue(actualModel.get("pid") instanceof String && !actualModel.get("pid").toString().isBlank(),"Actual published model PID is required");

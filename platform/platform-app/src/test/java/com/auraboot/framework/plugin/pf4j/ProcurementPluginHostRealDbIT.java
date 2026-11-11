@@ -416,7 +416,7 @@ class ProcurementPluginHostRealDbIT {
     }
     private Map<String,Object> foreignDirectorySnapshots(Long tenantA,Long tenantB) throws Exception {
         var snapshots=new LinkedHashMap<String,Object>();var modelService=application.getBean(com.auraboot.framework.meta.service.MetaModelService.class);
-        for(String code:List.of("pr_supplier_common","pr_supplier_pcba_contact","s2p_sourcing_event","pr_purchase_request","s2p_bid","pr_purchase_order","pr_purchase_order_line","qo_procurement_membership_common","qo_procurement_quote_line_common","qo_procurement_history_common","qo_procurement_allocation_common","qo_procurement_execution_common","qo_procurement_address_common","qo_procurement_shipment_common","qo_procurement_shipment_line_common","qo_procurement_receipt_common","qo_procurement_reminder_common","qo_procurement_submission_common","qo_procurement_submission_line_common","qo_procurement_category_policy_common","qo_procurement_category_supplier_common")) {
+        for(String code:ProcurementLinkedForeignNativeFixture.foreignSnapshotModels()) {
             String table=modelService.getTableName(code);assertTrue(table.matches("[a-z][a-z0-9_]*"));
             var tenantsSnapshot=new LinkedHashMap<String,Object>();
             try(var c=source.getConnection()) {
