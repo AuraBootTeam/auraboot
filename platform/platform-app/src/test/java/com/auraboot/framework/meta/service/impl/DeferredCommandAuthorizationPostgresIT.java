@@ -133,7 +133,9 @@ class DeferredCommandAuthorizationPostgresIT extends BaseIntegrationTest {
         assertThat(calls).hasValue(1);assertThat(row()).containsEntry(label,"approved");assertThat(((Number)row().get("row_version")).longValue()).isEqualTo(1L);
         assertThat(grants()).isEqualTo(grants);
     }
-    @Test void revokedCommandDutyCannotBeRestoredFromTheQueuedAllow() {
+    @ParameterizedTest @ValueSource(booleans={false,true})
+    void revokedCommandDutyCannotBeRestoredFromTheQueuedAllow(boolean domain) throws Exception {
+        if(domain) rootDomainDuty();
         var job=queued();jdbc.update("UPDATE ab_role_permission SET status='inactive' WHERE role_id=? AND permission_id IN(SELECT id FROM ab_permission WHERE tenant_id=? AND code=?)",getTestRole().getId(),tenant(),duty);evict();deniedWithoutWrite(job);
     }
     @Test void narrowedRecordScopeCannotBeRestoredFromQueuedAll() {
@@ -157,15 +159,24 @@ class DeferredCommandAuthorizationPostgresIT extends BaseIntegrationTest {
         scopes.setScope(tenant(),getTestRole().getId(),model.getCode(),"manage","self","MAX");
         permissions.evictPermissionDefinitions(tenant());evict();
     }
-    @Test void anOwningBusinessDutyNeedsNoTechnicalModelUpdateGrant() {
-        rootBusinessDuty();
+    void rootDomainDuty() throws Exception {
+        jdbc.update("UPDATE ab_permission SET resource_type='operation',action='write',extension=?::jsonb WHERE tenant_id=? AND code=?",
+                json.writeValueAsString(Map.of("domainModels",Map.of(model.getCode(),List.of("read")))),tenant(),duty);
+        jdbc.update("UPDATE ab_role SET default_data_scope_type=NULL WHERE id=?",getTestRole().getId());
+        scopes.setScope(tenant(),getTestRole().getId(),model.getCode(),"read","self","MAX");
+        permissions.evictPermissionDefinitions(tenant());evict();
+    }
+    @ParameterizedTest @ValueSource(booleans={false,true})
+    void anOwningBusinessDutyNeedsNoTechnicalModelUpdateGrant(boolean domain) throws Exception {
+        if(domain) rootDomainDuty(); else rootBusinessDuty();
         jdbc.update("UPDATE ab_role_permission SET status='inactive' WHERE role_id=? AND permission_id IN(SELECT id FROM ab_permission WHERE tenant_id=? AND code=?)",getTestRole().getId(),tenant(),"model."+model.getCode()+".update");
         evict();String grants=grants();var done=execute(queued());
         assertThat(done.getStatus()).as(done.getErrorMessage()).isEqualTo("completed");
         assertThat(calls).hasValue(1);assertThat(row()).containsEntry(label,"approved");assertThat(grants()).isEqualTo(grants);
     }
-    @Test void completeBusinessCheckpointRetainsMetadataFieldRolesWithoutRequiringModelCrud() {
-        rootBusinessDuty();
+    @ParameterizedTest @ValueSource(booleans={false,true})
+    void completeBusinessCheckpointRetainsMetadataFieldRolesWithoutRequiringModelCrud(boolean domain) throws Exception {
+        if(domain) rootDomainDuty(); else rootBusinessDuty();
         jdbc.update("UPDATE ab_role_permission SET status='inactive' WHERE role_id=? AND permission_id IN(SELECT id FROM ab_permission WHERE tenant_id=? AND code=?)",getTestRole().getId(),tenant(),"model."+model.getCode()+".update");
         var restriction=new ExtensionBean();restriction.setExtension(new HashMap<>(Map.of("fieldPermission",Map.of("edit",List.of("unassigned_"+model.getCode())))));
         field.setExtension(restriction);fields.updateById(field);metadata.clearAllCache();evict();
@@ -179,16 +190,19 @@ class DeferredCommandAuthorizationPostgresIT extends BaseIntegrationTest {
         assertThat(calls).hasValue(2);assertThat(row()).containsEntry(label,"approved");assertThat(grants()).isEqualTo(original);
     }
 
-    @Test void owningBusinessFieldsCannotBeBypassedByAnUnrestrictedModelGrant() throws Exception {
-        rootBusinessDuty();
+    @ParameterizedTest @ValueSource(booleans={false,true})
+    void owningBusinessFieldsCannotBeBypassedByAnUnrestrictedModelGrant(boolean domain) throws Exception {
+        if(domain) rootDomainDuty(); else rootBusinessDuty();
         jdbc.update("UPDATE ab_role_permission SET field_scope=?::jsonb WHERE role_id=? AND permission_id IN(SELECT id FROM ab_permission WHERE tenant_id=? AND code=?)",
                 json.writeValueAsString(Map.of("modelCode",model.getCode(),"readFields",List.of(label),"writeFields",List.of())),getTestRole().getId(),tenant(),duty);
         evict();var before=row();String grants=grants();var done=execute(queued());
         assertThat(done.getStatus()).as(done.getErrorMessage()).isEqualTo("failed");assertThat(calls).hasValue(1);
         assertThat(row()).isEqualTo(before);assertThat(grants()).isEqualTo(grants);
     }
-    @Test void owningBusinessScopeRefusalCannotFallBackToAnUnrestrictedModelGrant() {
-        rootBusinessDuty();scopes.setScope(tenant(),getTestRole().getId(),model.getCode(),"manage","none","MAX");evict();
+    @ParameterizedTest @ValueSource(booleans={false,true})
+    void owningBusinessScopeRefusalCannotFallBackToAnUnrestrictedModelGrant(boolean domain) throws Exception {
+        if(domain) rootDomainDuty(); else rootBusinessDuty();
+        scopes.setScope(tenant(),getTestRole().getId(),model.getCode(),domain ? "update" : "manage","none","MAX");evict();
         var before=row();String grants=grants();var done=execute(queued());
         assertThat(done.getStatus()).as(done.getErrorMessage()).isEqualTo("failed");assertThat(calls).hasValue(1);
         assertThat(row()).isEqualTo(before);assertThat(grants()).isEqualTo(grants);
