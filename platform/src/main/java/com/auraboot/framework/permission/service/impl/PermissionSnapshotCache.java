@@ -57,20 +57,22 @@ public class PermissionSnapshotCache {
 
     private static final String BASELINE_ROLE_CODE = "tenant_member";
 
-    private final ThreadLocal<Integer> freshReadDepth = new ThreadLocal<>();
+    private final ThreadLocal<Map<FreshLookupKey, Object>> freshReadValues = new ThreadLocal<>();
 
     /**
      * Host-only, thread-bound fresh reads through the same loaders. No shared cache is read or
-     * populated in this scope; this does not change transaction visibility or contributor caches.
+     * populated in this scope. Loader results are reused only within this callback; an explicit
+     * nested callback starts fresh and restores its parent on exit. This does not change
+     * transaction visibility or contributor caches.
      */
     public <T> T withFreshReads(Supplier<T> read) {
         Objects.requireNonNull(read, "read");
-        Integer previous = freshReadDepth.get();
-        freshReadDepth.set(previous == null ? 1 : previous + 1);
+        Map<FreshLookupKey, Object> previous = freshReadValues.get();
+        freshReadValues.set(new LinkedHashMap<>());
         try { return read.get(); }
         finally {
-            if (previous == null) freshReadDepth.remove();
-            else freshReadDepth.set(previous);
+            if (previous == null) freshReadValues.remove();
+            else freshReadValues.set(previous);
         }
     }
 
@@ -368,9 +370,20 @@ public class PermissionSnapshotCache {
         return cache;
     }
 
+    @SuppressWarnings("unchecked")
     private <T> T getOrLoad(String cacheName, Object key, Supplier<T> loader) {
-        if (freshReadDepth.get() != null) return loader.get();
+        Map<FreshLookupKey, Object> values = freshReadValues.get();
+        if (values != null) {
+            FreshLookupKey lookup = new FreshLookupKey(cacheName, key);
+            if (values.containsKey(lookup)) return (T) values.get(lookup);
+            T loaded = loader.get();
+            values.put(lookup, loaded);
+            return loaded;
+        }
         return cache(cacheName).get(key, loader::get);
+    }
+
+    private record FreshLookupKey(String cacheName, Object key) {
     }
 
     private record PermissionCatalogKey(Long tenantId) {
