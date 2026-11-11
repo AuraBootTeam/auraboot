@@ -26,6 +26,10 @@ public class CommandExecutionTransaction {
     private com.auraboot.framework.meta.mapper.CommandDefinitionMapper definitions;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.auraboot.framework.permission.service.impl.PermissionSnapshotCache snapshots;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization authorization;
+
     private java.util.Map<String,Object> commandConfiguration(String commandCode) {
         if (definitions == null) return java.util.Map.of();
         var command = definitions.findCurrentByCode(commandCode);
@@ -53,7 +57,8 @@ public class CommandExecutionTransaction {
         var isolation = resourceIsolation != null ? resourceIsolation : handlerIsolation;
         var template = new TransactionTemplate(transactions);
         var config = commandConfiguration(commandCode);
-        if (isolation == null && domainCommand(config)) {
+        boolean domain = domainCommand(config);
+        if (isolation == null && domain) {
             boolean serializable = com.auraboot.framework.meta.transaction.CommandTransactionIsolationPolicy.requiresSerializable(config)
                     || Integer.valueOf(org.springframework.transaction.TransactionDefinition.ISOLATION_SERIALIZABLE).equals(
                         TransactionSynchronizationManager.getCurrentTransactionIsolationLevel());
@@ -71,6 +76,18 @@ public class CommandExecutionTransaction {
         }
         return template.execute(status -> {
             if (dryRun) status.setRollbackOnly();
+            // Document generation already owns one physical snapshot transaction. Reuse only
+            // authorization configuration; every source row and field remains evaluated.
+            boolean document = config.get("handlerParams") instanceof java.util.Map<?,?> params
+                    && params.get("documentDefinition") instanceof java.util.Map<?,?>;
+            if (authorization != null && domain && document
+                    && com.auraboot.framework.application.tenant.MetaContext.getCurrentMemberId() != null
+                    && com.auraboot.framework.application.tenant.MetaContext.getCurrentUserId() != null
+                    && com.auraboot.framework.application.tenant.MetaContext.getExternalCommandPermission() == null
+                    && !com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
+                    && !com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()) {
+                return authorization.withReadProjectionSnapshot(operation);
+            }
             return operation.get();
         });
     }

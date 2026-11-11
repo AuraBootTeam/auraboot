@@ -344,7 +344,7 @@ test('quote sharing release gate: multiple members, role access and revocation t
     expect(foreignSchema.status()).toBe(200);
     expect(String((await foreignSchema.json()).code)).toBe('0');
     // Registration does not grant newly imported actions. Give the foreign fixture
-    // only the declared read surfaces needed to reach the tenant record boundary.
+    // the current domain levels needed to create its own record and reach the tenant boundary.
     const foreignRoles = await foreign.page.request.get('/api/roles?keyword=tenant_admin&pageNum=1&pageSize=50');
     expect(foreignRoles.status()).toBe(200);
     const foreignAdminRole = (await foreignRoles.json()).data.records.find((role: { code: string }) => role.code === 'tenant_admin');
@@ -354,11 +354,11 @@ test('quote sharing release gate: multiple members, role access and revocation t
     expect(foreignCapabilities.status()).toBe(200);
     const declared = (await foreignCapabilities.json()).data.flatMap((group: { capabilities: Array<{ code: string; granted: boolean; conventionDerived: boolean }> }) => group.capabilities)
       .filter((capability: { conventionDerived: boolean }) => !capability.conventionDerived);
-    const readSurfaces = ['qo.cap.quote_view', 'qo.cap.surface_bom_price', 'qo.cap.surface_process_fee'];
-    for (const code of readSurfaces) expect(declared.some((capability: { code: string }) => capability.code === code), code).toBe(true);
+    const fixtureLevels = ['qo.cap.read', 'qo.cap.write'];
+    for (const code of fixtureLevels) expect(declared.some((capability: { code: string }) => capability.code === code), code).toBe(true);
     const explicitRead = await foreign.page.request.put(capabilityUrl, { data: [...new Set([
       ...declared.filter((capability: { granted: boolean }) => capability.granted).map((capability: { code: string }) => capability.code),
-      ...readSurfaces,
+      ...fixtureLevels,
     ])] });
     expect(explicitRead.status()).toBe(200);
     expect(String((await explicitRead.json()).code)).toBe('0');

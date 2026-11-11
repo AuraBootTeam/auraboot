@@ -443,7 +443,14 @@ class BusinessCommandRecordAuthorizationTest {
                         com.auraboot.framework.permission.engine.model.EvaluationVerdict.NOT_APPLICABLE,"not shared"));
         authorization.withReadProjectionSnapshot(() -> {
             assertThat(authorization.resolveOrdinaryRead(5L,MODEL,record(1,"Shanghai")).result().granted()).isTrue();
-            assertThat(authorization.resolveOrdinaryRead(5L,MODEL,record(1,"Beijing")).result().granted()).isFalse();
+            authorization.withReadProjectionSnapshot(() -> {
+                assertThat(authorization.resolveOrdinaryRead(5L,MODEL,record(1,"Beijing")).result().granted()).isFalse();
+                var jdbc=mock(org.springframework.jdbc.core.JdbcTemplate.class);
+                var lock=new RoleAuthorizationWriteLock(jdbc,Map.of());
+                assertThatThrownBy(lock::lock).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+                verifyNoInteractions(jdbc);
+                return null;
+            });
             return null;
         });
         verify(bindings,times(1)).findBusinessGrants(100L,1L,5L,CODE);
@@ -461,6 +468,10 @@ class BusinessCommandRecordAuthorizationTest {
             assertThatThrownBy(() -> authorization.resolveOrdinaryRead(6L,MODEL,record(1,"Shanghai")))
                     .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
             MetaContext.setMemberId(5L);
+            MetaContext.setContext(100L,1L,"changed-pid","actor");
+            assertThatThrownBy(() -> authorization.resolveOrdinaryRead(5L,MODEL,record(1,"Shanghai")))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            MetaContext.setContext(100L,1L,"actor-pid","actor");
             Object connection=TransactionSynchronizationManager.unbindResource("business-grant-test-connection");
             TransactionSynchronizationManager.bindResource("business-grant-test-connection",new org.springframework.jdbc.datasource.ConnectionHolder(mock(Connection.class)));
             assertThatThrownBy(() -> authorization.resolveOrdinaryRead(5L,MODEL,record(1,"Shanghai")))

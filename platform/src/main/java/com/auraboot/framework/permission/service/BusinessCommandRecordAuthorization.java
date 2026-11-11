@@ -43,9 +43,10 @@ public class BusinessCommandRecordAuthorization {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private DomainCommandAuthorization domains;
 
-    private final ThreadLocal<ReadProjection> readProjection = new ThreadLocal<>();
+    private static final ThreadLocal<ReadProjection> readProjection = new ThreadLocal<>();
     private static final class ReadProjection {
         final Long tenant = MetaContext.getCurrentTenantId(), user = MetaContext.getCurrentUserId(), member = MetaContext.getCurrentMemberId();
+        final String userPid = MetaContext.getCurrentUserPid();
         final java.util.Set<Object> connections = connections();
         final Map<Object,Object> configuration = new HashMap<>();
         static java.util.Set<Object> connections() {
@@ -54,6 +55,7 @@ public class BusinessCommandRecordAuthorization {
         }
         void verify() {
             if (tenant == null || user == null || member == null || connections.isEmpty()
+                    || !Objects.equals(userPid,MetaContext.getCurrentUserPid())
                     || !Objects.equals(tenant,MetaContext.getCurrentTenantId())
                     || !Objects.equals(user,MetaContext.getCurrentUserId()) || !Objects.equals(member,MetaContext.getCurrentMemberId())
                     || !TransactionSynchronizationManager.isActualTransactionActive()
@@ -63,12 +65,20 @@ public class BusinessCommandRecordAuthorization {
         }
     }
 
-    /** Pure host projection loop: metadata may repeat, record/condition/field decisions may not. */
+    /** Host projection/document snapshot: reuse configuration, never record/condition/field decisions. */
     public <T> T withReadProjectionSnapshot(java.util.function.Supplier<T> projection) {
-        var previous=readProjection.get();var current=new ReadProjection();current.verify();readProjection.set(current);
+        var previous=readProjection.get();
+        if(previous!=null) {
+            previous.verify();
+            T result=projection.get();previous.verify();return result;
+        }
+        var current=new ReadProjection();current.verify();readProjection.set(current);
         try { return snapshots.withFreshReads(() -> { T result=projection.get();current.verify();return result; }); }
-        finally { if(previous==null)readProjection.remove();else readProjection.set(previous); }
+        finally { readProjection.remove(); }
     }
+
+    /** Authorization authoring cannot invalidate configuration during a host projection. */
+    public static boolean isReadProjectionSnapshotActive() { return readProjection.get()!=null; }
 
     @SuppressWarnings("unchecked")
     private <T> T readConfiguration(Object key, java.util.function.Supplier<T> loader) {

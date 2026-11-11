@@ -28,6 +28,9 @@ public class RoleAuthorizationWriteLock {
     }
 
     private void lockTenant(Long tenant) {
+        if (BusinessCommandRecordAuthorization.isReadProjectionSnapshotActive()) {
+            throw new AccessDeniedException("Authorization authoring is unavailable during a read projection snapshot");
+        }
         if (TransactionSynchronizationManager.hasResource(mutationKey)
                 && !java.util.Objects.equals(tenant, TransactionSynchronizationManager.getResource(mutationKey))) {
             throw new AccessDeniedException("One authorization mutation cannot span tenants");
