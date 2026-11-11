@@ -261,6 +261,12 @@ public interface DataAccessor extends RecordReadAccessor {
         return batchCreate(modelCode, dataList);
     }
 
+    /** Same atomic write and public read projection, without display-only reference labels. */
+    default List<Map<String,Object>> bulkCreateForProcessing(String modelCode,List<Map<String,Object>> rows) {
+        return bulkCreate(modelCode,rows);
+    }
+
+
     /**
      * Delete a record by ID.
      *

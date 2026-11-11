@@ -206,6 +206,8 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
         assertThatThrownBy(()->service.bulkCreate(MODEL_CODE,List.of(new HashMap<>(Map.of("name","forbidden")))))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThatThrownBy(()->service.bulkCreateForProcessing(MODEL_CODE,List.of(new HashMap<>(Map.of("name","forbidden")))))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
         verifyNoInteractions(dynamicDataMapper);
     }
 

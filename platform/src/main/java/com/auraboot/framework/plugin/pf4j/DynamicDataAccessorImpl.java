@@ -241,6 +241,11 @@ public class DynamicDataAccessorImpl implements DataAccessor {
     }
 
     @Override
+    public List<Map<String,Object>> bulkCreateForProcessing(String modelCode,List<Map<String,Object>> rows) {
+        return withCommandAuthority(() -> dynamicDataService.bulkCreateForProcessing(modelCode,mutableCopies(rows)));
+    }
+
+    @Override
     public List<Map<String, Object>> bulkCreate(String modelCode, List<Map<String, Object>> dataList) {
         log.debug("Plugin DataAccessor: bulkCreate({}, {} records)", modelCode, dataList != null ? dataList.size() : 0);
         return withCommandAuthority(() -> dynamicDataService.bulkCreate(modelCode, mutableCopies(dataList)));

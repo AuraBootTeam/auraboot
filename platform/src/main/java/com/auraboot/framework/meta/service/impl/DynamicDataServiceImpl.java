@@ -1683,6 +1683,14 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         return dynamicDataBatchSupport().bulkCreate(modelCode,dataList);
     }
 
+    @Override
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public List<Map<String,Object>> bulkCreateForProcessing(String modelCode,List<Map<String,Object>> rows) {
+        requireDomainAction(modelCode,"create");
+        BusinessResourceDataScope.unsupported();
+        return dynamicDataBatchSupport().bulkCreate(modelCode,rows,this::getByIdForProcessing);
+    }
+
     private boolean isRecordNotFound(MetaServiceException e) {
         return dynamicDataBatchSupport().isRecordNotFound(e);
     }

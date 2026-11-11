@@ -89,6 +89,13 @@ test('quote sharing release gate: multiple members, role access and revocation t
   const probe = async (index: number, allowed: boolean) => {
     const client = viewers[index].page;
     expect((await client.request.get(root)).status()).toBe(allowed ? 200 : 403);
+    if (!allowed) {
+      const beforeDeniedWrite = (await (await page.request.get(root)).json()).data;
+      const deniedWrite = await client.request.put(root, {data:{qo_quote_customer:'Denied unshared update'}});
+      expect(deniedWrite.status()).toBe(403);
+      const afterDeniedWrite = (await (await page.request.get(root)).json()).data;
+      expect(afterDeniedWrite.qo_quote_customer).toBe(beforeDeniedWrite.qo_quote_customer);
+    }
     for (const query of ['qo_quote_bom_price_metrics', 'qo_quote_process_fee_unassigned_facts']) {
       const response = await client.request.post(`/api/meta/named-queries/${query}/execute`, {
         data: { parameters: { quoteId: quote.quoteId } },
@@ -219,7 +226,7 @@ test('quote sharing release gate: multiple members, role access and revocation t
   for (const tabName of ['资料上传','BOM价格计算','加工点数','Gerber校验','报价Excel']) {
     await expect(viewers[2].page.getByRole('tab',{name:tabName,exact:true})).toBeVisible();
   }
-  // Sharing does not grant absent model-level CRUD privileges.
+  // Sharing grants only the record audience; the domain duty and field policy still apply.
   // Domain write plus the existing shared update audience permits ordinary editable fields.
   const beforeEdit2 = (await (await page.request.get(root)).json()).data;
   const edit2 = await viewers[2].page.request.put(root,{data:{qo_quote_customer:'Role-shared writer customer'}});

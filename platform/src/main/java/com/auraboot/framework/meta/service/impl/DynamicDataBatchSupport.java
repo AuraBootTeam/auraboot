@@ -188,7 +188,11 @@ final class DynamicDataBatchSupport extends BaseMetaService {
         return response;
     }
 
-    List<Map<String, Object>> bulkCreate(String modelCode, List<Map<String, Object>> dataList){
+    List<Map<String,Object>> bulkCreate(String modelCode,List<Map<String,Object>> dataList) {
+        return bulkCreate(modelCode,dataList,this::getById);
+    }
+
+    List<Map<String,Object>> bulkCreate(String modelCode,List<Map<String,Object>> dataList,GetByIdOperation publicReader){
         validateModelCode(modelCode);
         assertWritable(modelCode);
         if (dataList == null || dataList.isEmpty()) {
@@ -265,7 +269,7 @@ final class DynamicDataBatchSupport extends BaseMetaService {
         var publicRecords = new ArrayList<Map<String, Object>>(createdRecords.size());
         for (var row : createdRecords) {
             String recordId = row.get(primaryKey.getCode()).toString();
-            publicRecords.add(nativeReadFields.publicWriteResult(model, row, () -> getById(modelCode, recordId)));
+            publicRecords.add(nativeReadFields.publicWriteResult(model,row,() -> publicReader.execute(modelCode,recordId)));
         }
         for (var row : createdRecords) {
             mutationObserver.observe(model, row.get(primaryKey.getCode()).toString(), ModelMutationObserver.Operation.CREATED);

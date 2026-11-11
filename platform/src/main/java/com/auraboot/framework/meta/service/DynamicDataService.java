@@ -131,6 +131,12 @@ public interface DynamicDataService {
      */
     List<Map<String, Object>> bulkCreate(String modelCode, List<Map<String, Object>> dataList);
 
+    /** Preserve bulk write/read authorization while omitting display-only reference labels. */
+    default List<Map<String,Object>> bulkCreateForProcessing(String modelCode,List<Map<String,Object>> rows) {
+        return bulkCreate(modelCode,rows);
+    }
+
+
     /**
      * 批量更新数据
      * @param modelCode 模型编码
