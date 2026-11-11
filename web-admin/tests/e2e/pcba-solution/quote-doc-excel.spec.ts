@@ -144,34 +144,38 @@ test.describe('Quote pricing + document excel (QO-04 / QO-07 / XLS-Q) @smoke', (
         { fieldName: 'ab_da_source_record_pid', operator: 'EQ', value: created.quoteId },
       ]);
       expect(artifactHistory).toHaveLength(4);
-      const rejectedDelete = await admin.request.delete(`/api/dynamic/ab_document_artifact/${artifactHistory[0].pid}`);
-      expect(rejectedDelete.status()).toBe(400);
-      expect(String((await rejectedDelete.json()).context)).toContain('immutable');
-      expect(await queryDynamicRecords(admin, 'ab_document_artifact', [
-        { fieldName: 'ab_da_source_record_pid', operator: 'EQ', value: created.quoteId },
-      ])).toHaveLength(4);
       for (const row of artifactHistory.filter(row => Number(row.ab_da_document_version) === 2)) {
         created.rows.push({ model: 'ab_document_artifact', pid: String(row.pid) });
       }
+      // Technical artifacts have no public mutation authority, including for
+      // an administrator. Rejection must leave the business-owned history intact.
+      const rejectedDelete = await admin.request.delete(`/api/dynamic/ab_document_artifact/${artifactHistory[0].pid}`);
+      expect(rejectedDelete.status()).toBe(403);
+      expect(String((await rejectedDelete.json()).context)).toContain('model.ab_document_artifact.delete');
+      expect(await queryDynamicRecords(page, 'ab_document_artifact', [
+        { fieldName: 'ab_da_source_record_pid', operator: 'EQ', value: created.quoteId },
+      ])).toHaveLength(4);
       await page.reload();
       expect((await readDynamicRecord(page, 'qo_quote_common', created.quoteId)).qo_quote_status).toBe('priced');
       await expect(page.getByRole('button', { name: '生成正式报价文档', exact: true })).toBeVisible({ timeout: 20_000 });
-      await expect(page.getByRole('tab', { name: '报价Excel', exact: true })).toHaveCount(0);
-
-      // Sales can generate and download the formal document but the output
-      // history remains an explicitly separated read surface. Verify that
-      // surface through the administrator identity used by this test fixture.
-      await admin.goto(`/p/qo_quote_common/view/${created.quoteId}`);
-      const quoteOutputTab = admin.getByRole('tab', { name: '报价Excel', exact: true });
-      await expect(quoteOutputTab).toBeVisible();
-      await quoteOutputTab.click();
-      const documentHistoryTable = admin.getByRole('table').filter({
-        has: admin.getByRole('columnheader', { name: '格式', exact: true }),
-      });
-      await expect(documentHistoryTable.getByText('pdf', { exact: true }).first()).toBeVisible();
-      await expect(documentHistoryTable.getByText('xlsx', { exact: true }).first()).toBeVisible();
-      await expect(documentHistoryTable.getByText(new RegExp(created.quoteCode)).first()).toBeVisible();
-      await admin.screenshot({ path: info.outputPath('quote-document-history.png'), fullPage: true });
+      // Domain write includes reading this quote's own output history. Check
+      // both the creating employee and the administrator through the actual tab.
+      for (const viewer of [page, admin]) {
+        if (viewer === admin) await admin.goto(`/p/qo_quote_common/view/${created.quoteId}`);
+        const quoteOutputTab = viewer.getByRole('tab', { name: '报价Excel', exact: true });
+        await expect(quoteOutputTab).toBeVisible();
+        await quoteOutputTab.click();
+        const documentHistoryTable = viewer.getByRole('table').filter({
+          has: viewer.getByRole('columnheader', { name: '格式', exact: true }),
+        });
+        await expect(documentHistoryTable.getByText('pdf', { exact: true }).first()).toBeVisible();
+        await expect(documentHistoryTable.getByText('xlsx', { exact: true }).first()).toBeVisible();
+        await expect(documentHistoryTable.getByText(new RegExp(created.quoteCode)).first()).toBeVisible();
+        await viewer.screenshot({
+          path: info.outputPath(viewer === admin ? 'quote-document-history.png' : 'sales-quote-document-history.png'),
+          fullPage: true,
+        });
+      }
       // Job center is owner-scoped. Both document generations were performed
       // by the sales user, while the administrator only verifies output access.
       await ensureSidebarExpanded(page);
@@ -193,7 +197,13 @@ test.describe('Quote pricing + document excel (QO-04 / QO-07 / XLS-Q) @smoke', (
       try {
         const cleanup = await cleanupImmutableQuoteArtifacts(created);
         await info.attach('immutable-artifact-fixture-cleanup', { body: JSON.stringify(cleanup), contentType: 'application/json' });
-        await cleanupRows(admin, created);
+        // The exact owned artifacts were already deleted and verified by the
+        // guarded fixture purge; their public read endpoint is not an admin API.
+        const purged = new Set(cleanup.deletedIds);
+        await cleanupRows(admin, {
+          ...created,
+          rows: created.rows.filter(row => row.model !== 'ab_document_artifact' || !purged.has(row.pid)),
+        });
       } finally { await context.close(); }
     }
   });
