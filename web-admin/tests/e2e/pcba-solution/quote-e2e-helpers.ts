@@ -1652,7 +1652,7 @@ export async function seedBomWorkbench(
     expect(revisions, 'seed export must persist one controlled revision').toHaveLength(1);
     expect(revisions[0].bom_er_file_id).toBe(exportResult.exportFileId);
     created.exportRevisionId = String(revisions[0].pid);
-    trackFixtureRow(page, created.rows, { model: 'bom_export_revision', pid: created.exportRevisionId });
+    // Retain the real immutable export as audit evidence; it has no public deletion capability.
 
     // Optionally hand ownership of the SELF-scoped records (task + project + account) to a
     // business role so a non-admin (e.g. bom_engineering) can see the seeded conversion task

@@ -34,6 +34,11 @@ class PermissionCatalogLookupPostgresIT {
                     (7,100,'ordinary.read',false,'2026-01-01','{}'),
                     (8,100,'archived.read',null,'2026-01-01','{"domainModels":{"record":["read"]}}')
                     """);
+                try (var migration = getClass().getResourceAsStream(
+                        "/db/migration/core/V20261111161500__index_resolvable_permission_code.sql")) {
+                    if (migration == null) throw new IllegalStateException("Permission lookup migration is missing");
+                    statement.execute(new String(migration.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+                }
                 assertThat(ids(connection, "findResolvableDomainDefinitions", 100L, null))
                         .containsExactlyInAnyOrder(1L, 6L, 8L);
                 assertThat(ids(connection, "findResolvableDomainDefinitions", 200L, null)).containsExactly(2L);

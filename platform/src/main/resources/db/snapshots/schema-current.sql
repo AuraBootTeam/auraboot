@@ -30148,6 +30148,13 @@ CREATE INDEX idx_permission_plugin ON public.ab_permission USING btree (plugin_p
 
 
 --
+-- Name: idx_permission_resolvable_tenant_code; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_permission_resolvable_tenant_code ON public.ab_permission USING btree (tenant_id, lower(code), created_at DESC) WHERE ((deleted_flag = false) OR (deleted_flag IS NULL));
+
+
+--
 -- Name: idx_permission_resource; Type: INDEX; Schema: public; Owner: -
 --
 
