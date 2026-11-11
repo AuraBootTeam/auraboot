@@ -149,6 +149,8 @@ test.describe('PCBA quote supplier inquiry golden', () => {
       } finally {
         await context.close();
       }
+      // A writer still needs the existing object audience; use its own target for the positive control.
+      await reassignRecordOwnerByEmail([{ model: 'qo_supplier_request_common', pid: headPid }], users['sales'].email);
       const writer = await openQuoteRolePage(browser, users['sales']);
       try {
         const allowed = await writer.page.request.put(`/api/dynamic/qo_supplier_request_common/${headPid}`, {

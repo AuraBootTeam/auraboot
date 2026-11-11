@@ -261,7 +261,7 @@ public class BusinessCommandRecordAuthorization {
                 }
                 var fields = BusinessGrantFieldScope.select(json, grant.getFieldScopeJson(), model);
                 if (domain && fields.isPresent()) fields = restrictDomainData(permission, grant.getRoleId(), member, model,
-                        scopeAction, record, fields.get());
+                        scopeAction, record, fields.get(), sharedRecord);
                 if (fields.isEmpty()) {
                     trace.add(step(EvaluationVerdict.DENY, "No field grant is configured for this business object", code,
                             grant.getRoleId(), grant.getId()));
@@ -279,7 +279,7 @@ public class BusinessCommandRecordAuthorization {
     /** Retired codes are data-policy references only; they never supply positive function authority. */
     private java.util.Optional<BusinessGrantDecision.Fields> restrictDomainData(
             com.auraboot.framework.permission.entity.Permission permission, Long role, Long member, String model,
-            String action, Map<String,Object> record, BusinessGrantDecision.Fields fields) {
+            String action, Map<String,Object> record, BusinessGrantDecision.Fields fields, boolean sharedRecord) {
         List<?> declared = permission.getExtension() instanceof Map<?,?> extension
                 && extension.get("dataPolicyReferences") instanceof Map<?,?> references
                 && references.get(model) instanceof List<?> values ? values : List.of();
@@ -299,7 +299,7 @@ public class BusinessCommandRecordAuthorization {
             if (!(action.equals(policyAction) || "manage".equals(policyAction)
                     && (!"read".equals(action) || !"read".equals(permission.getAction())))) continue;
             var scope = scopes.resolveObjectBoundScopeForRole(member, role, model, policyAction, model);
-            if (scope == null || !"not_configured".equals(scope.scopeType())
+            if (scope == null || !sharedRecord && !"not_configured".equals(scope.scopeType())
                     && scopeEvaluator.evaluateGrantScope(scope, member, model, policyAction, record).verdict() == EvaluationVerdict.DENY)
                 return java.util.Optional.empty();
             var rows = domains == null ? bindings.findBusinessGrants(MetaContext.getCurrentTenantId(), MetaContext.getCurrentUserId(), member, code)

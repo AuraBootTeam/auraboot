@@ -374,6 +374,35 @@ class BusinessCommandRecordAuthorizationTest {
         assertThat(authorization.resolveOrdinaryRead(5L,MODEL,record(999,"Shanghai")).result().granted()).isFalse();
     }
 
+    @Test void domainReadSharesDoNotReapplyObjectScopeButRetainFieldsAndConditions() throws Exception {
+        var definition = permission(CODE); definition.setResourceCode("domain"); definition.setAction("read");
+        definition.setExtension(Map.of("domainModels", Map.of(MODEL, List.of("read"))));
+        when(snapshots.resourcePermissionCodes(100L, MODEL, "read")).thenReturn(List.of(CODE));
+        when(snapshots.resolvePermissionDefinition(100L, CODE)).thenReturn(definition);
+        String modelCode = "model." + MODEL + ".read";
+        var modelDefinition = permission(modelCode); modelDefinition.setResourceType("model");
+        modelDefinition.setResourceCode(MODEL); modelDefinition.setAction("read");
+        when(snapshots.resolvePermissionDefinition(100L, modelCode)).thenReturn(modelDefinition);
+        var function = grant(11, 101, CODE); grants(function);
+        var fields = grant(12, 101, modelCode); fields.setFieldScopeJson(fieldScope("label"));
+        when(bindings.findBusinessGrants(100L,1L,5L,modelCode)).thenReturn(List.of(fields));
+        when(scopes.resolveObjectBoundScopeForRole(5L,101L,MODEL,"read",MODEL))
+                .thenReturn(new DataScopeCondition("self","created_by",1L,null,List.of(),List.of()));
+        guards(CODE, new PermissionPolicyService.ConditionGuard(11L,null));
+        guards(modelCode, guard(12,"Shanghai"));
+        when(recordShares.evaluate(eq(5L),eq(MODEL),eq("read"),any())).thenReturn(
+                new com.auraboot.framework.permission.engine.model.EvaluationStep("RecordShare",
+                        com.auraboot.framework.permission.engine.model.EvaluationVerdict.ALLOW,"shared"));
+        var allowed = authorization.resolveOrdinaryRead(5L,MODEL,record(999,"Shanghai"));
+        assertThat(allowed.result().granted()).isTrue();
+        assertThat(allowed.canRead("label")).isTrue(); assertThat(allowed.canRead("cost")).isFalse();
+        assertThat(authorization.resolveOrdinaryRead(5L,MODEL,record(999,"Beijing")).result().granted()).isFalse();
+        when(recordShares.evaluate(eq(5L),eq(MODEL),eq("read"),any())).thenReturn(
+                new com.auraboot.framework.permission.engine.model.EvaluationStep("RecordShare",
+                        com.auraboot.framework.permission.engine.model.EvaluationVerdict.NOT_APPLICABLE,"revoked"));
+        assertThat(authorization.resolveOrdinaryRead(5L,MODEL,record(999,"Shanghai")).result().granted()).isFalse();
+    }
+
     @Test void ordinaryReadPreservesLegacyUnconfiguredScopeWithoutRelaxingBusinessCommands() throws Exception {
         String code = "model." + MODEL + ".read";
         var definition = permission(code); definition.setResourceType("model"); definition.setResourceCode(MODEL); definition.setAction("read");
