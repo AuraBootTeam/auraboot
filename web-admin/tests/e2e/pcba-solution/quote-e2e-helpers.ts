@@ -512,6 +512,7 @@ export async function expectCommandDenied(
   operationType?: string,
 ): Promise<void> {
   const result = await probeCommand(page, commandCode, payload, targetRecordId, operationType);
+  expect(result.status, `${commandCode} must not fail with a server error`).toBeLessThan(500);
   expect(
     isPermissionDeniedResult(result),
     `${commandCode} should be denied, got HTTP ${result.status}: ${result.text.slice(0, 800)}`,
@@ -526,6 +527,7 @@ export async function expectCommandNotDenied(
   operationType?: string,
 ): Promise<CommandProbeResult> {
   const result = await probeCommand(page, commandCode, payload, targetRecordId, operationType);
+  expect(result.status, `${commandCode} must not fail with a server error`).toBeLessThan(500);
   expect(
     isPermissionDeniedResult(result),
     `${commandCode} should pass permission gate, got HTTP ${result.status}: ${result.text.slice(0, 800)}`,

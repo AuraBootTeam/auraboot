@@ -1,8 +1,13 @@
 import type { APIRequestContext, Browser } from '@playwright/test';
 import { test, expect, type Page } from '../../fixtures';
 import { ensureSidebarExpanded, uniqueId } from '../helpers';
+import { BASE_URL } from '../../helpers/environments';
 import {
   ensureQuoteRoleUser,
+  seedQuoteScaffold,
+  reassignRecordOwnerByEmail,
+  cleanupRows,
+  type CreatedRows,
   expectCommandDenied,
   expectCommandNotDenied,
   fetchRoleSnapshot,
@@ -116,10 +121,10 @@ async function expectUnavailableByDirectUrl(page: Page, path: string): Promise<v
   );
 }
 
-function bomProjectPayload(seed: string): Record<string, unknown> {
+function bomProjectPayload(seed: string, customerId = `ACC-${seed}`): Record<string, unknown> {
   return {
     bom_project_name: `E2E BOM Project ${seed}`,
-    bom_project_customer_id: `ACC-${seed}`,
+    bom_project_customer_id: customerId,
     bom_project_quality_level: 'industrial',
     bom_pcba_code: `PCBA-${seed}`,
     bom_project_remark: `Quote/BOM role permission probe ${seed}`,
@@ -170,6 +175,7 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
   const uid = uniqueId('qobom_role').replace(/_/g, '-');
   const noBusinessRoleCode = `e2e_no_business_${uid.replace(/[^a-z0-9]+/gi, '_')}`.slice(0, 60);
   const users = {} as Record<RoleKey, QuoteRoleUser>;
+  const fixtures = {} as Record<Exclude<RoleKey, 'noBusinessRole'>, CreatedRows>;
 
   test.beforeAll(async ({ browser }) => {
     users.qoSales = makeQuoteRoleUser('qo_sales', uid, ['qo_sales']);
@@ -178,6 +184,7 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
     users.noBusinessRole = makeQuoteRoleUser('no_business_role', uid, [noBusinessRoleCode]);
 
     const context = await browser.newContext({
+      baseURL: BASE_URL, extraHTTPHeaders: { Origin: BASE_URL },
       storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
     });
     const page = await context.newPage();
@@ -187,6 +194,24 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
       for (const user of Object.values(users)) {
         await ensureQuoteRoleUser(page, user);
       }
+      for (const key of ['qoSales', 'qoProcurement', 'bomEngineering'] as const) {
+        const fixture = await seedQuoteScaffold(page, `ROLE-BOUNDARY-${key}`, []);
+        fixtures[key] = fixture;
+        await reassignRecordOwnerByEmail(fixture.rows, users[key].email);
+      }
+    } finally {
+      await context.close();
+    }
+  });
+
+  test.afterAll(async ({ browser }) => {
+    const context = await browser.newContext({
+      baseURL: BASE_URL, extraHTTPHeaders: { Origin: BASE_URL },
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
+    });
+    const page = await context.newPage();
+    try {
+      for (const fixture of Object.values(fixtures)) await cleanupRows(page, fixture);
     } finally {
       await context.close();
     }
@@ -230,12 +255,12 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
         expectExcludes(snapshot.permissionCodes, BOM_ADMIN_PERMISSIONS, `${label} permissions`);
         expectIncludes(
           snapshot.menuPaths,
-          [...QUOTE_MENU_PATHS, ...BUSINESS_MENU_PATHS, BOM_FORMAT_PROFILE_PATH],
+          [...QUOTE_MENU_PATHS, ...BUSINESS_MENU_PATHS, BOM_MATERIAL_LIBRARY_PATH, BOM_FORMAT_PROFILE_PATH],
           `${label} menu paths`,
         );
         expectExcludes(
           snapshot.menuPaths,
-          [BOM_REVIEW_QUEUE_PATH, BOM_MATERIAL_LIBRARY_PATH],
+          [BOM_REVIEW_QUEUE_PATH],
           `${label} menu paths`,
         );
       });
@@ -291,13 +316,15 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
       await withRolePage(browser, user, async (page) => {
         await assertSidebarLinks(
           page,
-          [...QUOTE_MENU_PATHS, ...BUSINESS_MENU_PATHS, BOM_FORMAT_PROFILE_PATH],
+          [...QUOTE_MENU_PATHS, ...BUSINESS_MENU_PATHS, BOM_MATERIAL_LIBRARY_PATH, BOM_FORMAT_PROFILE_PATH],
           [
             BOM_REVIEW_QUEUE_PATH,
-            BOM_MATERIAL_LIBRARY_PATH,
           ],
         );
-        await expectUnavailableByDirectUrl(page, BOM_MATERIAL_LIBRARY_PATH);
+        await page.goto(BOM_MATERIAL_LIBRARY_PATH, { waitUntil: 'domcontentloaded' });
+        await expect(page.getByTestId('dynamic-page-list')).toBeVisible();
+        await expect(page.getByTestId('toolbar-btn-sync_kingdee_incremental_now')).toHaveCount(0);
+        await expect(page.getByTestId('toolbar-btn-sync_kingdee_full_reconcile_now')).toHaveCount(0);
       });
     }
 
@@ -326,12 +353,18 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
       ['procurement', users.qoProcurement],
     ] as const) {
       await withRolePage(browser, user, async (page) => {
+        const fixture = fixtures[label === 'sales' ? 'qoSales' : 'qoProcurement'];
+        const customerId = fixture.rows.find((row) => row.model === 'crm_account_common')!.pid;
         await expectCommandNotDenied(page, 'qo_quote_common:create', {}, undefined, 'create');
-        await expectCommandNotDenied(page, 'qo_quote_common:batch_source_prices', {}, 'quote-id', 'update');
-        await expectCommandNotDenied(page, 'qo_quote_common:compute_process_fee', {}, 'quote-id', 'update');
-        await expectCommandNotDenied(page, 'qo_quote_common:generate_document', {}, 'quote-id', 'update');
+        await expectCommandNotDenied(page, 'qo_quote_common:batch_source_prices', {}, fixture.quoteId, 'update');
+        await expectCommandNotDenied(page, 'qo_quote_common:compute_process_fee', {}, fixture.quoteId, 'update');
+        await expectCommandNotDenied(page, 'qo_quote_common:generate_document', {}, fixture.quoteId, 'update');
         await expectCommandNotDenied(page, 'qo_offline_material_price_common:import_excel', {});
-        await expectCommandNotDenied(page, 'bom:create_project', bomProjectPayload(`${uid}-${label}`));
+        const project = await expectCommandNotDenied(page, 'bom:create_project', bomProjectPayload(`${uid}-${label}`, customerId));
+        const result = (project.body as any).data?.data ?? (project.body as any).data;
+        const projectId = String(result?.recordId ?? result?.recordPid ?? result?.pid ?? '');
+        expect(projectId, 'allowed project creation must persist a real record').toBeTruthy();
+        fixture.rows.push({ model: 'req_requirement_set_pcba_bom', pid: projectId });
         await expectCommandDenied(page, BOM_MATERIAL_SYNC_COMMAND, BOM_MATERIAL_SYNC_DRY_RUN);
         await expectCommandDenied(page, 'bom:create_material', { bom_mm_material_code: `X-${uid}` });
         await expectCommandDenied(page, 'org:create_department', { org_dept_name: `X-${uid}-${label}` });
@@ -339,13 +372,19 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
     }
 
     await withRolePage(browser, users.bomEngineering, async (page) => {
+      const fixture = fixtures.bomEngineering;
+      const customerId = fixture.rows.find((row) => row.model === 'crm_account_common')!.pid;
       await expectCommandNotDenied(page, 'qo_quote_common:create', {}, undefined, 'create');
-      await expectCommandNotDenied(page, 'qo_quote_common:batch_source_prices', {}, 'quote-id', 'update');
-      await expectCommandNotDenied(page, 'qo_quote_common:compute_process_fee', {}, 'quote-id', 'update');
-      await expectCommandNotDenied(page, 'qo_quote_common:generate_document', {}, 'quote-id', 'update');
+      await expectCommandNotDenied(page, 'qo_quote_common:batch_source_prices', {}, fixture.quoteId, 'update');
+      await expectCommandNotDenied(page, 'qo_quote_common:compute_process_fee', {}, fixture.quoteId, 'update');
+      await expectCommandNotDenied(page, 'qo_quote_common:generate_document', {}, fixture.quoteId, 'update');
       await expectCommandNotDenied(page, 'qo_offline_material_price_common:import_excel', {});
-      await expectCommandNotDenied(page, 'bom:create_project', bomProjectPayload(`${uid}-eng`));
-      await expectCommandNotDenied(page, 'qo_quote_common:import_corrected_bom', {}, 'quote-id', 'update');
+      const project = await expectCommandNotDenied(page, 'bom:create_project', bomProjectPayload(`${uid}-eng`, customerId));
+      const result = (project.body as any).data?.data ?? (project.body as any).data;
+      const projectId = String(result?.recordId ?? result?.recordPid ?? result?.pid ?? '');
+      expect(projectId, 'allowed project creation must persist a real record').toBeTruthy();
+      fixture.rows.push({ model: 'req_requirement_set_pcba_bom', pid: projectId });
+      await expectCommandNotDenied(page, 'qo_quote_common:import_corrected_bom', {}, fixture.quoteId, 'update');
       // Domain write does not grant shared-library management or live connector sync.
       await expectCommandDenied(page, 'bom:create_material', {
         bom_mm_material_code: `X-${uid}-eng`,
@@ -378,6 +417,7 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
       expect(memberPid, 'no-role member has a pid').toBeTruthy();
 
       const adminContext = await browser.newContext({
+        baseURL: BASE_URL, extraHTTPHeaders: { Origin: BASE_URL },
         storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
       });
       const grant = await adminContext.request.post('/api/user-roles/assign-by-code', {
