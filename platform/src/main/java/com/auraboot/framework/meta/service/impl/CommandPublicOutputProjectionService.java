@@ -36,6 +36,11 @@ public class CommandPublicOutputProjectionService {
         return snapshots.withFreshReads(() -> capture(context, owner));
     }
 
+    /** Finite server-owned document source fields use the same field and mask evaluation. */
+    public CommandPublicOutputProjectionPlan prepareDocument(CommandPipelineContext context, Map<String,Set<String>> fields) {
+        return snapshots.withFreshReads(() -> capture(context, Map.copyOf(fields), true));
+    }
+
     public Map<String,String> prepareArtifactBinding(CommandPipelineContext context, BusinessResourceAuthorization owner,
                                                      Map<String,Object> root) {
         var fields = new LinkedHashSet<>(owner.businessArtifactRootBindingFields());
@@ -68,10 +73,19 @@ public class CommandPublicOutputProjectionService {
     }
 
     private CommandPublicOutputProjectionPlan capture(CommandPipelineContext context, BusinessResourceAuthorization owner) {
-        CommandResultProjectionService.requireActor(context);
         var declarations = Map.copyOf(owner.publicBusinessResourceFields());
-        if (declarations.size() > 16 || !owner.businessResourceModels().containsAll(declarations.keySet()))
-            throw BusinessResultProjectionPlan.denied();
+        if (!owner.businessResourceModels().containsAll(declarations.keySet())) throw BusinessResultProjectionPlan.denied();
+        return capture(context, declarations);
+    }
+
+    private CommandPublicOutputProjectionPlan capture(CommandPipelineContext context, Map<String,Set<String>> declarations) {
+        return capture(context, declarations, false);
+    }
+
+    private CommandPublicOutputProjectionPlan capture(CommandPipelineContext context, Map<String,Set<String>> declarations,
+            boolean documentSourceFields) {
+        CommandResultProjectionService.requireActor(context);
+        if (declarations.size() > 16) throw BusinessResultProjectionPlan.denied();
         Map<String, CommandPublicOutputProjectionPlan.ModelFields> result = new LinkedHashMap<>();
         for (var entry : declarations.entrySet()) {
             String model = entry.getKey();
@@ -97,7 +111,7 @@ public class CommandPublicOutputProjectionService {
             Set<String> readable = new LinkedHashSet<>();
             for (String field : declared) {
                 String type = types.get(field);
-                if (type == null || type.isBlank() || Set.of("json", "jsonb", "object", "array", "list").contains(type))
+                if (type == null || type.isBlank() || !documentSourceFields && Set.of("json", "jsonb", "object", "array", "list").contains(type))
                     throw BusinessResultProjectionPlan.denied();
                 if (permission.viewableFields().contains(field) && !permission.hiddenFields().contains(field)
                         && (!model.equals(context.getBusinessTargetAuthorization().modelCode())
@@ -139,13 +153,30 @@ public class CommandPublicOutputProjectionService {
         if (plan == null || plan.grant() != context.getBusinessGrantDecision()
                 || !Objects.equals(plan.target(), context.getBusinessTargetAuthorization())
                 || !Boolean.TRUE.equals(context.getTargetRecordReadable())) throw BusinessResultProjectionPlan.denied();
+        return projectFields(plan,model,internal,false);
+    }
+
+    /** Called only by the host's active document frame, with a captured finite field contract. */
+    public Map<String,Object> projectDocument(CommandPublicOutputProjectionPlan plan,String model,Map<String,Object> internal) {
+        if(plan==null || plan.target()==null || plan.grant()==null || !plan.grant().result().granted()
+                || !MetaContext.exists() || MetaContext.isImpersonating()
+                || com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
+                || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
+                || !Objects.equals(plan.target().tenantId(),MetaContext.getCurrentTenantId())
+                || !Objects.equals(plan.target().userId(),MetaContext.getCurrentUserId())
+                || !Objects.equals(plan.target().memberId(),MetaContext.getCurrentMemberId())) throw BusinessResultProjectionPlan.denied();
+        return projectFields(plan,model,internal,true);
+    }
+
+    private Map<String,Object> projectFields(CommandPublicOutputProjectionPlan plan,String model,Map<String,Object> internal,
+            boolean document) {
         var fieldPlan = plan.models().get(model);
         if (fieldPlan == null || internal == null) throw BusinessResultProjectionPlan.denied();
         Map<String, Object> output = new LinkedHashMap<>();
         for (String field : fieldPlan.readable()) {
             if (!internal.containsKey(field)) continue;
             Object value = internal.get(field);
-            if (!(value == null || value instanceof String || value instanceof Boolean || value instanceof Number
+            if (!document && !(value == null || value instanceof String || value instanceof Boolean || value instanceof Number
                     || value instanceof java.time.temporal.TemporalAccessor || value instanceof java.util.Date))
                 throw BusinessResultProjectionPlan.denied();
             output.put(field, value);
@@ -161,6 +192,10 @@ public class CommandPublicOutputProjectionService {
         for (var config : fieldPlan.detailMasks()) {
             if (output.get(config.field()) != null) output.put(config.field(), masks.maskValue(output.get(config.field()).toString(),
                     config.type(), config.pattern(), config.replacement()));
+        }
+        if(document) {
+            // Identity supports joins inside the renderer; it is not an additional business field.
+            for(String key:List.of("pid","id")) if(internal.containsKey(key))output.put(key,internal.get(key));
         }
         return BusinessResourceAuthorization.snapshot(output);
     }

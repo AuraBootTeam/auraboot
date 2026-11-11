@@ -14,6 +14,19 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.*;
 
 class BusinessArtifactAuthorizationTest {
+    @Test void a_document_relation_has_a_versioned_source_view_without_a_fake_model_file_field() {
+        var source = plan(fields(Set.of("name", "brand"), List.of()));
+        String document = "\"document\":{\"code\":\"orders.standard\",\"version\":\"1.0.0\","
+                + "\"definitionHash\":\"" + "a".repeat(64) + "\",\"format\":\"xlsx\"},";
+        String encoded = BusinessArtifactAuthorization.capture(source, "export_file").encode()
+                .replace("\"version\":1,", "\"version\":2," + document)
+                .replace("\"rootField\":\"export_file\"", "\"rootField\":\"formal_documents\"");
+        var stamp = BusinessArtifactAuthorization.parse(encoded);
+        assertThat(stamp.rootField()).isEqualTo("formal_documents");
+        assertThat(stamp.permits(source)).isTrue();
+        assertThat(stamp.permits(plan(fields(Set.of("name"), List.of())))).isFalse();
+    }
+
     @Test void root_relationships_are_typed_immutable_hashes_without_raw_business_values() {
         var facts = new java.util.HashMap<String,Object>(); facts.put("project", "PRIVATE-PROJECT"); facts.put("run",null);
         var binding = BusinessArtifactAuthorization.binding(Set.of("project","run"),facts);

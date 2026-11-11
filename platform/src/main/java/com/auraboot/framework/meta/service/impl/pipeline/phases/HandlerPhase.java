@@ -120,6 +120,9 @@ public class HandlerPhase implements CommandPhase {
     private FileService fileService;
 
     @Autowired(required = false)
+    private com.auraboot.framework.meta.service.impl.DocumentArtifactProjectionService documentArtifacts;
+
+    @Autowired(required = false)
     private com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory commandTargetFiles;
 
     @Autowired(required = false)
@@ -685,6 +688,11 @@ public class HandlerPhase implements CommandPhase {
                 Map<String, Object> pluginSettings = new HashMap<>();
                 pluginSettings.putAll(resolveHandlerParams(execConfig));
 
+                if(com.auraboot.framework.meta.security.DocumentArtifactContract.from(execConfig,modelCode)!=null) {
+                    if(documentArtifacts==null)throw new AccessDeniedException("Document source projection is unavailable");
+                    pluginSettings.put(com.auraboot.framework.plugin.extension.DocumentOutputAccessor.SETTINGS_KEY,
+                            documentArtifacts.accessor(pipelineContext));
+                }
                 pluginSettings.put("__commandCode", commandCode);
                 pluginSettings.put("__handlerCode", handlerCode);
                 // Authenticated actor identity is a server-owned setting, never a client payload
@@ -840,6 +848,10 @@ public class HandlerPhase implements CommandPhase {
                     } else {
                         CommandHandlerExtension selectedHandler = handler;
                         Object result = com.auraboot.framework.meta.security.DocumentArtifactCommandScope.within(pipelineContext,
+                                () -> {
+                                    if(documentArtifacts==null)throw new AccessDeniedException("Document source projection is unavailable");
+                                    return documentArtifacts.prepare(pipelineContext);
+                                },
                                 () -> inventoryReceiptProvenance == null ? selectedHandler.execute(pluginContext)
                                         : inventoryReceiptProvenance.route(selectedHandler, pluginContext));
                         if(businessScope!=null)result=businessScope.projectResult(result);

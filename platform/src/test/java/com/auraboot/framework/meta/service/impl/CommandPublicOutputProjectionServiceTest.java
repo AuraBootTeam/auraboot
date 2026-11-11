@@ -177,4 +177,36 @@ class CommandPublicOutputProjectionServiceTest {
         context.setTargetRecordReadable(true); context.setBusinessGrantDecision(null);
         assertThatThrownBy(() -> service.project(context, "order_lines", internal())).isInstanceOf(AccessDeniedException.class);
     }
+    @Test void a_document_json_source_is_an_atomic_field_dependency_not_an_unrestricted_public_object() {
+        when(metadata.getModelFields("order_lines")).thenReturn(List.of(
+                FieldDefinition.builder().code("name").columnName("name_col").dataType("jsonb").build()));
+        when(owner.publicBusinessResourceFields()).thenReturn(Map.of("order_lines",Set.of("name")));
+        assertThatThrownBy(()->service.prepare(context,owner)).isInstanceOf(AccessDeniedException.class);
+        var document=service.prepareDocument(context,Map.of("order_lines",Set.of("name")));
+        assertThat(document.models().get("order_lines").readable()).containsExactly("name");
+        when(fields.getFieldPermissions(30L,"order_lines")).thenReturn(new FieldPermissionSet(Set.of(),Set.of(),Set.of("name")));
+        var hidden=service.prepareDocument(context,Map.of("order_lines",Set.of("name")));
+        assertThat(hidden.models().get("order_lines").readable()).isEmpty();
+        assertThat(document.models().get("order_lines").declared()).isEqualTo(hidden.models().get("order_lines").declared());
+        context.setPublicOutputProjection(document);
+        assertThatThrownBy(()->service.project(context,"order_lines",Map.of("name",Map.of("private","value"))))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test void document_projection_removes_hidden_fields_and_freezes_structured_source_without_mutating_facts() {
+        when(metadata.getModelFields("order_lines")).thenReturn(List.of(
+                FieldDefinition.builder().code("name").columnName("name_col").dataType("jsonb").build(),field("brand","brand_col")));
+        when(fields.getFieldPermissions(30L,"order_lines")).thenReturn(new FieldPermissionSet(Set.of("name"),Set.of(),Set.of("brand")));
+        var plan=service.prepareDocument(context,Map.of("order_lines",Set.of("name","brand")));
+        var nested=new HashMap<String,Object>(Map.of("source","Original"));
+        var source=new HashMap<String,Object>(Map.of("pid","line-1","name",nested,"brand","Private","internal_cost",42));
+        var output=service.projectDocument(plan,"order_lines",source);
+        assertThat(output).containsOnlyKeys("pid","name").containsEntry("pid","line-1");
+        nested.put("source","Changed");
+        assertThat((Map<?,?>)output.get("name")).isEqualTo(Map.of("source","Original"));
+        assertThat(source).containsEntry("brand","Private").containsEntry("internal_cost",42);
+        assertThatThrownBy(()->output.put("brand","forged")).isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(()->service.projectDocument(plan,"foreign",source)).isInstanceOf(AccessDeniedException.class);
+    }
+
 }

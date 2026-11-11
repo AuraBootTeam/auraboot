@@ -66,6 +66,7 @@ class BusinessArtifactAccessPostgresIT extends BaseIntegrationTest {
     @Autowired DataScopeService scopes;
     @Autowired BusinessCommandRecordAuthorization grants;
     @Autowired CommandPublicOutputProjectionService projection;
+    @Autowired com.auraboot.framework.meta.service.impl.DocumentArtifactProjectionService documentProjection;
     @Autowired com.auraboot.framework.meta.service.CommandExecutor commandExecutor;
     @Autowired FieldMaskService masks;
     @Autowired PlatformTransactionManager transactions;
@@ -122,6 +123,71 @@ class BusinessArtifactAccessPostgresIT extends BaseIntegrationTest {
         });
         assertThat(fileService.findByPid(filePid).getTenantId()).isEqualTo(testTenant.getId());
     }
+
+    @Test void a_versioned_document_saved_through_the_host_accessor_rechecks_current_source_masks() throws Exception {
+        String document=saveVersionedDocument(false,new java.util.concurrent.atomic.AtomicReference<>());
+        var saved=fileService.findByPid(document);
+        assertThat(saved.getRetentionLocked()).isTrue();
+        assertThat(BusinessArtifactAuthorization.parse(saved.getArtifactAuthorization()).document().format()).isEqualTo("xlsx");
+        try(var input=accessor().open(document)){assertThat(input.readAllBytes()).isEqualTo(BYTES);}
+        var mask=new FieldMaskConfig();mask.setModelCode(model);mask.setFieldCode(secret);mask.setEnabled(true);
+        mask.setApplyToDetail(false);mask.setApplyToExport(true);mask.setMaskType("FULL");mask.setReplacementChar("*");
+        masks.saveConfig(mask);maskIds.add(mask.getId());
+        assertThatThrownBy(()->accessor().open(document)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->fileService.getFileDownloadUrl(document)).isInstanceOf(AccessDeniedException.class);
+        masks.deleteConfig(mask.getId());maskIds.remove(mask.getId());
+        try(var input=accessor().open(document)){assertThat(input.readAllBytes()).isEqualTo(BYTES);}
+        assertThat(fileService.findByPid(document).getArtifactAuthorization()).isEqualTo(saved.getArtifactAuthorization());
+    }
+
+    @Test void a_versioned_document_rolls_back_its_bytes_relation_and_business_write_together() throws Exception {
+        long fileCount=jdbc.queryForObject("SELECT count(*) FROM ab_file WHERE tenant_id=?",Long.class,testTenant.getId());
+        long relationCount=jdbc.queryForObject("SELECT count(*) FROM ab_file_relation WHERE tenant_id=?",Long.class,testTenant.getId());
+        var key=new java.util.concurrent.atomic.AtomicReference<String>();
+        assertThatThrownBy(()->saveVersionedDocument(true,key)).isInstanceOf(IllegalStateException.class)
+                .hasMessage("abort versioned document transaction");
+        assertThat(key.get()).isNotBlank();
+        assertThat(storage.exists(key.get())).isFalse();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_file WHERE tenant_id=?",Long.class,testTenant.getId())).isEqualTo(fileCount);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_file_relation WHERE tenant_id=?",Long.class,testTenant.getId())).isEqualTo(relationCount);
+        assertThat(jdbc.queryForObject("SELECT "+secret+" FROM "+table+" WHERE pid=?",String.class,rootPid)).isEqualTo("BOARD");
+    }
+
+    private String saveVersionedDocument(boolean abort,java.util.concurrent.atomic.AtomicReference<String> storageKey) throws Exception {
+        grantCommittedPermissionToTestRole("model."+model+".read","model",model,"read","Document reader fixture");
+        grantScope("read","all");
+        var entry=commands.selectById(commandId);
+        var config=new HashMap<String,Object>(json.readValue(entry.getExecutionConfig(),new com.fasterxml.jackson.core.type.TypeReference<Map<String,Object>>(){}));
+        var parameters=new HashMap<String,Object>();
+        parameters.put("documentDefinition",Map.of("code","fixture.standard","version","1.0.0","dataset",model+":snapshot_v1",
+                "template","fixture_v1","outputs",List.of("xlsx","pdf"),"versionPolicy","immutable-artifact",
+                "artifactRelation",fileField,"publicFields",Map.of(model,List.of(secret))));
+        config.put("handlerParams",parameters);entry.setExecutionConfig(json.writeValueAsString(config));commands.updateById(entry);
+        var request=new CommandExecuteRequest();request.setTargetRecordId(rootPid);
+        var context=CommandPipelineContext.builder().commandCode(command).command(entry).request(request)
+                .tenantId(testTenant.getId()).userId(testUser.getId()).execConfig(config)
+                .authorizationVerdict(CommandAuthorizationVerdict.authorized(permission)).targetRecordReadable(true).build();
+        var tx=new TransactionTemplate(transactions);tx.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        return tx.execute(status->MetaContext.runWithCommandPermitPlan("TARGET",null,model,rootPid,
+                ()->MetaContext.runWithCommandAuthority(permission,()->MetaContext.runWithCommandAggregate(rootPid,
+                ()->MetaContext.runWithAuthorizedCommandCode(command,()->{
+                    try {
+                        return com.auraboot.framework.meta.security.DocumentArtifactCommandScope.within(context,
+                                ()->documentProjection.prepare(context),()->{
+                                    String pid=accessor().saveAndLink("document.xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                            BYTES,model,rootPid,fileField).fileId();
+                                    if(abort) {
+                                        storageKey.set(fileService.findByPid(pid).getFileName());
+                                        data.update(model,rootPid,new HashMap<>(Map.of(secret,"CHANGED")));
+                                        throw new IllegalStateException("abort versioned document transaction");
+                                    }
+                                    return pid;
+                                });
+                    } catch(RuntimeException failure){throw failure;}
+                    catch(Exception failure){throw new IllegalStateException(failure);}
+                })))));
+    }
+
     @Test void changed_root_relationship_blocks_old_bytes_even_while_the_duty_still_allows_the_root() {
         jdbc.update("UPDATE "+table+" SET "+projectField+"=? WHERE pid=?","PROJECT-B",rootPid);
         assertThatThrownBy(() -> accessor().open(filePid)).isInstanceOf(AccessDeniedException.class);

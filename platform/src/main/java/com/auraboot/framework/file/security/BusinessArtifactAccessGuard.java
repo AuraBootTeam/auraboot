@@ -42,11 +42,19 @@ public class BusinessArtifactAccessGuard {
     private final BusinessCommandRecordAuthorization authorization;
     private final CommandPublicOutputProjectionService projection;
     private final ObjectMapper json;
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private com.auraboot.framework.meta.service.impl.DocumentArtifactProjectionService documentArtifacts;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public void authorize(FileEntity file) {
         if (file == null || file.getArtifactAuthorization() == null) return;
         var stamp = BusinessArtifactAuthorization.parse(file.getArtifactAuthorization());
+        if(stamp.document()!=null) {
+            if(documentArtifacts==null)throw BusinessArtifactAuthorization.denied();
+            documentArtifacts.authorize(file,stamp);
+            return;
+        }
         if (!MetaContext.exists() || MetaContext.isImpersonating() || MetaContext.getCurrentMemberId() == null || MetaContext.getCurrentMemberId() <= 0
                 || MetaContext.getCurrentUserId() == null || MetaContext.getCurrentUserId() <= 0
                 || MetaContext.getCurrentUserPid() == null || MetaContext.getCurrentUserPid().isBlank()

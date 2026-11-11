@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class DocumentArtifactCommandScopeTest {
-    static final String COMMAND = "document:generate", DUTY = "example.cap.write", ROOT = "example_document", PID = "root-1";
+    static final String COMMAND = "document:generate", DUTY = "example.cap.write", ROOT = "example_document", PID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
     final CommandPipelineContext context = mock(CommandPipelineContext.class);
     final Map<String,Object> definition = Map.of("code","example.standard","version","1.0.0",
             "dataset",ROOT+":snapshot_v1","versionPolicy","immutable-artifact","outputs",List.of("xlsx","pdf"));
@@ -37,10 +37,11 @@ class DocumentArtifactCommandScopeTest {
                 "ab_da_source_model",ROOT,"ab_da_source_record_pid",PID,"ab_da_definition_code","example.standard",
                 "ab_da_definition_version","1.0.0","ab_da_format","xlsx"));
     }
-    private <T>T execute(Supplier<T> body) {
+    private <T>T execute(Supplier<T> body) { return execute(null,body); }
+    private <T>T execute(Supplier<com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionPlan> projection,Supplier<T> body) {
         return MetaContext.runWithCommandPermitPlan("TARGET",null,ROOT,PID,()->MetaContext.runWithCommandAuthority(DUTY,()->
                 MetaContext.runWithCommandAggregate(PID,()->MetaContext.runWithAuthorizedCommandCode(COMMAND,()->{
-                    try{return DocumentArtifactCommandScope.within(context,body::get);}catch(RuntimeException e){throw e;}
+                    try{return DocumentArtifactCommandScope.within(context,projection,body::get);}catch(RuntimeException e){throw e;}
                     catch(Exception e){throw new AssertionError(e);}
                 }))));
     }
@@ -69,6 +70,8 @@ class DocumentArtifactCommandScopeTest {
     }
     @Test void cannotBorrowOutsideTheInvocationOrAfterACommandSwap() {
         assertThat(DocumentArtifactCommandScope.authorityFor("ab_document_artifact",artifact(),"create")).isNull();
+        assertThatThrownBy(()->DocumentArtifactCommandScope.outputPlan(context))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
         execute(()->MetaContext.runWithAuthorizedCommandCode("other:command",()->{
             assertThat(DocumentArtifactCommandScope.authorityFor("ab_document_artifact",artifact(),"create")).isNull();return null;
         }));
@@ -109,4 +112,74 @@ class DocumentArtifactCommandScopeTest {
         when(context.getExecConfig()).thenReturn(Map.of("handlerParams",Map.of("documentDefinition",bad)));
         assertThatThrownBy(()->execute(()->{throw new AssertionError("must not execute");})).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
     }
+    @Test void protectedFileCaptureRequiresTheOriginalWritableTransaction() {
+        var protectedDefinition=new HashMap<>(definition);
+        protectedDefinition.put("template","standard_v1");protectedDefinition.put("artifactRelation","formal_documents");
+        protectedDefinition.put("publicFields",Map.of(ROOT,List.of("code")));
+        when(context.getExecConfig()).thenReturn(Map.of("handlerParams",Map.of("documentDefinition",protectedDefinition)));
+        execute(()->{
+            assertThatThrownBy(()->DocumentArtifactCommandScope.captureFile(ROOT,PID,"formal_documents","quote.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            return null;
+        });
+    }
+    @Test void legacyAndOrdinaryFilesDoNotAcquireDocumentProvenance() {
+        assertThat(DocumentArtifactCommandScope.captureFile(ROOT,PID,"formal_documents","quote.pdf","application/pdf")).isNull();
+        execute(()->{
+            assertThat(DocumentArtifactCommandScope.captureFile(ROOT,PID,"formal_documents","quote.pdf","application/pdf")).isNull();
+            return null;
+        });
+    }
+
+    @Test void protectedFilesShareOneSnapshotAndCannotEscapeTheAdmittedRootOrFormat() {
+        var definition=new HashMap<>(this.definition);
+        definition.put("template","standard_v1");definition.put("artifactRelation","formal_documents");
+        definition.put("publicFields",Map.of(ROOT,List.of("code")));
+        when(context.getExecConfig()).thenReturn(Map.of("handlerParams",Map.of("documentDefinition",definition)));
+        var target=new CommandPipelineContext.BusinessTargetAuthorization(COMMAND,ROOT,PID,"read",100L,1L,5L);
+        var fields=new com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionPlan.ModelFields(
+                Set.of("code"),Set.of("code"),List.of(),List.of());
+        var plan=new com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionPlan(target,null,Map.of(ROOT,fields));
+        var reads=new java.util.concurrent.atomic.AtomicInteger();
+        Object resource=new Object();
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        org.springframework.transaction.support.TransactionSynchronizationManager.bindResource(resource,
+                new org.springframework.jdbc.datasource.ConnectionHolder(mock(java.sql.Connection.class)));
+        try {
+            execute(()->{reads.incrementAndGet();return plan;},()->{
+                assertThatThrownBy(()->DocumentArtifactCommandScope.captureFile("foreign",PID,"formal_documents","a.pdf","application/pdf"))
+                        .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+                assertThatThrownBy(()->DocumentArtifactCommandScope.captureFile(ROOT,PID,"other","a.pdf","application/pdf"))
+                        .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+                assertThatThrownBy(()->DocumentArtifactCommandScope.captureFile(ROOT,PID,"formal_documents","a.pdf","text/plain"))
+                        .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+                var first=DocumentArtifactCommandScope.captureFile(ROOT,PID,"formal_documents","a.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                var second=DocumentArtifactCommandScope.captureFile(ROOT,PID,"formal_documents","a.pdf","application/pdf");
+                assertThat(DocumentArtifactCommandScope.outputPlan(context)).isSameAs(plan);
+                assertThatThrownBy(()->DocumentArtifactCommandScope.outputPlan(mock(CommandPipelineContext.class)))
+                        .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+                assertThat(first.version()).isEqualTo(2);
+                assertThat(first.document().format()).isEqualTo("xlsx");
+                assertThat(second.document().format()).isEqualTo("pdf");
+                assertThat(first.fingerprint()).isEqualTo(second.fingerprint());
+                assertThat(reads.get()).isEqualTo(1);
+                try(var machine=com.auraboot.framework.application.security.MachineDataAccessContext.begin(
+                        new com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal(
+                                100L,"machine","Machine",Set.of(),null,null,null,null))) {
+                    assertThatThrownBy(()->DocumentArtifactCommandScope.outputPlan(context))
+                            .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+                }
+                assertThat(DocumentArtifactCommandScope.outputPlan(context)).isSameAs(plan);
+                assertThatThrownBy(()->DocumentArtifactCommandScope.captureFile(ROOT,PID,"formal_documents","again.pdf","application/pdf"))
+                        .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+                return null;
+            });
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.unbindResource(resource);
+            org.springframework.transaction.support.TransactionSynchronizationManager.clear();
+        }
+    }
+
 }
