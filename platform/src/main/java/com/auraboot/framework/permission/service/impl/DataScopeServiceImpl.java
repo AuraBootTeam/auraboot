@@ -606,12 +606,12 @@ public class DataScopeServiceImpl implements DataScopeService {
             if (modelOpt.isEmpty()) {
                 return null;
             }
-            // ModelDefinition doesn't carry extension; look up the raw Model entity
-            var modelDto = metaModelService.findByCode(resourceCode);
-            if (modelDto == null || modelDto.getExtension() == null) {
+            // Preserve the fresh current-model policy source without presentation statistics.
+            var extension = metaModelService.findExtensionByCode(resourceCode);
+            if (extension == null) {
                 return null;
             }
-            Object dataScopeObj = modelDto.getExtension().get("dataScope");
+            Object dataScopeObj = extension.get("dataScope");
             if (dataScopeObj instanceof Map) {
                 return (Map<String, Object>) dataScopeObj;
             }

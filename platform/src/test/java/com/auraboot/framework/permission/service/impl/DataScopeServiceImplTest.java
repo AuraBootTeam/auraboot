@@ -219,7 +219,7 @@ class DataScopeServiceImplTest {
         MetaModelDTO modelDto = MetaModelDTO.builder()
                 .extension(Map.of("dataScope", Map.of("ownerField", "owner_user_id")))
                 .build();
-        when(metaModelService.findByCode("model.user")).thenReturn(modelDto);
+        when(metaModelService.findExtensionByCode("model.user")).thenReturn(modelDto.getExtension());
 
         DataScopeCondition c = service.resolveScope(5L, "model.user", "read");
 
@@ -290,9 +290,9 @@ class DataScopeServiceImplTest {
         when(tenantMemberMapper.selectById(5L)).thenReturn(m);
         when(teamMemberService.getTeamPidsByUserId(1L, 100L)).thenReturn(List.of("team-1", "team-2"));
         when(metaModelService.getModelDefinition("model.task")).thenReturn(Optional.of(ModelDefinition.builder().build()));
-        when(metaModelService.findByCode("model.task")).thenReturn(MetaModelDTO.builder()
+        when(metaModelService.findExtensionByCode("model.task")).thenReturn(MetaModelDTO.builder()
                 .extension(Map.of("dataScope", Map.of("teamField", "org_team_pid")))
-                .build());
+                .build().getExtension());
 
         DataScopeCondition c = service.resolveScope(5L, "model.task", "read");
 
@@ -328,9 +328,9 @@ class DataScopeServiceImplTest {
         when(tenantMemberMapper.selectById(5L)).thenReturn(m);
         when(teamMemberService.getTeamPidsByUserId(1L, 100L)).thenReturn(List.of());
         when(metaModelService.getModelDefinition("model.task")).thenReturn(Optional.of(ModelDefinition.builder().build()));
-        when(metaModelService.findByCode("model.task")).thenReturn(MetaModelDTO.builder()
+        when(metaModelService.findExtensionByCode("model.task")).thenReturn(MetaModelDTO.builder()
                 .extension(Map.of("dataScope", Map.of("teamField", "org_team_pid")))
-                .build());
+                .build().getExtension());
 
         DataScopeCondition c = service.resolveScope(5L, "model.task", "read");
         assertThat(c.scopeType()).isEqualTo("self");
@@ -358,9 +358,9 @@ class DataScopeServiceImplTest {
         when(tenantMemberMapper.selectById(5L)).thenReturn(m);
         when(teamMemberService.getTeamPidsByUserId(1L, 100L)).thenReturn(List.of("team-1"));
         when(metaModelService.getModelDefinition("model.task")).thenReturn(Optional.of(ModelDefinition.builder().build()));
-        when(metaModelService.findByCode("model.task")).thenReturn(MetaModelDTO.builder()
+        when(metaModelService.findExtensionByCode("model.task")).thenReturn(MetaModelDTO.builder()
                 .extension(Map.of("dataScope", Map.of("teamField", "org_team_pid")))
-                .build());
+                .build().getExtension());
 
         // MAX takes the higher-priority TEAM condition (documented merge rule)
         assertThat(service.resolveScope(5L, "model.task", "read").scopeType()).isEqualTo("team");
@@ -403,10 +403,10 @@ class DataScopeServiceImplTest {
                 .thenReturn(List.of("dept-1", "dept-1.1"));
         when(metaModelService.getModelDefinition("crm_opportunity_common"))
                 .thenReturn(Optional.of(ModelDefinition.builder().build()));
-        when(metaModelService.findByCode("crm_opportunity_common")).thenReturn(
+        when(metaModelService.findExtensionByCode("crm_opportunity_common")).thenReturn(
                 MetaModelDTO.builder().extension(Map.of("dataScope", Map.of(
                         "ownerField", "crm_opp_owner",
-                        "departmentOwnerField", "crm_opp_owner"))).build());
+                        "departmentOwnerField", "crm_opp_owner"))).build().getExtension());
         when(metaModelService.getFieldDataType("crm_opportunity_common", "crm_opp_owner"))
                 .thenReturn(DataTypeMapping.builder().javaType("String").build());
 
@@ -463,7 +463,7 @@ class DataScopeServiceImplTest {
         MetaModelDTO modelDto = MetaModelDTO.builder()
                 .extension(Map.of("dataScope", Map.of("ownerField", ownerField)))
                 .build();
-        when(metaModelService.findByCode(resourceCode)).thenReturn(modelDto);
+        when(metaModelService.findExtensionByCode(resourceCode)).thenReturn(modelDto.getExtension());
     }
 
     @Test

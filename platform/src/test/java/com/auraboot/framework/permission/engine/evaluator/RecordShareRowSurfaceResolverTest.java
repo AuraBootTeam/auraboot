@@ -2,7 +2,6 @@ package com.auraboot.framework.permission.engine.evaluator;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.FieldDefinition;
-import com.auraboot.framework.meta.dto.MetaModelDTO;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.permission.engine.model.SharedRootReference;
 import com.auraboot.framework.permission.service.RecordShareService;
@@ -36,18 +35,16 @@ class RecordShareRowSurfaceResolverTest {
         MetaContext.clear();
     }
 
-    private MetaModelDTO modelWithDeclaration(Map<String, Object> extension) {
-        MetaModelDTO model = org.mockito.Mockito.mock(MetaModelDTO.class);
-        when(model.getExtension()).thenReturn(extension);
-        return model;
+    private Map<String, Object> modelWithDeclaration(Map<String, Object> extension) {
+        return extension;
     }
 
     @Test
     void resolvesDeclaredEdgeWhenRootIsShared() {
         MetaContext.setContext(99L, 7L, "user_pid_7", "user");
-        MetaModelDTO model = modelWithDeclaration(Map.of(
+        Map<String, Object> model = modelWithDeclaration(Map.of(
                 "recordShare", Map.of("rootModel", "qo_quote_common", "referenceField", "qo_ql_quote_id")));
-        when(metaModelService.findByCode("qo_quote_line_common")).thenReturn(model);
+        when(metaModelService.findExtensionByCode("qo_quote_line_common")).thenReturn(model);
         when(metaModelService.getModelFields("qo_quote_line_common")).thenReturn(List.of(
                 FieldDefinition.builder()
                         .code("qo_ql_quote_id")
@@ -72,8 +69,8 @@ class RecordShareRowSurfaceResolverTest {
     @Test
     void withoutDeclarationReturnsEmptyAndNeverQueriesShares() {
         MetaContext.setContext(99L, 7L, "user_pid_7", "user");
-        MetaModelDTO model = modelWithDeclaration(Map.of("icon", "List"));
-        when(metaModelService.findByCode("some_model")).thenReturn(model);
+        Map<String, Object> model = modelWithDeclaration(Map.of("icon", "List"));
+        when(metaModelService.findExtensionByCode("some_model")).thenReturn(model);
 
         assertTrue(resolver.resolveSharedRootReferences(99L, 1L, "some_model", "read").isEmpty());
         verify(recordShareService, never()).getSharedRecordPids(any(), any(), anyLong(), any(), any());
@@ -82,9 +79,9 @@ class RecordShareRowSurfaceResolverTest {
     @Test
     void unknownDeclaredFieldFailsClosed() {
         MetaContext.setContext(99L, 7L, "user_pid_7", "user");
-        MetaModelDTO model = modelWithDeclaration(Map.of(
+        Map<String, Object> model = modelWithDeclaration(Map.of(
                 "recordShare", Map.of("rootModel", "qo_quote_common", "referenceField", "not_a_field")));
-        when(metaModelService.findByCode("qo_quote_line_common")).thenReturn(model);
+        when(metaModelService.findExtensionByCode("qo_quote_line_common")).thenReturn(model);
         when(metaModelService.getModelFields("qo_quote_line_common")).thenReturn(List.of(
                 FieldDefinition.builder()
                         .code("qo_ql_quote_id")
@@ -101,9 +98,9 @@ class RecordShareRowSurfaceResolverTest {
     @Test
     void stringTypedFkFieldIsHonoredByValueEquality() {
         MetaContext.setContext(99L, 7L, "user_pid_7", "user");
-        MetaModelDTO model = modelWithDeclaration(Map.of(
+        Map<String, Object> model = modelWithDeclaration(Map.of(
                 "recordShare", Map.of("rootModel", "qo_quote_common", "referenceField", "qo_pfrh_quote_id")));
-        when(metaModelService.findByCode("qo_quote_line_common")).thenReturn(model);
+        when(metaModelService.findExtensionByCode("qo_quote_line_common")).thenReturn(model);
         when(metaModelService.getModelFields("qo_quote_line_common")).thenReturn(List.of(
                 FieldDefinition.builder()
                         .code("qo_pfrh_quote_id")
@@ -122,9 +119,9 @@ class RecordShareRowSurfaceResolverTest {
     @Test
     void rootWithoutSharesYieldsEmptySurface() {
         MetaContext.setContext(99L, 7L, "user_pid_7", "user");
-        MetaModelDTO model = modelWithDeclaration(Map.of(
+        Map<String, Object> model = modelWithDeclaration(Map.of(
                 "recordShare", Map.of("rootModel", "qo_quote_common", "referenceField", "qo_ql_quote_id")));
-        when(metaModelService.findByCode("qo_quote_line_common")).thenReturn(model);
+        when(metaModelService.findExtensionByCode("qo_quote_line_common")).thenReturn(model);
         when(metaModelService.getModelFields("qo_quote_line_common")).thenReturn(List.of(
                 FieldDefinition.builder()
                         .code("qo_ql_quote_id")
