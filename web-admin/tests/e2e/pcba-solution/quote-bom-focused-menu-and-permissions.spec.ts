@@ -347,7 +347,7 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
 
   test('backend command permissions reject cross-role operations without 500', async ({
     browser,
-  }) => {
+  }, testInfo) => {
     for (const [label, user] of [
       ['sales', users.qoSales],
       ['procurement', users.qoProcurement],
@@ -393,6 +393,14 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
     });
 
     await withRolePage(browser, users.noBusinessRole, async (page) => {
+      const beforeGrant = await fetchRoleSnapshot(page);
+      expectNoQuoteMenus(beforeGrant, 'no-role before grant');
+      expectNoBomMenus(beforeGrant, 'no-role before grant');
+      expectExcludes(beforeGrant.menuPaths, [...QUOTE_MENU_PATHS, ...BUSINESS_MENU_PATHS],
+        'no-role business routes before grant');
+      expectExcludes(beforeGrant.permissionCodes,
+        [...QUOTE_PERMISSIONS, ...BOM_BUSINESS_PERMISSIONS, ...BOM_ADMIN_PERMISSIONS],
+        'no-role before grant');
       await expectCommandDenied(page, 'qo_quote_common:create', {}, undefined, 'create');
       await expectCommandDenied(page, 'bom:create_project', bomProjectPayload(`${uid}-norole`));
       await expectCommandDenied(page, 'org:create_department', { org_dept_name: `X-${uid}-norole` });
@@ -425,6 +433,10 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
       });
       expect(grant.status(), 'role grant via admin API succeeds').toBe(200);
       await expectCommandNotDenied(page, 'qo_quote_common:create', {}, undefined, 'create');
+      const afterGrant = await fetchRoleSnapshot(page);
+      expectIncludes(afterGrant.roleCodes, ['qo_sales'], 'same-session granted role');
+      expectIncludes(afterGrant.permissionCodes, QUOTE_PERMISSIONS, 'same-session granted permissions');
+      expectIncludes(afterGrant.menuPaths, [QUOTE_MENU_PATH], 'same-session configured role menu');
 
       // assign-by-code treats an empty roleCodes list as a no-op, so the
       // revoke uses the platform remove-by-pid endpoint (service-layer change
@@ -445,6 +457,19 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
       expect(revoke.status(), 'role revoke via admin API succeeds').toBe(200);
       await adminContext.close();
       await expectCommandDenied(page, 'qo_quote_common:create', {}, undefined, 'create');
+      const afterRevoke = await fetchRoleSnapshot(page);
+      expectNoQuoteMenus(afterRevoke, 'same-session revoked role');
+      expectNoBomMenus(afterRevoke, 'same-session revoked role');
+      expectExcludes(afterRevoke.menuPaths, [...QUOTE_MENU_PATHS, ...BUSINESS_MENU_PATHS],
+        'same-session revoked business routes');
+      expectExcludes(afterRevoke.roleCodes, ['qo_sales'], 'same-session revoked role');
+      expectExcludes(afterRevoke.permissionCodes,
+        [...QUOTE_PERMISSIONS, ...BOM_BUSINESS_PERMISSIONS, ...BOM_ADMIN_PERMISSIONS],
+        'same-session revoked permissions');
+      await testInfo.attach('no-role-authorization-lifecycle', {
+        body: JSON.stringify({ beforeGrant, afterGrant, afterRevoke }),
+        contentType: 'application/json',
+      });
     });
   });
 });
