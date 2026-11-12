@@ -131,6 +131,81 @@ class BusinessCommandRecordAuthorizationTest {
         verify(bindings, times(2)).findBusinessGrants(100L, 1L, 5L, CODE);
     }
 
+    @Test void inheritedDomainLevelsReadEachCandidateOncePerInvocation() {
+        var domains = bomDomainAuthorization();
+        when(bindings.findBusinessGrants(100L, 1L, 5L, "bom.cap.write"))
+                .thenReturn(List.of(grant(11, 101, "bom.cap.write")));
+        domains.withinInvocation(() -> {
+            assertThat(domains.authorize("bom.cap.write")).isTrue();
+            assertThat(domains.authorize("bom.cap.read")).isTrue();
+            assertThat(domains.authorize("bom.cap.write")).isTrue();
+            return null;
+        });
+        for (String level : List.of("read", "write", "manage"))
+            verify(bindings).findBusinessGrants(100L, 1L, 5L, "bom.cap." + level);
+    }
+
+    @Test void inheritedCandidateReuseDoesNotDiscardAHigherLevelDeny() {
+        var domains = bomDomainAuthorization();
+        when(bindings.findBusinessGrants(100L, 1L, 5L, "bom.cap.write"))
+                .thenReturn(List.of(grant(11, 101, "bom.cap.write")));
+        var deniedManage = grant(22, 202, "bom.cap.manage");
+        deniedManage.setGrantType("deny");
+        when(bindings.findBusinessGrants(100L, 1L, 5L, "bom.cap.manage")).thenReturn(List.of(deniedManage));
+        domains.withinInvocation(() -> {
+            assertThat(domains.authorize("bom.cap.write")).isTrue();
+            assertThat(domains.authorize("bom.cap.manage")).isFalse();
+            assertThat(domains.authorize("bom.cap.read")).isTrue();
+            return null;
+        });
+        verify(bindings).findBusinessGrants(100L, 1L, 5L, "bom.cap.manage");
+    }
+
+    @Test void nestedInvocationsReadFreshCandidatesAndRestoreOnlyTheirOwnCaller() {
+        var domains = bomDomainAuthorization();
+        when(bindings.findBusinessGrants(100L, 1L, 5L, "bom.cap.write"))
+                .thenReturn(List.of(grant(11, 101, "bom.cap.write")), List.of(), List.of());
+        domains.withinInvocation(() -> {
+            assertThat(domains.authorize("bom.cap.write")).isTrue();
+            domains.withinInvocation(() -> {
+                assertThat(domains.authorize("bom.cap.write")).isFalse();
+                return null;
+            });
+            assertThat(domains.authorize("bom.cap.write")).isTrue();
+            return null;
+        });
+        assertThat(domains.authorize("bom.cap.write")).isFalse();
+        verify(bindings, times(3)).findBusinessGrants(100L, 1L, 5L, "bom.cap.write");
+    }
+
+    @Test void candidateQueriesOutsideInvocationsAreNeverReused() {
+        var domains = bomDomainAuthorization();
+        when(bindings.findBusinessGrants(100L, 1L, 5L, "bom.cap.write"))
+                .thenReturn(List.of(grant(11, 101, "bom.cap.write")), List.of());
+        assertThat(domains.authorize("bom.cap.write")).isTrue();
+        assertThat(domains.authorize("bom.cap.write")).isFalse();
+        verify(bindings, times(2)).findBusinessGrants(100L, 1L, 5L, "bom.cap.write");
+    }
+
+    @Test void cachedCandidatesCannotFollowAnActorOrTenantSwitch() {
+        var domains = bomDomainAuthorization();
+        when(bindings.findBusinessGrants(100L, 1L, 5L, "bom.cap.write"))
+                .thenReturn(List.of(grant(11, 101, "bom.cap.write")));
+        domains.withinInvocation(() -> {
+            assertThat(domains.authorize("bom.cap.write")).isTrue();
+            MetaContext.setMemberId(6L);
+            assertThatThrownBy(() -> domains.grants("bom.cap.write")).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            MetaContext.setContext(100L, 2L, "other-actor", "other"); MetaContext.setMemberId(5L);
+            assertThatThrownBy(() -> domains.grants("bom.cap.write")).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            MetaContext.setContext(101L, 1L, "actor-pid", "actor"); MetaContext.setMemberId(5L);
+            assertThatThrownBy(() -> domains.grants("bom.cap.write")).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            MetaContext.setContext(100L, 1L, "actor-pid", "actor"); MetaContext.setMemberId(5L);
+            assertThat(domains.authorize("bom.cap.write")).isTrue();
+            return null;
+        });
+        verify(bindings).findBusinessGrants(100L, 1L, 5L, "bom.cap.write");
+    }
+
     @Test void internalDerivedWritesReuseTheDutyButStillEnforceObjectAndFieldConstraints() {
         var definition = permission(CODE); definition.setResourceCode("domain"); definition.setAction("write");
         definition.setExtension(Map.of("domainModels", Map.of(MODEL, List.of("read"))));
@@ -675,6 +750,19 @@ class BusinessCommandRecordAuthorizationTest {
 
     private void grants(RolePermissionMapper.BusinessGrantRow... rows) {
         when(bindings.findBusinessGrants(100L, 1L, 5L, CODE)).thenReturn(List.of(rows));
+    }
+    private DomainCommandAuthorization bomDomainAuthorization() {
+        var levels = List.of("read", "write", "manage");
+        for (int index = 0; index < levels.size(); index++) {
+            String code = "bom.cap." + levels.get(index);
+            var definition = permission(code); definition.setResourceCode("bom"); definition.setAction(levels.get(index));
+            definition.setExtension(Map.of("domainModels", Map.of("bom_task", List.of("read", "update"))));
+            when(snapshots.resolvePermissionDefinition(100L, code)).thenReturn(definition);
+            when(snapshots.domainPermissionAlternatives(100L, code))
+                    .thenReturn(levels.subList(index, levels.size()).stream().map(level -> "bom.cap." + level).toList());
+            when(bindings.findBusinessGrants(100L, 1L, 5L, code)).thenReturn(List.of());
+        }
+        return new DomainCommandAuthorization(snapshots, bindings);
     }
     private void guards(String code, PermissionPolicyService.ConditionGuard... guards) {
         when(policies.getConditionGuards(5L, code)).thenReturn(List.of(guards));

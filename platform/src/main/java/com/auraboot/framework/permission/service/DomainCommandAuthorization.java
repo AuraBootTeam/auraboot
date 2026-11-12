@@ -19,6 +19,7 @@ public class DomainCommandAuthorization {
     private static final class Frame {
         final Long tenant = MetaContext.getCurrentTenantId(), user = MetaContext.getCurrentUserId(), member = MetaContext.getCurrentMemberId();
         final Map<String, List<RolePermissionMapper.BusinessGrantRow>> grants = new HashMap<>();
+        final Map<String, List<RolePermissionMapper.BusinessGrantRow>> candidateGrants = new HashMap<>();
         void verify() {
             if (!Objects.equals(tenant, MetaContext.getCurrentTenantId()) || !Objects.equals(user, MetaContext.getCurrentUserId())
                     || !Objects.equals(member, MetaContext.getCurrentMemberId())) throw denied();
@@ -70,13 +71,26 @@ public class DomainCommandAuthorization {
         if (alternatives == null || alternatives.isEmpty()) alternatives = List.of(code);
         List<RolePermissionMapper.BusinessGrantRow> result = new ArrayList<>();
         for (String candidate : alternatives) {
-            var rows = bindings.findBusinessGrants(MetaContext.getCurrentTenantId(), MetaContext.getCurrentUserId(), MetaContext.getCurrentMemberId(), candidate);
-            if (rows == null) throw denied();
+            var rows = candidateGrants(candidate);
             // Denying a higher operation does not remove a separately granted lower one.
             rows.stream().filter(row -> candidate.equals(code) || "grant".equals(row.getGrantType())).forEach(result::add);
         }
         return result.stream().collect(java.util.stream.Collectors.toMap(RolePermissionMapper.BusinessGrantRow::getId,
                 row -> row, (first, second) -> first, LinkedHashMap::new)).values().stream().toList();
+    }
+
+    private List<RolePermissionMapper.BusinessGrantRow> candidateGrants(String code) {
+        Frame frame = CURRENT.get();
+        if (frame == null) return readCandidateGrants(code);
+        frame.verify();
+        // Retain raw denies: inheritance filtering depends on the requested level.
+        return frame.candidateGrants.computeIfAbsent(code, this::readCandidateGrants);
+    }
+
+    private List<RolePermissionMapper.BusinessGrantRow> readCandidateGrants(String code) {
+        var rows = bindings.findBusinessGrants(MetaContext.getCurrentTenantId(), MetaContext.getCurrentUserId(), MetaContext.getCurrentMemberId(), code);
+        if (rows == null) throw denied();
+        return List.copyOf(rows);
     }
     private static AccessDeniedException denied() { return new AccessDeniedException("Business domain authorization context is unavailable"); }
 }
