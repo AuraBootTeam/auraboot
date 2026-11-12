@@ -60,7 +60,7 @@ public class RoleNavigationService {
         var base=scope.menus(all);
         Set<String> codes=roleCodes(role);
         var protectedTargets=configuration.defaultTargetMenus(role.getTenantId());
-        var stored=selected(role,all,codes);
+        var stored=selected(role,all,codes,scope.active());
         var selected=new TreeSet<>(stored);
         if(scope.active())selected.retainAll(base.stream().map(Menu::getPid).toList());
         Map<Long,String> pids=new HashMap<>();base.forEach(m->pids.put(m.getId(),m.getPid()));
@@ -94,7 +94,7 @@ public class RoleNavigationService {
         var scope=catalogPolicy.read(role.getTenantId());
         if(scope.active()) {
             var all=configuration.allEffectiveMenus(role.getTenantId());
-            retained.addAll(selected(role,all,roleCodes(role)));
+            retained.addAll(selected(role,all,roleCodes(role),false));
             retained.removeAll(scope.menus(all).stream().map(Menu::getPid).toList());
         }
         var persisted=new TreeSet<>(proposed);persisted.addAll(retained);
@@ -117,9 +117,10 @@ public class RoleNavigationService {
             var ids=new LinkedHashSet<>(snapshots.getUserRoleIds(tenant,user,member));
             var baseline=roles.findByTenantIdAndCode(tenant,"tenant_member");if(baseline!=null)ids.add(baseline.getId());
             var result=new HashSet<String>();
+            boolean scoped=catalogPolicy.read(tenant).active();
             if(!ids.isEmpty())for(Role role:roles.selectBatchIds(ids))
                 if(Objects.equals(tenant,role.getTenantId())&&!Boolean.TRUE.equals(role.getDeletedFlag())&&"active".equalsIgnoreCase(role.getStatus()))
-                    result.addAll(selected(role,menus,roleCodes(role)));
+                    result.addAll(selected(role,menus,roleCodes(role),scoped));
             return Set.copyOf(result);
         });
     }
@@ -147,9 +148,10 @@ public class RoleNavigationService {
     private void requireMenu(String pid){if(configuration.effectiveMenus(MetaContext.getCurrentTenantId()).stream().noneMatch(m->pid.equals(m.getPid())&&Integer.valueOf(1).equals(m.getType())))throw new AccessDeniedException("Assignable navigation entry required");}
     private String entryRevision(String menuPid){return digest(List.of(menuPid,tenantRoles().stream().map(this::selection).toList()));}
     private boolean explicit(Role role){return jdbc.queryForObject("SELECT count(*) FROM ab_role_navigation_state WHERE tenant_id=? AND role_id=?",Integer.class,role.getTenantId(),role.getId())>0;}
-    private Set<String> selected(Role role,List<Menu> menus,Set<String> codes){
+    private Set<String> selected(Role role,List<Menu> menus,Set<String> codes,boolean inheritDirectoryPermission){
         if(explicit(role))return new TreeSet<>(jdbc.queryForList("SELECT menu_pid FROM ab_role_navigation_menu WHERE tenant_id=? AND role_id=? ORDER BY menu_pid",String.class,role.getTenantId(),role.getId()));
-        return menus.stream().filter(m->!Integer.valueOf(0).equals(m.getType())&&!custom(m)&&legacyAllowed(m,codes)).map(Menu::getPid).collect(java.util.stream.Collectors.toCollection(TreeSet::new));
+        var byId=new HashMap<Long,Menu>();menus.forEach(menu->byId.put(menu.getId(),menu));
+        return menus.stream().filter(m->!Integer.valueOf(0).equals(m.getType())&&!custom(m)&&legacyAllowed(m,codes,byId,inheritDirectoryPermission)).map(Menu::getPid).collect(java.util.stream.Collectors.toCollection(TreeSet::new));
     }
     Set<String> roleCodes(Role role){return snapshots.withFreshReads(()->snapshots.resolvePermissionCodes(role.getTenantId(),snapshots.getEffectiveRolePermissionIds(role.getTenantId(),role.getId())));}
     private String targetPermission(Menu menu,List<Menu> sources){
@@ -159,7 +161,20 @@ public class RoleNavigationService {
         return target==null?null:target.getPermissionCode();
     }
     private boolean targetAllowed(Menu menu,List<Menu> sources,Set<String> codes){String code=targetPermission(menu,sources);return code==null||code.isBlank()||codes.contains(code);}
-    static boolean legacyAllowed(Menu menu,Set<String> codes){return menu.getPermissionCode()==null||menu.getPermissionCode().isBlank()||codes.contains(menu.getPermissionCode());}
+    /** Only scoped legacy fallback inherits an unspecified leaf's declared directory requirement.
+     * Explicit role selections stay independent; unrelated product behavior stays unchanged.
+     */
+    static boolean legacyAllowed(Menu menu,Set<String> codes,Map<Long,Menu> byId,boolean inheritDirectoryPermission){
+        Menu current=menu;var visited=new HashSet<Menu>();
+        while(current!=null){
+            if(!visited.add(current))return false;
+            String code=current.getPermissionCode();
+            if(code!=null&&!code.isBlank())return codes.contains(code);
+            if(!inheritDirectoryPermission)return true;
+            current=current.getParentId()==null?null:byId.get(current.getParentId());
+        }
+        return true;
+    }
     private static boolean custom(Menu menu){return menu.getExtension()!=null&&Boolean.TRUE.equals(menu.getExtension().get("navigationCustom"));}
     void requireManager(){
         Long user=MetaContext.getCurrentUserId();

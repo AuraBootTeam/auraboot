@@ -387,9 +387,15 @@ test.describe('Quote/BOM per-role menu smoke @smoke', () => {
         // 3. walk EVERY visible menu via the sidebar; assert page renders, no forbidden text
         // (soft: keep going so a single run reports the FULL gap inventory)
         const leaves = await fetchLeafMenus(page);
+        const catalogResponse = await page.request.get('/api/tenant-preferences/application.catalog.bom-quote');
+        expect(catalogResponse.ok()).toBe(true);
+        const catalogBody = await catalogResponse.json();
+        expect(String(catalogBody.code)).toBe('0');
+        const catalog = catalogBody.data?.value;
+        const auditInCurrentProduct = !catalog || catalog.menuCodes.includes('audit_log_view');
         expect(leaves.filter(menu => menu.systemGroup).map(menu => menu.code).sort(),
-          'An audit-only navigation parent must not expose administrative leaves')
-          .toEqual(contract.roleCode === 'qo_procurement' ? ['audit_log_view'] : []);
+          'Current product scope must not expose administrative leaves to business roles')
+          .toEqual(contract.roleCode === 'qo_procurement' && auditInCurrentProduct ? ['audit_log_view'] : []);
         const problems = await traverseMenus(page, leaves, collector.setMenu, true);
         expect
           .soft(problems, `${contract.user.key} traversal problems:\n${problems.join('\n')}`)

@@ -899,6 +899,33 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
         }
     }
 
+    @Test void productLegacyNavigationUsesDirectoryRequirementButExplicitSelectionRemainsIndependent(){
+        var initial=drafts.snapshot(rolePid);
+        drafts.apply(rolePid,new RoleAuthorizationDraftRequest(initial.revision(),Set.of(readCapability),Set.of(),false,null,false,List.of()));
+        String directory=UniqueIdGenerator.generate(),inherited=UniqueIdGenerator.generate(),own=UniqueIdGenerator.generate();
+        Long directoryId=IdWorker.getId();
+        jdbc.update("INSERT INTO ab_menu(id,pid,tenant_id,code,name,type,permission_code,visible,status,deleted_flag) VALUES(?,?,?,?,?,0,?,TRUE,'active',FALSE)",directoryId,directory,getTestTenant().getId(),resource+"_group","Declared group",updateCode);
+        for(var entry:Map.of(inherited,resource+"_inherited",own,resource+"_own").entrySet())
+            jdbc.update("INSERT INTO ab_menu(id,pid,tenant_id,parent_id,code,name,type,path,permission_code,visible,status,deleted_flag) VALUES(?,?,?,?,?,?,1,'/home',?,TRUE,'active',FALSE)",IdWorker.getId(),entry.getKey(),getTestTenant().getId(),directoryId,entry.getValue(),entry.getValue(),entry.getKey().equals(own)?readCode:null);
+        try {
+            assertThat(navigation.read(rolePid).selectedMenuPids()).contains(inherited,own);
+            productCatalog(List.of(readCapability),List.of(resource+"_group",resource+"_inherited",resource+"_own"));
+            var legacy=navigation.read(rolePid);
+            assertThat(legacy.mode()).isEqualTo("legacy");
+            assertThat(legacy.selectedMenuPids()).contains(own).doesNotContain(inherited);
+            String grantBefore=migrationBindingBytes();
+            var explicit=navigation.save(rolePid,new com.auraboot.framework.menu.dto.RoleNavigation.Write(legacy.revision(),Set.of(inherited)));
+            assertThat(explicit.mode()).isEqualTo("explicit");
+            assertThat(explicit.selectedMenuPids()).containsExactly(inherited);
+            assertThat(migrationBindingBytes()).isEqualTo(grantBefore);
+            assertThat(persistedCodes()).doesNotContain(updateCode);
+        } finally {
+            jdbc.update("DELETE FROM ab_role_navigation_menu WHERE tenant_id=? AND role_id=?",getTestTenant().getId(),roleId);
+            jdbc.update("DELETE FROM ab_role_navigation_state WHERE tenant_id=? AND role_id=?",getTestTenant().getId(),roleId);
+            jdbc.update("DELETE FROM ab_menu WHERE tenant_id=? AND pid IN (?,?,?)",getTestTenant().getId(),directory,inherited,own);
+        }
+    }
+
     @Test void productCatalogChangeRejectsAnOlderJointDraftBeforeAnyGrantWrites() {
         productCatalog(List.of(readCapability,editCapability),List.of());
         var before=drafts.snapshot(rolePid);String facts=migrationBindingBytes();
