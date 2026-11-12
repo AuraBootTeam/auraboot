@@ -50,6 +50,8 @@ final class DynamicDataListingSupport extends BaseMetaService {
 
     private final ExecutorRegistry executorRegistry;
 
+    private final NativeReadFieldProjection nativeReadFields;
+
     private final EnrichAuditUsersBeforeFieldPermissionFilterOperation enrichAuditUsersBeforeFieldPermissionFilterOperation;
 
     private final EnrichListRecordsOperation enrichListRecordsOperation;
@@ -93,6 +95,10 @@ final class DynamicDataListingSupport extends BaseMetaService {
     private ModelDefinition getModelDefinition(String modelCode) { return getModelDefinitionOperation.execute(modelCode); }
 
     PaginationResult<Map<String, Object>> list(String modelCode, DynamicQueryRequest request){
+        return nativeReadFields.readWithinSnapshot(modelCode, () -> listInSnapshot(modelCode, request));
+    }
+
+    private PaginationResult<Map<String, Object>> listInSnapshot(String modelCode, DynamicQueryRequest request){
         validateModelCode(modelCode);
         logOperation("list", modelCode, request);
 
@@ -222,6 +228,7 @@ final class DynamicDataListingSupport extends BaseMetaService {
             throw new MetaServiceException("Query validation failed: " + validation.getErrorMessage());
         }
 
+        NativeReadFieldProjection.prepareQuery(model, queryBuilder);
         // 手动添加租户ID条件到SQL和参数中
         String sql = queryBuilder.getSql();
         Map<String, Object> paramMap = queryBuilder.getParameterMap();
@@ -231,6 +238,8 @@ final class DynamicDataListingSupport extends BaseMetaService {
 
         // Read-shape contract: json/jsonb fields leave as JSON strings, never PGobject.
         JsonbFieldHelper.normalizeJsonReadValues(model, records);
+        if (!commandPermitInForce && !com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active())
+            records = nativeReadFields.project(model, records);
 
         // Build count query with same filters (including row-level data permission)
         QueryBuilderService.QueryBuilder countBuilder = queryBuilderService.buildConditionQuery(

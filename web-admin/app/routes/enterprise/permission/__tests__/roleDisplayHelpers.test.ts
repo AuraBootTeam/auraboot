@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isRecommendedBomRole, recommendedBomRoleLabel, sortRolesForPermissionSetup } from '../roleDisplayHelpers';
+import {
+  isRecommendedBomRole,
+  localizedRoleText,
+  recommendedBomRoleLabel,
+  sortRolesForPermissionSetup,
+} from '../roleDisplayHelpers';
 import type { Role } from '../types';
 
 function role(code: string, name = code): Role {
@@ -59,5 +64,33 @@ describe('roleDisplayHelpers', () => {
       'crm_admin',
       'crm_sales',
     ]);
+  });
+});
+
+describe('localizedRoleText', () => {
+  it('translates shipped descriptions in both directions', () => {
+    const procurement = {
+      ...role('qo_procurement', '采购'),
+      description:
+        'Procurement role: maintain sourcing, manual prices, costs, evidence, process points, and corrected BOM imports for QuoteOps.',
+    };
+    expect(localizedRoleText(procurement, 'description', 'zh-CN')).toContain('采购岗位');
+    expect(localizedRoleText(procurement, 'description', 'en-US')).toBe(procurement.description);
+    expect(localizedRoleText(procurement, 'name', 'en-US')).toBe('Procurement');
+    expect(
+      localizedRoleText(
+        { ...role('tenant_admin'), description: '租户管理员角色，拥有该租户的所有权限' },
+        'description',
+        'en-US',
+      ),
+    ).toContain('Tenant administrator');
+  });
+  it('preserves tenant-edited names, descriptions, and unknown roles', () => {
+    const edited = { ...role('qo_procurement', '本地采购负责人'), description: '仅处理华东客户' };
+    expect(localizedRoleText(edited, 'name', 'en-US')).toBe(edited.name);
+    expect(localizedRoleText(edited, 'description', 'en-US')).toBe(edited.description);
+    expect(localizedRoleText({ ...edited, code: 'custom_buyer' }, 'description', 'zh-CN')).toBe(
+      edited.description,
+    );
   });
 });

@@ -20,10 +20,6 @@ import com.auraboot.framework.decision.rule.RuleConsumerBinding;
 import com.auraboot.framework.decision.rule.RuleEvaluationContext;
 import com.auraboot.framework.decision.rule.RuleEvaluationService;
 import com.auraboot.framework.decision.rule.RuleEvaluationTrace;
-import com.auraboot.framework.tenant.dao.entity.TenantMember;
-import com.auraboot.framework.tenant.service.TenantMemberService;
-import com.auraboot.framework.user.dao.entity.User;
-import com.auraboot.framework.user.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -53,6 +49,7 @@ import com.auraboot.framework.common.constant.StatusConstants;
 @Service
 public class AutomationTriggerServiceImpl implements AutomationTriggerService {
 
+    private final com.auraboot.framework.permission.service.HumanActorContext actors;
     private final AutomationMapper automationMapper;
     private final AutomationLogMapper automationLogMapper;
     private final ObjectProvider<AutomationWorkflowRuntime> automationProcessRuntimeProvider;
@@ -70,12 +67,6 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
     private RuleEvaluationService ruleEvaluationService;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private UserMapper userMapper;
-
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private TenantMemberService tenantMemberService;
-
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
     private io.micrometer.tracing.Tracer tracer;
 
     private final ExpressionParser spelParser = new SpelExpressionParser();
@@ -90,29 +81,20 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
     public AutomationTriggerServiceImpl(
             AutomationMapper automationMapper,
             AutomationLogMapper automationLogMapper,
-            ObjectProvider<AutomationWorkflowRuntime> automationProcessRuntimeProvider) {
+            ObjectProvider<AutomationWorkflowRuntime> automationProcessRuntimeProvider,
+            com.auraboot.framework.permission.service.HumanActorContext actors) {
+        this.actors = actors;
         this.automationMapper = automationMapper;
         this.automationLogMapper = automationLogMapper;
         this.automationProcessRuntimeProvider = automationProcessRuntimeProvider;
     }
 
-    /**
-     * Resolve enabled automations for a trigger fan-out. The @Async fan-out methods
-     * run on worker threads whose submitting thread may carry no MetaContext at all
-     * (external-event consumers, BPM action workers, scheduler paths) — the tenant-line
-     * interceptor then throws "MetaContext not initialized" and the whole automation
-     * evaluation is silently lost. The event payload carries no tenant either, so the
-     * context-less case deliberately queries across tenants for the one model code;
-     * each match is still executed under its own automation's tenant scope by
-     * {@link #executeAutomation}. Callers with a live context keep the exact
-     * tenant-filtered behavior they had before.
-     */
+    /** Event fan-out requires a source tenant; losing context must never become global delivery. */
     private List<Automation> findAutomationsForTrigger(String modelCode, String triggerType) {
-        if (MetaContext.exists()) {
-            return automationMapper.findEnabledByModelCodeAndTriggerType(modelCode, triggerType);
-        }
-        return MetaContext.runWithoutTenantFilter(() ->
-                automationMapper.findEnabledByModelCodeAndTriggerType(modelCode, triggerType));
+        Long tenant = MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
+        if (tenant == null || tenant <= 0) throw unavailableActor();
+        // Explicit SQL binding also holds when a trusted caller has a tenant-filter bypass.
+        return automationMapper.findEnabledByModelCodeAndTriggerType(tenant, modelCode, triggerType);
     }
 
     @Override
@@ -354,73 +336,84 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
                                            Map<String, Object> triggerPayload) {
         log.info("Executing automation: pid={}", automation.getPid());
 
-        Long tenantId = MetaContext.exists() && MetaContext.getCurrentTenantId() != null
-                ? MetaContext.getCurrentTenantId()
-                : automation.getTenantId();
-
-        // Establish tenant context for the whole run when the caller has none. Triggers that
-        // ride a JWT-exempt path (the webhook receiver) or an @Async worker thread arrive with
-        // no MetaContext, so the AutomationLogMapper insert/updateStatus and the tenant-scoped
-        // command pipeline would fail with "MetaContext not initialized". The previous code
-        // relied on AutomationWorkflowRuntime.run() setting then clearing MetaContext internally,
-        // which left updateStatus() below it uncovered. Scope the whole method here; clear in
-        // finally only when we are the one who set it.
-        MetaContextSnapshot metaContextSnapshot = null;
-        if (!hasUsableAutomationActorContext() && tenantId != null) {
-            metaContextSnapshot = MetaContextSnapshot.capture();
-            establishAutomationMetaContext(automation, tenantId);
+        Long tenantId = automation.getTenantId();
+        if (tenantId == null || tenantId <= 0
+                || MetaContext.exists() && !tenantId.equals(MetaContext.getCurrentTenantId())) {
+            throw unavailableActor();
         }
+        boolean hasHumanIdentity = MetaContext.exists()
+                && (MetaContext.getCurrentUserId() != null || MetaContext.getCurrentUserPid() != null
+                    || MetaContext.getCurrentMemberId() != null);
+        Long userId = null;
+        Long memberId = null;
+        String userPid = automation.getCreatedBy();
+        if (hasHumanIdentity) {
+            userId = MetaContext.getCurrentUserId();
+            memberId = MetaContext.getCurrentMemberId();
+            userPid = MetaContext.getCurrentUserPid();
+            if (userId == null || userId <= 0 || memberId == null || memberId <= 0
+                    || !StringUtils.hasText(userPid)) throw unavailableActor();
+        } else if (!StringUtils.hasText(userPid)) {
+            throw unavailableActor();
+        }
+        // A partial caller must never change identity to the creator. Both valid sources reload
+        // live membership/roles and restore all caller authority, even when establishment fails.
+        return actors.call(tenantId, userId, userPid, memberId,
+                () -> executeAsCurrentActor(automation, recordPid, triggerPayload, tenantId));
+    }
+
+    private org.springframework.security.access.AccessDeniedException unavailableActor() {
+        return new org.springframework.security.access.AccessDeniedException(
+                "AUTOMATION_ACTOR_UNAVAILABLE: a matching tenant and complete current actor are required");
+    }
+
+    private AutomationLog executeAsCurrentActor(Automation automation, String recordPid,
+                                                Map<String, Object> triggerPayload, Long tenantId) {
+        var capabilityPreflight = automationProcessRuntimeProvider.getIfAvailable();
+        if (capabilityPreflight != null) capabilityPreflight.assertCapabilities(automation);
+        Map<String, Object> executionPayload = prepareExecutionTriggerPayload(automation, triggerPayload);
+
+        // Create log entry
+        AutomationLog logEntry = new AutomationLog();
+        logEntry.setPid(UniqueIdGenerator.generate());
+        logEntry.setTenantId(tenantId);
+        logEntry.setAutomationId(automation.getPid());
+        logEntry.setTriggerType(automation.getTriggerType());
+        logEntry.setTriggerRecordPid(recordPid);
+        logEntry.setTriggerPayload(executionPayload);
+        logEntry.setStatus(StatusConstants.RUNNING);
+        logEntry.setStartedAt(Instant.now());
+        logEntry.setCreatedAt(Instant.now());
+
+        automationLogMapper.insertLog(logEntry);
+
+        // T2: every automation runs on SmartEngine. The compiler synthesizes a linear flow
+        // from triggerType + actions[] when there is no visual flowConfig, so the flat
+        // sequential executor has been removed.
+        List<ActionResult> actionResults = List.of();
         try {
-            var capabilityPreflight = automationProcessRuntimeProvider.getIfAvailable();
-            if (capabilityPreflight != null) capabilityPreflight.assertCapabilities(automation);
-            Map<String, Object> executionPayload = prepareExecutionTriggerPayload(automation, triggerPayload);
-
-            // Create log entry
-            AutomationLog logEntry = new AutomationLog();
-            logEntry.setPid(UniqueIdGenerator.generate());
-            logEntry.setTenantId(tenantId);
-            logEntry.setAutomationId(automation.getPid());
-            logEntry.setTriggerType(automation.getTriggerType());
-            logEntry.setTriggerRecordPid(recordPid);
-            logEntry.setTriggerPayload(executionPayload);
-            logEntry.setStatus(StatusConstants.RUNNING);
-            logEntry.setStartedAt(Instant.now());
-            logEntry.setCreatedAt(Instant.now());
-
-            automationLogMapper.insertLog(logEntry);
-
-            // T2: every automation runs on SmartEngine. The compiler synthesizes a linear flow
-            // from triggerType + actions[] when there is no visual flowConfig, so the flat
-            // sequential executor has been removed.
-            List<ActionResult> actionResults = List.of();
-            try {
-                // Pass the log id through so AutomationActionAccessorImpl can persist
-                // per-node execution rows linked to this run (G5 runtime overlay).
-                actionResults = requireAutomationWorkflowRuntime().run(
-                        automation, recordPid, executionPayload, logEntry.getId());
-                logEntry.setStatus(StatusConstants.SUCCESS);
-            } catch (AutomationWorkflowRuntime.AutomationWorkflowRunException e) {
-                actionResults = e.getActionResults();
-                log.error("Automation run failed: pid={}, error={}",
-                        automation.getPid(), e.getMessage(), e);
-                logEntry.setStatus(StatusConstants.FAILED);
-                logEntry.setErrorMessage(failureMessage(e));
-            } catch (Exception e) {
-                log.error("Automation run failed: pid={}, error={}",
-                        automation.getPid(), e.getMessage(), e);
-                logEntry.setStatus(StatusConstants.FAILED);
-                logEntry.setErrorMessage(e.getMessage());
-            }
-            logEntry.setActionResults(actionResults);
-            logEntry.setCompletedAt(Instant.now());
-            automationLogMapper.updateStatus(logEntry);
-            automationMapper.updateTriggerStats(automation.getPid());
-            return logEntry;
-        } finally {
-            if (metaContextSnapshot != null) {
-                metaContextSnapshot.restore();
-            }
+            // Pass the log id through so AutomationActionAccessorImpl can persist
+            // per-node execution rows linked to this run (G5 runtime overlay).
+            actionResults = requireAutomationWorkflowRuntime().run(
+                    automation, recordPid, executionPayload, logEntry.getId());
+            logEntry.setStatus(StatusConstants.SUCCESS);
+        } catch (AutomationWorkflowRuntime.AutomationWorkflowRunException e) {
+            actionResults = e.getActionResults();
+            log.error("Automation run failed: pid={}, error={}",
+                    automation.getPid(), e.getMessage(), e);
+            logEntry.setStatus(StatusConstants.FAILED);
+            logEntry.setErrorMessage(failureMessage(e));
+        } catch (Exception e) {
+            log.error("Automation run failed: pid={}, error={}",
+                    automation.getPid(), e.getMessage(), e);
+            logEntry.setStatus(StatusConstants.FAILED);
+            logEntry.setErrorMessage(e.getMessage());
         }
+        logEntry.setActionResults(actionResults);
+        logEntry.setCompletedAt(Instant.now());
+        automationLogMapper.updateStatus(logEntry);
+        automationMapper.updateTriggerStats(automation.getPid());
+        return logEntry;
     }
 
     private String failureMessage(Throwable failure) {
@@ -477,99 +470,6 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
     }
 
     // ==================== Private Helper Methods ====================
-
-    private boolean hasUsableAutomationActorContext() {
-        if (!MetaContext.exists()) {
-            return false;
-        }
-        return MetaContext.getCurrentUserId() != null && MetaContext.getCurrentMemberId() != null;
-    }
-
-    private void establishAutomationMetaContext(Automation automation, Long tenantId) {
-        String actorPid = automation.getCreatedBy();
-        Long actorUserId = resolveAutomationActorUserId(tenantId, actorPid);
-        User actor = actorUserId != null && userMapper != null ? userMapper.selectById(actorUserId) : null;
-        String username = actor != null
-                ? firstNonBlank(actor.getUserName(), actor.getEmail(), actor.getNickName())
-                : null;
-
-        MetaContext.setContext(tenantId, actorUserId, actorPid, username);
-
-        if (actorUserId != null && tenantMemberService != null) {
-            TenantMember member = tenantMemberService.findByTenantIdAndUserId(tenantId, actorUserId);
-            if (member != null && member.getId() != null) {
-                MetaContext.setMemberId(member.getId());
-            } else {
-                log.warn("Automation actor has no tenant member: automationPid={}, tenantId={}, userId={}",
-                        automation.getPid(), tenantId, actorUserId);
-            }
-        }
-    }
-
-    private Long resolveAutomationActorUserId(Long tenantId, String actorPid) {
-        if (!StringUtils.hasText(actorPid) || userMapper == null) {
-            return null;
-        }
-        try {
-            Long userId = userMapper.findUserIdInTenantByPid(tenantId, actorPid);
-            if (userId == null) {
-                log.warn("Automation actor pid not found in tenant: tenantId={}, actorPid={}", tenantId, actorPid);
-            }
-            return userId;
-        } catch (Exception e) {
-            log.warn("Failed to resolve automation actor: tenantId={}, actorPid={}",
-                    tenantId, actorPid, e);
-            return null;
-        }
-    }
-
-    private String firstNonBlank(String... values) {
-        for (String value : values) {
-            if (StringUtils.hasText(value)) {
-                return value;
-            }
-        }
-        return null;
-    }
-
-    private record MetaContextSnapshot(
-            boolean existed,
-            Long tenantId,
-            Long userId,
-            String userPid,
-            String username,
-            Set<Long> roleIds,
-            Long memberId,
-            Long environmentId,
-            String otelTraceId) {
-
-        static MetaContextSnapshot capture() {
-            if (!MetaContext.exists()) {
-                return new MetaContextSnapshot(false, null, null, null, null, Set.of(), null, null, null);
-            }
-            return new MetaContextSnapshot(
-                    true,
-                    MetaContext.getCurrentTenantId(),
-                    MetaContext.getCurrentUserId(),
-                    MetaContext.getCurrentUserPid(),
-                    MetaContext.getCurrentUsername(),
-                    MetaContext.getCurrentRoleIds(),
-                    MetaContext.getCurrentMemberId(),
-                    MetaContext.getCurrentEnvironmentId(),
-                    MetaContext.getOtelTraceId());
-        }
-
-        void restore() {
-            if (!existed) {
-                MetaContext.clear();
-                return;
-            }
-            MetaContext.setContext(tenantId, userId, userPid, username, roleIds);
-            MetaContext.setMemberId(memberId);
-            MetaContext.setEnvironmentId(environmentId);
-            MetaContext.setOtelTraceId(otelTraceId);
-        }
-    }
 
     private void executeAutomationAsync(Automation automation, String recordPid,
                                         Map<String, Object> triggerPayload) {

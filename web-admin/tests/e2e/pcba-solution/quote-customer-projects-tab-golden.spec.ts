@@ -64,12 +64,12 @@ test.describe('customer related-projects tab golden (B01-01) @smoke', () => {
 
       const projectA = await executeCommand(own.page, 'bom:create_project', {
         bom_project_name: `E2E B01-01 Project A ${uid}`, bom_project_customer_id: customerA,
-        bom_pcba_code: `PCBA-A-${uid}`, bom_project_library_source: 'excel_current_library',
+        bom_pcba_code: `PCBA-A-${uid}`, bom_project_quality_level: 'industrial',
       }, undefined, 'create');
       const projectAId = String(projectA.recordId ?? projectA.pid ?? projectA.projectId ?? '');
       const projectB = await executeCommand(own.page, 'bom:create_project', {
         bom_project_name: `E2E B01-01 Project B ${uid}`, bom_project_customer_id: customerB,
-        bom_pcba_code: `PCBA-B-${uid}`, bom_project_library_source: 'excel_current_library',
+        bom_pcba_code: `PCBA-B-${uid}`, bom_project_quality_level: 'industrial',
       }, undefined, 'create');
       const projectBId = String(projectB.recordId ?? projectB.pid ?? projectB.projectId ?? '');
       created.rows.push({ model: 'req_requirement_set_pcba_bom', pid: projectAId });

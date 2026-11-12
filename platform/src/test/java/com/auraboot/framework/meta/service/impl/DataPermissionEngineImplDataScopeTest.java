@@ -61,6 +61,37 @@ class DataPermissionEngineImplDataScopeTest {
         MetaContext.clear();
     }
 
+    @Test void hidingAFieldCannotBeWeakenedByAHigherPrioritySharedMask() {
+        var partial=com.auraboot.framework.meta.dto.FieldMaskRule.builder().fieldCode("cost").maskType("partial").build();
+        var hidden=com.auraboot.framework.meta.dto.FieldMaskRule.builder().fieldCode("cost").maskType("hide").build();
+        assertThat(engine.applyFieldMasking(List.of(Map.of("cost","sensitive")),List.of(partial,hidden)).getFirst().get("cost")).isNull();
+        assertThat(engine.applyFieldMasking(List.of(Map.of("cost","sensitive")),List.of(hidden,partial)).getFirst().get("cost")).isNull();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.NullAndEmptySource
+    @org.junit.jupiter.params.provider.ValueSource(strings={"unknown"})
+    void malformedMaskNeverReturnsTheOriginalSensitiveValue(String mask) {
+        var policy = new com.auraboot.framework.meta.entity.DataPermissionPolicy();
+        policy.setPolicyType("column"); policy.setFieldCode("cost"); policy.setMaskType(mask);
+        when(policyMapper.findEffectivePolicies(TENANT_ID, MODEL_CODE, MEMBER_ID)).thenReturn(List.of(policy));
+        assertThat(engine.applyFieldMasking(List.of(Map.of("cost", "sensitive")),
+                engine.getFieldMaskRules(TENANT_ID, MODEL_CODE, USER_ID)))
+                .singleElement().satisfies(row -> assertThat(row).containsEntry("cost", null));
+    }
+
+    @Test void legacyUppercaseFieldPoliciesStillHideAndBlockWrites() {
+        var hidden = new com.auraboot.framework.meta.entity.DataPermissionPolicy();
+        hidden.setPolicyType(" COLUMN "); hidden.setFieldCode("cost"); hidden.setMaskType("HIDE");
+        var readOnly = new com.auraboot.framework.meta.entity.DataPermissionPolicy();
+        readOnly.setPolicyType(" FIELD_WRITE "); readOnly.setFieldCode("cost");
+        when(policyMapper.findEffectivePolicies(TENANT_ID, MODEL_CODE, MEMBER_ID)).thenReturn(List.of(hidden, readOnly));
+        var rules = engine.getFieldMaskRules(TENANT_ID, MODEL_CODE, USER_ID);
+        assertThat(engine.applyFieldMasking(List.of(Map.of("cost", "secret")), rules))
+                .singleElement().satisfies(row -> assertThat(row).containsEntry("cost", null));
+        assertThat(engine.getNonWritableFields(TENANT_ID, MODEL_CODE, USER_ID)).containsExactly("cost");
+    }
+
     @Test void exactDisplayCandidatesRetainTheBaseScopeWithoutEnumeratingOtherRoots() {
         when(required.isConfigured(MODEL_CODE)).thenReturn(true);
         when(dataScopeEvaluator.getCondition(MEMBER_ID, MODEL_CODE, "read"))
@@ -125,6 +156,57 @@ class DataPermissionEngineImplDataScopeTest {
         MetaContext.runWithCommandPermitScope("ALL",()->
                 assertThat(engine.buildRequiredReadFilterForQuery(TENANT_ID,MODEL_CODE,USER_ID,List.of(),"chosen")).isEqualTo("AND 1 = 0"));
         org.mockito.Mockito.verifyNoInteractions(policyMapper,dataScopeEvaluator);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"self","SELF"," SeLf "})
+    void legacyRowPolicyCaseUsesTheSameRestrictionsInSqlRecordsAndHistoricalChecks(String scope) {
+        var policy=new com.auraboot.framework.meta.entity.DataPermissionPolicy();policy.setPolicyType("ROW");policy.setScopeType(scope);
+        when(policyMapper.findEffectivePolicies(TENANT_ID,MODEL_CODE,MEMBER_ID)).thenReturn(List.of(policy));
+        var own=Map.<String,Object>of("created_by",USER_ID);var other=Map.<String,Object>of("created_by",USER_ID+1);
+        assertThat(engine.buildRowFilter(TENANT_ID,MODEL_CODE,USER_ID)).contains("created_by = "+USER_ID);
+        assertThat(engine.filterRecords(TENANT_ID,MODEL_CODE,USER_ID,List.of(own,other))).containsExactly(own);
+        assertThat(engine.canAccessRecord(TENANT_ID,MODEL_CODE,USER_ID,own)).isTrue();
+        assertThat(engine.canAccessRecord(TENANT_ID,MODEL_CODE,USER_ID,other)).isFalse();
+        when(dataScopeEvaluator.getHistoricalCondition(MEMBER_ID,MODEL_CODE,"read")).thenReturn(DataScopeCondition.all());
+        when(dataScopeEvaluator.evaluateHistorical(MEMBER_ID,MODEL_CODE,"read",own))
+                .thenReturn(new EvaluationStep("DataScope",EvaluationVerdict.ALLOW,"Explicit all"));
+        assertThat(engine.canAccessHistoricalRecord(TENANT_ID,MODEL_CODE,USER_ID,MEMBER_ID,own)).isTrue();
+        assertThat(engine.canAccessHistoricalRecord(TENANT_ID,MODEL_CODE,USER_ID,MEMBER_ID,other)).isFalse();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.NullAndEmptySource
+    @org.junit.jupiter.params.provider.ValueSource(strings={"unknown","SELF_TYPO"," "})
+    void malformedStoredRowScopeNeverBecomesAnUnrestrictedFilter(String scope) {
+        var policy=new com.auraboot.framework.meta.entity.DataPermissionPolicy();policy.setPolicyType("row");policy.setScopeType(scope);
+        when(policyMapper.findEffectivePolicies(TENANT_ID,MODEL_CODE,MEMBER_ID)).thenReturn(List.of(policy));
+        var own=Map.<String,Object>of("created_by",USER_ID);
+        assertThat(engine.buildRowFilter(TENANT_ID,MODEL_CODE,USER_ID)).contains("1=0");
+        assertThat(engine.filterRecords(TENANT_ID,MODEL_CODE,USER_ID,List.of(own))).isEmpty();
+        assertThat(engine.canAccessRecord(TENANT_ID,MODEL_CODE,USER_ID,own)).isFalse();
+        assertThat(engine.canAccessHistoricalRecord(TENANT_ID,MODEL_CODE,USER_ID,MEMBER_ID,own)).isFalse();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.NullAndEmptySource
+    void emptyLegacyCustomPolicyDoesNotAllowAllOrApproximateSelf(String expression) {
+        var policy=new com.auraboot.framework.meta.entity.DataPermissionPolicy();policy.setPolicyType("row");
+        policy.setScopeType("CUSTOM");policy.setScopeExpression(expression);
+        when(policyMapper.findEffectivePolicies(TENANT_ID,MODEL_CODE,MEMBER_ID)).thenReturn(List.of(policy));
+        var own=Map.<String,Object>of("created_by",USER_ID);
+        assertThat(engine.buildRowFilter(TENANT_ID,MODEL_CODE,USER_ID)).contains("1=0");
+        assertThat(engine.filterRecords(TENANT_ID,MODEL_CODE,USER_ID,List.of(own))).isEmpty();
+        assertThat(engine.canAccessRecord(TENANT_ID,MODEL_CODE,USER_ID,own)).isFalse();
+    }
+
+    @Test void unsupportedStoredPolicyTypeCannotDisappearFromAuthorization() {
+        var policy=new com.auraboot.framework.meta.entity.DataPermissionPolicy();policy.setPolicyType("unsupported");policy.setScopeType("all");
+        when(policyMapper.findEffectivePolicies(TENANT_ID,MODEL_CODE,MEMBER_ID)).thenReturn(List.of(policy));
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->engine.buildRowFilter(TENANT_ID,MODEL_CODE,USER_ID))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->engine.getFieldMaskRules(TENANT_ID,MODEL_CODE,USER_ID))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
     }
 
     @Test

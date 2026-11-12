@@ -38,6 +38,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class CommandAuthorizationPhase implements CommandPhase {
 
     private final UserPermissionService userPermissionService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.permission.service.DomainCommandAuthorization domains;
     private final RecordShareService recordShareService;
     private final ObjectProvider<DynamicDataService> dynamicDataServiceProvider;
 
@@ -81,6 +83,14 @@ public class CommandAuthorizationPhase implements CommandPhase {
             return;
         }
 
+        if (domains != null && requiredPermissions.stream().anyMatch(domains::isDomain)
+                && (requiredPermissions.size() != 1 || ctx.getUserId() == null
+                    || !java.util.Objects.equals(ctx.getUserId(), MetaContext.getCurrentUserId())
+                    || !java.util.Objects.equals(ctx.getTenantId(), MetaContext.getCurrentTenantId()))) {
+            applyVerdict(ctx, CommandAuthorizationVerdict.denied(requiredPermissions));
+            throw new BusinessException(ResponseCode.FORBIDDEN, "Domain commands require one current application boundary");
+        }
+
         String installedPermission = MetaContext.getExternalCommandPermission();
         if (com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()) {
             // verify above already pinned the real published command/config/tenant. User 0 is audit-only.
@@ -104,14 +114,17 @@ public class CommandAuthorizationPhase implements CommandPhase {
             return;
         }
 
+        boolean domainDeclared = false;
         for (String permission : requiredPermissions) {
-            if (userPermissionService.hasPermission(userId, permission)) {
+            Boolean domain = domains == null ? null : domains.authorize(permission);
+            domainDeclared |= domain != null;
+            if (Boolean.TRUE.equals(domain) || domain == null && userPermissionService.hasPermission(userId, permission)) {
                 applyVerdict(ctx, CommandAuthorizationVerdict.authorized(permission));
                 return;
             }
         }
 
-        String recordSharePermission = authorizeDeclaredRecordShare(ctx);
+        String recordSharePermission = domainDeclared ? null : authorizeDeclaredRecordShare(ctx);
         if (recordSharePermission != null) {
             applyVerdict(ctx, CommandAuthorizationVerdict.authorized(recordSharePermission));
             return;

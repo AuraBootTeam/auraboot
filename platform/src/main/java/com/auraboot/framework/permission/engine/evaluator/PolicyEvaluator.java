@@ -99,6 +99,20 @@ public class PolicyEvaluator {
             }
         }
 
+        return evaluateGuards(memberId, resource, permissionCode, record, guards, false);
+    }
+
+    /** Evaluate a single grant without borrowing a condition from another role or permission. */
+    public EvaluationStep evaluateGrant(Long memberId, String permissionCode, String recordModel,
+                                         Map<String, Object> record, ConditionGuard guard) {
+        if (record == null || guard == null) {
+            return new EvaluationStep(NAME, EvaluationVerdict.DENY, "Business grant guard is missing");
+        }
+        return evaluateGuards(memberId, recordModel, permissionCode, record, List.of(guard), true);
+    }
+
+    private EvaluationStep evaluateGuards(Long memberId, String resource, String permissionCode,
+                                           Object record, List<ConditionGuard> guards, boolean business) {
         if (guards.isEmpty()) {
             // No grant rows surfaced for the guard layer (RBAC already allowed via its own path).
             return new EvaluationStep(NAME, EvaluationVerdict.NOT_APPLICABLE, "No condition guard configured");
@@ -146,7 +160,8 @@ public class PolicyEvaluator {
                 }
 
                 if (ctx == null) {
-                    ctx = fieldVocabulary.buildContext(memberId, resource, record);
+                    ctx = business ? fieldVocabulary.buildBusinessContext(memberId, resource, record)
+                            : fieldVocabulary.buildContext(memberId, resource, record);
                 }
                 EvalTrace trace = astEvaluator.evaluate(ast, ctx);
                 if (trace.result() != Truth.TRUE) {
@@ -162,7 +177,7 @@ public class PolicyEvaluator {
 
             if (hasActiveRuleCenterGuard(ruleBinding)) {
                 RuleGuardResult ruleResult = evaluateRuleCenterGuard(
-                        ruleBinding, parsedBinding.expectedMatched(), memberId, resource, permissionCode, record);
+                        ruleBinding, parsedBinding.expectedMatched(), memberId, resource, permissionCode, record, business);
                 if (!ruleResult.matchedExpected()) {
                     denyReasons.add("grant#" + guard.grantId() + ": " + ruleResult.reason());
                     Map<String, Object> detail = new LinkedHashMap<>(ruleResult.details());
@@ -345,7 +360,7 @@ public class PolicyEvaluator {
                                                      Long memberId,
                                                      String resource,
                                                      String permissionCode,
-                                                     Object record) {
+                                                     Object record, boolean business) {
         RuleEvaluationService ruleEvaluationService = ruleEvaluationServiceProvider.getIfAvailable();
         if (ruleEvaluationService == null) {
             return new RuleGuardResult(false, describe(binding)
@@ -353,7 +368,8 @@ public class PolicyEvaluator {
                     Map.of("error", "RULE_EVALUATION_SERVICE_UNAVAILABLE"));
         }
         RuleEvaluationContext context = new RuleEvaluationContext(
-                fieldVocabulary.buildScopes(memberId, resource, record),
+                business ? fieldVocabulary.buildBusinessScopes(memberId, resource, record)
+                        : fieldVocabulary.buildScopes(memberId, resource, record),
                 "PERMISSION",
                 firstNonBlank(binding.consumerCode(), permissionCode),
                 firstNonBlank(binding.consumerNodeId(), "dynamicAbac"),

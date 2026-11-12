@@ -5,7 +5,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { utils as XLSXUtils, write } from 'xlsx';
 import { expect, test } from '../../fixtures';
-import { FixtureCleanupJournal, immutableQuoteArtifactCleanup, type FixtureRow } from './fixture-cleanup';
+import { FixtureCleanupJournal, immutableQuoteArtifactCleanup, internalQuoteSnapshotCleanup, type FixtureRow } from './fixture-cleanup';
 import { loginViaUI } from '../../helpers/auth-fixtures';
 import {
   clickRowActionByLocator,
@@ -200,9 +200,12 @@ export async function openQuoteDetailFromList(page: Page, created: CreatedRows):
   expect(created.quoteId, 'quote id is required to open quote detail').toBeTruthy();
   expect(created.quoteCode, 'quote code is required to find the quote row').toBeTruthy();
 
-  await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
-  await ensureSidebarExpanded(page);
-  await clickSidebarPage(page, '/p/qo_quote_common', /报价单|Quotes/i);
+  // A caller already on the list must use its visible row, without repeating the home journey.
+  if (new URL(page.url()).pathname !== '/p/qo_quote_common') {
+    await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
+    await ensureSidebarExpanded(page);
+    await clickSidebarPage(page, '/p/qo_quote_common', /报价单|Quotes/i);
+  }
 
   const row = await findRowInPaginatedList(page, created.quoteCode, 20_000);
   await Promise.all([
@@ -509,6 +512,7 @@ export async function expectCommandDenied(
   operationType?: string,
 ): Promise<void> {
   const result = await probeCommand(page, commandCode, payload, targetRecordId, operationType);
+  expect(result.status, `${commandCode} must not fail with a server error`).toBeLessThan(500);
   expect(
     isPermissionDeniedResult(result),
     `${commandCode} should be denied, got HTTP ${result.status}: ${result.text.slice(0, 800)}`,
@@ -523,6 +527,7 @@ export async function expectCommandNotDenied(
   operationType?: string,
 ): Promise<CommandProbeResult> {
   const result = await probeCommand(page, commandCode, payload, targetRecordId, operationType);
+  expect(result.status, `${commandCode} must not fail with a server error`).toBeLessThan(500);
   expect(
     isPermissionDeniedResult(result),
     `${commandCode} should pass permission gate, got HTTP ${result.status}: ${result.text.slice(0, 800)}`,
@@ -803,6 +808,27 @@ export async function cleanupRows(page: Page, created: CreatedRows): Promise<voi
     rows.push({ model: 'qo_quote_common', pid: created.quoteId });
   }
   for (const row of rows) journal.track(row);
+  const snapshots = rows.filter(row => ['qo_bom_import_row_common', 'qo_bom_import_common'].includes(row.model));
+  if (snapshots.length) {
+    const { client, database } = await openPgClient();
+    try {
+      await client.query('BEGIN');
+      try {
+        // Purge rows before their import headers, independently of fixture insertion order.
+        for (const row of [...snapshots].sort((a, b) =>
+          Number(a.model === 'qo_bom_import_common') - Number(b.model === 'qo_bom_import_common'))) {
+          const query = internalQuoteSnapshotCleanup(database, created.quoteId, row);
+          await client.query(query.text, query.values);
+          const remaining = await client.query(query.absenceText, [row.pid]);
+          expect(remaining.rows, 'Exact internal fixture must be absent; foreign quote/tenant rows are never purged').toHaveLength(0);
+        }
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      }
+    } finally { await client.end(); }
+  }
   await journal.cleanup(page.request, rows);
 }
 
@@ -1616,25 +1642,17 @@ export async function seedBomWorkbench(
       created.rows,
     );
 
-    created.exportRevisionId = await dynamicCreate(
-      page,
-      'bom_export_revision',
-      {
-        bom_er_task_id: created.taskId,
-        bom_er_revision_no: 1,
-        bom_er_source_state_hash: `state-${suffix}-r1`,
-        bom_er_source_decision_version: 0,
-        bom_er_file_id: `export-${suffix}-r1`,
-        bom_er_filename: `${marker}-standard-bom-r1.xlsx`,
-        bom_er_generated_by: 'e2e',
-        bom_er_generated_at: new Date().toISOString(),
-        bom_er_green_count: 1,
-        bom_er_yellow_count: 1,
-        bom_er_red_count: 0,
-        bom_er_status: 'current',
-      },
-      created.rows,
-    );
+    // Export revisions are internal artifacts of the admitted export command, not public CRUD.
+    const exportResult = await executeCommand(page, 'bom:regenerate_export',
+      { sourceRecordId: created.taskId }, created.taskId, 'update');
+    expect(exportResult.exportFileId, 'seed export must produce a real file').toBeTruthy();
+    const revisions = await queryDynamicRecords(page, 'bom_export_revision', [
+      { fieldName: 'bom_er_task_id', operator: 'EQ', value: created.taskId },
+    ]);
+    expect(revisions, 'seed export must persist one controlled revision').toHaveLength(1);
+    expect(revisions[0].bom_er_file_id).toBe(exportResult.exportFileId);
+    created.exportRevisionId = String(revisions[0].pid);
+    // Retain the real immutable export as audit evidence; it has no public deletion capability.
 
     // Optionally hand ownership of the SELF-scoped records (task + project + account) to a
     // business role so a non-admin (e.g. bom_engineering) can see the seeded conversion task
@@ -1676,20 +1694,22 @@ export async function seedDownloadableQuote(page: Page): Promise<CreatedRows> {
     },
   ]);
   try {
-    // This export fixture supplies persisted board counts, independently of BOM line quantities.
-    // Parser geometry is exercised by the fixed-count sidecar suite.
-    for (const [stage, quantity, pointsEach] of [['SMT', 3, 0.5], ['DIP', 2, 1]] as const) {
-      await dynamicCreate(page, 'qo_process_fee_rule_hit_common', {
-        qo_pfrh_quote_id: created.quoteId,
-        qo_pfrh_process_stage: stage,
-        qo_pfrh_match_status: 'matched',
-        qo_pfrh_point_source: 'SIMPLE_COUNT_V1',
-        qo_pfrh_metering_qty: quantity,
-        qo_pfrh_unit_points: pointsEach,
-        qo_pfrh_total_points: quantity * pointsEach,
-        qo_pfrh_point_basis: 'SIMPLE_COUNT_V1',
-      }, created.rows);
-    }
+    await attachFixedCountSource(page, created);
+    await executeCommand(page, 'qo_quote_common:compute_process_fee', {
+      count_hole_mode: 'selected',
+      count_drill_text: 'M48\nMETRIC\nT01C0.800\n%\nT01\nX0.000Y0.000\nX1.500Y0.000\nM30\n',
+    }, created.quoteId, 'update');
+    const hits = await queryDynamicRecords(page, 'qo_process_fee_rule_hit_common', [
+      { fieldName: 'qo_pfrh_quote_id', operator: 'EQ', value: created.quoteId },
+    ]);
+    expect(hits.filter(row => row.qo_pfrh_process_stage === 'SMT')
+      .reduce((sum, row) => sum + Number(row.qo_pfrh_metering_qty), 0)).toBe(3);
+    expect(hits.filter(row => row.qo_pfrh_process_stage === 'DIP')
+      .reduce((sum, row) => sum + Number(row.qo_pfrh_metering_qty), 0)).toBe(2);
+    expect(hits.reduce((sum, row) => sum + Number(row.qo_pfrh_total_points), 0)).toBe(3.5);
+    for (const row of hits) trackFixtureRow(page, created.rows, {
+      model: 'qo_process_fee_rule_hit_common', pid: String(row.pid),
+    });
     await executeCommand(
       page,
       'qo_quote_common:override_process_fee',
@@ -2336,6 +2356,15 @@ export async function seedFixedCountQuote(
   opts: { withDrillFile?: boolean } = {},
 ): Promise<CreatedRows> {
   const created = await seedQuoteScaffold(page, 'FIXEDCOUNT', []);
+  await attachFixedCountSource(page, created, opts);
+  return created;
+}
+
+export async function attachFixedCountSource(
+  page: Page,
+  created: CreatedRows,
+  opts: { withDrillFile?: boolean } = {},
+): Promise<void> {
   const rfq = created.rows.find((row) => row.model === 'crm_customer_request_pcba_rfq');
   expect(rfq, 'quote scaffold must retain its RFQ').toBeTruthy();
   const geometry = '%FSLAX24Y24*%\n%MOMM*%\n%TF.FileFunction,Paste,Top*%\n%ADD10C,0.600*%\nD10*\nX000000Y000000D03*\nX020000Y000000D03*\nX040000Y000000D03*\nM02*\n';
@@ -2360,7 +2389,6 @@ export async function seedFixedCountQuote(
     qo_rsa_version_no: 2, qo_rsa_uploaded_at: new Date().toISOString(),
     qo_rsa_parse_status: 'uploaded', qo_rsa_validation_status: 'pending',
   }, created.rows);
-  return created;
 }
 
 

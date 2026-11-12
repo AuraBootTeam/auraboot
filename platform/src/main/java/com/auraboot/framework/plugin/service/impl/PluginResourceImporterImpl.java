@@ -142,6 +142,12 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     }
 
     @Override
+    public boolean checkRetiredRoleExists(Long tenantId, String code) {
+        return roleMapper.findRetiredByTenantIdAndCode(tenantId, code) != null;
+    }
+
+
+    @Override
     public boolean checkMenuExists(Long tenantId, String code) {
         return pageNavigationResources().checkMenuExists(tenantId, code);
     }
@@ -239,6 +245,13 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     public boolean reconcileRolePermissions(RoleDefinitionDTO dto, Long tenantId) {
         return accessPolicies().reconcileRolePermissions(dto, tenantId);
     }
+
+    @Override
+    public boolean reconcileImportedRolePermissions(RoleDefinitionDTO dto, Long tenantId,
+                                                   String pluginPid, String importId) {
+        return accessPolicies().reconcileImportedRolePermissions(dto, tenantId, pluginPid, importId);
+    }
+
 
     @Override
     public PluginResource importMenu(MenuDefinitionDTO dto, String pluginPid, String importId,
@@ -380,6 +393,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 permissionMapper,
                 rolePermissionMapper,
                 pluginRecordMapper,
+                pluginResourceMapper,
                 log,
                 sharedSupport());
     }

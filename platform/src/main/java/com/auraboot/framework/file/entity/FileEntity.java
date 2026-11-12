@@ -33,6 +33,16 @@ public class FileEntity implements Serializable {
     @TableField("pid")
     private String pid;
 
+    /** Host-only immutable business artifact provenance; never accepted from upload requests. */
+    @TableField("artifact_authorization")
+    @JsonIgnore
+    private String artifactAuthorization;
+
+    /** Explicitly mapped for host artifact provenance checks as well as tenant interception. */
+    @TableField("tenant_id")
+    @JsonIgnore
+    private Long tenantId;
+
     /**
      * 存储文件名
      */

@@ -54,6 +54,58 @@ import static org.mockito.ArgumentCaptor.forClass;
 @ExtendWith(MockitoExtension.class)
 class FileServiceImplTest {
 
+    private com.auraboot.framework.file.security.BusinessArtifactAuthorization provenance() {
+        var target = new com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext.BusinessTargetAuthorization(
+                "orders:export", "orders", "01ARZ3NDEKTSV4RRFFQ69G5FAV", "update", 7L, 42L, 10L);
+        var view = new com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionPlan(target, null,
+                java.util.Map.of("orders", new com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionPlan.ModelFields(
+                        java.util.Set.of("export_file"), java.util.Set.of("export_file"), List.of(), List.of())));
+        return com.auraboot.framework.file.security.BusinessArtifactAuthorization.capture(view, "export_file");
+    }
+
+    @Test void artifact_persistence_stamps_and_retains_before_insert_without_creating_any_url() {
+        when(storageProvider.upload(anyString(), any(), eq(4L), eq("text/plain"))).thenReturn("stored");
+        when(fileMapper.insert(any(FileEntity.class))).thenReturn(1);
+        var result = fileService.persistBusinessArtifact(new MockMultipartFile("file", "report.txt", "text/plain", "data".getBytes()), 42L, provenance());
+        assertThat(result.getArtifactAuthorization()).isEqualTo(provenance().encode());
+        assertThat(result.getRetentionLocked()).isTrue();
+        assertThat(result.getTenantId()).isEqualTo(7L);
+        assertThat(result.getStatus()).isEqualTo("success");
+        verify(storageProvider, never()).getPresignedUrl(anyString(), any());
+        verify(fileMapper, never()).selectOne(any(QueryWrapper.class));
+        var callback = TransactionSynchronizationManager.getSynchronizations().get(0);
+        callback.afterCompletion(TransactionSynchronization.STATUS_COMMITTED);
+        verify(storageProvider, never()).delete(anyString());
+    }
+
+    @Test void artifact_persistence_cleans_partial_storage_on_rollback_even_if_upload_throws() {
+        when(storageProvider.upload(anyString(), any(), eq(4L), eq("text/plain"))).thenThrow(new IllegalStateException("partial upload"));
+        assertThatThrownBy(() -> fileService.persistBusinessArtifact(new MockMultipartFile("file", "report.txt", "text/plain", "data".getBytes()), 42L, provenance()))
+                .isInstanceOf(IllegalStateException.class).hasMessage("partial upload");
+        verify(fileMapper, never()).insert(any(FileEntity.class));
+        TransactionSynchronizationManager.getSynchronizations().get(0).afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK);
+        verify(storageProvider).delete(anyString());
+    }
+
+    @Test void artifact_persistence_rejects_a_foreign_actor_before_io() {
+        assertThatThrownBy(() -> fileService.persistBusinessArtifact(new MockMultipartFile("file", "report.txt", "text/plain", "data".getBytes()), 99L, provenance()))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        org.mockito.Mockito.verifyNoInteractions(storageProvider, fileMapper);
+    }
+
+    @Test
+    void stamped_cloud_artifact_always_uses_guarded_api_instead_of_cdn_or_signed_url() {
+        var artifact = new FileEntity(); artifact.setPid("artifact-pid"); artifact.setStorageType(StorageType.S3);
+        artifact.setFileName("cloud-key"); artifact.setArtifactAuthorization("host-owned-provenance");
+        when(fileMapper.selectOne(any(QueryWrapper.class))).thenReturn(artifact);
+        var guard = org.mockito.Mockito.mock(com.auraboot.framework.file.security.BusinessArtifactAccessGuard.class);
+        ReflectionTestUtils.setField(fileService,"artifactAccess",guard);
+        ReflectionTestUtils.setField(fileService,"cdnUrlRewriter",cdnUrlRewriter);
+        assertThat(fileService.getFileDownloadUrl("artifact-pid")).isEqualTo("http://localhost:8080/api/file/download/artifact-pid");
+        verify(guard).authorize(artifact);
+        org.mockito.Mockito.verifyNoInteractions(cdnUrlRewriter,storageProvider);
+    }
+
     @Mock
     private FileRelationMutationGuard relationMutationGuard;
 

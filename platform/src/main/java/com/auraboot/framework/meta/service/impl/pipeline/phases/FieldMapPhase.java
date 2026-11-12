@@ -37,6 +37,9 @@ public class FieldMapPhase implements CommandPhase {
     private final MetaModelService metaModelService;
     private final ApplicationContext applicationContext;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.meta.service.impl.NativeBusinessCreateBoundary nativeCreation;
+
     @Override
     public String name() {
         return "field_map";
@@ -88,11 +91,21 @@ public class FieldMapPhase implements CommandPhase {
             boolean isCreateOrUpdate = "create".equalsIgnoreCase(cmdType) || "update".equalsIgnoreCase(cmdType);
 
             if (noBindingRules && (hasInputFields || hasAutoSetFields || isDeleteOp || isStateTransition || isCreateOrUpdate)) {
-                fieldMapResults = fieldMapExecutor.executeImplicitFieldMapPhase(
-                        ec, ctx.getPayload(), ctx.getTenantId(), ctx.getRequest(), ctx.getCommand());
+                if (com.auraboot.framework.meta.security.NativeBusinessCommandContract.declaresCreation(ctx)) {
+                    if (nativeCreation == null || ctx.getNativeCreationContract() == null)
+                        throw new org.springframework.security.access.AccessDeniedException("Native creation boundary is unavailable");
+                    fieldMapResults = fieldMapExecutor.executeImplicitFieldMapPhase(ec, ctx.getPayload(), ctx.getTenantId(),
+                            ctx.getRequest(), ctx.getCommand(), ctx.submittedInputKeys(), pid -> nativeCreation.authorizeRecord(ctx, pid));
+                } else fieldMapResults = ctx.submittedInputKeys() == null
+                        ? fieldMapExecutor.executeImplicitFieldMapPhase(
+                                ec, ctx.getPayload(), ctx.getTenantId(), ctx.getRequest(), ctx.getCommand())
+                        : fieldMapExecutor.executeImplicitFieldMapPhase(
+                                ec, ctx.getPayload(), ctx.getTenantId(), ctx.getRequest(), ctx.getCommand(), ctx.submittedInputKeys());
             } else {
-                fieldMapResults = fieldMapExecutor.executeFieldMapPhase(
-                        fieldMapRules, ctx.getPayload(), ctx.getTenantId(), ctx.getRequest());
+                fieldMapResults = ctx.submittedInputKeys() == null
+                        ? fieldMapExecutor.executeFieldMapPhase(fieldMapRules, ctx.getPayload(), ctx.getTenantId(), ctx.getRequest())
+                        : fieldMapExecutor.executeFieldMapPhase(fieldMapRules, ctx.getPayload(), ctx.getTenantId(), ctx.getRequest(),
+                                ctx.submittedInputKeys(), ctx.getCommandCode());
             }
         }
         ctx.setFieldMapResults(fieldMapResults);

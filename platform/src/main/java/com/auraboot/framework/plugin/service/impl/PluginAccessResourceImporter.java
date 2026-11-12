@@ -66,23 +66,35 @@ final class PluginAccessResourceImporter {
 
     private void captureImportSnapshot(PluginResource resource, Object manifestDto) { captureImportSnapshotOperation.execute(resource,manifestDto); }
 
-    void reconcileRolePermissionBindings(PluginManifestExtended manifest, Long tenantId){
+    void reconcileRolePermissionBindings(PluginManifestExtended manifest, Long tenantId) {
+        reconcileRolePermissionBindings(manifest, tenantId, null, null, java.util.Set.of());
+    }
+
+    void reconcileRolePermissionBindings(PluginManifestExtended manifest, Long tenantId,
+                                        String pluginPid, String importId, java.util.Set<String> createdRolePids) {
         if (manifest.getRoles() == null || manifest.getRoles().isEmpty()) {
             return;
         }
-        // Strict fail-closed: after model publication every declared role permission must
-        // resolve and bind. Every role is still attempted so one broken declaration does
+        // After publication every declaration must resolve. Only roles created by this
+        // import may receive initial bindings; existing roles retain administrator choices.
+        // Every role is attempted so one broken declaration does
         // not hide the others, then the import fails with the full list (the caller's
         // import transaction rolls the plugin back). The previous per-role warn+skip here
         // mirrored updateRolePermissions' lenience and let bad compositions silently
         // degrade roles until they surfaced as missing-access findings rounds later.
+        Map<String, String> rolePids = createdRolePids.isEmpty() ? Map.of()
+                : roleService.findByTenantId(tenantId).stream().collect(Collectors.toMap(Role::getCode, Role::getPid));
         List<String> failures = new ArrayList<>();
         for (RoleDefinitionDTO role : manifest.getRoles()) {
             if (role == null || !role.isValid()) {
                 continue;
             }
             try {
-                resourceImporter.reconcileRolePermissions(role, tenantId);
+                if (rolePids.get(role.getCode()) == null || !createdRolePids.contains(rolePids.get(role.getCode()))) {
+                    resourceImporter.reconcileRolePermissions(role, tenantId);
+                } else {
+                    resourceImporter.reconcileImportedRolePermissions(role, tenantId, pluginPid, importId);
+                }
             } catch (Exception e) {
                 failures.add("role '" + role.getCode() + "': " + e.getMessage());
             }
@@ -206,7 +218,7 @@ final class PluginAccessResourceImporter {
                 captureImportSnapshot(resource, role);
                 saveOrUpdatePluginResource(resource, tenantId);
                 result.incrementResourceCount(ResourceType.ROLE, resource.getActionEnum());
-                if (resource.getResourcePid() != null) {
+                if (resource.getActionEnum() == ResourceAction.CREATE && resource.getResourcePid() != null) {
                     result.addCreatedResource(ResourceType.ROLE, resource.getResourcePid());
                 }
             }

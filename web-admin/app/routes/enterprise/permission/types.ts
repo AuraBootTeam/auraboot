@@ -1,3 +1,5 @@
+import type { InternalResponseData } from '~/shared/services/http-client/internal-api';
+
 export interface Permission {
   id: number;
   pid: string;
@@ -17,7 +19,12 @@ export interface Permission {
   updatedAt: string;
 }
 
-export interface Role {
+type RolePresentation = Pick<
+  InternalResponseData<'get', '/api/roles/{pid}'>,
+  'memberCount' | 'managementRole'
+>;
+
+export interface Role extends RolePresentation {
   id: number;
   pid: string;
   code: string;
@@ -54,9 +61,9 @@ export interface PermissionMatrixActionDTO {
   label: string;
   granted: boolean;
   supported: boolean;
-  scopeType?: string | null;       // 'all' | 'self' | 'dept' | 'dept_and_sub' | 'none' | null
-  mergeStrategy?: string;   // 'MAX' | 'MIN' | null
-  policySchema?: string;    // JSON string of policy schema definition, null if no policy
+  scopeType?: string | null; // 'all' | 'self' | 'dept' | 'dept_and_sub' | 'none' | null
+  mergeStrategy?: string; // 'MAX' | 'MIN' | null
+  policySchema?: string; // JSON string of policy schema definition, null if no policy
   policyValues?: Record<string, any>; // current policy values for this role
   extension?: Record<string, any>; // display metadata such as displayGroup/displayOrder
 }

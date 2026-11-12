@@ -61,6 +61,7 @@ final class PluginAccessPolicyImporter {
     private final PermissionMapper permissionMapper;
     private final RolePermissionMapper rolePermissionMapper;
     private final PluginRecordMapper pluginRecordMapper;
+    private final com.auraboot.framework.plugin.mapper.PluginResourceMapper pluginResources;
     private final Logger log;
     private final PluginImportSupport support;
 
@@ -77,6 +78,7 @@ final class PluginAccessPolicyImporter {
             PermissionMapper permissionMapper,
             RolePermissionMapper rolePermissionMapper,
             PluginRecordMapper pluginRecordMapper,
+            com.auraboot.framework.plugin.mapper.PluginResourceMapper pluginResources,
             Logger log,
             PluginImportSupport support) {
         this.facadeReceiver = facadeReceiver;
@@ -91,6 +93,7 @@ final class PluginAccessPolicyImporter {
         this.permissionMapper = permissionMapper;
         this.rolePermissionMapper = rolePermissionMapper;
         this.pluginRecordMapper = pluginRecordMapper;
+        this.pluginResources = pluginResources;
         this.log = log;
         this.support = support;
     }
@@ -140,7 +143,9 @@ final class PluginAccessPolicyImporter {
 
             permissionMapper.updateForPluginImport(
                     dto.getEffectiveName(), dto.getDescription(), dto.getCategory(),
-                    dto.getResourceType(), dto.getResourceCode(), dto.getAction(),
+                    dto.getResourceType() != null ? dto.getResourceType() : existingPerm.getResourceType(),
+                    dto.getResourceCode() != null ? dto.getResourceCode() : existingPerm.getResourceCode(),
+                    dto.getAction() != null ? dto.getAction() : existingPerm.getAction(),
                     dto.getDataScopeType(), dataScopeConfigJson, extensionJson, tagsArray,
                     policySchemaJson,
                     pluginPid, tenantId, dto.getCode());
@@ -196,6 +201,14 @@ final class PluginAccessPolicyImporter {
 
         boolean exists = facadeReceiver.checkRoleExists(tenantId, dto.getCode());
 
+        Role retired = exists ? null : roleMapper.findRetiredByTenantIdAndCode(tenantId, dto.getCode());
+        if (retired != null) {
+            // A deleted template role is an administrator decision, not a fresh install.
+            return createResourceRecord(pluginPid, importId, tenantId, ResourceType.ROLE,
+                    retired.getPid(), retired.getId(), dto.getCode(), dto.getEffectiveName(),
+                    ResourceAction.SKIP, null, null);
+        }
+
         if (exists && conflictStrategy == ImportRequest.ConflictStrategy.ERROR) {
             throw new PluginException("Role already exists: " + dto.getCode());
         }
@@ -212,26 +225,12 @@ final class PluginAccessPolicyImporter {
         }
 
         if (exists) {
-            // Update existing role
-            String scopeContentJson = dto.getScopeContent() != null ? support.toJson(dto.getScopeContent()) : null;
-
-            roleMapper.updateForPluginImport(
-                    dto.getEffectiveName(), dto.getDescription(), dto.getType(),
-                    dto.getPriority(), dto.getIsDefault(), dto.getIsSystem(),
-                    dto.getScopeType(), scopeContentJson, dto.getDefaultDataScopeType(),
-                    pluginPid, tenantId, dto.getCode());
-
-            // Reconcile role-permission bindings and data-scope defaults.
-            Long roleId = roleMapper.findIdByCode(tenantId, dto.getCode());
-            updateRolePermissions(roleId, dto, tenantId, pluginPid);
-            applyRoleDataScopes(roleId, dto, tenantId);
-            assignSeedMembers(roleId, dto, tenantId);
-
-            String existingPid = roleMapper.findPidByCode(tenantId, dto.getCode());
-
+            // Templates define initial roles, never overwrite a tenant's live authorization.
+            // Even an empty role or NULL scope can be an intentional administrator decision.
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.ROLE,
-                    existingPid, roleId, dto.getCode(), dto.getEffectiveName(),
-                    ResourceAction.UPDATE, null, null);
+                    roleMapper.findPidByCode(tenantId, dto.getCode()),
+                    roleMapper.findIdByCode(tenantId, dto.getCode()), dto.getCode(), dto.getEffectiveName(),
+                    ResourceAction.SKIP, null, null);
         } else {
             // Create new role via service
             Role role = new Role();
@@ -258,8 +257,8 @@ final class PluginAccessPolicyImporter {
 
             // Create role-permission bindings
             updateRolePermissions(created.getId(), dto, tenantId, pluginPid);
-            applyRoleDataScopes(created.getId(), dto, tenantId);
-            assignSeedMembers(created.getId(), dto, tenantId);
+            // Finish scopes and member seeds after generated model permissions exist.
+
 
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.ROLE,
                     created.getPid(), created.getId(), dto.getCode(), dto.getEffectiveName(),
@@ -325,7 +324,8 @@ final class PluginAccessPolicyImporter {
                 throw new PluginException("Invalid role declaration during batch reconciliation");
             }
             Role role = roles.get(declaration.getCode());
-            if (role == null) throw new PluginException("Imported role not found: " + declaration.getCode());
+            if (role == null && roleMapper.findRetiredByTenantIdAndCode(tenantId, declaration.getCode()) == null)
+                throw new PluginException("Imported role not found: " + declaration.getCode());
             List<PermissionDTO> permissions = new ArrayList<>();
             for (String code : Optional.ofNullable(declaration.getPermissions()).orElse(List.of())) {
                 PermissionDTO permission = permissionService.findByTenantIdAndCode(tenantId, code);
@@ -334,42 +334,69 @@ final class PluginAccessPolicyImporter {
                 }
                 permissions.add(permission);
             }
+            // Existing roles may deliberately omit or revoke template grants.
+            // This public directory check validates definitions without repairing grants.
             facadeReceiver.reconcileRolePermissions(declaration, tenantId);
-            for (PermissionDTO permission : permissions) {
-                if (rolePermissionMapper.countByRoleAndPermission(role.getId(), permission.getId(), tenantId) <= 0) {
-                    throw new PluginException("Declared permission remains unbound: "
-                            + declaration.getCode() + ":" + permission.getCode());
-                }
-            }
             checked++;
         }
         return checked;
     }
 
     public boolean reconcileRolePermissions(RoleDefinitionDTO dto, Long tenantId) {
+        validateRolePermissions(dto, tenantId);
+        return false;
+    }
+
+    /** Only the current import's persisted CREATE receipt can initialize late bindings. */
+    public boolean reconcileImportedRolePermissions(RoleDefinitionDTO dto, Long tenantId,
+                                                    String pluginPid, String importId) {
+        Long roleId = validateRolePermissions(dto, tenantId);
+        if (roleId == null) throw new PluginException("Retired role cannot receive initial grants");
+        if (pluginPid == null || importId == null) {
+            throw new PluginException("Current role import identity is required");
+        }
+        PluginResource resource = pluginResources.findByTenantPluginAndResource(
+                tenantId, pluginPid, ResourceType.ROLE.code(), dto.getCode());
+        if (resource == null || !Objects.equals(tenantId, resource.getTenantId())
+                || !Objects.equals(pluginPid, resource.getPluginPid())
+                || !Objects.equals(importId, resource.getImportId())
+                || !Objects.equals(dto.getCode(), resource.getResourceCode())) {
+            throw new PluginException("Current owned role import receipt is required: " + dto.getCode());
+        }
+        if (resource.getActionEnum() != ResourceAction.CREATE) return false;
+        if (!Objects.equals(roleId, resource.getResourceId()) || resource.getResourcePid() == null
+                || !Objects.equals(roleMapper.findPidByCode(tenantId, dto.getCode()), resource.getResourcePid())) {
+            throw new PluginException("Created role identity no longer matches its import receipt");
+        }
+        int before = rolePermissionMapper.findPermissionIdsByRole(roleId).size();
+        facadeReceiver.updateRolePermissions(roleId, dto, tenantId, pluginPid, true);
+        for (String code : Optional.ofNullable(dto.getPermissions()).orElse(List.of())) {
+            PermissionDTO permission = permissionService.findByCode(code);
+            if (rolePermissionMapper.countByRoleAndPermission(roleId, permission.getId(), tenantId) <= 0) {
+                throw new PluginException("Declared permission remains unbound: " + dto.getCode() + ":" + code);
+            }
+        }
+        applyRoleDataScopes(roleId, dto, tenantId);
+        assignSeedMembers(roleId, dto, tenantId);
+        return rolePermissionMapper.findPermissionIdsByRole(roleId).size() > before;
+    }
+
+    private Long validateRolePermissions(RoleDefinitionDTO dto, Long tenantId) {
         if (dto == null || dto.getCode() == null || dto.getCode().isBlank()) {
-            return false;
+            throw new PluginException("Valid role declaration is required");
         }
         Long roleId = roleMapper.findIdByCode(tenantId, dto.getCode());
-        if (roleId == null) {
-            // Fail-closed: a declared role that cannot be resolved during strict
-            // reconciliation is an inconsistent import, not a skippable gap.
+        if (roleId == null && roleMapper.findRetiredByTenantIdAndCode(tenantId, dto.getCode()) == null) {
             throw new PluginException("Role permission reconciliation failed: declared role '"
                     + dto.getCode() + "' does not exist in this tenant");
         }
-        int before = rolePermissionMapper.findPermissionIdsByRole(roleId).size();
-        facadeReceiver.updateRolePermissions(roleId, dto, tenantId, null, true);
-        // The role-declaration contract carries top-level dataScopes (e.g. homeroom
-        // teachers reading only their own score-import batches); the strict
-        // post-publication reconcile must reapply them exactly like the role-import
-        // stage does, otherwise a re-imported plugin silently loses row filters.
-        applyRoleDataScopes(roleId, dto, tenantId);
-        int after = rolePermissionMapper.findPermissionIdsByRole(roleId).size();
-        if (after > before) {
-            log.info("Role permission reconciliation bound {} additional codes for role {}",
-                    after - before, PluginImportSupport.logSafe(dto.getCode()));
+        for (String code : Optional.ofNullable(dto.getPermissions()).orElse(List.of())) {
+            PermissionDTO permission = findRegisteredPermissionOrNull(tenantId, code);
+            if (permission == null || permission.getId() == null) {
+                throw new PluginException(unresolvedDeclaredPermissionMessage(dto.getCode(), code, tenantId));
+            }
         }
-        return after > before;
+        return roleId;
     }
 
     private void updateRolePermissions(Long roleId, RoleDefinitionDTO dto, Long tenantId, String pluginPid) {

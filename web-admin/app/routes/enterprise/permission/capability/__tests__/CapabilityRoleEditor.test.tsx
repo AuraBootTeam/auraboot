@@ -1,25 +1,34 @@
+import { permissionService } from '~/shared/services/permissionService';
 import { StrictMode } from 'react';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { CapabilityGroup } from '../types';
-import type { PermissionMatrixDTO } from '../../types';
-
+import CapabilityRoleEditor from '../CapabilityRoleEditor';
+import {
+  authorizationDraftService,
+  AuthorizationConflict,
+  type AuthorizationSnapshot,
+} from '../authorizationDraftService';
 vi.mock('~/contexts/I18nContext', () => ({
-  useI18n: () => ({
-    locale: 'en-US',
-    t: (key: string, _vars?: unknown, fallback?: string) => {
-      // Existing database translations override resource changes on upgraded environments.
-      if (key === 'admin.permission.editor.impactDetailsV2')
-        return 'Review affected capabilities ({count}), menus and action details';
-      return key === 'permission.qo.quote.read' ? '查看报价单' : fallback;
-    },
-  }),
+  useI18n: () => ({ locale: 'en-US', t: (k: string, _: unknown, f: string) => f ?? k }),
 }));
 vi.mock('~/contexts/ToastContext', () => ({
   useToastContext: () => ({ showSuccessToast: vi.fn(), showErrorToast: vi.fn() }),
 }));
-vi.mock('../capabilityService', () => ({
-  capabilityService: { getForRole: vi.fn(), applySelection: vi.fn(), previewSelection: vi.fn() },
+vi.mock('~/shared/services/modelService', () => ({
+  modelService: { findByCode: vi.fn().mockResolvedValue({ displayName: 'Order', extension: {} }) },
+}));
+vi.mock('../authorizationDraftService', async (original) => ({
+  ...(await original<typeof import('../authorizationDraftService')>()),
+  authorizationDraftService: {
+    read: vi.fn(),
+    preview: vi.fn(),
+    save: vi.fn(),
+    fieldPolicies: vi.fn(),
+    fieldPolicyRoots: vi.fn(),
+  },
+}));
+vi.mock('~/shared/services/permissionService', () => ({
+  permissionService: { getPolicySnapshot: vi.fn() },
 }));
 vi.mock('../../PolicyConfigDialog', () => ({
   default: (props: any) =>
@@ -34,697 +43,766 @@ vi.mock('../../PolicyConfigDialog', () => ({
       </section>
     ) : null,
 }));
-vi.mock('~/shared/services/permissionService', () => ({
-  permissionService: {
-    getMatrixForRole: vi.fn(),
-    getPolicySnapshot: vi.fn(),
-    batchUpdateRolePermissions: vi.fn(),
-    updateScope: vi.fn(),
-    getRoleDefaultScope: vi.fn().mockResolvedValue(null),
-    setRoleDefaultScope: vi.fn().mockResolvedValue(undefined),
-  },
-}));
-
-import { capabilityService } from '../capabilityService';
-import { permissionService } from '~/shared/services/permissionService';
-import CapabilityRoleEditor from '../CapabilityRoleEditor';
-
-function cap(code: string, label: string, granted: boolean) {
-  return {
+function baseline(): AuthorizationSnapshot {
+  const capability = (code: string, granted: boolean, includes: string[]) => ({
+    code,
+    label: code,
+    group: 'Orders',
+    granted,
+    includes,
     authorizationState: granted ? ('full' as const) : ('none' as const),
+    conventionDerived: false,
+    sensitive: false,
     description: null,
     tier: null,
-    displayGroupOrder: 10000,
     displayOrder: 100,
+    displayGroupOrder: 10000,
     localizedLabels: {},
     localizedDescriptions: {},
     missingCodes: [],
     unlockedMenus: null,
-
-    code,
-    group: '报价单',
-    label,
-    sensitive: false,
-    includes: [],
-    granted,
-    conventionDerived: false,
-  };
-}
-const groups: CapabilityGroup[] = [
-  {
-    group: '报价单',
-    capabilities: [
-      cap('qo.cap.quote_view', '查看报价', true),
-      cap('qo.cap.quote_edit', '编辑报价', false),
+  });
+  return {
+    fieldPolicies: [],
+    rolePid: 'role-1',
+    revision: 'a'.repeat(64),
+    defaultScopeType: 'self',
+    scopes: [],
+    groups: [
+      {
+        group: 'Orders',
+        capabilities: [
+          capability('order.read', true, ['model.order.read']),
+          capability('order.edit', false, ['model.order.read', 'model.order.update']),
+        ],
+      },
     ],
-  },
-];
-
-const emptyMatrix: PermissionMatrixDTO = { modules: [] };
-
-function mockData(g: CapabilityGroup[] = groups, m: PermissionMatrixDTO = emptyMatrix) {
-  (capabilityService.getForRole as ReturnType<typeof vi.fn>).mockResolvedValue(g);
-  (permissionService.getMatrixForRole as ReturnType<typeof vi.fn>).mockResolvedValue(m);
-}
-
-describe('CapabilityRoleEditor', () => {
-  function policyData() {
-    const capability = {
-      ...cap('cm.cap.refund', 'Manage refunds', true),
-      includes: ['cm_refund.create'],
-    };
-    const matrix: PermissionMatrixDTO = {
+    matrix: {
       modules: [
         {
-          moduleCode: 'commerce',
-          moduleName: 'Commerce',
+          moduleCode: 'order',
+          moduleName: 'Orders',
           resources: [
             {
-              resourceCode: 'cm_refund',
-              resourceName: 'Refund',
-              actions: [
-                {
-                  permissionId: 5,
-                  permissionPid: 'permission-refund-create',
-                  code: 'cm_refund.create',
-                  action: 'create',
-                  label: 'Create refund',
-                  granted: true,
-                  supported: true,
-                  policySchema: JSON.stringify({
-                    dynamicAbac: { type: 'rule-center', label: 'Business conditions', fields: [] },
-                  }),
-                },
-              ],
+              resourceCode: 'order',
+              resourceName: 'Order',
+              actions: ['read', 'update'].map((action, i) => ({
+                permissionId: i + 1,
+                permissionPid: 'p' + i,
+                code: 'model.order.' + action,
+                action,
+                label: action,
+                granted: action === 'read',
+                supported: true,
+                scopeType: action === 'read' ? 'self' : undefined,
+              })),
             },
           ],
         },
       ],
+    },
+  };
+}
+async function open() {
+  render(<CapabilityRoleEditor rolePid="role-1" />);
+  await screen.findByTestId('capability-role-editor');
+}
+async function toggleEdit() {
+  fireEvent.click(screen.getByTestId('capability-checkbox-order.edit'));
+}
+async function review() {
+  fireEvent.click(screen.getByTestId('capability-save'));
+  return screen.findByTestId('confirm-dialog');
+}
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(authorizationDraftService.fieldPolicyRoots).mockResolvedValue([]);
+  vi.mocked(authorizationDraftService.fieldPolicies).mockResolvedValue([]);
+  vi.mocked(authorizationDraftService.read).mockResolvedValue(baseline());
+  vi.mocked(authorizationDraftService.save).mockResolvedValue(baseline());
+  vi.mocked(authorizationDraftService.preview).mockImplementation(async (_, body) => ({
+    revision: body.expectedRevision,
+    capabilities: {
+      grantedCodes: ['model.order.update'],
+      revokedCodes: [],
+      preservedCodes: [],
+      relatedMenus: [],
+      resultingCapabilities: [],
+    },
+    defaultScopeChanged: body.defaultScopeChanged ?? false,
+    defaultScopeType: body.defaultScopeType ?? null,
+    applyDefaultToCurrentGrants: body.applyDefaultToCurrentGrants ?? false,
+    scopeChanges: body.scopeChanges ?? [],
+    grantFieldCandidates: [],
+  }));
+});
+describe('CapabilityRoleEditor joint authorization draft', () => {
+  it('reads one baseline and does not save until the draft changes', async () => {
+    await open();
+    expect(authorizationDraftService.read).toHaveBeenCalledWith('role-1');
+    expect(screen.getByTestId('capability-checkbox-order.read')).toBeChecked();
+    expect(screen.getByTestId('capability-save')).toBeDisabled();
+    expect(authorizationDraftService.save).not.toHaveBeenCalled();
+  });
+  it('previews and saves the same exact baseline and duty selection', async () => {
+    await open();
+    await toggleEdit();
+    await review();
+    const body = vi.mocked(authorizationDraftService.preview).mock.calls[0][1];
+    expect(body).toMatchObject({
+      expectedRevision: 'a'.repeat(64),
+      selectedCapabilityCodes: ['order.read', 'order.edit'],
+      scopeChanges: [],
+      defaultScopeChanged: false,
+    });
+    fireEvent.click(screen.getByTestId('confirm-ok'));
+    await waitFor(() =>
+      expect(authorizationDraftService.save).toHaveBeenCalledWith('role-1', body),
+    );
+    await waitFor(() => expect(screen.getByTestId('capability-save')).toBeDisabled());
+  });
+  it('stages default and newly granted action scopes before any server write', async () => {
+    await open();
+    await toggleEdit();
+    fireEvent.click(screen.getByTestId('data-scope-modify-btn'));
+    fireEvent.click(screen.getByTestId('data-scope-option-dept').querySelector('input')!);
+    fireEvent.click(screen.getByTestId('data-scope-apply-current'));
+    fireEvent.click(screen.getByTestId('data-scope-apply'));
+    fireEvent.click(screen.getByTestId('capability-scope-configure-order.edit'));
+    const select = await screen.findByTestId('capability-scope-model.order.update');
+    fireEvent.change(select, { target: { value: 'none' } });
+    fireEvent.click(screen.getByTestId('capability-scope-apply'));
+    expect(authorizationDraftService.save).not.toHaveBeenCalled();
+    expect(authorizationDraftService.preview).not.toHaveBeenCalled();
+    await review();
+    expect(authorizationDraftService.preview).toHaveBeenCalledWith(
+      'role-1',
+      expect.objectContaining({
+        defaultScopeChanged: true,
+        defaultScopeType: 'dept',
+        applyDefaultToCurrentGrants: true,
+        scopeChanges: [
+          {
+            resourceCode: 'order',
+            actionCode: 'update',
+            scopeType: 'none',
+            mergeStrategy: undefined,
+          },
+        ],
+      }),
+    );
+    expect(screen.getByTestId('draft-preview-default')).toBeVisible();
+    expect(screen.getByTestId('draft-preview-scopes')).toBeVisible();
+    expect(screen.getByTestId('draft-preview-scopes')).toHaveTextContent(
+      'Order · Update: 无权访问',
+    );
+    expect(screen.getByTestId('draft-preview-scopes')).not.toHaveTextContent('model.order');
+  });
+  it('preserves a rejected preview draft and requires explicit reload on conflict', async () => {
+    vi.mocked(authorizationDraftService.preview).mockRejectedValue(new AuthorizationConflict());
+    await open();
+    await toggleEdit();
+    fireEvent.click(screen.getByTestId('capability-save'));
+    await screen.findByTestId('authorization-conflict');
+    expect(screen.getByTestId('capability-checkbox-order.edit')).toBeChecked();
+    expect(screen.getByTestId('capability-save')).toBeDisabled();
+    expect(authorizationDraftService.save).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('authorization-reload'));
+    await waitFor(() =>
+      expect(screen.queryByTestId('authorization-conflict')).not.toBeInTheDocument(),
+    );
+    expect(screen.getByTestId('capability-checkbox-order.edit')).not.toBeChecked();
+  });
+  it('preserves a draft when the save conflicts after a successful preview', async () => {
+    vi.mocked(authorizationDraftService.save).mockRejectedValue(new AuthorizationConflict());
+    await open();
+    await toggleEdit();
+    await review();
+    fireEvent.click(screen.getByTestId('confirm-ok'));
+    await screen.findByTestId('authorization-conflict');
+    expect(screen.getByTestId('capability-draft')).toBeVisible();
+    expect(screen.getByTestId('capability-checkbox-order.edit')).toBeChecked();
+  });
+  it('keeps a failed save editable without claiming success', async () => {
+    vi.mocked(authorizationDraftService.save).mockRejectedValue(new Error('unavailable'));
+    await open();
+    await toggleEdit();
+    await review();
+    fireEvent.click(screen.getByTestId('confirm-ok'));
+    await waitFor(() => expect(screen.getByTestId('capability-save')).toBeEnabled());
+    expect(screen.getByTestId('capability-draft')).toBeVisible();
+    expect(screen.queryByTestId('capability-editor-error')).not.toBeInTheDocument();
+  });
+  it('discards duty and scope changes together without writing', async () => {
+    await open();
+    await toggleEdit();
+    fireEvent.click(screen.getByTestId('data-scope-modify-btn'));
+    fireEvent.click(screen.getByTestId('data-scope-option-dept').querySelector('input')!);
+    fireEvent.click(screen.getByTestId('data-scope-apply'));
+    fireEvent.click(screen.getByTestId('capability-discard'));
+    expect(screen.queryByTestId('capability-draft')).not.toBeInTheDocument();
+    expect(screen.getByTestId('data-scope-default')).toHaveTextContent('仅本人');
+    expect(authorizationDraftService.save).not.toHaveBeenCalled();
+  });
+  it('keeps read-only permissions visible and blocks all authoring', async () => {
+    render(<CapabilityRoleEditor rolePid="role-1" readOnly />);
+    await screen.findByTestId('capability-role-editor');
+    for (const id of ['capability-checkbox-order.edit', 'data-scope-modify-btn', 'capability-save'])
+      expect(screen.getByTestId(id)).toBeDisabled();
+    expect(screen.getByTestId('permission-diagnostics').querySelector('summary')).toBeVisible();
+    expect(authorizationDraftService.preview).not.toHaveBeenCalled();
+  });
+  it('uses declared localized names in search and the review dialog', async () => {
+    const value = baseline();
+    value.groups[0].capabilities[1].localizedLabels = { en: 'Edit Orders' };
+    vi.mocked(authorizationDraftService.read).mockResolvedValue(value);
+    await open();
+    fireEvent.change(screen.getByTestId('capability-search'), { target: { value: 'Edit Orders' } });
+    await toggleEdit();
+    const dialog = await review();
+    expect(dialog).toHaveTextContent('Grant: Edit Orders');
+  });
+  it('does not seed a StrictMode draft from an obsolete request', async () => {
+    let resolve!: (v: AuthorizationSnapshot) => void;
+    vi.mocked(authorizationDraftService.read).mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolve = r;
+        }),
+    );
+    render(
+      <StrictMode>
+        <CapabilityRoleEditor rolePid="role-1" />
+      </StrictMode>,
+    );
+    await screen.findByTestId('capability-role-editor');
+    await toggleEdit();
+    resolve(baseline());
+    await waitFor(() => expect(screen.getByTestId('capability-checkbox-order.edit')).toBeChecked());
+  });
+  it('retries an unavailable baseline without exposing a writable empty role', async () => {
+    vi.mocked(authorizationDraftService.read).mockRejectedValueOnce(new Error('offline'));
+    render(<CapabilityRoleEditor rolePid="role-1" />);
+    await screen.findByTestId('capability-editor-error');
+    expect(screen.getByTestId('capability-editor-error')).toBeVisible();
+    expect(screen.queryByTestId('capability-save')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Retry'));
+    await screen.findByTestId('capability-role-editor');
+  });
+});
+
+describe('CapabilityRoleEditor retained permission safeguards', () => {
+  function partial() {
+    const value = baseline();
+    const edit = value.groups[0].capabilities[1];
+    edit.authorizationState = 'partial';
+    edit.missingCodes = ['model.order.update'];
+    return value;
+  }
+  it('represents partial actions as mixed and completes only by explicit selection', async () => {
+    vi.mocked(authorizationDraftService.read).mockResolvedValue(partial());
+    await open();
+    const checkbox = screen.getByTestId('capability-checkbox-order.edit');
+    expect(checkbox).toHaveAttribute('aria-checked', 'mixed');
+    expect(screen.getByTestId('capability-save')).toBeDisabled();
+    fireEvent.click(checkbox);
+    await review();
+    expect(authorizationDraftService.preview).toHaveBeenCalledWith(
+      'role-1',
+      expect.objectContaining({
+        selectedCapabilityCodes: ['order.read', 'order.edit'],
+        revokedPartialCapabilityCodes: [],
+      }),
+    );
+  });
+  it('requires explicit partial revocation and supports undo and discard', async () => {
+    vi.mocked(authorizationDraftService.read).mockResolvedValue(partial());
+    await open();
+    const revoke = screen.getByTestId('capability-revoke-partial-order.edit');
+    fireEvent.click(revoke);
+    fireEvent.click(revoke);
+    expect(screen.getByTestId('capability-save')).toBeDisabled();
+    fireEvent.click(revoke);
+    fireEvent.click(screen.getByTestId('capability-discard'));
+    expect(screen.getByTestId('capability-checkbox-order.edit')).toHaveAttribute(
+      'aria-checked',
+      'mixed',
+    );
+    fireEvent.click(revoke);
+    await review();
+    expect(authorizationDraftService.preview).toHaveBeenCalledWith(
+      'role-1',
+      expect.objectContaining({ revokedPartialCapabilityCodes: ['order.edit'] }),
+    );
+  });
+  it('clears partial revocation when an explicit tier preset selects the duty', async () => {
+    const value = partial();
+    value.groups[0].capabilities[1].tier = 'viewer';
+    vi.mocked(authorizationDraftService.read).mockResolvedValue(value);
+    await open();
+    fireEvent.click(screen.getByTestId('capability-revoke-partial-order.edit'));
+    fireEvent.click(screen.getByTestId('capability-preset-viewer'));
+    await review();
+    expect(authorizationDraftService.preview).toHaveBeenCalledWith(
+      'role-1',
+      expect.objectContaining({
+        selectedCapabilityCodes: ['order.read', 'order.edit'],
+        revokedPartialCapabilityCodes: [],
+      }),
+    );
+  });
+  it('tier presets retain untiered business grants', async () => {
+    const value = baseline();
+    value.groups[0].capabilities[1].tier = 'editor';
+    vi.mocked(authorizationDraftService.read).mockResolvedValue(value);
+    await open();
+    fireEvent.click(screen.getByTestId('capability-preset-editor'));
+    expect(screen.getByTestId('capability-checkbox-order.read')).toBeChecked();
+    expect(screen.getByTestId('capability-checkbox-order.edit')).toBeChecked();
+    await review();
+    expect(authorizationDraftService.preview).toHaveBeenCalledWith(
+      'role-1',
+      expect.objectContaining({ selectedCapabilityCodes: ['order.read', 'order.edit'] }),
+    );
+  });
+  it('never submits derived model bundles as declared duties', async () => {
+    const value = baseline();
+    value.groups[0].capabilities.push({
+      ...value.groups[0].capabilities[0],
+      code: 'derived.order',
+      conventionDerived: true,
+    });
+    vi.mocked(authorizationDraftService.read).mockResolvedValue(value);
+    await open();
+    await toggleEdit();
+    await review();
+    expect(screen.queryByTestId('capability-checkbox-derived.order')).not.toBeInTheDocument();
+    expect(authorizationDraftService.preview).toHaveBeenCalledWith(
+      'role-1',
+      expect.objectContaining({ selectedCapabilityCodes: ['order.read', 'order.edit'] }),
+    );
+  });
+  it('clears the local draft if authoring access is revoked', async () => {
+    const { rerender } = render(<CapabilityRoleEditor rolePid="role-1" />);
+    await screen.findByTestId('capability-role-editor');
+    await toggleEdit();
+    rerender(<CapabilityRoleEditor rolePid="role-1" readOnly />);
+    await waitFor(() =>
+      expect(screen.getByTestId('capability-checkbox-order.edit')).not.toBeChecked(),
+    );
+    expect(screen.queryByTestId('capability-draft')).not.toBeInTheDocument();
+    expect(authorizationDraftService.save).not.toHaveBeenCalled();
+  });
+});
+
+describe('field restrictions participate in the same role draft', () => {
+  const definition = {
+    pid: 'hide-cost',
+    name: 'Hide quote cost',
+    modelCode: 'order',
+    fieldCode: 'cost',
+    policyType: 'column',
+    maskType: 'hide',
+    enabled: true,
+  };
+  const binding = {
+    policyPid: 'hide-cost',
+    name: 'Hide quote cost',
+    modelCode: 'order',
+    fieldCode: 'cost',
+    policyType: 'column',
+    maskType: 'hide',
+    enabled: true,
+  };
+  it('discovers business root restrictions without requiring generic model access', async () => {
+    const state = baseline();
+    state.groups[0].capabilities = [
+      { ...state.groups[0].capabilities[0], includes: ['order.manage'] },
+    ];
+    state.matrix.modules![0].resources![0].resourceCode = 'business.order';
+    state.matrix.modules![0].resources![0].actions = [
+      {
+        ...state.matrix.modules![0].resources![0].actions![0],
+        code: 'order.manage',
+        action: 'execute',
+      },
+    ];
+    vi.mocked(authorizationDraftService.read).mockResolvedValue(state);
+    vi.mocked(authorizationDraftService.fieldPolicyRoots).mockResolvedValue([
+      { model: 'order', permissions: ['order.manage'] },
+    ]);
+    vi.mocked(authorizationDraftService.fieldPolicies).mockResolvedValue([
+      definition,
+      { ...definition, pid: 'internal-policy', modelCode: 'internal_dependency' },
+    ]);
+    await open();
+    expect(await screen.findByTestId('field-policy-hide-cost')).not.toBeDisabled();
+    expect(screen.queryByTestId('field-policy-internal-policy')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('field-policy-hide-cost'));
+    await review();
+    expect(vi.mocked(authorizationDraftService.preview).mock.calls[0][1].fieldPolicyPids).toEqual([
+      'hide-cost',
+    ]);
+  });
+  it('previews and atomically saves field selection together with duty changes', async () => {
+    vi.mocked(authorizationDraftService.fieldPolicies).mockResolvedValue([definition]);
+    vi.mocked(authorizationDraftService.preview).mockImplementation(async (_, body) => ({
+      revision: body.expectedRevision,
+      capabilities: {
+        grantedCodes: [],
+        revokedCodes: [],
+        preservedCodes: [],
+        relatedMenus: [],
+        resultingCapabilities: [],
+      },
+      defaultScopeChanged: false,
+      defaultScopeType: null,
+      applyDefaultToCurrentGrants: false,
+      scopeChanges: [],
+      fieldPolicies: { added: [binding], removed: [] },
+    }));
+    vi.mocked(authorizationDraftService.save).mockResolvedValue({
+      ...baseline(),
+      fieldPolicies: [binding],
+    });
+    await open();
+    fireEvent.click(await screen.findByTestId('field-policy-hide-cost'));
+    await toggleEdit();
+    expect(authorizationDraftService.save).not.toHaveBeenCalled();
+    await review();
+    expect(screen.getByTestId('draft-preview-fields')).toHaveTextContent('Hide quote cost');
+    const body = vi.mocked(authorizationDraftService.preview).mock.calls[0][1];
+    expect(body.fieldPolicyPids).toEqual(['hide-cost']);
+    expect(body.selectedCapabilityCodes).toContain('order.edit');
+    fireEvent.click(screen.getByTestId('confirm-ok'));
+    await waitFor(() =>
+      expect(authorizationDraftService.save).toHaveBeenCalledWith('role-1', body),
+    );
+    await waitFor(() => expect(screen.getByTestId('field-policy-hide-cost')).toBeChecked());
+  });
+  it('cancels a field preview and discards the local selection without writes', async () => {
+    vi.mocked(authorizationDraftService.fieldPolicies).mockResolvedValue([definition]);
+    await open();
+    fireEvent.click(await screen.findByTestId('field-policy-hide-cost'));
+    expect(screen.queryByTestId('capability-draft')).not.toBeInTheDocument();
+    expect(screen.getByTestId('field-policies-pending')).toBeVisible();
+    await review();
+    fireEvent.click(screen.getByTestId('confirm-cancel'));
+    expect(authorizationDraftService.save).not.toHaveBeenCalled();
+    expect(screen.getByTestId('field-policy-hide-cost')).toBeChecked();
+    fireEvent.click(screen.getByTestId('capability-discard'));
+    await waitFor(() => expect(screen.getByTestId('field-policy-hide-cost')).not.toBeChecked());
+    expect(screen.getByTestId('capability-save')).toBeDisabled();
+  });
+  it('fails a malformed field catalog without manufacturing an empty binding change', async () => {
+    vi.mocked(authorizationDraftService.fieldPolicies).mockResolvedValue([
+      { ...definition, enabled: undefined },
+    ]);
+    await open();
+    await screen.findByTestId('field-policies-retry');
+    expect(screen.queryByTestId('field-policy-hide-cost')).not.toBeInTheDocument();
+    await toggleEdit();
+    await review();
+    expect(vi.mocked(authorizationDraftService.preview).mock.calls[0][1]).not.toHaveProperty(
+      'fieldPolicyPids',
+    );
+  });
+  it('retries policy loading without throwing away the staged duty draft', async () => {
+    vi.mocked(authorizationDraftService.fieldPolicies)
+      .mockRejectedValueOnce(new Error('Unavailable'))
+      .mockResolvedValue([definition]);
+    await open();
+    await screen.findByTestId('field-policies-retry');
+    await toggleEdit();
+    fireEvent.click(screen.getByTestId('field-policies-retry'));
+    await screen.findByTestId('field-policy-hide-cost');
+    expect(screen.getByTestId('capability-checkbox-order.edit')).toBeChecked();
+    expect(authorizationDraftService.read).toHaveBeenCalledTimes(1);
+    expect(authorizationDraftService.save).not.toHaveBeenCalled();
+  });
+  it('removes the last binding explicitly rather than omitting field changes', async () => {
+    vi.mocked(authorizationDraftService.read).mockResolvedValue({
+      ...baseline(),
+      fieldPolicies: [binding],
+    });
+    vi.mocked(authorizationDraftService.fieldPolicies).mockResolvedValue([definition]);
+    await open();
+    fireEvent.click(await screen.findByTestId('field-policy-hide-cost'));
+    await review();
+    expect(vi.mocked(authorizationDraftService.preview).mock.calls[0][1].fieldPolicyPids).toEqual(
+      [],
+    );
+    expect(authorizationDraftService.save).not.toHaveBeenCalled();
+  });
+  it('preserves existing bindings when the policy catalog is denied', async () => {
+    vi.mocked(authorizationDraftService.read).mockResolvedValue({
+      ...baseline(),
+      fieldPolicies: [binding],
+    });
+    vi.mocked(authorizationDraftService.fieldPolicies).mockRejectedValue(new Error('Forbidden'));
+    await open();
+    await screen.findByTestId('field-policies-retry');
+    expect(screen.getByTestId('bound-field-policy-summary')).toHaveTextContent('Hide quote cost');
+    await toggleEdit();
+    await review();
+    expect(vi.mocked(authorizationDraftService.preview).mock.calls[0][1]).not.toHaveProperty(
+      'fieldPolicyPids',
+    );
+  });
+  it('does not turn an unknown historical binding snapshot into an empty selection', async () => {
+    vi.mocked(authorizationDraftService.read).mockResolvedValue({
+      ...baseline(),
+      fieldPolicies: undefined,
+    });
+    await open();
+    expect(screen.getByTestId('role-field-policies')).toHaveTextContent('unavailable');
+    expect(authorizationDraftService.fieldPolicies).not.toHaveBeenCalled();
+    await toggleEdit();
+    await review();
+    expect(vi.mocked(authorizationDraftService.preview).mock.calls[0][1]).not.toHaveProperty(
+      'fieldPolicyPids',
+    );
+  });
+  it('does not fetch privileged policy definitions for a read-only editor', async () => {
+    vi.mocked(authorizationDraftService.read).mockResolvedValue({
+      ...baseline(),
+      fieldPolicies: [binding],
+    });
+    render(<CapabilityRoleEditor rolePid="role-1" readOnly />);
+    await screen.findByTestId('capability-role-editor');
+    expect(await screen.findByTestId('field-policy-hide-cost')).toBeDisabled();
+    expect(authorizationDraftService.fieldPolicies).not.toHaveBeenCalled();
+  });
+  it('allows removing an inactive restriction but never newly selecting it', async () => {
+    vi.mocked(authorizationDraftService.read).mockResolvedValue({
+      ...baseline(),
+      fieldPolicies: [{ ...binding, enabled: false }],
+    });
+    vi.mocked(authorizationDraftService.fieldPolicies).mockResolvedValue([
+      { ...definition, enabled: false },
+    ]);
+    await open();
+    const checkbox = await screen.findByTestId('field-policy-hide-cost');
+    expect(checkbox).toBeEnabled();
+    fireEvent.click(checkbox);
+    expect(checkbox).not.toBeChecked();
+    expect(checkbox).toBeDisabled();
+  });
+});
+
+describe('positive grant field authoring in the original role draft', () => {
+  const metadataRevision = 'b'.repeat(64);
+  const fields = [
+    { code: 'name', label: 'Name' },
+    { code: 'cost', label: 'Cost' },
+  ];
+  const binding = {
+    bindingPid: 'saved-binding',
+    permissionCode: 'model.order.read',
+    modelCode: 'order',
+    modelLabel: 'Order',
+    editable: true,
+    legacy: false,
+    readFields: ['name', 'cost'],
+    writeFields: [],
+    fields,
+    metadataRevision,
+  };
+  function snapshot() {
+    return {
+      ...baseline(),
+      grantFields: [binding],
+      fieldAccess: [
+        {
+          code: 'order',
+          label: 'Order',
+          fields: fields.map((field) => ({
+            ...field,
+            access: 'inherit',
+            additionalRestrictions: [],
+          })),
+        },
+      ],
     };
-    mockData([{ group: 'Commerce', capabilities: [capability] }], matrix);
+  }
+  beforeEach(() => {
+    vi.mocked(authorizationDraftService.read).mockResolvedValue(snapshot());
+    vi.mocked(authorizationDraftService.preview).mockImplementation(async (_, body) => {
+      const candidates = [
+        binding,
+        ...(body.selectedCapabilityCodes.includes('order.edit')
+          ? [
+              {
+                ...binding,
+                bindingPid: null,
+                permissionCode: 'model.order.update',
+                legacy: true,
+                readFields: [],
+                writeFields: [],
+              },
+            ]
+          : []),
+      ];
+      return {
+        revision: body.expectedRevision,
+        capabilities: {
+          grantedCodes: [],
+          revokedCodes: [],
+          preservedCodes: [],
+          relatedMenus: [],
+          resultingCapabilities: [],
+        },
+        defaultScopeChanged: false,
+        defaultScopeType: null,
+        applyDefaultToCurrentGrants: false,
+        scopeChanges: [],
+        grantFieldCandidates: candidates,
+        grantFieldChanges: (body.grantFieldChanges ?? []).map((change) => ({
+          before: candidates.find((candidate) =>
+            change.bindingPid
+              ? candidate.bindingPid === change.bindingPid
+              : candidate.permissionCode === change.permissionCode,
+          ),
+          readFields: change.readFields,
+          writeFields: change.writeFields,
+        })),
+      };
+    });
+  });
+  it('stages existing and newly selected bindings separately and saves the exact reviewed fields once', async () => {
+    const view = render(<CapabilityRoleEditor rolePid="role-1" />);
+    await screen.findByTestId('capability-role-editor');
+    await toggleEdit();
+    view.rerender(<CapabilityRoleEditor rolePid="role-1" activeSection="scope" />);
+    const read = await screen.findByTestId('grant-field-model.order.read-0-read-cost');
+    await waitFor(() => expect(read).toBeEnabled());
+    fireEvent.click(read);
+    fireEvent.click(screen.getByText('Set a finite field list'));
+    fireEvent.click(screen.getByTestId('grant-field-model.order.update-1-write-cost'));
+    expect(authorizationDraftService.save).not.toHaveBeenCalled();
+    await review();
+    const body = vi.mocked(authorizationDraftService.preview).mock.calls.at(-1)![1];
+    expect(body.selectedCapabilityCodes).toEqual(['order.read', 'order.edit']);
+    expect(body.grantFieldChanges).toEqual([
+      {
+        bindingPid: 'saved-binding',
+        modelCode: 'order',
+        expectedMetadataRevision: metadataRevision,
+        readFields: ['name'],
+        writeFields: [],
+      },
+      {
+        permissionCode: 'model.order.update',
+        modelCode: 'order',
+        expectedMetadataRevision: metadataRevision,
+        readFields: [],
+        writeFields: ['name'],
+      },
+    ]);
+    expect(screen.getByTestId('draft-preview-grant-fields')).toHaveTextContent('Order');
+    fireEvent.click(screen.getByTestId('confirm-ok'));
+    await waitFor(() =>
+      expect(authorizationDraftService.save).toHaveBeenCalledExactlyOnceWith('role-1', body),
+    );
+  });
+  it('preserves field edits on candidate failure and exposes an explicit reset', async () => {
+    const view = render(<CapabilityRoleEditor rolePid="role-1" activeSection="scope" />);
+    const checkbox = await screen.findByTestId('grant-field-model.order.read-0-read-cost');
+    fireEvent.click(checkbox);
+    vi.mocked(authorizationDraftService.preview).mockRejectedValue(new Error('unavailable'));
+    view.rerender(<CapabilityRoleEditor rolePid="role-1" activeSection="capabilities" />);
+    view.rerender(<CapabilityRoleEditor rolePid="role-1" activeSection="scope" />);
+    await screen.findByText(/Could not check field candidates/);
+    expect(screen.getByTestId('grant-fields-pending')).toBeVisible();
+    fireEvent.click(screen.getByText('Discard field edits'));
+    expect(screen.queryByTestId('grant-fields-pending')).not.toBeInTheDocument();
+    expect(authorizationDraftService.save).not.toHaveBeenCalled();
+  });
+  it('does not silently rebase a staged metadata token on a later candidate refresh', async () => {
+    const view = render(<CapabilityRoleEditor rolePid="role-1" activeSection="scope" />);
+    fireEvent.click(await screen.findByTestId('grant-field-model.order.read-0-read-cost'));
+    const preview = vi.mocked(authorizationDraftService.preview).getMockImplementation()!;
+    vi.mocked(authorizationDraftService.preview).mockImplementation(async (...args) => {
+      const result = await preview(...args);
+      return {
+        ...result,
+        grantFieldCandidates: result.grantFieldCandidates?.map((candidate) => ({
+          ...candidate,
+          metadataRevision: 'c'.repeat(64),
+        })),
+      };
+    });
+    view.rerender(<CapabilityRoleEditor rolePid="role-1" activeSection="capabilities" />);
+    view.rerender(<CapabilityRoleEditor rolePid="role-1" activeSection="scope" />);
+    await waitFor(() =>
+      expect(screen.getByTestId('grant-field-model.order.read-0-read-name')).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByTestId('grant-field-model.order.read-0-read-name'));
+    await review();
+    expect(
+      vi.mocked(authorizationDraftService.preview).mock.calls.at(-1)![1].grantFieldChanges,
+    ).toEqual([
+      {
+        bindingPid: 'saved-binding',
+        modelCode: 'order',
+        expectedMetadataRevision: metadataRevision,
+        readFields: [],
+        writeFields: [],
+      },
+    ]);
+    fireEvent.click(screen.getByTestId('confirm-cancel'));
+    expect(authorizationDraftService.save).not.toHaveBeenCalled();
+  });
+  it('uses the saved catalog without privileged preview for read-only roles', async () => {
+    render(<CapabilityRoleEditor rolePid="role-1" activeSection="scope" readOnly />);
+    expect(await screen.findByTestId('grant-field-model.order.read-0-read-cost')).toBeDisabled();
+    expect(authorizationDraftService.preview).not.toHaveBeenCalled();
+  });
+});
+
+describe('mainline business-rule policy integration', () => {
+  function policyBaseline() {
+    const value = baseline();
+    const action = value.matrix.modules?.[0]?.resources?.[0]?.actions?.[0];
+    if (!action) throw new Error('Expected the saved grant fixture');
+    action.policySchema = JSON.stringify({
+      dynamicAbac: { type: 'rule-center', label: 'Business conditions', fields: [] },
+    });
+    vi.mocked(authorizationDraftService.read).mockResolvedValue(value);
     vi.mocked(permissionService.getPolicySnapshot).mockResolvedValue({
       revision: 'grant:1',
       values: { dynamicAbac: { enabled: true } },
     });
   }
 
-  it('opens the current role business-rule policy through the shared dialog', async () => {
-    policyData();
-    render(<CapabilityRoleEditor rolePid="role-current" />);
-    fireEvent.click(await screen.findByTestId('capability-policy-configure-cm.cap.refund'));
-    fireEvent.click(await screen.findByRole('button', { name: 'Create refund', exact: true }));
+  it('opens the saved grant policy without changing the atomic draft', async () => {
+    policyBaseline();
+    await open();
+    fireEvent.click(await screen.findByTestId('capability-policy-configure-order.read'));
+    fireEvent.click(await screen.findByRole('button', { name: 'read', exact: true }));
     const dialog = await screen.findByTestId('shared-policy-dialog');
-    expect(permissionService.getPolicySnapshot).toHaveBeenCalledWith(
-      'role-current',
-      'permission-refund-create',
-    );
-    expect(dialog).toHaveAttribute('data-role', 'role-current');
-    expect(dialog).toHaveAttribute('data-permission', 'permission-refund-create');
+    expect(permissionService.getPolicySnapshot).toHaveBeenCalledWith('role-1', 'p0');
+    expect(dialog).toHaveAttribute('data-role', 'role-1');
+    expect(dialog).toHaveAttribute('data-permission', 'p0');
     expect(screen.getByTestId('shared-policy-values')).toHaveTextContent('"enabled":true');
     fireEvent.click(screen.getByRole('button', { name: 'Cancel shared policy' }));
-    expect(capabilityService.applySelection).not.toHaveBeenCalled();
+    expect(authorizationDraftService.save).not.toHaveBeenCalled();
   });
 
-  it('keeps business rules unavailable without policy edit authority', async () => {
-    policyData();
-    render(<CapabilityRoleEditor rolePid="role-current" scopeReadOnly />);
+  it('keeps the policy entry unavailable without scope edit authority', async () => {
+    policyBaseline();
+    render(<CapabilityRoleEditor rolePid="role-1" scopeReadOnly />);
     await screen.findByTestId('capability-role-editor');
-    expect(
-      screen.queryByTestId('capability-policy-configure-cm.cap.refund'),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('capability-policy-configure-order.read')).not.toBeInTheDocument();
     expect(permissionService.getPolicySnapshot).not.toHaveBeenCalled();
   });
 
-  it('searches the displayed English declaration and retains that name in preview and impact', async () => {
-    const capability = {
-      ...cap('org.cap.read', '查看组织架构', false),
-      localizedLabels: { en: 'View Organization' },
-      includes: ['org.hr.read'],
-    };
-    mockData([{ group: 'Organization', capabilities: [capability] }]);
-    vi.mocked(capabilityService.previewSelection).mockResolvedValue({
-      grantedCodes: ['org.hr.read'],
-      revokedCodes: [],
-      preservedCodes: [],
-      relatedMenus: [],
-      resultingCapabilities: [
-        { ...capability, granted: true, authorizationState: 'full', missingCodes: [] },
-      ],
-    });
-    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
-    await screen.findByTestId('capability-role-editor');
-    fireEvent.change(screen.getByTestId('capability-search'), {
-      target: { value: 'View Organization' },
-    });
-    fireEvent.click(screen.getByTestId('capability-checkbox-org.cap.read'));
-    fireEvent.click(screen.getByTestId('capability-save'));
-    const dialog = await screen.findByRole('dialog');
-    expect(dialog).toHaveTextContent('Grant: View Organization');
-    expect(screen.getByTestId('capability-preview-impact-org.cap.read')).toHaveTextContent(
-      'View Organization',
-    );
-    expect(dialog).not.toHaveTextContent('查看组织架构');
-  });
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(capabilityService.previewSelection).mockResolvedValue({
-      grantedCodes: [],
-      revokedCodes: [],
-      preservedCodes: [],
-      resultingCapabilities: [],
-      relatedMenus: [],
-    });
-  });
-
-  it('loads capability + matrix views, seeds selection from granted, disables Save until dirty', async () => {
-    mockData();
-    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
-
-    await waitFor(() => screen.getByTestId('capability-role-editor'));
-    expect(capabilityService.getForRole).toHaveBeenCalledWith('role-pid-5');
-    expect(permissionService.getMatrixForRole).toHaveBeenCalledWith('role-pid-5');
-    // ② data-scope bar and ③ advanced section both present
-    expect(screen.getByTestId('data-scope-bar')).toBeTruthy();
-    expect(screen.getByTestId('permission-diagnostics')).toBeTruthy();
-    expect(
-      (screen.getByTestId('capability-checkbox-qo.cap.quote_view') as HTMLInputElement).checked,
-    ).toBe(true);
-    expect(
-      (screen.getByTestId('capability-checkbox-qo.cap.quote_edit') as HTMLInputElement).checked,
-    ).toBe(false);
-    expect((screen.getByTestId('capability-save') as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it('keeps grants and diagnostics readable while disabling all authoring for a role reader', async () => {
-    mockData();
-    render(<CapabilityRoleEditor rolePid="role-pid-5" readOnly />);
-    await waitFor(() => screen.getByTestId('capability-role-editor'));
-    const edit = screen.getByTestId('capability-checkbox-qo.cap.quote_edit') as HTMLInputElement;
-    expect(edit.disabled).toBe(true);
-    expect((screen.getByTestId('data-scope-modify-btn') as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByTestId('capability-preset-admin') as HTMLButtonElement).disabled).toBe(
-      true,
-    );
-    expect((screen.getByTestId('capability-save') as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(edit);
-    fireEvent.click(screen.getByTestId('capability-save'));
-    expect(screen.getByTestId('permission-diagnostics')).toBeTruthy();
-    expect(screen.queryByTestId('capability-draft')).toBeNull();
-    expect(capabilityService.previewSelection).not.toHaveBeenCalled();
-    expect(capabilityService.applySelection).not.toHaveBeenCalled();
-    expect(permissionService.setRoleDefaultScope).not.toHaveBeenCalled();
-  });
-
-  it('discards an authoring draft when management access is revoked', async () => {
-    mockData();
-    const { rerender } = render(<CapabilityRoleEditor rolePid="role-pid-5" />);
-    await waitFor(() => screen.getByTestId('capability-role-editor'));
-    fireEvent.click(screen.getByTestId('capability-checkbox-qo.cap.quote_edit'));
-    expect(screen.getByTestId('capability-draft')).toBeTruthy();
-    rerender(<CapabilityRoleEditor rolePid="role-pid-5" readOnly />);
-    await waitFor(() => screen.getByTestId('capability-role-editor'));
-    expect(screen.queryByTestId('capability-draft')).toBeNull();
-    expect(
-      (screen.getByTestId('capability-checkbox-qo.cap.quote_edit') as HTMLInputElement).checked,
-    ).toBe(false);
-    expect((screen.getByTestId('capability-save') as HTMLButtonElement).disabled).toBe(true);
-    expect(capabilityService.applySelection).not.toHaveBeenCalled();
-  });
-
-  it('enables Save after a toggle and persists the selection via applySelection', async () => {
-    mockData();
-    (capabilityService.applySelection as ReturnType<typeof vi.fn>).mockResolvedValue(groups);
-    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
-    await waitFor(() => screen.getByTestId('capability-role-editor'));
-
-    fireEvent.click(screen.getByTestId('capability-checkbox-qo.cap.quote_edit')); // select quote edit -> dirty
-    expect((screen.getByTestId('capability-save') as HTMLButtonElement).disabled).toBe(false);
-
-    fireEvent.click(screen.getByTestId('capability-save'));
-    expect(capabilityService.applySelection).not.toHaveBeenCalled();
-    fireEvent.click(await screen.findByTestId('confirm-ok'));
-    await waitFor(() =>
-      expect(capabilityService.applySelection).toHaveBeenCalledWith('role-pid-5', [
-        'qo.cap.quote_view',
-        'qo.cap.quote_edit',
-      ]),
-    );
-  });
-
-  it('applies a tier preset, selecting tiered capabilities and enabling Save', async () => {
-    const tieredGroups: CapabilityGroup[] = [
-      {
-        group: '报价单',
-        capabilities: [
-          {
-            authorizationState: 'none' as const,
-            description: null,
-            displayGroupOrder: 10000,
-            displayOrder: 100,
-            localizedLabels: {},
-            localizedDescriptions: {},
-            missingCodes: [],
-            unlockedMenus: null,
-
-            code: 'qo.cap.quote_view',
-            group: '报价单',
-            label: '查看报价',
-            sensitive: false,
-            tier: 'viewer',
-            includes: [],
-            granted: false,
-            conventionDerived: false,
-          },
-          {
-            authorizationState: 'none' as const,
-            description: null,
-            displayGroupOrder: 10000,
-            displayOrder: 100,
-            localizedLabels: {},
-            localizedDescriptions: {},
-            missingCodes: [],
-            unlockedMenus: null,
-
-            code: 'qo.cap.quote_edit',
-            group: '报价单',
-            label: '编辑报价',
-            sensitive: false,
-            tier: 'editor',
-            includes: [],
-            granted: false,
-            conventionDerived: false,
-          },
-        ],
-      },
-    ];
-    mockData(tieredGroups);
-    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
-    await waitFor(() => screen.getByTestId('capability-role-editor'));
-
-    fireEvent.click(screen.getByTestId('capability-preset-viewer')); // viewer preset -> only the viewer-tier capability
-    expect(
-      (screen.getByTestId('capability-checkbox-qo.cap.quote_view') as HTMLInputElement).checked,
-    ).toBe(true);
-    expect(
-      (screen.getByTestId('capability-checkbox-qo.cap.quote_edit') as HTMLInputElement).checked,
-    ).toBe(false);
-    expect((screen.getByTestId('capability-save') as HTMLButtonElement).disabled).toBe(false);
-  });
-
-  it('keeps generated model capabilities out of the primary checklist but preserves them on save', async () => {
-    const mixedGroups: CapabilityGroup[] = [
-      {
-        group: '报价单',
-        capabilities: [
-          {
-            authorizationState: 'full' as const,
-            description: null,
-            displayGroupOrder: 10000,
-            displayOrder: 100,
-            localizedLabels: {},
-            localizedDescriptions: {},
-            missingCodes: [],
-            unlockedMenus: null,
-
-            code: 'qo.cap.quote_view',
-            group: '报价单',
-            label: '查看报价',
-            sensitive: false,
-            tier: 'viewer',
-            includes: [],
-            granted: true,
-            conventionDerived: false,
-          },
-          {
-            authorizationState: 'none' as const,
-            description: null,
-            displayGroupOrder: 10000,
-            displayOrder: 100,
-            localizedLabels: {},
-            localizedDescriptions: {},
-            missingCodes: [],
-            unlockedMenus: null,
-
-            code: 'qo.cap.quote_edit',
-            group: '报价单',
-            label: '编辑报价',
-            sensitive: false,
-            tier: 'editor',
-            includes: [],
-            granted: false,
-            conventionDerived: false,
-          },
-        ],
-      },
-      {
-        group: 'model',
-        capabilities: [
-          {
-            authorizationState: 'full' as const,
-            description: null,
-            displayGroupOrder: 10000,
-            displayOrder: 100,
-            localizedLabels: {},
-            localizedDescriptions: {},
-            missingCodes: [],
-            unlockedMenus: null,
-
-            code: 'model.qo_quote_common',
-            group: 'model',
-            label: 'Qo_quote_common Read',
-            sensitive: false,
-            tier: null,
-            includes: [],
-            granted: true,
-            conventionDerived: true,
-          },
-        ],
-      },
-    ];
-    mockData(mixedGroups);
-    (capabilityService.applySelection as ReturnType<typeof vi.fn>).mockResolvedValue(mixedGroups);
-    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
-    await waitFor(() => screen.getByTestId('capability-role-editor'));
-
-    expect(screen.getByTestId('capability-checkbox-qo.cap.quote_view')).toBeTruthy();
-    expect(screen.queryByTestId('capability-checkbox-model.qo_quote_common')).toBeNull();
-    expect(screen.queryByTestId('advanced-capability-summary')).toBeNull();
-
-    fireEvent.click(screen.getByTestId('capability-checkbox-qo.cap.quote_edit'));
-    fireEvent.click(screen.getByTestId('capability-save'));
-    expect(capabilityService.applySelection).not.toHaveBeenCalled();
-    fireEvent.click(await screen.findByTestId('confirm-ok'));
-    await waitFor(() =>
-      expect(capabilityService.applySelection).toHaveBeenCalledWith('role-pid-5', [
-        'qo.cap.quote_view',
-        'qo.cap.quote_edit',
-      ]),
-    );
-  });
-  it('preserves untiered business grants when applying a tier preset', async () => {
-    mockData([
-      {
-        group: '新业务',
-        capabilities: [
-          { ...cap('custom.cap.new', '新业务', true), tier: null },
-          { ...cap('custom.cap.read', '读取', false), tier: 'viewer' },
-        ],
-      },
-    ]);
-    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
-    await screen.findByTestId('capability-role-editor');
-    fireEvent.click(screen.getByTestId('capability-preset-viewer'));
-    expect(screen.getByTestId('capability-checkbox-custom.cap.new')).toBeChecked();
-    expect(screen.getByTestId('capability-checkbox-custom.cap.read')).toBeChecked();
-  });
-  it('retains the draft when saving fails', async () => {
-    mockData();
-    vi.mocked(capabilityService.applySelection).mockRejectedValue(new Error('offline'));
-    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
-    await screen.findByTestId('capability-role-editor');
-    fireEvent.click(screen.getByTestId('capability-checkbox-qo.cap.quote_edit'));
-    fireEvent.click(screen.getByTestId('capability-save'));
-    fireEvent.click(await screen.findByTestId('confirm-ok'));
-    await waitFor(() => expect(screen.getByTestId('capability-save')).not.toBeDisabled());
-    expect(screen.getByTestId('capability-checkbox-qo.cap.quote_edit')).toBeChecked();
-    expect(screen.getByTestId('capability-draft')).toBeTruthy();
-  });
-  it('ignores a stale StrictMode initialization response after the user starts a draft', async () => {
-    let finishOldRead!: (value: CapabilityGroup[]) => void;
-    const oldRead = new Promise<CapabilityGroup[]>((resolve) => {
-      finishOldRead = resolve;
-    });
-    mockData();
-    vi.mocked(capabilityService.getForRole).mockImplementationOnce(() => oldRead);
-    render(
-      <StrictMode>
-        <CapabilityRoleEditor rolePid="role-pid-5" />
-      </StrictMode>,
-    );
-    await screen.findByTestId('capability-role-editor');
-    expect(capabilityService.getForRole).toHaveBeenCalledTimes(2);
-    fireEvent.click(screen.getByTestId('capability-checkbox-qo.cap.quote_edit'));
-    expect(screen.getByTestId('capability-checkbox-qo.cap.quote_edit')).toBeChecked();
-    await act(async () => {
-      finishOldRead(groups);
-    });
-    expect(screen.getByTestId('capability-checkbox-qo.cap.quote_edit')).toBeChecked();
-    expect(screen.getByTestId('capability-draft')).toBeTruthy();
-  });
-  it('shows read-only diagnostics without atomic write controls', async () => {
-    const matrix: PermissionMatrixDTO = {
-      modules: [
-        {
-          moduleCode: 'quote',
-          moduleName: 'Quote',
-          resources: [
-            {
-              resourceCode: 'qo.quote',
-              resourceName: 'Quote',
-              actions: [
-                {
-                  permissionId: 1,
-                  permissionPid: 'p1',
-                  code: 'qo.quote.read',
-                  action: 'read',
-                  label: 'Read quote',
-                  granted: true,
-                  supported: true,
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    };
-    mockData(groups, matrix);
-    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
-    await screen.findByTestId('capability-role-editor');
-    expect(screen.getByTestId('permission-diagnostics')).toBeTruthy();
-    expect(screen.queryByTestId('atomic-checkbox-qo.quote.read')).toBeNull();
-    expect(screen.queryByTestId('atomic-scope-qo.quote.read')).toBeNull();
-    const diagnostics = screen.getByTestId('permission-diagnostics') as HTMLDetailsElement;
-    diagnostics.open = true;
-    fireEvent(diagnostics, new Event('toggle'));
-    expect(await screen.findByText('查看报价单')).toBeTruthy();
-    expect(screen.queryByText('Read quote')).toBeNull();
-    fireEvent.change(screen.getByRole('textbox', { name: 'Search permission diagnostics' }), {
-      target: { value: '查看报价单' },
-    });
-    expect(screen.getByTestId('diagnostic-action-qo.quote.read')).toBeTruthy();
-    vi.mocked(capabilityService.previewSelection).mockResolvedValue({
-      grantedCodes: [],
-      revokedCodes: ['qo.quote.read'],
-      preservedCodes: [],
-      resultingCapabilities: [],
-      relatedMenus: [],
-    });
-    fireEvent.click(screen.getByTestId('capability-checkbox-qo.cap.quote_edit'));
-    fireEvent.click(screen.getByTestId('capability-save'));
-    expect(await screen.findByText(/Revoke: 查看报价单/)).toBeTruthy();
-    expect(screen.queryByText(/Revoke: Read quote/)).toBeNull();
-    expect(permissionService.batchUpdateRolePermissions).not.toHaveBeenCalled();
-  });
-
-  it('hides stale state when capability write succeeds but readback fails', async () => {
-    mockData();
-    vi.mocked(capabilityService.applySelection).mockResolvedValue(groups);
-    vi.mocked(permissionService.getMatrixForRole)
-      .mockResolvedValueOnce(emptyMatrix)
-      .mockRejectedValueOnce(new Error('readback unavailable'));
-    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
-    await screen.findByTestId('capability-role-editor');
-    fireEvent.click(screen.getByTestId('capability-checkbox-qo.cap.quote_edit'));
-    fireEvent.click(screen.getByTestId('capability-save'));
-    fireEvent.click(await screen.findByTestId('confirm-ok'));
-    await screen.findByTestId('capability-editor-error');
-    expect(screen.queryByTestId('capability-role-editor')).toBeNull();
-    vi.mocked(permissionService.getMatrixForRole).mockResolvedValue(emptyMatrix);
-    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
-    await screen.findByTestId('capability-role-editor');
-  });
-
-  it('keeps authoritative shared impacts in a collapsed disclosure without burying the requested change', async () => {
-    mockData(groups, {
-      modules: [
-        {
-          moduleCode: 'quote',
-          moduleName: 'Quote',
-          resources: [
-            {
-              resourceCode: 'qo.quote',
-              resourceName: 'Quote',
-              actions: [
-                {
-                  permissionId: 1,
-                  permissionPid: 'p1',
-                  code: 'qo.quote.read',
-                  action: 'read',
-                  label: 'Read quote',
-                  granted: true,
-                  supported: true,
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    });
-    const affected = Array.from({ length: 30 }, (_, index) => ({
-      ...cap(`shared.${index}`, `Shared capability ${index}`, false),
-      authorizationState: 'partial' as const,
-    }));
-    vi.mocked(capabilityService.previewSelection).mockResolvedValue({
-      grantedCodes: ['qo.quote.update'],
-      revokedCodes: ['qo.quote.read'],
-      preservedCodes: ['legacy.read'],
-      resultingCapabilities: [
-        ...affected,
-        { ...cap('qo.cap.quote_edit', '编辑报价', false), authorizationState: 'partial' },
-        { ...cap('qo.cap.quote_view', '查看报价', false), authorizationState: 'none' },
-        { ...cap('full.cap', 'Complete capability', true), authorizationState: 'full' },
-      ],
-      relatedMenus: ['Quotes', 'Organization'],
-    });
-    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
-    await screen.findByTestId('capability-role-editor');
-    fireEvent.click(screen.getByTestId('capability-checkbox-qo.cap.quote_edit'));
-    fireEvent.click(screen.getByTestId('capability-save'));
-    const impact = (await screen.findByTestId('capability-preview-impact')) as HTMLDetailsElement;
-    expect(impact.open).toBe(false);
-    expect(screen.getByText('Grant: 编辑报价')).toBeTruthy();
-    expect(impact.querySelector('summary')).toHaveTextContent(
-      'Review related capability states, menus and action details',
-    );
-    expect(screen.getByTestId('capability-preview-state-counts')).toHaveTextContent(
-      'Related capabilities after saving: 1 fully granted · 31 with partial actions · 1 not granted',
-    );
-    expect(screen.getByTestId('capability-preview-state-guidance')).toHaveTextContent(
-      'Partial actions do not grant the complete capability',
-    );
-    expect(screen.getByTestId('capability-preview-resulting').querySelectorAll('li')).toHaveLength(
-      33,
-    );
-    const secondary = screen.getByTestId('capability-preview-partial-impact') as HTMLDetailsElement;
-    expect(secondary.open).toBe(false);
-    expect(secondary.querySelectorAll('li')).toHaveLength(30);
-    expect(secondary).not.toHaveTextContent('编辑报价');
-    expect(secondary).not.toHaveTextContent('查看报价');
-    expect(secondary).toHaveTextContent('Partial actions do not grant the complete capability');
-    expect(impact).toHaveTextContent('Shared capability 29');
-    const menus = screen.getByTestId('capability-preview-menus') as HTMLDetailsElement;
-    expect(menus.open).toBe(false);
-    expect(menus.querySelector('summary')).toHaveTextContent('Related menus · 2');
-    expect(Array.from(menus.querySelectorAll('li'), (item) => item.textContent)).toEqual([
-      'Quotes',
-      'Organization',
-    ]);
-    expect(impact).toHaveTextContent('Revoke: 查看报价单');
-    expect(capabilityService.applySelection).not.toHaveBeenCalled();
-  });
-
-  it('does not submit when authoritative preview fails and preserves the draft', async () => {
-    mockData();
-    vi.mocked(capabilityService.previewSelection).mockRejectedValue(
-      new Error('preview unavailable'),
-    );
-    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
-    await screen.findByTestId('capability-role-editor');
-    fireEvent.click(screen.getByTestId('capability-checkbox-qo.cap.quote_edit'));
-    fireEvent.click(screen.getByTestId('capability-save'));
-    await waitFor(() => expect(screen.getByTestId('capability-save')).not.toBeDisabled());
-    expect(screen.queryByTestId('confirm-dialog')).toBeNull();
-    expect(capabilityService.applySelection).not.toHaveBeenCalled();
-    expect(screen.getByTestId('capability-draft')).toBeTruthy();
-  });
-  it('shows a partial grant as mixed and allows explicit completion through preview', async () => {
-    mockData([
-      {
-        group: 'Business',
-        capabilities: [
-          {
-            ...cap('partial.cap', 'Partial capability', false),
-            authorizationState: 'partial',
-            includes: ['read', 'write'],
-            missingCodes: ['write'],
-          },
-        ],
-      },
-    ]);
-    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
-    await screen.findByTestId('capability-role-editor');
-    const checkbox = screen.getByTestId('capability-checkbox-partial.cap') as HTMLInputElement;
-    expect(checkbox.indeterminate).toBe(true);
-    expect(checkbox).toHaveAttribute('aria-checked', 'mixed');
-    expect(screen.getByTestId('capability-partial-partial.cap')).toBeTruthy();
-    fireEvent.click(checkbox);
-    expect(checkbox).toBeChecked();
-    fireEvent.click(screen.getByTestId('capability-save'));
-    await screen.findByTestId('confirm-dialog');
-    expect(capabilityService.previewSelection).toHaveBeenCalledWith('role-pid-5', ['partial.cap']);
-  });
-  it('requires explicit partial revocation and supports undo and discard before preview', async () => {
-    mockData([
-      {
-        group: '报价单',
-        capabilities: [
-          {
-            ...cap('partial.cap', 'Partial capability', false),
-            authorizationState: 'partial',
-            includes: ['record.read', 'record.edit'],
-            missingCodes: ['record.edit'],
-          },
-        ],
-      },
-    ]);
-    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
-    await screen.findByTestId('capability-revoke-partial-partial.cap');
-    expect(screen.getByTestId('capability-save')).toBeDisabled();
-    fireEvent.click(screen.getByTestId('capability-revoke-partial-partial.cap'));
-    expect(screen.getByTestId('capability-checkbox-partial.cap')).toHaveAttribute(
-      'aria-checked',
-      'false',
-    );
-    fireEvent.click(screen.getByTestId('capability-revoke-partial-partial.cap'));
-    expect(screen.getByTestId('capability-save')).toBeDisabled();
-    fireEvent.click(screen.getByTestId('capability-revoke-partial-partial.cap'));
-    fireEvent.click(screen.getByTestId('capability-discard'));
-    expect(screen.getByTestId('capability-checkbox-partial.cap')).toHaveAttribute(
-      'aria-checked',
-      'mixed',
-    );
-    fireEvent.click(screen.getByTestId('capability-revoke-partial-partial.cap'));
-    fireEvent.click(screen.getByTestId('capability-save'));
-    await screen.findByTestId('confirm-ok');
-    expect(capabilityService.previewSelection).toHaveBeenCalledWith(
-      'role-pid-5',
-      [],
-      ['partial.cap'],
-    );
-    expect(capabilityService.applySelection).not.toHaveBeenCalled();
-  });
-  it('clears conflicting partial revocation when a preset explicitly selects that capability', async () => {
-    mockData([
-      {
-        group: '报价单',
-        capabilities: [
-          {
-            ...cap('partial.cap', 'Partial capability', false),
-            tier: 'viewer',
-            authorizationState: 'partial',
-            includes: ['record.read', 'record.edit'],
-            missingCodes: ['record.edit'],
-          },
-        ],
-      },
-    ]);
-    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
-    await screen.findByTestId('capability-revoke-partial-partial.cap');
-    fireEvent.click(screen.getByTestId('capability-revoke-partial-partial.cap'));
-    fireEvent.click(screen.getByTestId('capability-preset-viewer'));
-    expect(screen.getByTestId('capability-checkbox-partial.cap')).toBeChecked();
-    fireEvent.click(screen.getByTestId('capability-save'));
-    await screen.findByTestId('confirm-ok');
-    expect(capabilityService.previewSelection).toHaveBeenCalledWith('role-pid-5', ['partial.cap']);
+  it('keeps a pending joint draft from editing the saved policy independently', async () => {
+    policyBaseline();
+    await open();
+    await toggleEdit();
+    expect(screen.queryByTestId('capability-policy-configure-order.read')).not.toBeInTheDocument();
+    expect(permissionService.getPolicySnapshot).not.toHaveBeenCalled();
+    expect(authorizationDraftService.save).not.toHaveBeenCalled();
   });
 });

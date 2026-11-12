@@ -73,6 +73,7 @@ const reportDir = process.env.PW_REPORT_DIR || './test-results/html-report';
 const resultsJson = process.env.PW_RESULTS_JSON || './test-results/results.json';
 const deepSpecPattern = /.*-deep\.spec\.ts$/;
 const quoteOpsCurrentSpecNames = [
+  'quote-bom-domain-levels',
   'enterprise-info-profile',
   'quote-bom-focused-menu-and-permissions',
   'quote-bom-operations-dashboard',

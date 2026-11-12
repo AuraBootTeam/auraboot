@@ -70,7 +70,7 @@ public final class ApplicationNavigationPolicy {
             // needs to stay visible.
             boolean directory = children != null && !children.isEmpty();
             if (!directory && Integer.valueOf(1).equals(menu.getType()) && menu.getPath() != null
-                    && !menu.getPath().isBlank() && !seen.add(menu.getPath())) continue;
+                    && !menu.getPath().isBlank() && !seen.add(menu.getExtension()!=null && Boolean.TRUE.equals(menu.getExtension().get("navigationCustomized")) ? "entry:"+menu.getPid() : menu.getPath())) continue;
             if (children != null) menu.setChildren(deduplicate(children, seen));
             if (Integer.valueOf(0).equals(menu.getType())
                     && (menu.getChildren() == null || menu.getChildren().isEmpty())) continue;

@@ -1538,5 +1538,19 @@
     "tier": "admin",
     "order": 350,
     "sensitive": true
+  },
+  {
+    "code": "sys.cap.navigation",
+    "group": "系统管理",
+    "displayGroupOrder": 95,
+    "name:zh-CN": "管理菜单与导航",
+    "name:en": "Manage Menus and Navigation",
+    "description": "维护目录、页面链接与导航定制；不授予角色管理或业务数据权限。",
+    "description:en": "Manage navigation and page links without granting role-authoring or business data access.",
+    "includes": [
+      "meta.menu.update"
+    ],
+    "tier": "admin",
+    "order": 12
   }
 ]

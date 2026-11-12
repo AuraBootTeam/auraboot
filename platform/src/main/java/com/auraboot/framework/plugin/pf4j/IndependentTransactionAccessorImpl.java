@@ -22,6 +22,9 @@ public final class IndependentTransactionAccessorImpl implements IndependentTran
         Objects.requireNonNull(dynamicDataService, "dynamicDataService");
         this.requiresNew = new TransactionTemplate(transactionManager);
         this.requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        // Unbounded legacy deliveries use ordinary complete-grant field checks inside each checkpoint.
+        if (com.auraboot.framework.meta.service.impl.AsyncTaskExecutionContext.isActive())
+            this.requiresNew.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
         this.dataAccessor = new DynamicDataAccessorImpl(dynamicDataService);
     }
 

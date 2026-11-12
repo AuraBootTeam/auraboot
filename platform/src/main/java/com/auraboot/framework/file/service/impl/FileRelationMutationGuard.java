@@ -53,6 +53,11 @@ public class FileRelationMutationGuard {
                 || !(parent.get("tenant_id") instanceof Number tenant)
                 || tenant.longValue() != MetaContext.getCurrentTenantId()) throw denied();
         if (!beans.getBean(DataAccessAuthorizationHelper.class).authorizeRecord(modelCode,"update",parent)) throw denied();
+        // A relation mutation targets a field even when its scalar projection is unchanged.
+        // Ordinary callers must retain a complete current write grant; host command loans
+        // keep the independently validated command path in NativeRecordFieldAuthorization.
+        beans.getBean(com.auraboot.framework.meta.service.impl.NativeRecordFieldAuthorization.class).requireUpdate(
+                modelCode,pid,field == null ? Map.of() : java.util.Collections.singletonMap(field.getCode(),parent.get(field.getCode())));
         Long expected = MetaContext.getCommandExpectedVersion(modelCode,pid);
         if (expected != null && (!(parent.get("row_version") instanceof Number version) || version.longValue() != expected))
             throw new com.auraboot.framework.exception.ConflictException("iot.error.version_conflict");

@@ -42,6 +42,9 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("RoleServiceImpl")
 class RoleServiceImplTest {
+    @org.mockito.Mock
+    private com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
+
 
     @Test
     void invalidDefaultScopeIsRejectedBeforeUpdatingRole() {
@@ -53,6 +56,14 @@ class RoleServiceImplTest {
         org.mockito.Mockito.verifyNoInteractions(roleMapper);
     }
 
+    @Test void defaultScopeRequiresCurrentAuthorityBeforeResolvingOrWritingTheRole() {
+        org.mockito.Mockito.doThrow(new org.springframework.security.access.AccessDeniedException("Revoked"))
+                .when(authoringAccess).requireWrite();
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,()->service.setDefaultDataScopeType(7L,"all"));
+        org.mockito.Mockito.verifyNoInteractions(roleMapper);
+    }
+
+    @Mock private com.auraboot.framework.permission.service.RoleAuthorizationAuthoringAccess authoringAccess;
     @Mock private RoleMapper roleMapper;
     @Mock private RolePermissionService rolePermissionService;
     @Mock private UserRoleService userRoleService;
@@ -65,8 +76,12 @@ class RoleServiceImplTest {
     @BeforeEach
     void setUp() throws Exception {
         service = new RoleServiceImpl();
+        org.springframework.test.util.ReflectionTestUtils.setField(service,"roleFieldAccess",org.mockito.Mockito.mock(com.auraboot.framework.permission.service.RoleFieldAccessService.class));
+        injectField(service, "authorizationWriteLock", authorizationWriteLock);
+        injectField(service, "authoringAccess", authoringAccess);
         injectField(service, "baseMapper", roleMapper);
         injectField(service, "roleMapper", roleMapper);
+        injectField(service,"roleNavigation",org.mockito.Mockito.mock(com.auraboot.framework.menu.service.RoleNavigationService.class));
         injectField(service, "rolePermissionService", rolePermissionService);
         injectField(service, "userRoleService", userRoleService);
         injectField(service, "permissionService", permissionService);
@@ -132,7 +147,71 @@ class RoleServiceImplTest {
     void createRolePlatformAdminBlocked() {
         Role r = role(null, "platform_admin");
         r.setScopeType("tenant");
-        assertThrows(BusinessException.class, () -> spyService.createRole(r));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> spyService.createRole(r));
+    }
+
+    @org.junit.jupiter.api.AfterEach void clearRoleContext() { MetaContext.clear(); }
+
+    @Test void businessTenantCannotCreatePlatformRoleEvenWithGlobalScope() {
+        MetaContext.setCurrentTenantId(10L);
+        Role input = role(null, "platform_admin"); input.setScopeType("global");
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> spyService.createRole(input));
+        input.setTenantId(1L);
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> spyService.createRole(input));
+        org.mockito.Mockito.verify(spyService, org.mockito.Mockito.never()).save(any(Role.class));
+    }
+    @Test void systemTenantCanCreateTheGlobalPlatformDefinition() {
+        MetaContext.setCurrentTenantId(1L);
+        Role input = role(null, "platform_admin"); input.setTenantId(1L); input.setScopeType("global");
+        doReturn(true).when(spyService).save(input);
+        assertEquals(input, spyService.createRole(input));
+        assertTrue(input.getIsSystem());
+    }
+    @Test void updatingCannotPromoteAnOrdinaryRoleToPlatformAdmin() {
+        MetaContext.setCurrentTenantId(10L);
+        doReturn(role(1L, "ordinary")).when(spyService).getById(1L);
+        Role input = role(1L, "platform_admin"); input.setScopeType("global");
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> spyService.updateRole(input));
+        org.mockito.Mockito.verify(spyService, org.mockito.Mockito.never()).updateById(any(Role.class));
+    }
+    @Test void updateCannotMoveAnOwnedRoleToAnotherTenant() {
+        MetaContext.setCurrentTenantId(10L);
+        doReturn(role(1L, "ordinary")).when(spyService).getById(1L);
+        Role input = role(1L, "ordinary"); input.setTenantId(1L);
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> spyService.updateRole(input));
+        org.mockito.Mockito.verify(spyService, org.mockito.Mockito.never()).updateById(any(Role.class));
+    }
+    @Test void systemPlatformCodeAndScopeRemainImmutable() {
+        MetaContext.setCurrentTenantId(1L);
+        Role existing = role(1L, "platform_admin"); existing.setTenantId(1L); existing.setScopeType("global");
+        doReturn(existing).when(spyService).getById(1L);
+        Role rename = role(1L, "ordinary"); rename.setTenantId(1L);
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> spyService.updateRole(rename));
+        Role scope = new Role(); scope.setId(1L); scope.setScopeType("tenant");
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> spyService.updateRole(scope));
+    }
+    @Test void copyingCannotCreatePlatformRolesOrReadForeignRolePermissions() {
+        MetaContext.setCurrentTenantId(10L);
+        doReturn(role(1L, "ordinary")).when(spyService).getById(1L);
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> spyService.copyRole(1L, "Copy", "platform_admin"));
+        MetaContext.setCurrentTenantId(20L);
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> spyService.copyRole(1L, "Copy", "new"));
+        org.mockito.Mockito.verifyNoInteractions(rolePermissionService);
+    }
+
+    @Test void protectedPlatformLifecycleDoesNotDependOnALegacySystemFlag() {
+        MetaContext.setCurrentTenantId(1L);
+        Role existing = role(1L, "platform_admin"); existing.setTenantId(1L); existing.setScopeType("global"); existing.setIsSystem(false);
+        doReturn(existing).when(spyService).getById(1L);
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> spyService.disableRole(1L));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> spyService.deleteRole(1L));
+    }
+    @Test void ordinaryRoleUpdatesCannotSetTheHostSystemFlag() {
+        Role existing = role(1L, "ordinary"); existing.setIsSystem(false);
+        doReturn(existing).when(spyService).getById(1L);
+        Role input = role(1L, "ordinary"); input.setIsSystem(true);
+        spyService.updateRole(input);
+        assertFalse(input.getIsSystem());
     }
 
     @Test
@@ -390,19 +469,25 @@ class RoleServiceImplTest {
         Role src = role(1L, "src");
         src.setType("business");
         src.setPriority(5);
+        src.setRoleScope("tenant");src.setScopeType("TENANT");src.setScopeContent("{}");
+        src.setDefaultDataScopeType("self");src.setStatus("inactive");
         doReturn(src).when(spyService).getById(1L);
         doReturn(0L).when(spyService).count(any(QueryWrapper.class));
         doAnswer(inv -> {
             Role saved = inv.getArgument(0);
-            saved.setId(1L);
+            saved.setId(2L);
             return true;
         }).when(spyService).save(any(Role.class));
-        when(rolePermissionService.getPermissionIdsByRoleId(1L)).thenReturn(Set.of());
+        when(rolePermissionService.copyRolePermissions(1L,2L)).thenReturn(true);
 
         Role copied = spyService.copyRole(1L, "newName", "newCode");
         assertEquals("newName", copied.getName());
         assertEquals("newCode", copied.getCode());
         assertEquals("business", copied.getType());
+        assertEquals("tenant",copied.getRoleScope());assertEquals("TENANT",copied.getScopeType());
+        assertEquals("{}",copied.getScopeContent());assertEquals("self",copied.getDefaultDataScopeType());
+        assertEquals("inactive",copied.getStatus());assertFalse(copied.getIsDefault());assertFalse(copied.getIsSystem());
+        verify(rolePermissionService).copyRolePermissions(1L,2L);
     }
 
     @Test

@@ -222,7 +222,8 @@ for (const c of cases) {
     if (c.enabled) expect(payload.payload[c.enabled]).toBe(false);
     await expect.poll(async () => (await records()).length).toBe(1);
     const saved = (await records())[0];
-    fixtureJournal(page).track({ model: c.model, pid: String(saved.pid) });
+    // A retained setting has no public deletion contract; its retention is asserted below.
+    if (c.allowDelete !== false) fixtureJournal(page).track({ model: c.model, pid: String(saved.pid) });
     if (c.enabled) expect(saved[c.enabled]).toBe(false);
     for (const choice of [c.select, c.extraSelect, ...(c.choices || [])].filter(Boolean))
       expect(saved[choice!.field]).toBe(choice!.value);
@@ -592,7 +593,7 @@ test('header alias enabled/disabled affects new BOM conversions and preserves pr
   expect(customerId).toBeTruthy();
   const project = await executeCommand(page, 'bom:create_project', {
     bom_project_name: marker, bom_project_customer_id: customerId, bom_pcba_code: marker,
-    bom_project_library_source: 'excel_current_library',
+    bom_project_quality_level: 'industrial',
   }, undefined, 'create');
   const projectId = String(project.recordId ?? project.pid ?? project.projectId ?? '');
   expect(projectId).toBeTruthy();
@@ -928,7 +929,7 @@ test(`${kind} rule enabled/disabled changes extracted attributes in real BOM con
   expect(customerId).toBeTruthy();
   const project = await executeCommand(page, 'bom:create_project', {
     bom_project_name: marker, bom_project_customer_id: customerId, bom_pcba_code: marker,
-    bom_project_library_source: 'excel_current_library',
+    bom_project_quality_level: 'industrial',
   }, undefined, 'create');
   const projectId = String(project.recordId ?? project.pid ?? project.projectId ?? '');
   expect(projectId).toBeTruthy();
@@ -1327,7 +1328,7 @@ test('B18-03 part map: mapping applies to a new conversion, prior snapshots stay
   const customerId = String(account.recordId ?? account.pid ?? account.id ?? '');
   const project = await executeCommand(page, 'bom:create_project', {
     bom_project_name: marker, bom_project_customer_id: customerId, bom_pcba_code: marker,
-    bom_project_library_source: 'excel_current_library',
+    bom_project_quality_level: 'industrial',
   }, undefined, 'create');
   const projectId = String(project.recordId ?? project.pid ?? project.projectId ?? '');
   const field = (name: string) => page.getByTestId(`form-field-${name}`);

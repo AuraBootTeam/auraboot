@@ -30,12 +30,28 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Unit tests for MenuServiceImpl
  */
 class MenuServiceImplTest {
+    private static void attachNavigation(MenuServiceImpl service, MenuMapper mapper) {
+        var configuration=mock(com.auraboot.framework.menu.service.NavigationConfigurationService.class);
+        when(configuration.effectiveMenus(org.mockito.ArgumentMatchers.anyLong())).thenAnswer(invocation -> mapper.findVisibleDirectoriesAndMenus());
+        ReflectionTestUtils.setField(service,"navigationConfiguration",configuration);
+        var assignment=mock(com.auraboot.framework.menu.service.RoleNavigationService.class);
+        when(assignment.visibleForCurrentActor(org.mockito.ArgumentMatchers.anyList())).thenAnswer(invocation -> {
+            var permissionService=(com.auraboot.framework.permission.service.UserPermissionService)ReflectionTestUtils.getField(service,"userPermissionService");
+            var current=permissionService==null?Set.<String>of():permissionService.getUserPermissionCodes(7L);
+            List<Menu> menus=invocation.getArgument(0);
+            return menus.stream().filter(menu->menu.getPermissionCode()==null||menu.getPermissionCode().isBlank()||current.contains(menu.getPermissionCode()))
+                .map(menu->menu.getPid()==null?String.valueOf(menu.getId()):menu.getPid()).collect(java.util.stream.Collectors.toSet());
+        });
+        ReflectionTestUtils.setField(service,"roleNavigation",assignment);
+    }
+
 
     private MenuServiceImpl releaseService(com.auraboot.framework.menu.mapper.MenuMapper mapper,
                                            com.auraboot.framework.permission.service.UserPermissionService permissions,
                                            com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog catalog) {
         MenuServiceImpl service = new MenuServiceImpl();
         org.springframework.test.util.ReflectionTestUtils.setField(service, "baseMapper", mapper);
+        attachNavigation(service,mapper);
         org.springframework.test.util.ReflectionTestUtils.setField(service, "userPermissionService", permissions);
         org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimeDefinitionCatalog", catalog);
         org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimePrimaryEnabled", true);
@@ -53,9 +69,28 @@ class MenuServiceImplTest {
 
     private Menu navigationLeaf(long id, String code, String path, String permission) {
         Menu menu = new Menu();
-        menu.setId(id); menu.setCode(code); menu.setType(1); menu.setVisible(true);
+        menu.setId(id); menu.setPid("menu-"+id); menu.setCode(code); menu.setType(1); menu.setVisible(true);
         menu.setPath(path); menu.setPermissionCode(permission);
         return menu;
+    }
+
+    @Test
+    void explicitMenuSelectionDoesNotGrantBusinessAccessOrDependOnBusinessGrants() {
+        var mapper=mock(MenuMapper.class);
+        var permissions=mock(UserPermissionService.class);
+        var catalog=mock(com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.class);
+        var service=releaseService(mapper,permissions,catalog);
+        ReflectionTestUtils.setField(service,"applicationRuntimePrimaryEnabled",false);
+        ReflectionTestUtils.setField(service,"subjectPermissionService",mock(SubjectPermissionService.class));
+        Menu visibleWithoutBusiness=navigationLeaf(10,"selected","/p/protected","missing.business.read");
+        Menu hiddenWithBusiness=navigationLeaf(11,"unselected","/p/allowed","existing.business.read");
+        when(mapper.findVisibleDirectoriesAndMenus()).thenReturn(List.of(visibleWithoutBusiness,hiddenWithBusiness));
+        when(permissions.getUserPermissionCodes(7L)).thenReturn(Set.of("existing.business.read"));
+        var assigned=mock(com.auraboot.framework.menu.service.RoleNavigationService.class);
+        when(assigned.visibleForCurrentActor(anyList())).thenReturn(Set.of(visibleWithoutBusiness.getPid()));
+        ReflectionTestUtils.setField(service,"roleNavigation",assigned);
+        assertEquals(List.of("/p/protected"),service.getUserMenuTree(7L,42L).stream().map(Menu::getPath).toList());
+        org.mockito.Mockito.verify(permissions,org.mockito.Mockito.never()).hasPermission(org.mockito.ArgumentMatchers.anyLong(),org.mockito.ArgumentMatchers.anyString());
     }
 
     @Test
@@ -177,6 +212,7 @@ class MenuServiceImplTest {
         UserPermissionService permissions = mock(UserPermissionService.class);
         ApplicationRuntimeDefinitionCatalog catalog = mock(ApplicationRuntimeDefinitionCatalog.class);
         ReflectionTestUtils.setField(service, "baseMapper", mapper);
+        attachNavigation(service,mapper);
         ReflectionTestUtils.setField(service, "userPermissionService", permissions);
         ReflectionTestUtils.setField(service, "applicationRuntimeDefinitionCatalog", catalog);
         ReflectionTestUtils.setField(service, "applicationRuntimePrimaryEnabled", true);
@@ -197,6 +233,7 @@ class MenuServiceImplTest {
         UserPermissionService permissions = mock(UserPermissionService.class);
         SubjectPermissionService subjects = mock(SubjectPermissionService.class);
         ReflectionTestUtils.setField(service, "baseMapper", mapper);
+        attachNavigation(service,mapper);
         ReflectionTestUtils.setField(service, "userPermissionService", permissions);
         ReflectionTestUtils.setField(service, "subjectPermissionService", subjects);
         when(mapper.findVisibleDirectoriesAndMenus()).thenReturn(menus);
@@ -208,6 +245,7 @@ class MenuServiceImplTest {
     private Menu menu(Long id, Long parent, int type, String permission) {
         Menu menu = new Menu();
         menu.setId(id);
+        menu.setPid("test-menu-"+id);
         menu.setParentId(parent);
         menu.setType(type);
         menu.setPermissionCode(permission);

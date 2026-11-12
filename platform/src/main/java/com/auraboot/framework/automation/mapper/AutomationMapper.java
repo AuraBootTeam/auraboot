@@ -42,13 +42,15 @@ public interface AutomationMapper extends BaseMapper<Automation> {
     @ResultMap("mybatis-plus_Automation")
     @Select("""
         SELECT * FROM ab_automation
-        WHERE model_code = #{modelCode}
+        WHERE tenant_id = #{tenantId}
+          AND model_code = #{modelCode}
           AND trigger_type = #{triggerType}
           AND enabled = true
           AND deleted_flag = false
         ORDER BY created_at
         """)
     List<Automation> findEnabledByModelCodeAndTriggerType(
+            @Param("tenantId") Long tenantId,
             @Param("modelCode") String modelCode,
             @Param("triggerType") String triggerType);
 

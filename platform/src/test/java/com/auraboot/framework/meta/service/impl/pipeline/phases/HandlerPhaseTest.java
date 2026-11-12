@@ -1057,6 +1057,74 @@ class HandlerPhaseTest {
         verify(asyncTaskService, never()).submitTask(any(), any(), any());
     }
 
+    @Test void declaredOwnerIsolationIsEnforcedBeforeAnyHandlerOrAsyncSubmission() {
+        RecordingPluginHandler handler = new RecordingPluginHandler(PLUGIN_HANDLER_CODE) {
+            @Override public com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.ReadIsolation commandReadIsolation() {
+                return com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.ReadIsolation.READ_COMMITTED;
+            }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+        var guard = mock(com.auraboot.framework.plugin.pf4j.CommandHandlerTransactionGuard.class);
+        ReflectionTestUtils.setField(phase, "handlerTransactions", guard);
+        doThrow(new org.springframework.security.access.AccessDeniedException("Owner isolation rejected"))
+                .when(guard).require(com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.ReadIsolation.READ_COMMITTED);
+        var ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of("type", "custom", "handler", PLUGIN_HANDLER_CODE));
+        assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(handler.capturedContext.get()).isNull();
+        verify(asyncTaskService, never()).submitTask(any(), any(), any());
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataService, dynamicDataMapper);
+    }
+
+    private static final class RecordingBusinessHandler extends RecordingPluginHandler
+            implements com.auraboot.framework.plugin.extension.BusinessResourceAuthorization {
+        final AtomicReference<CommandContext> seen=new AtomicReference<>();
+        RecordingBusinessHandler(){super(PLUGIN_HANDLER_CODE);}
+        public Boundary businessBoundary(){return new Boundary(BUSINESS_COMMAND_CODE,"pr_purchase_order","update",java.util.Set.of("inventory.receipt.confirm"));}
+        public java.util.Set<String> businessResourceModels(){return java.util.Set.of("pr_purchase_order");}
+        public java.util.Set<String> businessResultFields(){return java.util.Set.of("status");}
+        public Grant authorizeResource(TargetAuthorizationContext root,Request request){throw new AssertionError("Factory boundary is mocked by wiring tests");}
+        @Override public Object execute(CommandContext context){seen.set(context);return Map.of("status","confirmed","secret_cost",7);}
+    }
+
+    @Test void businessHandlersReceiveOnlyTheBoundedAccessorAndProjectTheResult() {
+        var handler=new RecordingBusinessHandler();
+        var factory=mock(com.auraboot.framework.plugin.pf4j.BusinessCommandDataAccessorFactory.class);
+        var scope=mock(com.auraboot.framework.plugin.pf4j.BusinessCommandDataAccessorFactory.Scope.class);
+        var accessor=mock(com.auraboot.framework.plugin.extension.DataAccessor.class);
+        ReflectionTestUtils.setField(phase,"businessResources",factory);
+        var ctx=buildContext(BUSINESS_COMMAND_CODE,"pr_purchase_order",Map.of("type","custom","handler",PLUGIN_HANDLER_CODE,
+                "handlerParams",Map.of("targetRecordAuthorization","business","targetRecordAction","update","dslPersistence",false,"tenantProjectionRead",true)));
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+        when(factory.open(ctx,handler)).thenReturn(scope);when(scope.accessor()).thenReturn(accessor);
+        when(scope.projectResult(any())).thenReturn(Map.of("status","confirmed"));
+        phase.execute(ctx);
+        assertThat(handler.seen.get().settings().get(CommandHandlerExtension.DATA_ACCESSOR_KEY)).isSameAs(accessor);
+        assertThat(handler.seen.get().settings()).doesNotContainKeys(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY,
+                CommandHandlerExtension.FILE_ACCESSOR_KEY,CommandHandlerExtension.INDEPENDENT_TRANSACTION_ACCESSOR_KEY,
+                CommandHandlerExtension.ASYNC_TASK_ACCESSOR_KEY,com.auraboot.framework.plugin.extension.TenantRoleAssignmentAccessor.SETTINGS_KEY);
+        assertThat(ctx.getHandlerResults()).containsEntry("status","confirmed").doesNotContainKey("secret_cost");
+        verify(scope).projectResult(Map.of("status","confirmed","secret_cost",7));verify(scope).close();
+    }
+
+    @Test void businessModeCannotDispatchAnUnconstrainedAsyncTask() {
+        var handler=new RecordingBusinessHandler();
+        var factory=mock(com.auraboot.framework.plugin.pf4j.BusinessCommandDataAccessorFactory.class);
+        ReflectionTestUtils.setField(phase,"businessResources",factory);
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+        var ctx=buildContext(BUSINESS_COMMAND_CODE,"pr_purchase_order",Map.of("type","custom","handler",PLUGIN_HANDLER_CODE,
+                "handlerParams",Map.of("targetRecordAuthorization","business","targetRecordAction","update","dslPersistence",false,"async",true)));
+        assertThatThrownBy(()->phase.execute(ctx)).isInstanceOf(AccessDeniedException.class);
+        org.mockito.Mockito.verifyNoInteractions(asyncTaskService,factory);assertThat(handler.seen.get()).isNull();
+    }
+
+    @Test void businessModeRejectsAHandlerWithoutAResourceOwnerBeforeExecution() {
+        var handler=new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+        var ctx=buildContext(BUSINESS_COMMAND_CODE,"pr_purchase_order",Map.of("type","custom","handler",PLUGIN_HANDLER_CODE,
+                "handlerParams",Map.of("targetRecordAuthorization","business","targetRecordAction","update","dslPersistence",false)));
+        assertThatThrownBy(()->phase.execute(ctx)).isInstanceOf(AccessDeniedException.class);assertThat(handler.capturedContext.get()).isNull();
+    }
+
     private CommandPipelineContext buildContext(String commandCode, String modelCode, Map<String, Object> execConfig) {
         CommandDefinition command = new CommandDefinition();
         command.setCode(commandCode);

@@ -6109,5 +6109,1663 @@
     "en-US": "Full event types, e.g. [\"external.erp.materials.received.v1\"]. Match the sender source, event and version.",
     "source": "import",
     "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.title",
+    "zh-CN": "字段与敏感信息",
+    "en-US": "Fields and sensitive information",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.help",
+    "zh-CN": "为本角色选择已有字段限制，与职责、记录范围一起预览和保存。字段限制不授予业务访问权。",
+    "en-US": "Select existing field restrictions for this role. They do not grant business access and are saved with duties and record scopes.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.unknown",
+    "zh-CN": "当前字段限制不可读取，原有绑定将保留。",
+    "en-US": "Current field restrictions are unavailable. Existing bindings will be preserved.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.loading",
+    "zh-CN": "正在读取字段限制…",
+    "en-US": "Loading field restrictions…",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.loadError",
+    "zh-CN": "无法读取字段限制，请检查策略管理权限或重试。原有绑定将保留。",
+    "en-US": "Field restrictions could not be loaded. Check policy-management access or try again. Existing bindings will be preserved.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.empty",
+    "zh-CN": "本角色已授权的资源暂无可选字段限制。",
+    "en-US": "No field restrictions are available for this role’s authorized resources.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.readOnly",
+    "zh-CN": "只读限制",
+    "en-US": "Read-only restriction",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.masked",
+    "zh-CN": "隐藏或脱敏限制",
+    "en-US": "Visibility or masking restriction",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.inactive",
+    "zh-CN": "已停用",
+    "en-US": "Inactive",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.noResource",
+    "zh-CN": "本角色已无对应资源访问权，请在保存字段变更前检查此绑定。",
+    "en-US": "This role no longer has access to the associated resource. Review this binding before saving field changes.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.preview",
+    "zh-CN": "字段限制变更",
+    "en-US": "Field restriction changes",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.apply",
+    "zh-CN": "应用限制",
+    "en-US": "Apply restriction",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.remove",
+    "zh-CN": "移除限制",
+    "en-US": "Remove restriction",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.fields.pending",
+    "zh-CN": "已选择 {count} 项字段限制，请与本次草稿一起预览和保存。",
+    "en-US": "{count} field restrictions selected; review and save with this draft.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.denied.title",
+    "zh-CN": "无菜单管理权限",
+    "en-US": "Menu management unavailable",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.denied.message",
+    "zh-CN": "请联系管理员开通菜单管理权限。",
+    "en-US": "Ask an administrator for menu management access.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.validation",
+    "zh-CN": "请填写菜单名称和合法目标。",
+    "en-US": "Enter a menu name and a valid target.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.saved",
+    "zh-CN": "菜单配置已保存",
+    "en-US": "Menu configuration saved.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.saveError",
+    "zh-CN": "保存失败，请检查目标、上级目录和访问规则；配置发生变化时请重新载入。",
+    "en-US": "Could not save. Check the target, parent directory and access rule, then reload if configuration changed.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.hidden",
+    "zh-CN": "已隐藏或停用",
+    "en-US": "Hidden",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.customized",
+    "zh-CN": "已定制",
+    "en-US": "Customized",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.title",
+    "zh-CN": "菜单管理",
+    "en-US": "Menu management",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.subtitle",
+    "zh-CN": "调整导航结构并添加页面链接。菜单变更不会授予业务权限。",
+    "en-US": "Arrange navigation and add page links. Menu changes do not grant business permissions.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.add",
+    "zh-CN": "新增菜单",
+    "en-US": "Add menu",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.search",
+    "zh-CN": "搜索菜单名称",
+    "en-US": "Search menus",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.loadError",
+    "zh-CN": "菜单加载失败，现有配置未改变。",
+    "en-US": "Menus could not be loaded. Existing settings have not changed.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.empty",
+    "zh-CN": "尚无菜单，可先新增目录或页面链接。",
+    "en-US": "No menus yet. Add a directory or page link.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.conflict",
+    "zh-CN": "菜单配置已被修改，当前草稿已保留，请重新载入后再保存。",
+    "en-US": "Menus changed after you opened this editor. Your draft is preserved; reload before saving.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.reload",
+    "zh-CN": "放弃草稿并重新载入",
+    "en-US": "Discard draft and reload",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.select",
+    "zh-CN": "选择左侧菜单进行配置，或新增一个菜单入口。",
+    "en-US": "Select a menu to edit, or add a new entry.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.new",
+    "zh-CN": "新增菜单",
+    "en-US": "New menu",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.source.custom",
+    "zh-CN": "自建菜单",
+    "en-US": "Custom menu",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.source.default",
+    "zh-CN": "插件或平台默认菜单",
+    "en-US": "Plugin or platform default",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.source.missing",
+    "zh-CN": "默认来源已失效",
+    "en-US": "Default no longer available",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.restore",
+    "zh-CN": "恢复默认",
+    "en-US": "Restore default",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.missing",
+    "zh-CN": "菜单来源或目标页面当前不可用，请选择有效页面，或清除失效定制。",
+    "en-US": "The menu source or target page is unavailable. Choose a valid page or clear the orphaned customization.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.section.identity",
+    "zh-CN": "名称与位置",
+    "en-US": "Name and position",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.name",
+    "zh-CN": "菜单名称",
+    "en-US": "Menu name",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.name.example",
+    "zh-CN": "例如：工程文档",
+    "en-US": "For example, Engineering documents",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.parent",
+    "zh-CN": "上级目录",
+    "en-US": "Parent directory",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.root",
+    "zh-CN": "顶层菜单",
+    "en-US": "Top level",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.icon",
+    "zh-CN": "图标",
+    "en-US": "Icon",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.order",
+    "zh-CN": "显示顺序",
+    "en-US": "Display order",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.order.help",
+    "zh-CN": "同一目录下，数字越小越靠前。",
+    "en-US": "Lower numbers appear first within the same directory.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.section.target",
+    "zh-CN": "内容与打开方式",
+    "en-US": "Content and opening behavior",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.kind",
+    "zh-CN": "菜单类型",
+    "en-US": "Menu type",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.page",
+    "zh-CN": "已发布的系统页面",
+    "en-US": "Published system page",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.target",
+    "zh-CN": "目标地址",
+    "en-US": "Destination",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.page.choose",
+    "zh-CN": "请选择页面",
+    "en-US": "Select a page",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.embed.help",
+    "zh-CN": "外部网站可能要求单独登录或禁止内嵌，页面始终提供外部打开入口。",
+    "en-US": "The external site may require sign-in or prevent embedding. An external-open link remains available.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.target.help",
+    "zh-CN": "这里只新增导航入口，不创建页面，也不授予目标数据的访问权限。",
+    "en-US": "This creates a navigation entry. It does not create a new page or grant access to its data.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.opening",
+    "zh-CN": "打开位置",
+    "en-US": "Open in",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.open.same",
+    "zh-CN": "当前窗口",
+    "en-US": "Current window",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.open.new",
+    "zh-CN": "新窗口",
+    "en-US": "New window",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.section.access",
+    "zh-CN": "显示与访问",
+    "en-US": "Visibility and access",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.visible",
+    "zh-CN": "在导航中显示",
+    "en-US": "Show in navigation",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.enabled",
+    "zh-CN": "启用",
+    "en-US": "Enabled",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.access",
+    "zh-CN": "可见性要求",
+    "en-US": "Visibility requirement",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.authenticated",
+    "zh-CN": "已登录用户可见",
+    "en-US": "Signed-in users",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.access.help",
+    "zh-CN": "默认菜单保留目标访问要求。菜单可见不代表拥有页面、操作或数据权限。",
+    "en-US": "Default target requirements remain in place. Visibility does not grant page, operation or data permissions.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.preview",
+    "zh-CN": "预览",
+    "en-US": "Preview",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.audit",
+    "zh-CN": "最近菜单变更",
+    "en-US": "Recent menu changes",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.confirm.title",
+    "zh-CN": "确认菜单变更",
+    "en-US": "Confirm menu change",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.confirm.delete",
+    "zh-CN": "从当前导航移除此入口？目标页面和业务权限不受影响，默认菜单可恢复。",
+    "en-US": "Delete this custom menu? Its target page and business permissions will remain unchanged.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.confirm.restore",
+    "zh-CN": "移除当前定制并恢复为最新默认配置？",
+    "en-US": "Remove your customization and use the current default?",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.confirm.discard",
+    "zh-CN": "放弃尚未保存的菜单修改？",
+    "en-US": "Discard your unsaved changes?",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.preview.help",
+    "zh-CN": "仅预览，尚未保存，业务访问权限不变。",
+    "en-US": "Preview only. Nothing has been saved and business access is unchanged.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.preview.open",
+    "zh-CN": "打开目标页面",
+    "en-US": "Open destination",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.frame.denied",
+    "zh-CN": "此页面不可用，或当前账号已无权访问。",
+    "en-US": "This page is unavailable or you no longer have access.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.frame.help",
+    "zh-CN": "外部网站自行管理登录，并可能限制内嵌；若未显示，请在外部打开。",
+    "en-US": "The external site manages its own sign-in and may restrict embedding. If it does not display, open it separately.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.frame.open",
+    "zh-CN": "在外部打开",
+    "en-US": "Open externally",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.kind.directory",
+    "zh-CN": "目录",
+    "en-US": "Directory",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.kind.page",
+    "zh-CN": "系统页面",
+    "en-US": "System page",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.kind.internal",
+    "zh-CN": "站内链接",
+    "en-US": "Internal link",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.kind.external",
+    "zh-CN": "外部链接",
+    "en-US": "External link",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.kind.embedded",
+    "zh-CN": "内嵌页面",
+    "en-US": "Embedded page",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.icon.Link",
+    "zh-CN": "链接",
+    "en-US": "Link",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.icon.Folder",
+    "zh-CN": "文件夹",
+    "en-US": "Folder",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.icon.FileText",
+    "zh-CN": "文档",
+    "en-US": "Document",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.icon.Globe",
+    "zh-CN": "网页",
+    "en-US": "Web page",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.icon.Settings",
+    "zh-CN": "设置",
+    "en-US": "Settings",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.icon.ListTree",
+    "zh-CN": "菜单树",
+    "en-US": "Menu tree",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.icon.ShieldCheck",
+    "zh-CN": "权限",
+    "en-US": "Permissions",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.action.CREATE",
+    "zh-CN": "新增",
+    "en-US": "Created",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.action.UPDATE",
+    "zh-CN": "修改",
+    "en-US": "Updated",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.action.DELETE",
+    "zh-CN": "删除",
+    "en-US": "Deleted",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.action.RESTORE",
+    "zh-CN": "恢复默认",
+    "en-US": "Restored default",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.action.HIDE",
+    "zh-CN": "从导航移除",
+    "en-US": "Removed from navigation",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.inherited",
+    "zh-CN": "继承目标访问要求",
+    "en-US": "Inherited target requirement",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.audit.removed",
+    "zh-CN": "账号已移除",
+    "en-US": "Removed account",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.directory.help",
+    "zh-CN": "目录下没有当前用户可见的子菜单时，不会出现在侧边栏。",
+    "en-US": "Directories appear in the sidebar only when they contain an entry visible to the user.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.audit.empty",
+    "zh-CN": "尚无菜单变更记录。",
+    "en-US": "No menu changes yet.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.expand",
+    "zh-CN": "展开目录",
+    "en-US": "Expand directory",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.collapse",
+    "zh-CN": "收起目录",
+    "en-US": "Collapse directory",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.frame.failed",
+    "zh-CN": "外部网页未能在此显示，请使用“在外部打开”。",
+    "en-US": "The external page could not be displayed here. Use Open externally.",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.sameAudience",
+    "zh-CN": "与「{name}」入口相同",
+    "en-US": "Same audience as {name}",
+    "source": "import",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.tabMenus",
+    "zh-CN": "可见菜单",
+    "en-US": "Visible menus",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.tabBusiness",
+    "zh-CN": "业务权限",
+    "en-US": "Business permissions",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.tabScope",
+    "zh-CN": "数据范围与字段",
+    "en-US": "Record scopes and fields",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.tabChanges",
+    "zh-CN": "变更记录",
+    "en-US": "Changes",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.title",
+    "zh-CN": "选择该角色可见的菜单",
+    "en-US": "Select visible menus for this role",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.structure",
+    "zh-CN": "管理菜单结构",
+    "en-US": "Manage menu structure",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.help",
+    "zh-CN": "勾选仅控制导航可见性。业务权限、记录范围与字段限制分别配置。",
+    "en-US": "Selection controls navigation only. Business permissions, record scopes and fields remain independent.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.legacy",
+    "zh-CN": "此角色沿用历史导航规则。确认当前选择后，将按独立菜单分配管理，业务授权保持原样。",
+    "en-US": "This role follows legacy navigation rules. Confirm the current selection to manage its menus independently.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.adopt",
+    "zh-CN": "确认当前菜单选择",
+    "en-US": "Confirm current menu selection",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.selected",
+    "zh-CN": "已选 {count} 个",
+    "en-US": "{count} selected",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.search",
+    "zh-CN": "搜索菜单名称",
+    "en-US": "Search menus",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.emptySearch",
+    "zh-CN": "没有匹配的菜单",
+    "en-US": "No matching menus",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.previewTitle",
+    "zh-CN": "导航预览",
+    "en-US": "Navigation preview",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.currentDraft",
+    "zh-CN": "当前角色草稿",
+    "en-US": "Current role draft",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.empty",
+    "zh-CN": "尚无可见菜单",
+    "en-US": "No visible entries",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.lockHelp",
+    "zh-CN": "锁表示当前未授予目标业务访问权。用户预览会同时计算草稿中的业务变更。",
+    "en-US": "A lock indicates missing current business access. Preview the user to include draft changes.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.userPreview",
+    "zh-CN": "以用户身份预览",
+    "en-US": "Preview as a user",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.removed",
+    "zh-CN": "菜单已移除",
+    "en-US": "Removed menu",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.disabled",
+    "zh-CN": "全局不可用",
+    "en-US": "Unavailable globally",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.unavailable",
+    "zh-CN": "角色菜单配置暂不可用，原有分配会保留。",
+    "en-US": "Role navigation is unavailable. Existing assignments are preserved.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.finishPreview",
+    "zh-CN": "完成预览",
+    "en-US": "Finish preview",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.previewDraft",
+    "zh-CN": "包含当前角色草稿。菜单可见性与业务访问权限独立计算。",
+    "en-US": "Includes the current role draft. Menu visibility and business access are calculated independently.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.previewSaved",
+    "zh-CN": "按当前已保存配置计算。",
+    "en-US": "Uses the current saved configuration.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.previewError",
+    "zh-CN": "预览失败或草稿已过期，请重新载入角色后重试。",
+    "en-US": "Preview failed or the draft is stale. Reload the role before retrying.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.chooseMember",
+    "zh-CN": "选择成员或模拟角色组合",
+    "en-US": "Choose a member or simulate roles",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.simulation",
+    "zh-CN": "模拟角色组合",
+    "en-US": "Simulated role combination",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.roleInactive",
+    "zh-CN": "已停用",
+    "en-US": "Inactive",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.calculating",
+    "zh-CN": "正在计算最终导航…",
+    "en-US": "Calculating effective navigation…",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.merged",
+    "zh-CN": "合并后的导航",
+    "en-US": "Merged navigation",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.businessAllowed",
+    "zh-CN": "具备目标业务入口权限",
+    "en-US": "Business entry permission present",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.businessDenied",
+    "zh-CN": "未授予目标业务权限",
+    "en-US": "Business permission not granted",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.allowedHelp",
+    "zh-CN": "记录范围、对象检查与字段限制继续生效。本预览不读取业务记录。",
+    "en-US": "Record scopes, object checks and field restrictions still apply. This preview does not read business records.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.deniedHelp",
+    "zh-CN": "菜单可以显示，但勾选入口不会授予访问目标业务的权限。",
+    "en-US": "This menu can be shown. Selecting it does not grant permission to access the target business.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.changes",
+    "zh-CN": "角色菜单变更",
+    "en-US": "Role menu changes",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.auditError",
+    "zh-CN": "暂时无法载入菜单变更记录。",
+    "en-US": "Could not load role menu changes.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.noChanges",
+    "zh-CN": "该角色暂无菜单变更记录",
+    "en-US": "No menu changes for this role yet.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.menuAssignment",
+    "zh-CN": "更新可见菜单",
+    "en-US": "Updated visible menus",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.adopted",
+    "zh-CN": "已确认历史投影并转为独立菜单分配。",
+    "en-US": "Confirmed legacy projection and switched to independent assignments.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.added",
+    "zh-CN": "新增",
+    "en-US": "Added",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.removedEntries",
+    "zh-CN": "移除",
+    "en-US": "Removed",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.assignSaved",
+    "zh-CN": "菜单角色分配已保存，业务授权未改变。",
+    "en-US": "Menu roles saved. Business permissions are unchanged.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.assignError",
+    "zh-CN": "菜单角色分配未保存，当前选择已保留。",
+    "en-US": "Could not save menu roles. Your selection is preserved.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.visibleRoles",
+    "zh-CN": "可见角色",
+    "en-US": "Visible roles",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.rolesError",
+    "zh-CN": "暂时无法载入可见角色。",
+    "en-US": "Could not load visible roles.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.historical",
+    "zh-CN": "历史规则",
+    "en-US": "Legacy",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.noRoles",
+    "zh-CN": "尚未分配给任何角色",
+    "en-US": "Not assigned to any role",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.globalHelp",
+    "zh-CN": "角色分配与菜单启用状态共同决定入口是否出现；目标页面继续校验业务权限。",
+    "en-US": "Role assignment and global enabled status determine visibility. Target pages retain their own business authorization.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.assignHelp",
+    "zh-CN": "仅分配导航入口，业务授权、记录范围与字段策略保持原有配置。",
+    "en-US": "Only navigation is assigned. Business permissions, record scopes and field policies will not change.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.assignConflict",
+    "zh-CN": "菜单或角色已变更，当前选择已保留；请重新载入后保存。",
+    "en-US": "Roles or menus changed. Your selection is preserved; reload before saving.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.reload",
+    "zh-CN": "重新载入当前分配",
+    "en-US": "Reload current assignments",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.afterCreate",
+    "zh-CN": "保存菜单后再分配可见角色；新入口不会自动分配。",
+    "en-US": "Save this menu, then assign its visible roles. New entries are not assigned automatically.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.reviewMenus",
+    "zh-CN": "可见菜单变更",
+    "en-US": "Visible menu changes",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.executionAudit",
+    "zh-CN": "业务权限执行审计",
+    "en-US": "Business permission execution audit",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.roleHint",
+    "zh-CN": "可见菜单、业务职责、记录范围与字段在一份角色草稿中配置、预览并保存。",
+    "en-US": "Configure visible menus, business duties, record scopes and fields in one role draft.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.allModules",
+    "zh-CN": "全部模块",
+    "en-US": "All modules",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "navigation.unavailable",
+    "zh-CN": "目标不可用",
+    "en-US": "Unavailable target",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.businessHelp",
+    "zh-CN": "业务职责不会自动勾选菜单；用例内部的服务步骤由业务用例统一承接授权。",
+    "en-US": "Business duties do not select menus automatically. Internal service steps are authorized by the business use case.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.relatedPages",
+    "zh-CN": "相关页面（仅供参考）",
+    "en-US": "Related pages (reference only)",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.morePreview",
+    "zh-CN": "另有 {count} 个入口，可打开用户预览查看。",
+    "en-US": "{count} more entries. Open user preview to inspect all.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.searchRoles",
+    "zh-CN": "搜索预览角色",
+    "en-US": "Search preview roles",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleNavigation.configureRoles",
+    "zh-CN": "配置角色",
+    "en-US": "Configure roles",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.title",
+    "zh-CN": "字段权限",
+    "en-US": "Field access",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.help",
+    "zh-CN": "选择业务对象并限制字段访问。业务授权、记录范围和共享策略仍会共同生效。",
+    "en-US": "Choose a business object and restrict its fields. Business access, record scopes and shared policies still apply.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.unnamedModel",
+    "zh-CN": "业务对象定义待完善",
+    "en-US": "Business object definition unavailable",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.unnamedField",
+    "zh-CN": "字段定义待完善",
+    "en-US": "Field definition unavailable",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.inherit",
+    "zh-CN": "随业务权限",
+    "en-US": "Use business access",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.read_only",
+    "zh-CN": "只读",
+    "en-US": "Read only",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.hidden",
+    "zh-CN": "不可见",
+    "en-US": "Hidden",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.unavailable",
+    "zh-CN": "字段定义暂不可用，现有字段限制将保留。",
+    "en-US": "Field definitions are unavailable. Existing restrictions will be preserved.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.empty",
+    "zh-CN": "暂无可配置的字段定义。",
+    "en-US": "No field definitions are available for this role.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.model",
+    "zh-CN": "业务对象",
+    "en-US": "Business object",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.search",
+    "zh-CN": "搜索字段",
+    "en-US": "Search fields",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.authorityError",
+    "zh-CN": "无法确认此角色的业务资源，字段修改已禁用，现有配置将保留。",
+    "en-US": "Could not verify this role’s business resources. Existing restrictions are preserved; changes are disabled.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.noBusiness",
+    "zh-CN": "当前角色未获此业务对象的访问权。字段设置不会授予访问权；可明确移除已有的字段限制。",
+    "en-US": "This role has no business access to this object. Field settings cannot grant access; existing restrictions may be removed explicitly.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.field",
+    "zh-CN": "字段",
+    "en-US": "Field",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.access",
+    "zh-CN": "访问方式",
+    "en-US": "Access",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.other",
+    "zh-CN": "其他限制",
+    "en-US": "Other restrictions",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.noAdditional",
+    "zh-CN": "无共享字段限制",
+    "en-US": "No shared field restriction",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.inheritHelp",
+    "zh-CN": "“随业务权限”仅解除本角色在此表格设置的限制，不增加写入权、不移除共享策略。“不可见”同时限制写入。",
+    "en-US": "Use business access removes only this role’s grid restriction. It does not grant write access or remove shared restrictions. Hidden fields are also read only.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleFields.sharedPolicies",
+    "zh-CN": "共享字段策略",
+    "en-US": "Shared field policies",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.title",
+    "zh-CN": "角色授权变更",
+    "en-US": "Role authorization changes",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.error",
+    "zh-CN": "授权变更记录加载失败。",
+    "en-US": "Could not load role authorization changes.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.empty",
+    "zh-CN": "此角色暂无授权变更记录。",
+    "en-US": "No authorization changes for this role yet.",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.updated",
+    "zh-CN": "更新角色授权",
+    "en-US": "Updated role authorization",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.kind.duty",
+    "zh-CN": "业务职责",
+    "en-US": "Business duty",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.kind.default_scope",
+    "zh-CN": "角色默认范围",
+    "en-US": "Role default scope",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.kind.apply_default",
+    "zh-CN": "应用到当前授权",
+    "en-US": "Apply to current grants",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.kind.scope",
+    "zh-CN": "记录范围",
+    "en-US": "Record scope",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.kind.scope_merge",
+    "zh-CN": "范围合并方式",
+    "en-US": "Scope merge",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.kind.shared_field",
+    "zh-CN": "共享字段策略",
+    "en-US": "Shared field policy",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.kind.field",
+    "zh-CN": "字段访问",
+    "en-US": "Field access",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.not_configured",
+    "zh-CN": "未配置",
+    "en-US": "Not configured",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.none",
+    "zh-CN": "无权限",
+    "en-US": "No access",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.partial",
+    "zh-CN": "部分授权",
+    "en-US": "Partially granted",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.full",
+    "zh-CN": "已授权",
+    "en-US": "Granted",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.all",
+    "zh-CN": "全部记录",
+    "en-US": "All records",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.self",
+    "zh-CN": "本人记录",
+    "en-US": "Own records",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.dept",
+    "zh-CN": "本部门",
+    "en-US": "Department",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.dept_and_sub",
+    "zh-CN": "本部门及下级",
+    "en-US": "Department and subdepartments",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.team",
+    "zh-CN": "本团队",
+    "en-US": "Team",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.MAX",
+    "zh-CN": "合并可访问记录",
+    "en-US": "Union of accessible records",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.MIN",
+    "zh-CN": "交集限制",
+    "en-US": "Intersection",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.inherit",
+    "zh-CN": "随业务权限",
+    "en-US": "Use business access",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.read_only",
+    "zh-CN": "只读",
+    "en-US": "Read only",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.hidden",
+    "zh-CN": "不可见",
+    "en-US": "Hidden",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.applied",
+    "zh-CN": "已应用",
+    "en-US": "Applied",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "roleChanges.value.not_applied",
+    "zh-CN": "未应用",
+    "en-US": "Not applied",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "admin.permission.role.searchEmpty",
+    "zh-CN": "没有匹配的角色",
+    "en-US": "No matching roles",
+    "source": "platform-admin",
+    "refType": "ui"
+  },
+  {
+    "key": "rbacExperience.businessRoles",
+    "zh-CN": "业务角色",
+    "en-US": "Business roles"
+  },
+  {
+    "key": "rbacExperience.managementRoles",
+    "zh-CN": "管理角色",
+    "en-US": "Management roles"
+  },
+  {
+    "key": "rbacExperience.memberCountUnavailable",
+    "zh-CN": "成员数暂不可用",
+    "en-US": "Member count unavailable"
+  },
+  {
+    "key": "rbacExperience.memberCount",
+    "zh-CN": "{count} 位已分配成员",
+    "en-US": "{count} assigned members"
+  },
+  {
+    "key": "rbacExperience.unsaved",
+    "zh-CN": "有未保存修改",
+    "en-US": "Unsaved changes"
+  },
+  {
+    "key": "rbacExperience.saved",
+    "zh-CN": "已保存",
+    "en-US": "Saved"
+  },
+  {
+    "key": "rbacExperience.roleSettings",
+    "zh-CN": "角色设置",
+    "en-US": "Role settings"
+  },
+  {
+    "key": "rbacExperience.draftSummary",
+    "zh-CN": "{menus} 个菜单入口 · {duties} 项业务职责",
+    "en-US": "{menus} menu entries · {duties} business duties"
+  },
+  {
+    "key": "rbacExperience.otherEntries",
+    "zh-CN": "其他入口",
+    "en-US": "Other entries"
+  },
+  {
+    "key": "rbacExperience.executionBoundary",
+    "zh-CN": "内部步骤在获准的业务用例内执行；租户、对象关系、状态、版本和字段限制继续校验。",
+    "en-US": "Internal steps run within the authorized business use case. Tenant, object relationships, state, version and field restrictions remain enforced."
+  },
+  {
+    "key": "rbacExperience.maintain",
+    "zh-CN": "维护",
+    "en-US": "Maintain"
+  },
+  {
+    "key": "rbacExperience.businessAction",
+    "zh-CN": "业务操作",
+    "en-US": "Business operation"
+  },
+  {
+    "key": "rbacExperience.recordScope",
+    "zh-CN": "记录范围",
+    "en-US": "Record scope"
+  },
+  {
+    "key": "rbacExperience.scopeHelp",
+    "zh-CN": "记录范围只约束已有业务授权。切换对象或动作不会赋权；修改与本角色草稿一起预览和保存。",
+    "en-US": "Record scope restricts existing business access. Changing the object or action does not change grants; edits are reviewed with this role draft."
+  },
+  {
+    "key": "rbacExperience.scopeMetadataError",
+    "zh-CN": "无法核实业务对象定义。原有范围已保留，请重新载入后再编辑。",
+    "en-US": "Object metadata could not be verified. Existing scope is preserved; reload before editing."
+  },
+  {
+    "key": "rbacExperience.noScopeActions",
+    "zh-CN": "该对象尚无已授权的记录动作，请先配置所需业务职责。",
+    "en-US": "No granted record actions for this object. Assign the required business duty first."
+  },
+  {
+    "key": "rbacExperience.accessibleRecords",
+    "zh-CN": "可访问的记录",
+    "en-US": "Accessible records"
+  },
+  {
+    "key": "rbacExperience.mixedScopes",
+    "zh-CN": "各动作范围不同",
+    "en-US": "Different scopes by action"
+  },
+  {
+    "key": "rbacExperience.appliesToActions",
+    "zh-CN": "适用业务动作",
+    "en-US": "Applies to actions"
+  },
+  {
+    "key": "rbacExperience.allGrantedActions",
+    "zh-CN": "该对象全部已授权动作",
+    "en-US": "All granted actions for this object"
+  },
+  {
+    "key": "rbacExperience.teamUnavailable",
+    "zh-CN": "该对象未定义团队归属字段，不能配置团队范围。",
+    "en-US": "This object has no team ownership field; team scope is unavailable."
+  },
+  {
+    "key": "rbacExperience.existingConditions",
+    "zh-CN": "已有授权条件继续生效；此处不会用固定样例替代或清除这些条件。",
+    "en-US": "Existing grant conditions remain effective. This control does not replace them with a fixed example or remove them."
+  },
+  {
+    "key": "rbacExperience.objectAccess",
+    "zh-CN": "业务对象与数据访问",
+    "en-US": "Business object access"
+  },
+  {
+    "key": "rbacExperience.defaultScopeAdvanced",
+    "zh-CN": "角色默认范围 · 高级设置",
+    "en-US": "Role default scope · advanced"
+  },
+  {
+    "key": "rbacExperience.backToRoles",
+    "zh-CN": "角色权限",
+    "en-US": "Role permissions"
+  },
+  {
+    "key": "rbacExperience.navigationHelp",
+    "zh-CN": "插件提供默认菜单，租户定制在升级后保留。新增入口不会授予业务权限；可见角色单独分配。",
+    "en-US": "Plugins provide default menus; tenant changes are preserved on upgrade. Adding a menu never grants business access. Assign visible roles separately."
+  },
+  {
+    "key": "rbacExperience.membersHelp",
+    "zh-CN": "多角色成员的菜单按有效角色合并；业务授权、记录范围和字段限制单独计算。成员分配期限本身不授予业务访问。",
+    "en-US": "Menus merge across effective roles. Business grants, record scopes and fields are evaluated separately. Membership dates do not by themselves grant business access."
+  },
+  {
+    "key": "rbacExperience.immediate",
+    "zh-CN": "立即",
+    "en-US": "Immediately"
+  },
+  {
+    "key": "rbacExperience.indefinite",
+    "zh-CN": "长期",
+    "en-US": "No expiry"
+  },
+  {
+    "key": "rbacExperience.status.loading",
+    "zh-CN": "正在载入配置",
+    "en-US": "Loading configuration"
+  },
+  {
+    "key": "rbacExperience.status.failed",
+    "zh-CN": "配置未能载入",
+    "en-US": "Configuration unavailable"
+  },
+  {
+    "key": "rbacExperience.status.conflict",
+    "zh-CN": "版本已变更 · 草稿保留",
+    "en-US": "Configuration changed · draft preserved"
+  },
+  {
+    "key": "rbacExperience.status.saving",
+    "zh-CN": "正在处理…",
+    "en-US": "Processing…"
+  },
+  {
+    "key": "rbacExperience.status.dirty",
+    "zh-CN": "有未保存修改",
+    "en-US": "Unsaved changes"
+  },
+  {
+    "key": "rbacExperience.status.saved",
+    "zh-CN": "已保存",
+    "en-US": "Saved"
+  },
+  {
+    "key": "rbacExperience.assignmentExpired",
+    "zh-CN": "分配已到期",
+    "en-US": "Assignment expired"
+  },
+  {
+    "key": "rbacExperience.assignmentScheduled",
+    "zh-CN": "尚未开始",
+    "en-US": "Not started"
+  },
+  {
+    "key": "rbacExperience.assignmentWithinWindow",
+    "zh-CN": "在分配期限内",
+    "en-US": "Within assignment period"
+  },
+  {
+    "key": "rbacExperience.previewUnverified",
+    "zh-CN": "草稿访问结果未能核实，请打开用户预览重试。",
+    "en-US": "Draft access could not be verified. Open user preview to retry."
+  },
+  {
+    "key": "rbacExperience.previewComputing",
+    "zh-CN": "正在计算草稿访问结果…",
+    "en-US": "Calculating draft access…"
+  },
+  {
+    "key": "rbacExperience.roleIdentifier",
+    "zh-CN": "高级 · 集成标识",
+    "en-US": "Advanced · integration identifier"
+  },
+  {
+    "key": "rbacExperience.roleIdentifierHelp",
+    "zh-CN": "系统自动生成标识，集成可引用；创建后不能修改。新角色初始没有菜单和业务授权。",
+    "en-US": "An identifier is generated automatically. Integrations may reference it; it cannot change after creation. New roles start without menus or business grants."
+  },
+  {
+    "key": "rbacExperience.deleteRoleConfirmation",
+    "zh-CN": "确定删除角色“{name}”吗？此操作不可撤销。",
+    "en-US": "Delete role \"{name}\"? This cannot be undone."
+  },
+  {
+    "key": "rbacExperience.removeMemberConfirmation",
+    "zh-CN": "确定将“{name}”从此角色中移除吗？",
+    "en-US": "Remove \"{name}\" from this role?"
+  },
+  {
+    "key": "rbacExperience.searchVisibleRoles",
+    "zh-CN": "搜索可见角色",
+    "en-US": "Search roles"
+  },
+  {
+    "key": "rbacExperience.noMatchingRoles",
+    "zh-CN": "没有匹配的角色",
+    "en-US": "No matching roles"
   }
 ]

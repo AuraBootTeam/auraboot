@@ -105,12 +105,24 @@ public class CommandTargetVersionLockPhase implements CommandPhase {
 
         // This dedicated mapper validates identifiers and binds the tenant and target PID.
         // The general SELECT provider deliberately rejects UPDATE, including FOR UPDATE.
-        List<Map<String, Object>> rows = dynamicDataMapper.selectTargetVersionForUpdate(
-                tableName, primaryKeyColumn, ctx.getTenantId(),
-                ctx.getRequest().getTargetRecordId());
+        List<Map<String, Object>> rows;
+        try {
+            rows = dynamicDataMapper.selectTargetVersionForUpdate(
+                    tableName, primaryKeyColumn, ctx.getTenantId(),
+                    ctx.getRequest().getTargetRecordId());
+        } catch (org.springframework.dao.CannotSerializeTransactionException conflict) {
+            // CATCH: distinguish a server-declared current-state intent before any handler
+            // from ordinary value/CAS conflicts. The transaction owner decides whether it
+            // can roll back and establish a fresh, fully authorized invocation once.
+            if (!currentStateLock) throw conflict;
+            throw new com.auraboot.framework.meta.exception.CurrentStateTargetLockConflictException(conflict);
+        }
         Long authoritative = resolveVersion(rows);
+        Long authorizedVersion = ctx.getTargetRecordVersion();
         Integer requested = ctx.getRequest().getExpectedVersion();
-        if (authoritative == null || (!currentStateLock && requested.longValue() != authoritative)) {
+        if (authoritative == null || (!currentStateLock && requested.longValue() != authoritative)
+                || (currentStateLock && ctx.getBusinessTargetAuthorization() != null
+                    && !java.util.Objects.equals(authorizedVersion, authoritative))) {
             throw new CasVersionConflictException(
                     "Command target version conflict (expected " + requested
                             + ", current " + (authoritative == null ? "unavailable" : authoritative)

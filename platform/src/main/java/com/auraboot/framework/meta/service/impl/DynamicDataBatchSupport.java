@@ -62,6 +62,10 @@ final class DynamicDataBatchSupport extends BaseMetaService {
 
     private final java.util.function.BiConsumer<String, String> deleteOperation;
 
+    private final NativeRecordFieldAuthorization nativeFields;
+
+    private final NativeReadFieldProjection nativeReadFields;
+
     @FunctionalInterface
     interface GetByIdOperation { Map<String, Object> execute(String modelCode, String recordId); }
 
@@ -145,6 +149,10 @@ final class DynamicDataBatchSupport extends BaseMetaService {
                 // Check if record already exists (idempotent behavior)
                 Object primaryKeyValue = data.get(primaryKey.getCode());
                 if (primaryKeyValue != null) {
+                    if (!stripNonWritableFields(modelCode, new LinkedHashMap<>(data)).isEmpty()) {
+                        throw new org.springframework.security.access.AccessDeniedException(
+                                "FIELD_WRITE_DENIED: batch create contains a non-writable field");
+                    }
                     try {
                         Map<String, Object> existingRecord = getById(modelCode, primaryKeyValue.toString());
                         if (existingRecord != null) {
@@ -180,7 +188,11 @@ final class DynamicDataBatchSupport extends BaseMetaService {
         return response;
     }
 
-    List<Map<String, Object>> bulkCreate(String modelCode, List<Map<String, Object>> dataList){
+    List<Map<String,Object>> bulkCreate(String modelCode,List<Map<String,Object>> dataList) {
+        return bulkCreate(modelCode,dataList,this::getById);
+    }
+
+    List<Map<String,Object>> bulkCreate(String modelCode,List<Map<String,Object>> dataList,GetByIdOperation publicReader){
         validateModelCode(modelCode);
         assertWritable(modelCode);
         if (dataList == null || dataList.isEmpty()) {
@@ -202,6 +214,7 @@ final class DynamicDataBatchSupport extends BaseMetaService {
         List<Map<String, Object>> columnDataList = new ArrayList<>(dataList.size());
         List<Map<String, Object>> createdRecords = new ArrayList<>(dataList.size());
         List<Map<String, Object>> validationRows = new ArrayList<>(dataList.size());
+        List<Map<String, Object>> submittedRows = new ArrayList<>(dataList.size());
 
         for (Map<String, Object> input : dataList) {
             if (input == null || input.isEmpty()) {
@@ -210,8 +223,11 @@ final class DynamicDataBatchSupport extends BaseMetaService {
             // Preserve the create() normalization and conversion on copies of caller maps.
             // Validate the complete batch before the first write to share relation lookups.
             Map<String, Object> data = new HashMap<>(input);
+            submittedRows.add(new LinkedHashMap<>(input));
             FieldWriterGuard.assertCreateAllowed(model, data);
-            stripNonWritableFields(modelCode, data);
+            if (!stripNonWritableFields(modelCode, data).isEmpty()) {
+                throw new org.springframework.security.access.AccessDeniedException("FIELD_WRITE_DENIED: bulk create contains a non-writable field");
+            }
             payloadTemporalNormalizer.normalize(data, model);
             validationRows.add(data);
 
@@ -245,10 +261,23 @@ final class DynamicDataBatchSupport extends BaseMetaService {
                     "Bulk create expected " + dataList.size() + " rows inserted but got " + inserted);
         }
 
+        // Complete all canonical record decisions in one immutable configuration snapshot.
+        // No observer runs until every inserted row and every public result is checked.
+        var publicRecords=nativeFields.withConfigurationSnapshot(modelCode,() -> {
+            for (int i=0;i<createdRecords.size();i++) {
+                nativeFields.requireCreated(modelCode,createdRecords.get(i).get(primaryKey.getCode()).toString(),submittedRows.get(i));
+            }
+            var projected=new ArrayList<Map<String,Object>>(createdRecords.size());
+            for (var row:createdRecords) {
+                String recordId=row.get(primaryKey.getCode()).toString();
+                projected.add(nativeReadFields.publicWriteResult(model,row,() -> publicReader.execute(modelCode,recordId)));
+            }
+            return projected;
+        });
         for (var row : createdRecords) {
             mutationObserver.observe(model, row.get(primaryKey.getCode()).toString(), ModelMutationObserver.Operation.CREATED);
         }
-        return createdRecords;
+        return publicRecords;
     }
 
     boolean isRecordNotFound(MetaServiceException e){

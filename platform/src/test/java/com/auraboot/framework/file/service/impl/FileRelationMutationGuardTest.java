@@ -26,6 +26,8 @@ class FileRelationMutationGuardTest {
     private final MetaModelService models=mock(MetaModelService.class);
     private final DynamicDataService data=mock(DynamicDataService.class);
     private final DataAccessAuthorizationHelper permissions=mock(DataAccessAuthorizationHelper.class);
+    private final com.auraboot.framework.meta.service.impl.NativeRecordFieldAuthorization fieldAuthorization=
+            mock(com.auraboot.framework.meta.service.impl.NativeRecordFieldAuthorization.class);
     private final FileRelationMutationGuard guard=new FileRelationMutationGuard(beans,records);
     private final FieldDefinition photos=FieldDefinition.builder().code("photos").columnName("physical_photos")
             .dataType("file").allowedWriterCommands(List.of("order:repair")).build();
@@ -37,6 +39,7 @@ class FileRelationMutationGuardTest {
         when(beans.getBean(MetaModelService.class)).thenReturn(models);
         when(beans.getBean(DynamicDataService.class)).thenReturn(data);
         when(beans.getBean(DataAccessAuthorizationHelper.class)).thenReturn(permissions);
+        when(beans.getBean(com.auraboot.framework.meta.service.impl.NativeRecordFieldAuthorization.class)).thenReturn(fieldAuthorization);
         when(models.getModelDefinition("order")).thenReturn(Optional.of(model));
         when(records.selectRecordWriterTargetsForUpdate(anyString(),anyString(),anyString(),anyMap())).thenReturn(List.of(Map.of("pid","parent")));
         when(data.getById("order","parent")).thenReturn(Map.of("pid","parent","tenant_id",1L,"state","released","row_version",1L));

@@ -53,6 +53,11 @@ test.describe('PCBA quote cost scenario golden', () => {
     await expect(page.getByText('frozen', { exact: true })).toHaveCount(0);
     await expect(page.getByText('estimate', { exact: true })).toHaveCount(0);
 
+    // Related tables load after the root; preserve the semantic checks without racing that load.
+    for (const description of ['缺少测试报告成本项', '汇率假设 7.0 CNY/USD']) {
+      await expect(page.locator('main').getByText(description, { exact: true }).first())
+        .toBeVisible({ timeout: 20_000 });
+    }
     // 档位子表人类可读:数量 100 可见;缺口/假设描述人类可读,无内部 JSON 块
     const bodyText = await page.locator('main').innerText();
     expect(bodyText).toContain('100');

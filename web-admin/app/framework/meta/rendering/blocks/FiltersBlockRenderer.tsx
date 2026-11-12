@@ -22,10 +22,14 @@ export interface FiltersBlockRendererProps {
 }
 
 export const FiltersBlockRenderer: React.FC<FiltersBlockRendererProps> = ({ block, runtime }) => {
-  const { t } = useI18n();
   useRuntimeStateSubscription(runtime);
   const windowConfig = (block as any).props?.timeWindow;
   if (windowConfig) return <TimeWindowFilter config={windowConfig} runtime={runtime} />;
+  return <FieldFiltersBlockRenderer block={block} runtime={runtime} />;
+};
+
+const FieldFiltersBlockRenderer: React.FC<FiltersBlockRendererProps> = ({ block, runtime }) => {
+  const { t } = useI18n();
   const fields = block.fields || [];
   const density = (block as any).density || 'default';
   const compact = density === 'compact';

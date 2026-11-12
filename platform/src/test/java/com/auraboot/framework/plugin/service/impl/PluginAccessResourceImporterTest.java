@@ -158,6 +158,29 @@ class PluginAccessResourceImporterTest {
         importer.importMenus(m,new ImportRequest(),result,"p","i",42L);
         assertThat(result.getResourceCounts()).containsEntry("MENU",Map.of("UPDATE",1));
     }
+    @Test void onlyRolesCreatedByThisBatchCanReceiveDeferredInitialGrants() {
+        var fresh=new Role();fresh.setPid("fresh");fresh.setCode("new_reader");
+        var existing=new Role();existing.setPid("old");existing.setCode("old_reader");
+        when(roles.findByTenantId(42L)).thenReturn(List.of(fresh,existing));
+        var m=new PluginManifestExtended();
+        var newRole=RoleDefinitionDTO.builder().code("new_reader").build();
+        var oldRole=RoleDefinitionDTO.builder().code("old_reader").build();
+        m.setRoles(List.of(newRole,oldRole));
+        importer.reconcileRolePermissionBindings(m,42L,"plugin","current",Set.of("fresh"));
+        verify(resources).reconcileImportedRolePermissions(newRole,42L,"plugin","current");
+        verify(resources).reconcileRolePermissions(oldRole,42L);
+        verify(resources,never()).reconcileImportedRolePermissions(eq(oldRole),any(),any(),any());
+    }
+
+    @Test void reimportWithoutNewRolesUsesOnlyDefinitionValidation() {
+        var m=new PluginManifestExtended();var declaration=RoleDefinitionDTO.builder().code("old_reader").build();
+        m.setRoles(List.of(declaration));
+        importer.reconcileRolePermissionBindings(m,42L,"plugin","upgrade",Set.of());
+        verify(resources).reconcileRolePermissions(declaration,42L);
+        verify(resources,never()).reconcileImportedRolePermissions(any(),any(),any(),any());
+        verifyNoInteractions(roles);
+    }
+
     @Test void menuReferencingPermissionMissingFromTenantCreatesItBeforeMenusAndBindsToAdmin() {
         // Fan-out into a tenant that has never seen xy.score_import.read: the menu row used
         // to land referencing a code resolving to nothing (runtime 403), or the preview

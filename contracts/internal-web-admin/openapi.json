@@ -3161,6 +3161,32 @@
         },
         "type": "object"
       },
+      "ApiResponseAsyncImportStatus": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AsyncImportStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseAsyncTaskDTO": {
         "properties": {
           "code": {
@@ -3431,6 +3457,32 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/BehaviorQuarantineReplayResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseBiTemporalRecord": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BiTemporalRecord"
               },
               {
                 "type": "null"
@@ -5988,6 +6040,32 @@
         },
         "type": "object"
       },
+      "ApiResponseExcelImportResult": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExcelImportResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseExchangeRateResponse": {
         "properties": {
           "code": {
@@ -6180,6 +6258,32 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/FileUploadResponseDTO"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseGanttData": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GanttData"
               },
               {
                 "type": "null"
@@ -7460,6 +7564,31 @@
           "data": {
             "items": {
               "$ref": "#/components/schemas/BatchPasswordResetItem"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseListBiTemporalRecord": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/BiTemporalRecord"
             },
             "type": [
               "array",
@@ -8785,6 +8914,31 @@
           "data": {
             "items": {
               "$ref": "#/components/schemas/ExchangeRateResponse"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseListExecutionJobDTO": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionJobDTO"
             },
             "type": [
               "array",
@@ -10531,6 +10685,31 @@
         },
         "type": "object"
       },
+      "ApiResponseListRoleNavigationAudit": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/RoleNavigationAudit"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseListRolePreviewTargetView": {
         "properties": {
           "code": {
@@ -12123,6 +12302,32 @@
         },
         "type": "object"
       },
+      "ApiResponseMrpResult": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MrpResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseNamedQueryBatchResult": {
         "properties": {
           "code": {
@@ -12305,6 +12510,136 @@
         },
         "type": "object"
       },
+      "ApiResponseNavigationEntryRoles": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NavigationEntryRoles"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseNavigationPreviewOptions": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NavigationPreviewOptions"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseNavigationSnapshot": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NavigationSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseNavigationTarget": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NavigationTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseNavigationUserPreview": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NavigationUserPreview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseNewPageWorkspaceOptions": {
         "properties": {
           "code": {
@@ -12417,6 +12752,32 @@
           "context": {},
           "data": {
             "type": "null"
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseOeeResult": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OeeResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "message": {
             "type": "string"
@@ -14794,6 +15155,84 @@
         },
         "type": "object"
       },
+      "ApiResponseRoleAuthorizationDraftPreview": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleAuthorizationDraftPreview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseRoleAuthorizationDraftSnapshot": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleAuthorizationDraftSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseRoleBoundaryMigrationPreview": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleBoundaryMigrationPreview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseRoleMemberTreeResponse": {
         "properties": {
           "code": {
@@ -14804,6 +15243,32 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/RoleMemberTreeResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseRoleNavigationSelection": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleNavigationSelection"
               },
               {
                 "type": "null"
@@ -14960,6 +15425,32 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/SavedViewDTO"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseScheduleResult": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScheduleResult"
               },
               {
                 "type": "null"
@@ -16142,6 +16633,32 @@
         },
         "type": "object"
       },
+      "ApiResponseValidationReport": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ValidationReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseValidationResult": {
         "properties": {
           "code": {
@@ -16723,6 +17240,37 @@
         },
         "type": "object"
       },
+      "Artifact": {
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "checksumSha256": {
+            "type": "string"
+          },
+          "downloadUrl": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "size": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "Asset": {
         "properties": {
           "url": {
@@ -16771,6 +17319,31 @@
               "type": "string"
             },
             "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "AsyncImportStatus": {
+        "properties": {
+          "modelCode": {
+            "type": "string"
+          },
+          "processedRows": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "result": {
+            "$ref": "#/components/schemas/ExcelImportResult"
+          },
+          "status": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "totalRows": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -18163,6 +18736,79 @@
         },
         "type": "object"
       },
+      "BiTemporalRecord": {
+        "properties": {
+          "createdAt": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "deletedFlag": {
+            "type": "boolean"
+          },
+          "entityId": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/JsonNode"
+          },
+          "tenantId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "txFrom": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "txTo": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "validFrom": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "validTo": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "versionNo": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "BiTemporalRequest": {
+        "properties": {
+          "payload": {
+            "$ref": "#/components/schemas/JsonNode"
+          },
+          "validFrom": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "validTo": {
+            "format": "local-date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "Binding": {
         "properties": {
           "applicationId": {
@@ -18549,6 +19195,26 @@
           "expireTime": {
             "format": "int64",
             "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "CalendarEntry": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "endTime": {
+            "format": "time-local",
+            "type": "string"
+          },
+          "holiday": {
+            "type": "boolean"
+          },
+          "startTime": {
+            "format": "time-local",
+            "type": "string"
           }
         },
         "type": "object"
@@ -21148,15 +21814,26 @@
         "type": "object"
       },
       "CopyPermissionsRequest": {
+        "description": "Provide exactly one target role identity; public PID is preferred.",
         "properties": {
           "targetRoleId": {
+            "deprecated": true,
+            "exclusiveMinimum": 0,
             "format": "int64",
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "targetRolePid": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
-        "required": [
-          "targetRoleId"
-        ],
         "type": "object"
       },
       "CopySavedViewToPersonalRequest": {
@@ -22267,6 +22944,9 @@
           "id": {
             "format": "int64",
             "type": "integer"
+          },
+          "managedRolePid": {
+            "type": "string"
           },
           "maskExpression": {
             "type": "string"
@@ -24067,6 +24747,25 @@
           },
           "canDelete": {
             "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "DemandEntry": {
+        "properties": {
+          "materialId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "materialName": {
+            "type": "string"
+          },
+          "needDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
           }
         },
         "type": "object"
@@ -27661,6 +28360,55 @@
         ],
         "type": "object"
       },
+      "ExcelImportResult": {
+        "properties": {
+          "asyncTask": {
+            "type": "boolean"
+          },
+          "createdCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "errorCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "errorReportExpired": {
+            "type": "boolean"
+          },
+          "errorReportFailed": {
+            "type": "boolean"
+          },
+          "errorReportUrl": {
+            "type": "string"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ImportValidationError"
+            },
+            "type": "array"
+          },
+          "hasErrors": {
+            "type": "boolean"
+          },
+          "successCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "totalRows": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "updatedCount": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ExchangeRateRequest": {
         "properties": {
           "baseCurrency": {
@@ -27734,6 +28482,69 @@
             "type": "string"
           },
           "toolId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ExecutionJobDTO": {
+        "properties": {
+          "artifact": {
+            "$ref": "#/components/schemas/Artifact"
+          },
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/Artifact"
+            },
+            "type": "array"
+          },
+          "completedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "definitionCode": {
+            "type": "string"
+          },
+          "downloadUrl": {
+            "type": "string"
+          },
+          "failedUnits": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "format": {
+            "type": "string"
+          },
+          "pid": {
+            "type": "string"
+          },
+          "processedUnits": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "progress": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "succeededUnits": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "totalUnits": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "type": {
             "type": "string"
           }
         },
@@ -29454,6 +30265,109 @@
         },
         "type": "object"
       },
+      "GanttData": {
+        "properties": {
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleConflict"
+            },
+            "type": "array"
+          },
+          "milestones": {
+            "items": {
+              "$ref": "#/components/schemas/GanttMilestone"
+            },
+            "type": "array"
+          },
+          "resourceUtilization": {
+            "additionalProperties": {
+              "format": "double",
+              "type": "number"
+            },
+            "type": "object"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/GanttRow"
+            },
+            "type": "array"
+          },
+          "strategy": {
+            "type": "string"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/GanttTask"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "GanttMilestone": {
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "time": {
+            "format": "local-date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "GanttRow": {
+        "properties": {
+          "resourceId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "resourceName": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "GanttTask": {
+        "properties": {
+          "color": {
+            "type": "string"
+          },
+          "endTime": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "jobCode": {
+            "type": "string"
+          },
+          "operationName": {
+            "type": "string"
+          },
+          "processingTimeMin": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "resourceId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "setupTimeMin": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "startTime": {
+            "format": "local-date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "GenAiUsageSummary": {
         "properties": {
           "callCount": {
@@ -31003,6 +31917,21 @@
             "type": "integer"
           },
           "updated": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ImportValidationError": {
+        "properties": {
+          "fieldCode": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "rowNumber": {
             "format": "int32",
             "type": "integer"
           }
@@ -34401,6 +35330,79 @@
         ],
         "type": "object"
       },
+      "MrpExceptionMessage": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "materialId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "materialName": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "suggestedAction": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "MrpResult": {
+        "properties": {
+          "exceptions": {
+            "items": {
+              "$ref": "#/components/schemas/MrpExceptionMessage"
+            },
+            "type": "array"
+          },
+          "plannedOrders": {
+            "items": {
+              "$ref": "#/components/schemas/PlannedOrderDto"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "MrpRunRequest": {
+        "properties": {
+          "demands": {
+            "items": {
+              "$ref": "#/components/schemas/DemandEntry"
+            },
+            "type": "array"
+          },
+          "horizonDays": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "materialIds": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "orderIds": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "scope": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "NamedQueryBatchResult": {
         "properties": {
           "allFailure": {
@@ -35963,6 +36965,409 @@
         },
         "type": "object"
       },
+      "NavigationAudit": {
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "menuPid": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "pid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "actor",
+          "createdAt",
+          "menuPid",
+          "name",
+          "pid"
+        ],
+        "type": "object"
+      },
+      "NavigationDefinition": {
+        "properties": {
+          "authenticated": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "icon": {
+            "maxLength": 80,
+            "minLength": 0,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 0,
+            "type": "string"
+          },
+          "opening": {
+            "type": "string"
+          },
+          "orderNo": {
+            "format": "int32",
+            "maximum": 100000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "parentPid": {
+            "maxLength": 26,
+            "minLength": 0,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permissionCode": {
+            "maxLength": 150,
+            "minLength": 0,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target": {
+            "maxLength": 2048,
+            "minLength": 0,
+            "type": "string"
+          },
+          "visible": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "authenticated",
+          "enabled",
+          "kind",
+          "name",
+          "opening",
+          "orderNo",
+          "target",
+          "visible"
+        ],
+        "type": "object"
+      },
+      "NavigationEntry": {
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "customized": {
+            "type": "boolean"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/NavigationDefinition"
+          },
+          "pid": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "available",
+          "customized",
+          "definition",
+          "pid",
+          "source"
+        ],
+        "type": "object"
+      },
+      "NavigationEntryRoles": {
+        "properties": {
+          "menuPid": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/NavigationRoleOption"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "menuPid",
+          "revision",
+          "roles"
+        ],
+        "type": "object"
+      },
+      "NavigationEntryRolesWrite": {
+        "properties": {
+          "expectedRevision": {
+            "minLength": 1,
+            "pattern": "[a-f0-9]{64}",
+            "type": "string"
+          },
+          "rolePids": {
+            "items": {
+              "maxLength": 32,
+              "minLength": 0,
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "rolePids"
+        ],
+        "type": "object"
+      },
+      "NavigationOption": {
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ],
+        "type": "object"
+      },
+      "NavigationPreviewMember": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "pid": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "pid"
+        ],
+        "type": "object"
+      },
+      "NavigationPreviewOptions": {
+        "properties": {
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/NavigationPreviewMember"
+            },
+            "type": "array"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/NavigationRoleOption"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "members",
+          "roles"
+        ],
+        "type": "object"
+      },
+      "NavigationPreviewRequest": {
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/RoleAuthorizationDraftRequest"
+          },
+          "draftRolePid": {
+            "maxLength": 32,
+            "minLength": 0,
+            "type": "string"
+          },
+          "memberPid": {
+            "maxLength": 32,
+            "minLength": 0,
+            "type": "string"
+          },
+          "rolePids": {
+            "items": {
+              "maxLength": 32,
+              "minLength": 0,
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "type": "object"
+      },
+      "NavigationRevision": {
+        "properties": {
+          "expectedRevision": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedRevision"
+        ],
+        "type": "object"
+      },
+      "NavigationRoleOption": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "pid": {
+            "type": "string"
+          },
+          "selected": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "mode",
+          "name",
+          "pid",
+          "selected"
+        ],
+        "type": "object"
+      },
+      "NavigationSnapshot": {
+        "properties": {
+          "audit": {
+            "items": {
+              "$ref": "#/components/schemas/NavigationAudit"
+            },
+            "type": "array"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/NavigationEntry"
+            },
+            "type": "array"
+          },
+          "pages": {
+            "items": {
+              "$ref": "#/components/schemas/NavigationOption"
+            },
+            "type": "array"
+          },
+          "permissions": {
+            "items": {
+              "$ref": "#/components/schemas/NavigationOption"
+            },
+            "type": "array"
+          },
+          "revision": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "audit",
+          "entries",
+          "pages",
+          "permissions",
+          "revision"
+        ],
+        "type": "object"
+      },
+      "NavigationTarget": {
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "opening": {
+            "type": "string"
+          },
+          "pid": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "name",
+          "opening",
+          "pid",
+          "target"
+        ],
+        "type": "object"
+      },
+      "NavigationUserPreview": {
+        "properties": {
+          "menus": {
+            "items": {
+              "$ref": "#/components/schemas/RoleNavigationChoice"
+            },
+            "type": "array"
+          },
+          "rolePids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "menus",
+          "rolePids",
+          "source"
+        ],
+        "type": "object"
+      },
+      "NavigationWrite": {
+        "properties": {
+          "definition": {
+            "$ref": "#/components/schemas/NavigationDefinition"
+          },
+          "expectedRevision": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "definition",
+          "expectedRevision"
+        ],
+        "type": "object"
+      },
       "NbaSuggestion": {
         "properties": {
           "category": {
@@ -36453,6 +37858,29 @@
         "properties": {
           "interactionContext": {
             "$ref": "#/components/schemas/JsonNode"
+          }
+        },
+        "type": "object"
+      },
+      "OeeResult": {
+        "properties": {
+          "availability": {
+            "type": "number"
+          },
+          "losses": {
+            "$ref": "#/components/schemas/SixBigLosses"
+          },
+          "oee": {
+            "type": "number"
+          },
+          "performance": {
+            "type": "number"
+          },
+          "quality": {
+            "type": "number"
+          },
+          "teep": {
+            "type": "number"
           }
         },
         "type": "object"
@@ -41203,6 +42631,46 @@
         },
         "type": "object"
       },
+      "PlannedOrderDto": {
+        "properties": {
+          "leadTimeDays": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "lotSizingPolicy": {
+            "type": "string"
+          },
+          "materialId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "materialName": {
+            "type": "string"
+          },
+          "mrpRunId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "needDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "orderDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "orderQty": {
+            "type": "number"
+          },
+          "orderType": {
+            "type": "string"
+          },
+          "sourceDemandJson": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "PlatformAiScoreRequest": {
         "properties": {
           "batchSize": {
@@ -45467,6 +46935,678 @@
         },
         "type": "object"
       },
+      "RoleAuthorizationChange": {
+        "properties": {
+          "after": {
+            "type": "string"
+          },
+          "before": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "target"
+        ],
+        "type": "object"
+      },
+      "RoleAuthorizationDraftPreview": {
+        "properties": {
+          "applyDefaultToCurrentGrants": {
+            "type": "boolean"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/CapabilitySelectionPreview"
+          },
+          "defaultScopeChanged": {
+            "type": "boolean"
+          },
+          "defaultScopeType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fieldAccessChanges": {
+            "items": {
+              "$ref": "#/components/schemas/RoleFieldAccessReviewed"
+            },
+            "type": "array"
+          },
+          "fieldPolicies": {
+            "$ref": "#/components/schemas/RoleFieldPolicyPreview"
+          },
+          "grantFieldCandidates": {
+            "items": {
+              "$ref": "#/components/schemas/RoleGrantFieldsBinding"
+            },
+            "type": "array"
+          },
+          "grantFieldChanges": {
+            "items": {
+              "$ref": "#/components/schemas/RoleGrantFieldsReviewed"
+            },
+            "type": "array"
+          },
+          "navigation": {
+            "$ref": "#/components/schemas/RoleNavigationSelection"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "scopeChanges": {
+            "items": {
+              "$ref": "#/components/schemas/DataScopeUpdateRequest"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "applyDefaultToCurrentGrants",
+          "capabilities",
+          "defaultScopeChanged",
+          "defaultScopeType",
+          "revision",
+          "scopeChanges"
+        ],
+        "type": "object"
+      },
+      "RoleAuthorizationDraftRequest": {
+        "properties": {
+          "applyDefaultToCurrentGrants": {
+            "type": "boolean"
+          },
+          "defaultScopeChanged": {
+            "type": "boolean"
+          },
+          "defaultScopeType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expectedRevision": {
+            "minLength": 1,
+            "pattern": "[a-f0-9]{64}",
+            "type": "string"
+          },
+          "fieldChanges": {
+            "items": {
+              "$ref": "#/components/schemas/RoleFieldAccessChange"
+            },
+            "maxItems": 1000,
+            "minItems": 0,
+            "type": "array"
+          },
+          "fieldPolicyPids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "grantFieldChanges": {
+            "items": {
+              "$ref": "#/components/schemas/RoleGrantFieldsChange"
+            },
+            "maxItems": 1000,
+            "minItems": 0,
+            "type": "array"
+          },
+          "menuPids": {
+            "items": {
+              "maxLength": 32,
+              "minLength": 0,
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "revokedPartialCapabilityCodes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "scopeChanges": {
+            "items": {
+              "$ref": "#/components/schemas/DataScopeUpdateRequest"
+            },
+            "maxItems": 1000,
+            "minItems": 0,
+            "type": "array"
+          },
+          "selectedCapabilityCodes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "selectedCapabilityCodes"
+        ],
+        "type": "object"
+      },
+      "RoleAuthorizationDraftSnapshot": {
+        "properties": {
+          "defaultScopeType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fieldAccess": {
+            "items": {
+              "$ref": "#/components/schemas/RoleFieldAccessModel"
+            },
+            "type": "array"
+          },
+          "fieldPolicies": {
+            "items": {
+              "$ref": "#/components/schemas/RoleFieldPolicyView"
+            },
+            "type": "array"
+          },
+          "grantFields": {
+            "items": {
+              "$ref": "#/components/schemas/RoleGrantFieldsBinding"
+            },
+            "type": "array"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/CapabilityGroup"
+            },
+            "type": "array"
+          },
+          "matrix": {
+            "$ref": "#/components/schemas/PermissionMatrixDTO"
+          },
+          "navigation": {
+            "$ref": "#/components/schemas/RoleNavigationSelection"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "rolePid": {
+            "type": "string"
+          },
+          "scopes": {
+            "items": {
+              "$ref": "#/components/schemas/DataScopeUpdateRequest"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "defaultScopeType",
+          "groups",
+          "matrix",
+          "revision",
+          "rolePid",
+          "scopes"
+        ],
+        "type": "object"
+      },
+      "RoleBoundaryMigrationBinding": {
+        "properties": {
+          "bindingPid": {
+            "type": "string"
+          },
+          "conditionAst": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonNode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conditions": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonNode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dataScopeAst": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonNode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "effectiveDate": {
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expiryDate": {
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fieldScope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonNode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "grantType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permissionCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permissionPid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "snapshotId": {
+            "description": "Owning publish snapshot pointer; never migration authorization",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "sourceOwnership": {
+            "description": "Configuration owner classification, not effective access or migration eligibility",
+            "enum": [
+              "DIRECT",
+              "DETACHED_COPY",
+              "PUBLISHED_SNAPSHOT",
+              "EXTERNAL_SOURCE"
+            ],
+            "type": "string"
+          },
+          "sourceRef": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "bindingPid",
+          "sourceOwnership"
+        ],
+        "type": "object"
+      },
+      "RoleBoundaryMigrationBoundary": {
+        "properties": {
+          "commandCode": {
+            "type": "string"
+          },
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/RoleBoundaryMigrationOperation"
+            },
+            "type": "array"
+          },
+          "rootModel": {
+            "type": "string"
+          },
+          "targetAction": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "commandCode",
+          "operations",
+          "rootModel",
+          "targetAction"
+        ],
+        "type": "object"
+      },
+      "RoleBoundaryMigrationConsumer": {
+        "description": "Current declared consumer, not effective access or whole-role equivalence",
+        "properties": {
+          "commandCode": {
+            "type": "string"
+          },
+          "commandType": {
+            "type": "string"
+          },
+          "modelCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permissionCodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "publicationStatus": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reviewStatus": {
+            "enum": [
+              "REGISTERED_BOUNDARY_REVIEW_REQUIRED",
+              "LEGACY_OR_UNREGISTERED_REVIEW_REQUIRED",
+              "ENTRY_DEFINITION_REQUIRES_REVIEW"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "commandCode",
+          "commandType",
+          "permissionCodes",
+          "reviewStatus"
+        ],
+        "type": "object"
+      },
+      "RoleBoundaryMigrationOperation": {
+        "properties": {
+          "actionCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bindingPids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "currentScopeType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permissionCode": {
+            "type": "string"
+          },
+          "permissionPid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resourceCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scopeOrigin": {
+            "type": "string"
+          },
+          "scopeStatus": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "bindingPids",
+          "permissionCode",
+          "scopeOrigin",
+          "scopeStatus"
+        ],
+        "type": "object"
+      },
+      "RoleBoundaryMigrationPolicy": {
+        "properties": {
+          "conditionAst": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonNode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "enabled": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "fieldCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "maskExpression": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "maskType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "modelCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "policyPid": {
+            "type": "string"
+          },
+          "policyType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "scopeExpression": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scopeType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "policyPid"
+        ],
+        "type": "object"
+      },
+      "RoleBoundaryMigrationPreview": {
+        "properties": {
+          "bindings": {
+            "items": {
+              "$ref": "#/components/schemas/RoleBoundaryMigrationBinding"
+            },
+            "type": "array"
+          },
+          "boundPolicies": {
+            "items": {
+              "$ref": "#/components/schemas/RoleBoundaryMigrationPolicy"
+            },
+            "type": "array"
+          },
+          "boundaries": {
+            "items": {
+              "$ref": "#/components/schemas/RoleBoundaryMigrationBoundary"
+            },
+            "type": "array"
+          },
+          "commandConsumers": {
+            "items": {
+              "$ref": "#/components/schemas/RoleBoundaryMigrationConsumer"
+            },
+            "type": "array"
+          },
+          "defaultScopeType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "equivalentMigrationProven": {
+            "type": "boolean"
+          },
+          "fieldPolicies": {
+            "items": {
+              "$ref": "#/components/schemas/RoleFieldPolicyView"
+            },
+            "type": "array"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "rolePid": {
+            "type": "string"
+          },
+          "scopes": {
+            "items": {
+              "$ref": "#/components/schemas/RoleBoundaryMigrationScope"
+            },
+            "type": "array"
+          },
+          "unmappedPermissionCodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "unresolvedBindingPids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "bindings",
+          "boundPolicies",
+          "boundaries",
+          "commandConsumers",
+          "equivalentMigrationProven",
+          "fieldPolicies",
+          "revision",
+          "rolePid",
+          "scopes",
+          "unmappedPermissionCodes",
+          "unresolvedBindingPids"
+        ],
+        "type": "object"
+      },
+      "RoleBoundaryMigrationScope": {
+        "properties": {
+          "actionCode": {
+            "type": "string"
+          },
+          "mergeStrategy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resourceCode": {
+            "type": "string"
+          },
+          "scopeConfig": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonNode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scopePid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scopeType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "actionCode",
+          "resourceCode"
+        ],
+        "type": "object"
+      },
       "RoleDTO": {
         "properties": {
           "code": {
@@ -45583,6 +47723,301 @@
         },
         "type": "object"
       },
+      "RoleFieldAccessChange": {
+        "properties": {
+          "access": {
+            "minLength": 1,
+            "pattern": "inherit|read_only|hidden",
+            "type": "string"
+          },
+          "fieldCode": {
+            "maxLength": 255,
+            "minLength": 0,
+            "type": "string"
+          },
+          "modelCode": {
+            "maxLength": 255,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "access",
+          "fieldCode",
+          "modelCode"
+        ],
+        "type": "object"
+      },
+      "RoleFieldAccessField": {
+        "properties": {
+          "access": {
+            "type": "string"
+          },
+          "additionalRestrictions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "code": {
+            "type": "string"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "access",
+          "additionalRestrictions",
+          "code"
+        ],
+        "type": "object"
+      },
+      "RoleFieldAccessModel": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/RoleFieldAccessField"
+            },
+            "type": "array"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "fields"
+        ],
+        "type": "object"
+      },
+      "RoleFieldAccessReviewed": {
+        "properties": {
+          "access": {
+            "type": "string"
+          },
+          "beforeAccess": {
+            "type": "string"
+          },
+          "fieldCode": {
+            "type": "string"
+          },
+          "fieldLabel": {
+            "type": "string"
+          },
+          "modelCode": {
+            "type": "string"
+          },
+          "modelLabel": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "access",
+          "beforeAccess",
+          "fieldCode",
+          "fieldLabel",
+          "modelCode",
+          "modelLabel"
+        ],
+        "type": "object"
+      },
+      "RoleFieldPolicyPreview": {
+        "properties": {
+          "added": {
+            "items": {
+              "$ref": "#/components/schemas/RoleFieldPolicyView"
+            },
+            "type": "array"
+          },
+          "removed": {
+            "items": {
+              "$ref": "#/components/schemas/RoleFieldPolicyView"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "RoleFieldPolicyView": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "fieldCode": {
+            "type": "string"
+          },
+          "maskType": {
+            "type": "string"
+          },
+          "modelCode": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "policyPid": {
+            "type": "string"
+          },
+          "policyType": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RoleGrantFieldsBinding": {
+        "properties": {
+          "bindingPid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "editable": {
+            "type": "boolean"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/RoleGrantFieldsField"
+            },
+            "type": "array"
+          },
+          "legacy": {
+            "type": "boolean"
+          },
+          "metadataRevision": {
+            "type": "string"
+          },
+          "modelCode": {
+            "type": "string"
+          },
+          "modelLabel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permissionCode": {
+            "type": "string"
+          },
+          "readFields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "writeFields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "RoleGrantFieldsChange": {
+        "description": "Set exactly one of bindingPid (existing binding) or permissionCode (newly selected permission). New permissions require the candidate metadata revision.",
+        "properties": {
+          "bindingPid": {
+            "maxLength": 32,
+            "minLength": 0,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expectedMetadataRevision": {
+            "pattern": "[a-f0-9]{64}",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "modelCode": {
+            "description": "Business object; omitted requests retain the permission's canonical resource model.",
+            "pattern": "[A-Za-z_][A-Za-z0-9_]{0,127}",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permissionCode": {
+            "maxLength": 255,
+            "minLength": 0,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "readFields": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "minItems": 0,
+            "type": "array"
+          },
+          "writeFields": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "minItems": 0,
+            "type": "array"
+          }
+        },
+        "required": [
+          "readFields",
+          "writeFields"
+        ],
+        "type": "object"
+      },
+      "RoleGrantFieldsField": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "RoleGrantFieldsReviewed": {
+        "properties": {
+          "before": {
+            "$ref": "#/components/schemas/RoleGrantFieldsBinding"
+          },
+          "readFields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "writeFields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "RoleMemberDTO": {
         "properties": {
           "assignedAt": {
@@ -45669,6 +48104,152 @@
         },
         "type": "object"
       },
+      "RoleNavigationAudit": {
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "addedMenus": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/RoleAuthorizationChange"
+            },
+            "type": "array"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "pid": {
+            "type": "string"
+          },
+          "previousMode": {
+            "type": "string"
+          },
+          "removedMenus": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "actor",
+          "addedMenus",
+          "changes",
+          "createdAt",
+          "pid",
+          "previousMode",
+          "removedMenus"
+        ],
+        "type": "object"
+      },
+      "RoleNavigationChoice": {
+        "properties": {
+          "businessAllowed": {
+            "type": "boolean"
+          },
+          "directory": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "parentPid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permissionCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pid": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "businessAllowed",
+          "directory",
+          "enabled",
+          "name",
+          "pid",
+          "source"
+        ],
+        "type": "object"
+      },
+      "RoleNavigationSelection": {
+        "properties": {
+          "menus": {
+            "items": {
+              "$ref": "#/components/schemas/RoleNavigationChoice"
+            },
+            "type": "array"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "rolePid": {
+            "type": "string"
+          },
+          "selectedMenuPids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "menus",
+          "mode",
+          "revision",
+          "rolePid",
+          "selectedMenuPids"
+        ],
+        "type": "object"
+      },
+      "RoleNavigationWrite": {
+        "properties": {
+          "expectedRevision": {
+            "minLength": 1,
+            "pattern": "[a-f0-9]{64}",
+            "type": "string"
+          },
+          "selectedMenuPids": {
+            "items": {
+              "maxLength": 32,
+              "minLength": 0,
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "selectedMenuPids"
+        ],
+        "type": "object"
+      },
       "RolePermissionPolicyDefinitionDTO": {
         "properties": {
           "conditions": {
@@ -45734,6 +48315,21 @@
           "isSystem": {
             "type": [
               "boolean",
+              "null"
+            ]
+          },
+          "managementRole": {
+            "description": "Presentation group only, not management qualification",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "memberCount": {
+            "description": "Assigned tenant members, not effective access",
+            "format": "int64",
+            "type": [
+              "integer",
               "null"
             ]
           },
@@ -46039,6 +48635,39 @@
               "type": "string"
             },
             "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "RowError": {
+        "properties": {
+          "fieldCode": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "rowNumber": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RowWarning": {
+        "properties": {
+          "fieldCode": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "rowNumber": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -46742,6 +49371,180 @@
               "string",
               "null"
             ]
+          }
+        },
+        "type": "object"
+      },
+      "ScheduleConflict": {
+        "properties": {
+          "achievableBy": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "jobId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "requestedBy": {
+            "format": "local-date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ScheduleJob": {
+        "properties": {
+          "arrivalTime": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "dueDate": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "operationName": {
+            "type": "string"
+          },
+          "priority": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "processingTimeMin": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "productId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "requiredResourceId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "requiredResourceType": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ScheduleRequest": {
+        "properties": {
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleJob"
+            },
+            "type": "array"
+          },
+          "resourceCalendars": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/CalendarEntry"
+              },
+              "type": "array"
+            },
+            "type": "object"
+          },
+          "resources": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceInfo"
+            },
+            "type": "array"
+          },
+          "scheduleStart": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "setupTimes": {
+            "additionalProperties": {
+              "format": "int32",
+              "type": "integer"
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "ScheduleResult": {
+        "properties": {
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleConflict"
+            },
+            "type": "array"
+          },
+          "earliestCompletion": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduledOperation"
+            },
+            "type": "array"
+          },
+          "resourceUtilization": {
+            "additionalProperties": {
+              "format": "double",
+              "type": "number"
+            },
+            "type": "object"
+          },
+          "strategy": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ScheduledOperation": {
+        "properties": {
+          "endTime": {
+            "format": "local-date-time",
+            "type": "string"
+          },
+          "jobCode": {
+            "type": "string"
+          },
+          "jobId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "operationName": {
+            "type": "string"
+          },
+          "processingTimeMin": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "resourceId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "resourceName": {
+            "type": "string"
+          },
+          "setupTimeMin": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "startTime": {
+            "format": "local-date-time",
+            "type": "string"
           }
         },
         "type": "object"
@@ -47624,6 +50427,29 @@
           },
           "pid": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SixBigLosses": {
+        "properties": {
+          "breakdownHours": {
+            "type": "number"
+          },
+          "minorStopHours": {
+            "type": "number"
+          },
+          "processDefectUnits": {
+            "type": "number"
+          },
+          "setupHours": {
+            "type": "number"
+          },
+          "speedLossUnits": {
+            "type": "number"
+          },
+          "startupDefectUnits": {
+            "type": "number"
           }
         },
         "type": "object"
@@ -51179,6 +54005,43 @@
           },
           "severity": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ValidationReport": {
+        "properties": {
+          "errorReportFailed": {
+            "type": "boolean"
+          },
+          "errorReportUrl": {
+            "type": "string"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/RowError"
+            },
+            "type": "array"
+          },
+          "taskId": {
+            "type": "string"
+          },
+          "totalRows": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "valid": {
+            "type": "boolean"
+          },
+          "validRows": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/RowWarning"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -62620,6 +65483,136 @@
         ]
       }
     },
+    "/api/aps/gantt/{strategy}": {
+      "post": {
+        "operationId": "gantt",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "strategy",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseGanttData"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "aps-controller"
+        ]
+      }
+    },
+    "/api/aps/schedule": {
+      "post": {
+        "operationId": "schedule",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseScheduleResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "aps-controller"
+        ]
+      }
+    },
+    "/api/aps/schedule/{strategy}": {
+      "post": {
+        "operationId": "scheduleWithStrategy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "strategy",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseScheduleResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "aps-controller"
+        ]
+      }
+    },
+    "/api/aps/strategies": {
+      "get": {
+        "operationId": "strategies",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListString"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "aps-controller"
+        ]
+      }
+    },
     "/api/async-tasks": {
       "get": {
         "operationId": "listTasks",
@@ -67108,6 +70101,281 @@
         "summary": "Get a usage event by event code",
         "tags": [
           "Billing Metering"
+        ]
+      }
+    },
+    "/api/bitemporal/{entityType}/{entityId}": {
+      "post": {
+        "operationId": "put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entityType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entityId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BiTemporalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBiTemporalRecord"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "bi-temporal-controller"
+        ]
+      }
+    },
+    "/api/bitemporal/{entityType}/{entityId}/asOf": {
+      "get": {
+        "operationId": "getAsOf",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entityType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entityId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "validTime",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "txTime",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBiTemporalRecord"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "bi-temporal-controller"
+        ]
+      }
+    },
+    "/api/bitemporal/{entityType}/{entityId}/correct": {
+      "put": {
+        "operationId": "correct",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entityType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entityId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BiTemporalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBiTemporalRecord"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "bi-temporal-controller"
+        ]
+      }
+    },
+    "/api/bitemporal/{entityType}/{entityId}/current": {
+      "get": {
+        "operationId": "getCurrent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entityType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entityId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseBiTemporalRecord"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "bi-temporal-controller"
+        ]
+      }
+    },
+    "/api/bitemporal/{entityType}/{entityId}/history": {
+      "get": {
+        "operationId": "getHistory_4",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entityType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entityId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListBiTemporalRecord"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "bi-temporal-controller"
+        ]
+      }
+    },
+    "/api/bitemporal/{entityType}/{entityId}/terminate": {
+      "delete": {
+        "operationId": "terminate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entityType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entityId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "validTime",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "bi-temporal-controller"
         ]
       }
     },
@@ -75782,6 +79050,41 @@
         ]
       }
     },
+    "/api/exchange/jobs": {
+      "get": {
+        "operationId": "recent",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "format": "int32",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListExecutionJobDTO"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "List recent data exchange and document jobs",
+        "tags": [
+          "Exchange Jobs"
+        ]
+      }
+    },
     "/api/exports/domain/{taskPid}": {
       "get": {
         "operationId": "status_1",
@@ -79917,6 +83220,128 @@
         },
         "tags": [
           "aps-scheduling-controller"
+        ]
+      }
+    },
+    "/api/manufacturing/oee/equipment/{equipmentId}": {
+      "get": {
+        "operationId": "equipmentOee",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "equipmentId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseOeeResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "oee-controller"
+        ]
+      }
+    },
+    "/api/manufacturing/oee/fleet": {
+      "get": {
+        "operationId": "fleetOee",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "oee-controller"
+        ]
+      }
+    },
+    "/api/manufacturing/oee/fleet/summary": {
+      "get": {
+        "operationId": "fleetSummary",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "oee-controller"
         ]
       }
     },
@@ -86549,6 +89974,444 @@
         ]
       }
     },
+    "/api/meta/excel/document-import/{modelCode}": {
+      "post": {
+        "operationId": "importDocument",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "modelCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dryRun",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "skipErrors",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseExcelImportResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "excel-import-controller"
+        ]
+      }
+    },
+    "/api/meta/excel/document-template/{modelCode}": {
+      "get": {
+        "operationId": "downloadDocumentTemplate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "modelCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "excel-import-controller"
+        ]
+      }
+    },
+    "/api/meta/excel/import/{modelCode}": {
+      "post": {
+        "operationId": "importExcel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "modelCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "skipErrors",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dryRun",
+            "required": false,
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "default": "insert",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "matchKey",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseExcelImportResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "excel-import-controller"
+        ]
+      }
+    },
+    "/api/meta/excel/import/{modelCode}/cancel/{taskId}": {
+      "post": {
+        "operationId": "cancelImport",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "modelCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "taskId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAsyncImportStatus"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "excel-import-controller"
+        ]
+      }
+    },
+    "/api/meta/excel/import/{modelCode}/error-report/{taskId}": {
+      "get": {
+        "operationId": "downloadErrorReport",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "modelCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "taskId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "excel-import-controller"
+        ]
+      }
+    },
+    "/api/meta/excel/import/{modelCode}/status/{taskId}": {
+      "get": {
+        "operationId": "getImportStatus",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "modelCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "taskId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseAsyncImportStatus"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "excel-import-controller"
+        ]
+      }
+    },
+    "/api/meta/excel/import/{modelCode}/{taskId}/progress": {
+      "get": {
+        "operationId": "streamProgress_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "modelCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "taskId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/SseEmitter"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "excel-import-controller"
+        ]
+      }
+    },
+    "/api/meta/excel/template/{modelCode}": {
+      "get": {
+        "operationId": "downloadTemplate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "modelCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "default": "insert",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "excel-import-controller"
+        ]
+      }
+    },
+    "/api/meta/excel/validate/{modelCode}": {
+      "post": {
+        "operationId": "validateFile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "modelCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "default": "insert",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "matchKey",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseValidationReport"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "excel-import-controller"
+        ]
+      }
+    },
     "/api/meta/field-library": {
       "get": {
         "operationId": "listFieldsBySemanticType",
@@ -91708,6 +95571,448 @@
         "summary": "Validate ViewModel config",
         "tags": [
           "ViewModel Management"
+        ]
+      }
+    },
+    "/api/mrp/run": {
+      "post": {
+        "operationId": "runMrp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MrpRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMrpResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "mrp-controller"
+        ]
+      }
+    },
+    "/api/navigation/configuration": {
+      "get": {
+        "operationId": "readNavigationConfiguration",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseNavigationSnapshot"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Navigation configuration"
+        ]
+      }
+    },
+    "/api/navigation/entries": {
+      "post": {
+        "operationId": "createNavigationEntry",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NavigationWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseNavigationSnapshot"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Navigation configuration"
+        ]
+      }
+    },
+    "/api/navigation/entries/{pid}": {
+      "delete": {
+        "operationId": "removeNavigationEntry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NavigationRevision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseNavigationSnapshot"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Navigation configuration"
+        ]
+      },
+      "get": {
+        "operationId": "readCurrentNavigationTarget",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseNavigationTarget"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Navigation configuration"
+        ]
+      },
+      "put": {
+        "operationId": "updateNavigationEntry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NavigationWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseNavigationSnapshot"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Navigation configuration"
+        ]
+      }
+    },
+    "/api/navigation/entries/{pid}/restore": {
+      "post": {
+        "operationId": "restoreNavigationEntry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NavigationRevision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseNavigationSnapshot"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Navigation configuration"
+        ]
+      }
+    },
+    "/api/navigation/entries/{pid}/roles": {
+      "get": {
+        "operationId": "readNavigationEntryRoles",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseNavigationEntryRoles"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "role-navigation-controller"
+        ]
+      },
+      "put": {
+        "operationId": "saveNavigationEntryRoles",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NavigationEntryRolesWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseNavigationEntryRoles"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "role-navigation-controller"
+        ]
+      }
+    },
+    "/api/navigation/preview": {
+      "post": {
+        "operationId": "previewUserNavigation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NavigationPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseNavigationUserPreview"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "role-navigation-controller"
+        ]
+      }
+    },
+    "/api/navigation/preview/options": {
+      "get": {
+        "operationId": "readNavigationPreviewOptions",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseNavigationPreviewOptions"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "role-navigation-controller"
+        ]
+      }
+    },
+    "/api/navigation/roles/{rolePid}": {
+      "get": {
+        "operationId": "readRoleNavigationSelection",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rolePid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRoleNavigationSelection"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "role-navigation-controller"
+        ]
+      },
+      "put": {
+        "operationId": "saveRoleNavigationSelection",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rolePid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleNavigationWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRoleNavigationSelection"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "role-navigation-controller"
+        ]
+      }
+    },
+    "/api/navigation/roles/{rolePid}/audit": {
+      "get": {
+        "operationId": "readRoleNavigationAudit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rolePid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListRoleNavigationAudit"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "role-navigation-controller"
         ]
       }
     },
@@ -97033,6 +101338,148 @@
         },
         "tags": [
           "capability-controller"
+        ]
+      }
+    },
+    "/api/permission/roles/{rolePid}/draft": {
+      "get": {
+        "operationId": "readRoleAuthorizationDraft",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rolePid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRoleAuthorizationDraftSnapshot"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Read a consistent role authorization draft baseline",
+        "tags": [
+          "Role Authorization Draft"
+        ]
+      },
+      "put": {
+        "operationId": "applyRoleAuthorizationDraft",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rolePid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleAuthorizationDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRoleAuthorizationDraftSnapshot"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Atomically commit role duties and record scopes with conflict detection",
+        "tags": [
+          "Role Authorization Draft"
+        ]
+      }
+    },
+    "/api/permission/roles/{rolePid}/draft/migration": {
+      "get": {
+        "operationId": "inspectRoleBoundaryMigration",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rolePid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRoleBoundaryMigrationPreview"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Inspect role bindings and explicit scope decisions before migration",
+        "tags": [
+          "Role Authorization Draft"
+        ]
+      }
+    },
+    "/api/permission/roles/{rolePid}/draft/preview": {
+      "post": {
+        "operationId": "previewRoleAuthorizationDraft",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rolePid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleAuthorizationDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRoleAuthorizationDraftPreview"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Preview role duties and record scopes against an exact revision",
+        "tags": [
+          "Role Authorization Draft"
         ]
       }
     },
@@ -111510,6 +115957,10 @@
       "name": "自动填充"
     },
     {
+      "description": "Owner-scoped import, export, and document jobs",
+      "name": "Exchange Jobs"
+    },
+    {
       "description": "Category tree management",
       "name": "Categories"
     },
@@ -111720,6 +116171,10 @@
     {
       "description": "Add/remove a single field on a published model — Spec §4",
       "name": "Meta Field Orchestrator"
+    },
+    {
+      "description": "Atomic role authorization authoring",
+      "name": "Role Authorization Draft"
     },
     {
       "description": "User menu tree and menu management APIs",

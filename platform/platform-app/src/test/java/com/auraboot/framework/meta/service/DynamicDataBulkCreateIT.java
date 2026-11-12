@@ -12,6 +12,7 @@ import com.auraboot.framework.meta.mapper.MetaFieldMapper;
 import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
 import com.auraboot.framework.meta.dto.SchemaOperationResult;
+import com.auraboot.framework.permission.service.AutoPermissionAssignmentService;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +50,7 @@ class DynamicDataBulkCreateIT extends BaseIntegrationTest {
     @Autowired private MetaModelFieldBindingMapper fieldBindingMapper;
     @Autowired private SchemaManagementService schemaManagementService;
     @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private AutoPermissionAssignmentService permissionAssignmentService;
 
     private String modelCode;
     private String nameField;
@@ -76,7 +78,16 @@ class DynamicDataBulkCreateIT extends BaseIntegrationTest {
             bindField(cellsField, "jsonb", 2);
             bindField(qtyField, "integer", 3);
             createPhysicalTable();
+            // Raw metadata inserts above bypass normal model publication and its action catalog.
+            // Register definitions only; the fixture's existing role grants remain unchanged.
+            permissionAssignmentService.registerPermissions(modelCode, null, getTestTenant().getId());
             modelReady = true;
+        }
+        // The base fixture is an ordinary role, not an administrator. These committed grants
+        // are removed by BaseIntegrationTest after each case and never touch business roles.
+        for (String action : List.of("create", "read", "delete")) {
+            grantCommittedPermissionToTestRole("model." + modelCode + "." + action,
+                    "model", modelCode, action, "Bulk fixture " + action);
         }
     }
 
@@ -161,6 +172,35 @@ class DynamicDataBulkCreateIT extends BaseIntegrationTest {
                 "SELECT " + nameField + ", " + qtyField + " FROM mt_" + modelCode + " WHERE pid = ?", pid);
         assertThat(Objects.toString(row2.get(nameField))).isEqualTo("solo");
         assertThat(Objects.toString(row2.get(qtyField))).isEqualTo("7");
+    }
+
+    @Test
+    @Order(3)
+    void creationWithoutResultPersistsWithoutReadGrantAndRollsBackForbiddenFields() throws Exception {
+        Long tenant = getTestTenant().getId();
+        Long role = getTestRole().getId();
+        assertThat(jdbcTemplate.update("""
+                DELETE FROM ab_role_permission WHERE tenant_id=? AND role_id=?
+                AND permission_id IN (SELECT id FROM ab_permission WHERE code=?)
+                """, tenant, role, "model." + modelCode + ".read")).isEqualTo(1);
+        dynamicDataService.createWithoutResult(modelCode,
+                new HashMap<>(Map.of(nameField, "no-result", qtyField, 11, cellsField, List.of("kept"))));
+        var stored = jdbcTemplate.queryForMap("SELECT pid," + qtyField + "," + cellsField
+                + "::text AS cells FROM mt_" + modelCode + " WHERE " + nameField + "=?", "no-result");
+        createdPids.add(stored.get("pid").toString());
+        assertThat(stored.get(qtyField).toString()).isEqualTo("11");
+        assertThat(stored.get("cells").toString()).contains("kept");
+        String fieldScope = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(
+                Map.of("modelCode", modelCode, "readFields", List.of(), "writeFields", List.of(qtyField)));
+        assertThat(jdbcTemplate.update("""
+                UPDATE ab_role_permission SET field_scope=?::jsonb WHERE tenant_id=? AND role_id=?
+                AND permission_id IN (SELECT id FROM ab_permission WHERE code=?)
+                """, fieldScope, tenant, role, "model." + modelCode + ".create")).isEqualTo(1);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> dynamicDataService.createWithoutResult(
+                modelCode, new HashMap<>(Map.of(nameField, "forbidden-no-result", qtyField, 12))))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM mt_" + modelCode
+                + " WHERE " + nameField + "=?", Integer.class, "forbidden-no-result")).isZero();
     }
 
     // ── Helpers (mirror DynamicDataJsonbUpdateIT) ──────────────────────────────

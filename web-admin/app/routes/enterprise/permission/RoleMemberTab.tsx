@@ -7,11 +7,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import {
-  UserPlusIcon,
-  TrashIcon,
-  UsersIcon,
-} from '@heroicons/react/24/outline';
+import { UserPlusIcon, TrashIcon, UsersIcon } from '@heroicons/react/24/outline';
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import { LoadingSpinner } from '~/ui/LoadingSpinner';
@@ -27,13 +23,18 @@ import type { RoleMemberDTO } from './types';
 interface RoleMemberTabProps {
   rolePid: string | null;
   readOnly?: boolean;
+  onMembershipChange?: () => void;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export default function RoleMemberTab({ rolePid, readOnly = false }: RoleMemberTabProps) {
+export default function RoleMemberTab({
+  rolePid,
+  readOnly = false,
+  onMembershipChange,
+}: RoleMemberTabProps) {
   const { t } = useI18n();
   const { showSuccessToast, showErrorToast } = useToastContext();
 
@@ -100,13 +101,16 @@ export default function RoleMemberTab({ rolePid, readOnly = false }: RoleMemberT
     try {
       await permissionService.removeRoleMembers(rolePid, [confirmRemove.member.memberPid]);
       showSuccessToast(
-        (t('admin.permission.members.removeSuccess', undefined, 'Member removed: {name}')).replace(
+        t('admin.permission.members.removeSuccess', undefined, 'Member removed: {name}').replace(
           '{name}',
-          confirmRemove.member.userName || confirmRemove.member.email || t('admin.permission.members.unnamed', undefined, 'Member'),
+          confirmRemove.member.userName ||
+            confirmRemove.member.email ||
+            t('admin.permission.members.unnamed', undefined, 'Member'),
         ),
       );
       setConfirmRemove({ open: false, member: null });
       fetchMembers();
+      onMembershipChange?.();
     } catch (err: any) {
       showErrorToast(err?.message || t('common.error', undefined, 'Failed'));
     } finally {
@@ -147,11 +151,18 @@ export default function RoleMemberTab({ rolePid, readOnly = false }: RoleMemberT
 
   return (
     <div data-testid="role-member-tab">
+      <p className="bg-subtle text-text-2 rounded-control mb-4 px-3 py-3 text-xs">
+        {t(
+          'rbacExperience.membersHelp',
+          undefined,
+          'Menus merge across effective roles. Business grants, record scopes and fields are evaluated separately. Membership dates do not by themselves grant business access.',
+        )}
+      </p>
       {/* Toolbar */}
       <div className="mb-4 flex items-center justify-between">
         <span className="text-sm text-gray-500 dark:text-gray-400">
           {total > 0
-            ? (t('admin.permission.members.totalCount', undefined, '{count} member(s)')).replace(
+            ? t('admin.permission.members.totalCount', undefined, '{count} member(s)').replace(
                 '{count}',
                 String(total),
               )
@@ -174,9 +185,19 @@ export default function RoleMemberTab({ rolePid, readOnly = false }: RoleMemberT
           <LoadingSpinner />
         </div>
       ) : loadError ? (
-        <div role="alert" data-testid="role-member-load-error" className="rounded-lg border border-red-200 p-6 text-sm text-red-700 dark:border-red-800 dark:text-red-300">
-          {t('admin.permission.members.loadFailed', undefined, 'Members could not be loaded. Please retry.')}
-          <button className="ml-3 underline" onClick={fetchMembers}>{t('common.retry', undefined, 'Retry')}</button>
+        <div
+          role="alert"
+          data-testid="role-member-load-error"
+          className="rounded-lg border border-red-200 p-6 text-sm text-red-700 dark:border-red-800 dark:text-red-300"
+        >
+          {t(
+            'admin.permission.members.loadFailed',
+            undefined,
+            'Members could not be loaded. Please retry.',
+          )}
+          <button className="ml-3 underline" onClick={fetchMembers}>
+            {t('common.retry', undefined, 'Retry')}
+          </button>
         </div>
       ) : members.length === 0 ? (
         <div
@@ -200,7 +221,7 @@ export default function RoleMemberTab({ rolePid, readOnly = false }: RoleMemberT
       ) : (
         <>
           <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-            <table className="w-full table-fixed divide-y divide-gray-200 dark:divide-gray-700">
+            <table className="w-full min-w-[620px] table-fixed divide-y divide-gray-200 dark:divide-gray-700">
               <colgroup>
                 <col className="w-[28%]" />
                 <col className="w-[12%]" />
@@ -211,19 +232,19 @@ export default function RoleMemberTab({ rolePid, readOnly = false }: RoleMemberT
               </colgroup>
               <thead className="bg-gray-50 dark:bg-gray-800">
                 <tr>
-                  <th className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="px-4 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap text-gray-500 uppercase">
                     {t('admin.permission.members.colName', undefined, 'Name')}
                   </th>
-                  <th className="whitespace-nowrap px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="px-2 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap text-gray-500 uppercase">
                     {t('admin.permission.members.colDepartment', undefined, 'Department')}
                   </th>
-                  <th className="whitespace-nowrap px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="px-2 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap text-gray-500 uppercase">
                     {t('admin.permission.members.colPosition', undefined, 'Position')}
                   </th>
-                  <th className="whitespace-nowrap px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="px-2 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap text-gray-500 uppercase">
                     {t('admin.permission.members.colAssignedAt', undefined, 'Assigned')}
                   </th>
-                  <th className="whitespace-nowrap px-2 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="px-2 py-3 text-left text-xs font-medium tracking-wider whitespace-nowrap text-gray-500 uppercase">
                     {t('admin.permission.members.colValidity', undefined, 'Validity')}
                   </th>
                   <th className="px-2 py-3 text-right text-xs font-medium text-gray-500">
@@ -238,37 +259,52 @@ export default function RoleMemberTab({ rolePid, readOnly = false }: RoleMemberT
                     data-testid={`role-member-row-${member.memberPid}`}
                     className="hover:bg-gray-50 dark:hover:bg-gray-800"
                   >
-                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+                    <td className="px-4 py-3 text-sm font-medium whitespace-nowrap text-gray-900 dark:text-gray-100">
                       <div>
-                        <div>{member.userName || member.email || t('admin.permission.members.unnamed', undefined, 'Member')}</div>
+                        <div>
+                          {member.userName ||
+                            member.email ||
+                            t('admin.permission.members.unnamed', undefined, 'Member')}
+                        </div>
                         <div className="text-xs text-gray-400">{member.email}</div>
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-2 py-3 text-sm text-gray-500 dark:text-gray-400">
+                    <td className="px-2 py-3 text-sm whitespace-nowrap text-gray-500 dark:text-gray-400">
                       {member.departmentName || '-'}
                     </td>
-                    <td className="whitespace-nowrap px-2 py-3 text-sm text-gray-500 dark:text-gray-400">
+                    <td className="px-2 py-3 text-sm whitespace-nowrap text-gray-500 dark:text-gray-400">
                       {member.positionName || '-'}
                     </td>
-                    <td className="whitespace-nowrap px-2 py-3 text-sm text-gray-500 dark:text-gray-400">
-                      {member.assignedAt
-                        ? new Date(member.assignedAt).toLocaleDateString()
-                        : '-'}
+                    <td className="px-2 py-3 text-sm whitespace-nowrap text-gray-500 dark:text-gray-400">
+                      {member.assignedAt ? new Date(member.assignedAt).toLocaleDateString() : '-'}
                     </td>
-                    <td className="whitespace-nowrap px-2 py-3 text-sm text-gray-500 dark:text-gray-400">
+                    <td className="px-2 py-3 text-sm whitespace-nowrap text-gray-500 dark:text-gray-400">
+                      <span className="bg-subtle text-text-2 mb-1 block w-fit rounded px-1.5 py-0.5 text-xs">
+                        {(() => {
+                          const now = new Date();
+                          const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                          return member.expiryDate && member.expiryDate < today
+                            ? t('rbacExperience.assignmentExpired', undefined, 'Assignment expired')
+                            : member.effectiveDate && member.effectiveDate > today
+                              ? t('rbacExperience.assignmentScheduled', undefined, 'Not started')
+                              : t(
+                                  'rbacExperience.assignmentWithinWindow',
+                                  undefined,
+                                  'Within assignment period',
+                                );
+                        })()}
+                      </span>
                       {member.effectiveDate || member.expiryDate
-                        ? `${member.effectiveDate || '立即'} - ${member.expiryDate || '长期'}`
+                        ? `${member.effectiveDate || t('rbacExperience.immediate', undefined, 'Immediately')} - ${member.expiryDate || t('rbacExperience.indefinite', undefined, 'No expiry')}`
                         : t('admin.permission.members.permanent', undefined, 'Permanent')}
                     </td>
-                    <td className="whitespace-nowrap px-2 py-3 text-right">
+                    <td className="px-2 py-3 text-right whitespace-nowrap">
                       <button
                         data-testid={`role-member-remove-${member.memberPid}`}
                         disabled={readOnly}
                         aria-label={`${t('common.remove', undefined, 'Remove')} ${member.userName || member.email || t('admin.permission.members.unnamed', undefined, 'Member')}`}
                         title={t('common.remove', undefined, 'Remove')}
-                        onClick={() =>
-                          setConfirmRemove({ open: true, member })
-                        }
+                        onClick={() => setConfirmRemove({ open: true, member })}
                         className="inline-flex h-8 w-8 items-center justify-center rounded text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-gray-400 disabled:hover:bg-transparent dark:text-red-400 dark:hover:bg-red-900/20 dark:disabled:text-gray-500 dark:disabled:hover:bg-transparent"
                       >
                         <TrashIcon className="h-4 w-4" />
@@ -284,7 +320,7 @@ export default function RoleMemberTab({ rolePid, readOnly = false }: RoleMemberT
           {totalPages > 1 && (
             <div className="mt-4 flex items-center justify-between">
               <span className="text-xs text-gray-500">
-                {(t('common.pagination.showing', undefined, 'Page {page} of {total}'))
+                {t('common.pagination.showing', undefined, 'Page {page} of {total}')
                   .replace('{page}', String(pageNum))
                   .replace('{total}', String(totalPages))}
               </span>
@@ -318,6 +354,7 @@ export default function RoleMemberTab({ rolePid, readOnly = false }: RoleMemberT
         onSuccess={() => {
           setShowAddDialog(false);
           fetchMembers();
+          onMembershipChange?.();
         }}
       />
 
@@ -325,11 +362,16 @@ export default function RoleMemberTab({ rolePid, readOnly = false }: RoleMemberT
       <ConfirmDialog
         open={confirmRemove.open && !readOnly}
         title={t('admin.permission.members.removeTitle', undefined, 'Remove Member')}
-        content={
-          (
-            t('admin.permission.members.removeContent', undefined, 'Are you sure you want to remove "{name}" from this role?')
-          ).replace('{name}', confirmRemove.member?.userName || confirmRemove.member?.email || t('admin.permission.members.unnamed', undefined, 'Member'))
-        }
+        content={t(
+          'rbacExperience.removeMemberConfirmation',
+          {
+            name:
+              confirmRemove.member?.userName ||
+              confirmRemove.member?.email ||
+              t('admin.permission.members.unnamed', undefined, 'Member'),
+          },
+          `Remove "${confirmRemove.member?.userName || confirmRemove.member?.email || t('admin.permission.members.unnamed', undefined, 'Member')}" from this role?`,
+        )}
         variant="danger"
         onConfirm={handleRemove}
         onCancel={() => setConfirmRemove({ open: false, member: null })}

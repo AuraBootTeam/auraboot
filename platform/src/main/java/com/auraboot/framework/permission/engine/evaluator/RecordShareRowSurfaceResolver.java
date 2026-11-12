@@ -2,7 +2,6 @@ package com.auraboot.framework.permission.engine.evaluator;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.FieldDefinition;
-import com.auraboot.framework.meta.dto.MetaModelDTO;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.permission.engine.model.SharedRootReference;
 import com.auraboot.framework.permission.service.RecordShareService;
@@ -69,11 +68,11 @@ public class RecordShareRowSurfaceResolver {
      */
     private Declaration readDeclaration(String resource) {
         try {
-            MetaModelDTO model = metaModelService.findByCode(resource);
-            if (model == null || model.getExtension() == null) {
+            var extension = metaModelService.findExtensionByCode(resource);
+            if (extension == null) {
                 return null;
             }
-            Object declared = model.getExtension().get("recordShare");
+            Object declared = extension.get("recordShare");
             if (!(declared instanceof Map<?, ?> spec)) {
                 return null;
             }

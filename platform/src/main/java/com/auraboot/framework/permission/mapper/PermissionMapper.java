@@ -36,7 +36,29 @@ public interface PermissionMapper extends BaseMapper<Permission> {
           AND (deleted_flag = false OR deleted_flag IS NULL)
         ORDER BY created_at DESC
         """)
+    @ResultMap("mybatis-plus_Permission")
     List<Permission> findResolvableDefinitions(@Param("tenantId") Long tenantId);
+
+    /** Fresh domain ownership lookup without materializing unrelated model definitions. */
+    @Select("""
+        SELECT * FROM (
+            SELECT DISTINCT ON (LOWER(p.code)) p.*
+            FROM ab_permission p
+            WHERE p.tenant_id = #{tenantId}
+              AND (p.deleted_flag = false OR p.deleted_flag IS NULL)
+              AND LOWER(p.code) IN (
+                  SELECT LOWER(d.code) FROM ab_permission d
+                  WHERE d.tenant_id = #{tenantId}
+                    AND (d.deleted_flag = false OR d.deleted_flag IS NULL)
+                    AND jsonb_exists(d.extension, 'domainModels')
+              )
+            ORDER BY LOWER(p.code), p.created_at DESC
+        ) current_definitions
+        WHERE jsonb_exists(extension, 'domainModels')
+        ORDER BY created_at DESC
+        """)
+    @ResultMap("mybatis-plus_Permission")
+    List<Permission> findResolvableDomainDefinitions(@Param("tenantId") Long tenantId);
 
     /**
      * Find permission by code
@@ -51,6 +73,7 @@ public interface PermissionMapper extends BaseMapper<Permission> {
         ORDER BY created_at DESC
         LIMIT 1
         """)
+    @ResultMap("mybatis-plus_Permission")
     Permission findByCode(@Param("code") String code);
 
     /**
@@ -69,6 +92,7 @@ public interface PermissionMapper extends BaseMapper<Permission> {
         ORDER BY created_at DESC
         LIMIT 1
         """)
+    @ResultMap("mybatis-plus_Permission")
     Permission findByTenantIdAndCode(@Param("tenantId") Long tenantId,
                                      @Param("code") String code);
 
@@ -117,6 +141,7 @@ public interface PermissionMapper extends BaseMapper<Permission> {
           AND deleted_flag = false
         ORDER BY created_at DESC
         """)
+    @ResultMap("mybatis-plus_Permission")
     List<Permission> findByStatus(@Param("status") String status);
 
     /**
@@ -165,6 +190,7 @@ public interface PermissionMapper extends BaseMapper<Permission> {
         ORDER BY created_at DESC
         </script>
         """)
+    @ResultMap("mybatis-plus_Permission")
     List<Permission> findByIds(@Param("ids") List<Long> ids);
 
     /**
@@ -301,6 +327,7 @@ public interface PermissionMapper extends BaseMapper<Permission> {
         ORDER BY created_at DESC
         </script>
         """)
+    @ResultMap("mybatis-plus_Permission")
     List<Permission> findByPids(
         @Param("pids") List<String> pids
     );

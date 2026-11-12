@@ -30,6 +30,12 @@ import java.util.Set;
  */
 public interface CommandHandlerExtension extends ExtensionPoint {
 
+    /** Server-owned transaction requirement; metadata and callers cannot relax it. */
+    default BusinessResourceAuthorization.ReadIsolation commandReadIsolation() { return null; }
+
+
+
+
     /** Well-known key for DataAccessor in the settings map. */
     String DATA_ACCESSOR_KEY = "__dataAccessor";
 

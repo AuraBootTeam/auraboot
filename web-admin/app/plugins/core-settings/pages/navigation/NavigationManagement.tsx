@@ -1,0 +1,902 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/ui/ui/dialog';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useBlocker } from 'react-router';
+import NavigationRoleAssignment from './NavigationRoleAssignment';
+import { usePermissions } from '~/contexts/AuthContext';
+import { useI18n } from '~/contexts/I18nContext';
+import { useToastContext } from '~/contexts/ToastContext';
+import { RouteAccessDenied } from '~/ui/PermissionGuard';
+import ConfirmDialog from '~/ui/ConfirmDialog';
+import { resolveIcon } from '~/utils/icon-resolver';
+import {
+  navigationService,
+  NavigationConflict,
+  type NavigationDefinition,
+  type NavigationSnapshot,
+} from './navigationService';
+
+type Entry = NavigationSnapshot['entries'][number];
+const fresh = (parentPid: string | null): NavigationDefinition => ({
+  name: '',
+  parentPid,
+  icon: 'Link',
+  kind: 'page',
+  target: '',
+  opening: 'same',
+  permissionCode: null,
+  authenticated: true,
+  visible: true,
+  enabled: true,
+  orderNo: 50,
+});
+const input = 'border-border bg-bg text-text-1 w-full rounded-lg border px-3 py-2 text-sm';
+export default function NavigationManagement() {
+  const { hasPermission } = usePermissions();
+  const { t } = useI18n();
+  if (!hasPermission('meta.menu.update'))
+    return (
+      <RouteAccessDenied
+        title={t('navigation.denied.title', undefined, 'Menu management unavailable')}
+        message={t(
+          'navigation.denied.message',
+          undefined,
+          'Ask an administrator for menu management access.',
+        )}
+      />
+    );
+  return <Editor />;
+}
+function Editor() {
+  const { t } = useI18n();
+  const { showSuccessToast, showErrorToast } = useToastContext();
+  const [snapshot, setSnapshot] = useState<NavigationSnapshot | null>(null),
+    [selected, setSelected] = useState<string | null>(null),
+    [draft, setDraft] = useState<NavigationDefinition | null>(null);
+  const [loading, setLoading] = useState(true),
+    [failed, setFailed] = useState(false),
+    [saving, setSaving] = useState(false),
+    [conflict, setConflict] = useState(false),
+    [query, setQuery] = useState(''),
+    [confirm, setConfirm] = useState<'delete' | 'restore' | 'discard' | null>(null),
+    [preview, setPreview] = useState(false),
+    [createOpen, setCreateOpen] = useState(false),
+    [pending, setPending] = useState<Entry | 'add' | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const entry = snapshot?.entries.find((item) => item.pid === selected);
+  const dirty =
+    !!draft &&
+    JSON.stringify(draft) !== JSON.stringify(entry?.definition ?? fresh(draft.parentPid ?? null));
+  const blocker = useBlocker(dirty);
+  const labels: Record<string, string> = {
+    directory: t('navigation.kind.directory', undefined, 'Directory'),
+    page: t('navigation.kind.page', undefined, 'System page'),
+    internal: t('navigation.kind.internal', undefined, 'Internal link'),
+    external: t('navigation.kind.external', undefined, 'External link'),
+    embedded: t('navigation.kind.embedded', undefined, 'Embedded page'),
+  };
+  const loadGeneration = useRef(0);
+  async function load() {
+    const generation = ++loadGeneration.current;
+    setLoading(true);
+    setFailed(false);
+    try {
+      const value = await navigationService.read();
+      if (generation !== loadGeneration.current) return;
+      setSnapshot(value);
+      const first = value.entries.find(
+        (item) => item.available && item.definition.kind !== 'directory',
+      );
+      setDraft(first ? { ...first.definition } : null);
+      setSelected(first?.pid ?? null);
+      const expanded = new Set<string>();
+      let parent = first?.definition.parentPid;
+      while (parent && !expanded.has(parent)) {
+        expanded.add(parent);
+        parent = value.entries.find((item) => item.pid === parent)?.definition.parentPid;
+      }
+      setCollapsed(
+        new Set(
+          value.entries
+            .filter((item) => item.definition.kind === 'directory' && !expanded.has(item.pid))
+            .map((item) => item.pid),
+        ),
+      );
+      setConflict(false);
+    } catch {
+      if (generation === loadGeneration.current) setFailed(true);
+    } finally {
+      if (generation === loadGeneration.current) setLoading(false);
+    }
+  }
+  useEffect(() => {
+    void load();
+    return () => {
+      loadGeneration.current++;
+    };
+  }, []);
+  function choose(item: Entry) {
+    if (dirty) {
+      setPending(item);
+      setConfirm('discard');
+      return;
+    }
+    setSelected(item.pid);
+    setDraft({ ...item.definition });
+    setConflict(false);
+  }
+  function add() {
+    if (dirty) {
+      setPending('add');
+      setConfirm('discard');
+      return;
+    }
+    setCreateOpen(true);
+    setSelected(null);
+    setDraft(fresh(entry?.definition.kind === 'directory' ? entry.pid : null));
+    setConflict(false);
+  }
+  function change<K extends keyof NavigationDefinition>(key: K, value: NavigationDefinition[K]) {
+    setDraft((previous) => (previous ? { ...previous, [key]: value } : previous));
+  }
+  const directories = useMemo(
+    () =>
+      snapshot?.entries.filter((item) => {
+        if (!item.available || item.definition.kind !== 'directory') return false;
+        const seen = new Set<string>();
+        let current: Entry | undefined = item;
+        while (current) {
+          if (current.pid === selected || seen.has(current.pid)) return false;
+          seen.add(current.pid);
+          current = snapshot.entries.find((parent) => parent.pid === current?.definition.parentPid);
+        }
+        return true;
+      }) ?? [],
+    [snapshot, selected],
+  );
+  function validate(): boolean {
+    if (!draft?.name.trim()) return false;
+    if (draft.kind === 'directory') return true;
+    const target = draft.target ?? '';
+    if (draft.kind === 'page') return !!snapshot?.pages.some((page) => page.value === target);
+    if (/[\s\\]/.test(target)) return false;
+    if (draft.kind === 'internal')
+      return target.startsWith('/') && !target.startsWith('//') && !target.includes('/../');
+    try {
+      const url = new URL(target);
+      return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password;
+    } catch {
+      return false;
+    }
+  }
+  async function mutate(action: 'save' | 'delete' | 'restore') {
+    if (!snapshot || saving) return;
+    if (action === 'save' && !validate()) {
+      showErrorToast(
+        t(
+          'navigation.validation',
+          undefined,
+          'Enter a name and a valid target, and choose an access rule.',
+        ),
+      );
+      return;
+    }
+    setSaving(true);
+    try {
+      const value =
+        action === 'save'
+          ? selected
+            ? await navigationService.update(selected, snapshot.revision, draft!)
+            : await navigationService.create(snapshot.revision, draft!)
+          : action === 'delete'
+            ? await navigationService.remove(selected!, snapshot.revision)
+            : await navigationService.restore(selected!, snapshot.revision);
+      const next =
+        action === 'delete'
+          ? undefined
+          : (value.entries.find((item) => item.pid === selected) ??
+            (action === 'save' && !selected
+              ? value.entries.find((item) => !snapshot.entries.some((old) => old.pid === item.pid))
+              : undefined));
+      setSnapshot(value);
+      setSelected(next?.pid ?? null);
+      setDraft(next ? { ...next.definition } : null);
+      setConfirm(null);
+      setConflict(false);
+      window.dispatchEvent(new Event('menu:refresh'));
+      showSuccessToast(t('navigation.saved', undefined, 'Menu configuration saved.'));
+    } catch (error) {
+      if (error instanceof NavigationConflict) setConflict(true);
+      else
+        showErrorToast(
+          t(
+            'navigation.saveError',
+            undefined,
+            'Could not save. Check the target, parent directory and access rule, then reload if configuration changed.',
+          ),
+        );
+    } finally {
+      setSaving(false);
+    }
+  }
+  function tree(parent: string | null, depth = 0, visited = new Set<string>()) {
+    if (depth > 30) return null;
+    return snapshot?.entries
+      .filter((item) => item.available && (item.definition.parentPid || null) === parent)
+      .map((item) => {
+        if (visited.has(item.pid)) return null;
+        const branch = new Set(visited).add(item.pid);
+        return (
+          <div key={item.pid}>
+            <div className="flex items-center">
+              {item.definition.kind === 'directory' && (
+                <button
+                  type="button"
+                  data-testid={`navigation-toggle-${item.pid}`}
+                  aria-expanded={!collapsed.has(item.pid)}
+                  aria-label={
+                    t(
+                      collapsed.has(item.pid) ? 'navigation.expand' : 'navigation.collapse',
+                      undefined,
+                      collapsed.has(item.pid) ? 'Expand directory' : 'Collapse directory',
+                    ) +
+                    ' ' +
+                    item.definition.name
+                  }
+                  onClick={() =>
+                    setCollapsed((previous) => {
+                      const next = new Set(previous);
+                      if (next.has(item.pid)) next.delete(item.pid);
+                      else next.add(item.pid);
+                      return next;
+                    })
+                  }
+                  className="text-text-2 p-1 text-xs"
+                >
+                  {collapsed.has(item.pid) ? '▸' : '▾'}
+                </button>
+              )}
+              <button
+                type="button"
+                data-testid={`navigation-entry-${item.pid}`}
+                onClick={() => choose(item)}
+                style={{ paddingInlineStart: 12 + depth * 16 }}
+                className={`flex w-full items-center gap-2 rounded-lg py-2 pe-3 text-start text-sm ${selected === item.pid ? 'bg-blue-50 text-blue-700' : 'hover:bg-hover text-text-1'}`}
+              >
+                <span aria-hidden="true">
+                  {resolveIcon(item.definition.icon, item.definition.name, 16)}
+                </span>
+                <span className="min-w-0 flex-1 truncate">{item.definition.name}</span>
+                {(!item.definition.visible || !item.definition.enabled) && (
+                  <span className="text-text-2 text-xs">
+                    {t('navigation.hidden', undefined, 'Hidden')}
+                  </span>
+                )}
+                {item.customized && (
+                  <span className="text-brand text-xs">
+                    {t('navigation.customized', undefined, 'Customized')}
+                  </span>
+                )}
+              </button>
+            </div>
+            {!collapsed.has(item.pid) && tree(item.pid, depth + 1, branch)}
+          </div>
+        );
+      });
+  }
+  const empty = !snapshot?.entries.length;
+  const editorForm = draft ? (
+    <form
+      data-testid="navigation-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void mutate('save');
+      }}
+      className="max-w-3xl space-y-4"
+    >
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-text-1 text-lg font-semibold">
+            {entry ? entry.definition.name : t('navigation.new', undefined, 'New menu')}
+          </h2>
+          <p className="text-text-2 text-xs">
+            {entry?.source === 'custom'
+              ? t('navigation.source.custom', undefined, 'Custom menu')
+              : entry?.source === 'missing'
+                ? t('navigation.source.missing', undefined, 'Default no longer available')
+                : entry
+                  ? t('navigation.source.default', undefined, 'Plugin or platform default')
+                  : t('navigation.source.custom', undefined, 'Custom menu')}
+            {entry?.customized ? ' · ' + t('navigation.customized', undefined, 'Customized') : ''}
+          </p>
+        </div>
+        <span
+          data-testid="navigation-save-state"
+          className={`rounded px-2 py-1 text-xs ${dirty ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-800'}`}
+        >
+          {t(
+            dirty ? 'rbacExperience.unsaved' : 'rbacExperience.saved',
+            undefined,
+            dirty ? 'Unsaved changes' : 'Saved',
+          )}
+        </span>
+      </div>
+      {entry && !entry.available && (
+        <p role="alert" className="text-sm text-amber-700">
+          {t(
+            'navigation.missing',
+            undefined,
+            'The source menu is no longer available. Clear this customization or select a new valid entry.',
+          )}
+        </p>
+      )}
+      <fieldset
+        disabled={saving || conflict || entry?.source === 'missing'}
+        className="space-y-5 disabled:opacity-60"
+      >
+        <section className="border-border space-y-3 border-b pb-4">
+          <h3 className="text-text-2 text-xs font-medium">
+            {t('navigation.section.identity', undefined, 'Name and position')}
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            <label className="text-text-2 space-y-1 text-sm">
+              <span>{t('navigation.name', undefined, 'Menu name')}</span>
+              <input
+                data-testid="navigation-name"
+                required
+                maxLength={120}
+                value={draft.name}
+                onChange={(e) => change('name', e.target.value)}
+                placeholder={t(
+                  'navigation.name.example',
+                  undefined,
+                  'For example, Engineering documents',
+                )}
+                className={input}
+              />
+            </label>
+            <label className="text-text-2 space-y-1 text-sm">
+              <span>{t('navigation.parent', undefined, 'Parent directory')}</span>
+              <select
+                data-testid="navigation-parent"
+                value={draft.parentPid ?? ''}
+                onChange={(e) => change('parentPid', e.target.value || null)}
+                className={input}
+              >
+                <option value="">{t('navigation.root', undefined, 'Top level')}</option>
+                {directories.map((item) => (
+                  <option key={item.pid} value={item.pid}>
+                    {item.definition.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-text-2 space-y-1 text-sm">
+              <span>{t('navigation.icon', undefined, 'Icon')}</span>
+              <select
+                value={draft.icon ?? 'Link'}
+                onChange={(e) => change('icon', e.target.value)}
+                className={input}
+              >
+                {[
+                  ...new Set([
+                    draft.icon || 'Link',
+                    'Link',
+                    'Folder',
+                    'FileText',
+                    'Globe',
+                    'Settings',
+                    'ListTree',
+                    'ShieldCheck',
+                  ]),
+                ].map((icon) => (
+                  <option key={icon} value={icon}>
+                    {t('navigation.icon.' + icon, undefined, 'Current icon')}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-text-2 space-y-1 text-sm">
+              <span>{t('navigation.order', undefined, 'Display order')}</span>
+              <input
+                data-testid="navigation-order"
+                type="number"
+                min={0}
+                max={100000}
+                value={draft.orderNo}
+                onChange={(e) => change('orderNo', Number(e.target.value))}
+                className={input}
+              />
+              <span className="block text-xs">
+                {t(
+                  'navigation.order.help',
+                  undefined,
+                  'Lower numbers appear first within the same directory.',
+                )}
+              </span>
+            </label>
+          </div>
+        </section>
+        <section className="border-border space-y-3 border-b pb-4">
+          <h3 className="text-text-2 text-xs font-medium">
+            {t('navigation.section.target', undefined, 'Content and opening behavior')}
+          </h3>
+          <label className="text-text-2 block space-y-1 text-sm">
+            <span>{t('navigation.kind', undefined, 'Menu type')}</span>
+            <select
+              data-testid="navigation-kind"
+              value={draft.kind}
+              onChange={(e) =>
+                setDraft({
+                  ...draft,
+                  kind: e.target.value,
+                  target: e.target.value === 'directory' ? '' : draft.target,
+                })
+              }
+              className={input}
+            >
+              {Object.entries(labels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {draft.kind === 'directory' && (
+            <p className="text-text-2 text-xs">
+              {t(
+                'navigation.directory.help',
+                undefined,
+                'Directories appear in the sidebar only when they contain an entry visible to the user.',
+              )}
+            </p>
+          )}
+          {draft.kind !== 'directory' && (
+            <label className="text-text-2 block space-y-1 text-sm">
+              <span>
+                {draft.kind === 'page'
+                  ? t('navigation.page', undefined, 'Published system page')
+                  : t('navigation.target', undefined, 'Destination')}
+              </span>
+              {draft.kind === 'page' ? (
+                <select
+                  data-testid="navigation-target"
+                  required
+                  value={draft.target ?? ''}
+                  onChange={(e) => change('target', e.target.value)}
+                  className={input}
+                >
+                  <option value="">
+                    {t('navigation.page.choose', undefined, 'Select a page')}
+                  </option>
+                  {snapshot?.pages.map((page) => (
+                    <option key={page.value} value={page.value}>
+                      {page.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  data-testid="navigation-target"
+                  required
+                  value={draft.target ?? ''}
+                  onChange={(e) => change('target', e.target.value)}
+                  placeholder={draft.kind === 'internal' ? '/home' : 'https://example.com/docs'}
+                  className={input}
+                />
+              )}
+              <span className="block text-xs">
+                {draft.kind === 'embedded'
+                  ? t(
+                      'navigation.embed.help',
+                      undefined,
+                      'The external site may require sign-in or prevent embedding. An external-open link remains available.',
+                    )
+                  : t(
+                      'navigation.target.help',
+                      undefined,
+                      'This creates a navigation entry. It does not create a new page or grant access to its data.',
+                    )}
+              </span>
+            </label>
+          )}
+          {!['directory', 'embedded'].includes(draft.kind) && (
+            <label className="text-text-2 block space-y-1 text-sm">
+              <span>{t('navigation.opening', undefined, 'Open in')}</span>
+              <select
+                data-testid="navigation-opening"
+                value={draft.opening ?? 'same'}
+                onChange={(e) => change('opening', e.target.value)}
+                className={input}
+              >
+                <option value="same">
+                  {t('navigation.open.same', undefined, 'Current window')}
+                </option>
+                <option value="new">{t('navigation.open.new', undefined, 'New window')}</option>
+              </select>
+            </label>
+          )}
+        </section>
+        <section className="border-border space-y-3 border-b pb-4">
+          <h3 className="text-text-2 text-xs font-medium">
+            {t('navigation.section.access', undefined, 'Visibility and access')}
+          </h3>
+          <div className="flex gap-6">
+            <label className="text-text-1 flex items-center gap-2 text-sm">
+              <input
+                data-testid="navigation-visible"
+                type="checkbox"
+                checked={draft.visible}
+                onChange={(e) => change('visible', e.target.checked)}
+              />
+              {t('navigation.visible', undefined, 'Show in navigation')}
+            </label>
+            <label className="text-text-1 flex items-center gap-2 text-sm">
+              <input
+                data-testid="navigation-enabled"
+                type="checkbox"
+                checked={draft.enabled}
+                onChange={(e) => change('enabled', e.target.checked)}
+              />
+              {t('navigation.enabled', undefined, 'Enabled')}
+            </label>
+          </div>
+          <p className="text-text-2 text-xs">
+            {t(
+              'roleNavigation.globalHelp',
+              undefined,
+              'Role assignment and global enabled status determine visibility. Target pages retain their own business authorization.',
+            )}
+          </p>
+          {entry && draft.kind !== 'directory' && (
+            <NavigationRoleAssignment
+              key={entry.pid}
+              menuPid={entry.pid}
+              disabled={saving || conflict || dirty}
+            />
+          )}
+          {!entry && draft.kind !== 'directory' && (
+            <p className="text-text-2 text-xs">
+              {t(
+                'roleNavigation.afterCreate',
+                undefined,
+                'Save this menu, then assign its visible roles. New entries are not assigned automatically.',
+              )}
+            </p>
+          )}
+        </section>
+      </fieldset>
+      <div className="border-border bg-panel sticky -bottom-6 z-10 flex flex-wrap items-center gap-3 border-t py-4">
+        {!entry && (
+          <button
+            type="button"
+            data-testid="navigation-create-cancel"
+            disabled={saving}
+            onClick={() => {
+              setCreateOpen(false);
+              if (dirty) {
+                setPending(null);
+                setConfirm('discard');
+              } else setDraft(null);
+            }}
+            className="border-border rounded-control border px-3 py-2 text-sm"
+          >
+            {t('common.cancel', undefined, 'Cancel')}
+          </button>
+        )}
+        <button
+          type="button"
+          data-testid="navigation-preview"
+          disabled={!validate()}
+          onClick={() => {
+            if (!entry) setCreateOpen(false);
+            setPreview(true);
+          }}
+          className="border-border rounded-lg border px-4 py-2 text-sm"
+        >
+          {t('navigation.preview', undefined, 'Preview')}
+        </button>
+        <button
+          data-testid="navigation-save"
+          type="submit"
+          disabled={!dirty || saving || conflict || entry?.source === 'missing'}
+          className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+        >
+          {saving ? t('common.saving', undefined, 'Saving…') : t('common.save', undefined, 'Save')}
+        </button>
+        <div className="flex gap-3">
+          {entry && (
+            <button
+              type="button"
+              data-testid="navigation-delete"
+              disabled={saving || conflict}
+              onClick={() => setConfirm('delete')}
+              className="text-sm text-red-600"
+            >
+              {t('common.delete', undefined, 'Delete')}
+            </button>
+          )}
+          {entry?.customized && entry.source !== 'custom' && (
+            <button
+              type="button"
+              data-testid="navigation-restore"
+              disabled={saving || conflict}
+              onClick={() => setConfirm('restore')}
+              className="text-brand text-sm"
+            >
+              {t('navigation.restore', undefined, 'Restore default')}
+            </button>
+          )}
+        </div>
+      </div>
+    </form>
+  ) : null;
+  return (
+    <main data-testid="navigation-management" className="bg-bg flex h-full min-h-0 flex-col">
+      <header className="border-border flex items-center justify-between border-b p-6">
+        <div>
+          <Link
+            to="/enterprise/permissions"
+            className="text-text-2 mb-2 block text-xs hover:underline"
+          >
+            {t('rbacExperience.backToRoles', undefined, 'Role permissions')} /{' '}
+            {t('navigation.title', undefined, 'Menu management')}
+          </Link>
+          <h1 className="text-text-1 text-2xl font-semibold">
+            {t('navigation.title', undefined, 'Menu management')}
+          </h1>
+          <p className="text-text-2 mt-1 text-sm">
+            {t(
+              'navigation.subtitle',
+              undefined,
+              'Arrange navigation and add page links. Menu changes do not grant business permissions.',
+            )}
+          </p>
+        </div>
+        <button
+          type="button"
+          data-testid="navigation-add"
+          disabled={loading || saving || failed}
+          onClick={add}
+          className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+        >
+          {t('navigation.add', undefined, 'Add menu')}
+        </button>
+      </header>
+      {loading ? (
+        <div role="status" className="p-6">
+          {t('common.loading', undefined, 'Loading…')}
+        </div>
+      ) : failed ? (
+        <div role="alert" className="p-6">
+          <p>
+            {t(
+              'navigation.loadError',
+              undefined,
+              'Menus could not be loaded. Existing settings have not changed.',
+            )}
+          </p>
+          <button onClick={() => void load()} className="text-brand mt-3 underline">
+            {t('common.retry', undefined, 'Retry')}
+          </button>
+        </div>
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col gap-4 px-5 pt-4">
+          <p className="bg-subtle text-text-2 rounded-control shrink-0 px-3 py-3 text-xs">
+            {t(
+              'rbacExperience.navigationHelp',
+              undefined,
+              'Plugins provide default menus; tenant changes are preserved on upgrade. Adding a menu never grants business access. Assign visible roles separately.',
+            )}
+          </p>
+          <div className="border-border grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-lg border lg:grid-cols-[260px_minmax(0,1fr)]">
+            <aside className="border-border max-h-52 min-h-0 overflow-y-auto border-e p-3 lg:max-h-none">
+              <input
+                data-testid="navigation-search"
+                aria-label={t('navigation.search', undefined, 'Search menus')}
+                placeholder={t('navigation.search', undefined, 'Search menus')}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className={input}
+              />
+              <div className="mt-3">
+                {empty ? (
+                  <p className="text-text-2 p-3 text-sm">
+                    {t(
+                      'navigation.empty',
+                      undefined,
+                      'No menus yet. Add a directory or page link.',
+                    )}
+                  </p>
+                ) : query ? (
+                  snapshot?.entries
+                    .filter((item) =>
+                      item.definition.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
+                    )
+                    .map((item) => (
+                      <button
+                        key={item.pid}
+                        data-testid={`navigation-entry-${item.pid}`}
+                        onClick={() => choose(item)}
+                        className="text-text-1 hover:bg-hover block w-full rounded-lg p-3 text-start text-sm"
+                      >
+                        {item.definition.name}
+                      </button>
+                    ))
+                ) : (
+                  tree(null)
+                )}
+                {!query &&
+                  snapshot?.entries
+                    .filter((item) => !item.available)
+                    .map((item) => (
+                      <button
+                        key={item.pid}
+                        onClick={() => choose(item)}
+                        className="text-text-2 w-full p-3 text-start text-sm"
+                      >
+                        {item.definition.name} ·{' '}
+                        {t('navigation.unavailable', undefined, 'Unavailable target')}
+                      </button>
+                    ))}
+              </div>
+            </aside>
+            <section className="min-h-0 overflow-y-auto p-6">
+              {conflict && (
+                <div
+                  role="alert"
+                  data-testid="navigation-conflict"
+                  className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm"
+                >
+                  <p>
+                    {t(
+                      'navigation.conflict',
+                      undefined,
+                      'Menus changed after you opened this editor. Your draft is preserved; reload before saving.',
+                    )}
+                  </p>
+                  <button onClick={() => void load()} className="mt-2 text-blue-700 underline">
+                    {t('navigation.reload', undefined, 'Discard draft and reload')}
+                  </button>
+                </div>
+              )}
+              {!draft ? (
+                <div className="text-text-2 flex min-h-[220px] items-center justify-center text-sm">
+                  {t('navigation.select', undefined, 'Select a menu to edit, or add a new entry.')}
+                </div>
+              ) : entry ? (
+                editorForm
+              ) : (
+                <Dialog
+                  open={createOpen}
+                  onOpenChange={(open) => {
+                    if (!open) {
+                      setCreateOpen(false);
+                      if (dirty) {
+                        setPending(null);
+                        setConfirm('discard');
+                      } else setDraft(null);
+                    }
+                  }}
+                >
+                  <DialogContent
+                    className="max-h-[88vh] overflow-y-auto sm:max-w-2xl"
+                    data-testid="navigation-create-dialog"
+                  >
+                    <DialogHeader className="sr-only">
+                      <DialogTitle>{t('navigation.new', undefined, 'New menu')}</DialogTitle>
+                    </DialogHeader>
+                    {editorForm}
+                  </DialogContent>
+                </Dialog>
+              )}
+              <details className="border-border mt-5 max-w-3xl border-t py-4">
+                <summary className="text-text-2 cursor-pointer text-sm">
+                  {t('navigation.audit', undefined, 'Recent menu changes')}
+                </summary>
+                <ul className="text-text-2 mt-3 space-y-2 text-xs">
+                  {snapshot?.audit.length === 0 && (
+                    <li>{t('navigation.audit.empty', undefined, 'No menu changes yet.')}</li>
+                  )}
+                  {snapshot?.audit.map((item) => (
+                    <li key={item.pid}>
+                      {item.name} · {t('navigation.action.' + item.action, undefined, item.action)}{' '}
+                      · {item.actor || t('navigation.audit.removed', undefined, 'Removed account')}{' '}
+                      · {new Date(item.createdAt).toLocaleString()}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            </section>
+          </div>
+        </div>
+      )}
+      <ConfirmDialog
+        open={!!confirm || blocker.state === 'blocked'}
+        title={t('navigation.confirm.title', undefined, 'Confirm menu change')}
+        content={
+          confirm === 'delete'
+            ? t(
+                'navigation.confirm.delete',
+                undefined,
+                'Delete this custom menu? Its target page and business permissions will remain unchanged.',
+              )
+            : confirm === 'restore'
+              ? t(
+                  'navigation.confirm.restore',
+                  undefined,
+                  'Remove your customization and use the current default?',
+                )
+              : t('navigation.confirm.discard', undefined, 'Discard your unsaved changes?')
+        }
+        onConfirm={() => {
+          if (confirm === 'discard' || blocker.state === 'blocked') {
+            if (blocker.state === 'blocked') {
+              blocker.proceed();
+              return;
+            }
+            if (pending === 'add') {
+              setCreateOpen(true);
+              setSelected(null);
+              setDraft(fresh(entry?.definition.kind === 'directory' ? entry.pid : null));
+            } else if (pending) {
+              setSelected(pending.pid);
+              setDraft({ ...pending.definition });
+            } else setDraft(entry ? { ...entry.definition } : null);
+            setPending(null);
+            setConfirm(null);
+          } else void mutate(confirm!);
+        }}
+        onCancel={() => {
+          if (confirm === 'discard' && draft && !entry) setCreateOpen(true);
+          setConfirm(null);
+          if (blocker.state === 'blocked') blocker.reset();
+        }}
+      />
+      <ConfirmDialog
+        open={preview}
+        title={t('navigation.preview', undefined, 'Preview')}
+        content={
+          <div className="space-y-3">
+            <div className="text-text-1 flex items-center gap-2">
+              {resolveIcon(draft?.icon, draft?.name ?? '', 20)}
+              <strong>{draft?.name}</strong>
+            </div>
+            {draft?.kind !== 'directory' && (
+              <a
+                href={
+                  draft?.kind === 'page' ? `/p/c/${draft.target}` : (draft?.target ?? undefined)
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-brand block text-sm break-all underline"
+              >
+                {t('navigation.preview.open', undefined, 'Open destination')}
+              </a>
+            )}
+            <p className="text-text-2 text-sm">
+              {labels[draft?.kind ?? 'internal']} ·{' '}
+              {draft?.visible && draft?.enabled
+                ? t('navigation.visible', undefined, 'Show in navigation')
+                : t('navigation.hidden', undefined, 'Hidden')}
+            </p>
+            <p className="text-text-2 text-sm">
+              {t(
+                'navigation.preview.help',
+                undefined,
+                'Preview only. Nothing has been saved and business access is unchanged.',
+              )}
+            </p>
+          </div>
+        }
+        onConfirm={() => {
+          setPreview(false);
+          if (draft && !entry) setCreateOpen(true);
+        }}
+        onCancel={() => {
+          setPreview(false);
+          if (draft && !entry) setCreateOpen(true);
+        }}
+      />
+    </main>
+  );
+}

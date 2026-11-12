@@ -99,6 +99,27 @@ class HandlerPhaseCommandAuthorityTest {
         return seen.get();
     }
 
+    @Test void finiteDocumentProjectionStartsInsideTheHandlerAndNotForAnUnadmittedTarget() {
+        var phase=phase();
+        var authorization=org.mockito.Mockito.mock(com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(phase,"documentAuthorization",authorization);
+        org.mockito.Mockito.when(authorization.withReadProjectionSnapshot(org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(call->((java.util.function.Supplier<?>)call.getArgument(0)).get());
+        var context=context(CommandAuthorizationVerdict.authorized("qo.cap.write"));
+        var command=new com.auraboot.framework.meta.entity.CommandDefinition();command.setModelCode("quote");context.setCommand(command);
+        context.setExecConfig(java.util.Map.of("handlerParams",java.util.Map.of("documentDefinition",java.util.Map.of(
+                "code","quote.standard","version","1","dataset","quote:snapshot","template","standard",
+                "outputs",java.util.List.of("xlsx"),"versionPolicy","immutable-artifact","artifactRelation","documents",
+                "publicFields",java.util.Map.of("quote",java.util.List.of("title"))))));
+        context.setBusinessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization(
+                context.getCommandCode(),"quote","01ARZ3NDEKTSV4RRFFQ69G5FAV","update",1L,42L,3L));
+        assertThat(phase.withHandlerReadProjection(context,()->"document")).isEqualTo("document");
+        org.mockito.Mockito.verify(authorization).withReadProjectionSnapshot(org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.clearInvocations(authorization);context.setBusinessTargetAuthorization(null);
+        assertThat(phase.withHandlerReadProjection(context,()->"ordinary")).isEqualTo("ordinary");
+        org.mockito.Mockito.verifyNoInteractions(authorization);
+    }
+
     /**
      * Only the authority decision is under test, so the phase is built without its collaborators —
      * {@code withCommandAuthority} touches none of them. Constructing the real bean graph here would

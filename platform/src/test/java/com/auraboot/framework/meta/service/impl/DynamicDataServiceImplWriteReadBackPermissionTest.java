@@ -98,6 +98,20 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
 
     @Spy private ThreadContextScopes threadContexts = new ThreadContextScopes(List.of());
 
+    @org.mockito.Mock private NativeReadFieldProjection nativeReadFields;
+    @org.junit.jupiter.api.BeforeEach
+    void stubIndependentNativeFieldBoundary() {
+        org.mockito.Mockito.lenient().when(applicationContext.getBean(NativeRecordFieldAuthorization.class))
+                .thenReturn(org.mockito.Mockito.mock(NativeRecordFieldAuthorization.class));
+        org.mockito.Mockito.lenient().when(nativeReadFields.readWithinSnapshot(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any())).thenAnswer(call -> ((java.util.function.Supplier<?>) call.getArgument(1)).get());
+        org.mockito.Mockito.lenient().when(nativeReadFields.project(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyList())).thenAnswer(call -> call.getArgument(1));
+        org.mockito.Mockito.lenient().when(nativeReadFields.publicWriteResult(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyMap(), org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(call -> call.getArgument(1));
+    }
+
     @InjectMocks
     private DynamicDataServiceImpl service;
 
@@ -127,6 +141,10 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
 
         lenient().when(metadataService.getModelDefinition(MODEL_CODE)).thenReturn(Optional.of(model));
         lenient().when(metadataService.getDefinitionByCode(MODEL_CODE)).thenReturn(model);
+        lenient().when(metadataService.getModelFields(MODEL_CODE)).thenAnswer(inv -> model.getFields());
+        lenient().when(fieldPermissionService.getFieldPermissions(anyLong(),eq(MODEL_CODE))).thenAnswer(inv ->
+                com.auraboot.framework.permission.engine.model.FieldPermissionSet.allAllowed(
+                        model.getFields().stream().map(FieldDefinition::getCode).collect(java.util.stream.Collectors.toSet())));
         lenient().when(metadataService.getPrimaryKeyField(MODEL_CODE)).thenReturn(pk);
         lenient().when(tableMetadataService.tableExists("mt_" + MODEL_CODE)).thenReturn(true);
         lenient().when(dataPermissionEngine.getNonWritableFields(TENANT_ID, MODEL_CODE, USER_ID))
@@ -167,14 +185,48 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
         // so a permitted read reaches the end instead of failing closed on a bare mock.
         lenient().when(fieldMaskService.applyMaskingForDetail(eq(MODEL_CODE), anyMap(), anyLong()))
                 .thenAnswer(inv -> inv.getArgument(1));
-        lenient().when(fieldPermissionService.getFieldPermissions(anyLong(), eq(MODEL_CODE)))
-                .thenReturn(com.auraboot.framework.permission.engine.model.FieldPermissionSet
-                        .allAllowed(java.util.Set.of("pid", "name")));
+
     }
 
     @AfterEach
     void clearContext() {
         MetaContext.clear();
+    }
+
+    private void readonlyName() {
+        when(fieldPermissionService.getFieldPermissions(USER_ID,MODEL_CODE)).thenReturn(
+                new com.auraboot.framework.permission.engine.model.FieldPermissionSet(
+                        java.util.Set.of("pid","name"),java.util.Set.of("pid"),java.util.Set.of()));
+    }
+
+    @Test
+    void dslReadonlyFieldRejectsCreateAndBulkCreateBeforePersistence() {
+        readonlyName();
+        assertThatThrownBy(()->service.create(MODEL_CODE,new HashMap<>(Map.of("name","forbidden"))))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThatThrownBy(()->service.createWithoutResult(MODEL_CODE,new HashMap<>(Map.of("name","forbidden"))))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThatThrownBy(()->service.bulkCreate(MODEL_CODE,List.of(new HashMap<>(Map.of("name","forbidden")))))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThatThrownBy(()->service.bulkCreateForProcessing(MODEL_CODE,List.of(new HashMap<>(Map.of("name","forbidden")))))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(dynamicDataMapper);
+    }
+
+    @Test
+    void dslReadonlyFieldRejectsCompareAndSetBeforePersistence() {
+        readonlyName();
+        assertThatThrownBy(()->service.compareAndSet(MODEL_CODE,RECORD_ID,"name","old","forbidden"))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(dynamicDataMapper);
+    }
+
+    @Test
+    void dslReadonlyFieldRejectsChangedNativeUpdate() {
+        stubReadVerdict(true); readonlyName();
+        assertThatThrownBy(()->service.update(MODEL_CODE,RECORD_ID,Map.of("name","forbidden")))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(dynamicDataMapper,never()).updateByQuery(anyString(),anyMap());
     }
 
     @Test
@@ -192,6 +244,19 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
         assertThat(created).containsEntry("pid", RECORD_ID);
         // The read-back must not have been projected through the caller's read permission.
         verify(permissionFacade, never()).canOperate(anyLong(), anyString(), eq("read"), anyMap());
+    }
+
+    @Test
+    void createWithoutResultRetainsWriteBoundaryAndAuditWithoutPublicProjection() {
+        stubReadVerdict(false);
+        when(dynamicDataMapper.insert(anyString(), anyMap())).thenReturn(1);
+        service.createWithoutResult(MODEL_CODE,
+                new HashMap<>(Map.of("pid", RECORD_ID, "name", "written-value")));
+        verify(applicationContext.getBean(NativeRecordFieldAuthorization.class))
+                .requireCreated(eq(MODEL_CODE), eq(RECORD_ID), anyMap());
+        verify(changeTracker).recordChange(argThat(change ->
+                "create".equals(change.getOperation()) && RECORD_ID.equals(change.getRecordId())));
+        verify(nativeReadFields, never()).publicWriteResult(any(), anyMap(), any());
     }
 
     @Test
@@ -213,7 +278,17 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
     @Test
     void observerFailureStillDiscardsIntermediatePredicatesAndPropagates() { assertObserverInvalidation(true); }
 
+    @Test
+    void createWithoutResultPreservesObserverInvalidation() { assertObserverInvalidation(false, true); }
+
+    @Test
+    void createWithoutResultPropagatesObserverFailure() { assertObserverInvalidation(true, true); }
+
     private void assertObserverInvalidation(boolean fail) {
+        assertObserverInvalidation(fail, false);
+    }
+
+    private void assertObserverInvalidation(boolean fail, boolean withoutResult) {
         stubReadVerdict(false);
         var version=new java.util.concurrent.atomic.AtomicInteger();
         java.util.function.Supplier<String> filter=()->"AND version = "+version.get();
@@ -226,7 +301,11 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
         when(applicationContext.getBeansOfType(ModelMutationObserver.class)).thenReturn(Map.of("fixture",observer));
         try (DynamicDataQueryScope scope=DynamicDataQueryScope.open()) {
             assertThat(DynamicDataQueryScope.rowFilter(TENANT_ID,"dependent_bundle",USER_ID,filter)).isEqualTo("AND version = 0");
-            Runnable create=()->service.create(MODEL_CODE,new HashMap<>(Map.of("pid",RECORD_ID,"name","written-value")));
+            Runnable create=()-> {
+                var data = new HashMap<String,Object>(Map.of("pid",RECORD_ID,"name","written-value"));
+                if (withoutResult) service.createWithoutResult(MODEL_CODE, data);
+                else service.create(MODEL_CODE, data);
+            };
             if(fail)org.assertj.core.api.Assertions.assertThatThrownBy(create::run).isInstanceOf(IllegalStateException.class).hasMessage("observer failed");
             else create.run();
             assertThat(DynamicDataQueryScope.rowFilter(TENANT_ID,"dependent_bundle",USER_ID,filter)).isEqualTo("AND version = 2");

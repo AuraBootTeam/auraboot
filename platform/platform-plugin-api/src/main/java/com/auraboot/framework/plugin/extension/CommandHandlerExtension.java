@@ -30,6 +30,12 @@ import java.util.Set;
  */
 public interface CommandHandlerExtension extends ExtensionPoint {
 
+    /** Server-owned transaction requirement; metadata and callers cannot relax it. */
+    default BusinessResourceAuthorization.ReadIsolation commandReadIsolation() { return null; }
+
+
+
+
     /**
      * Explicit server-metadata opt-in for a handler-owned target authorization boundary.
      * Invoked after command permission and before idempotency; never grants raw model reads.

@@ -1,4 +1,6 @@
 import type { Role } from './types';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import rolePresentation from './rolePresentation.i18n.json';
 
 // RBAC v2 (business-roles.json) is the source of truth for the Quote/BOM
 // deployment: four roles, with 销售/采购/工程 separated. `bom_operator` and
@@ -50,4 +52,18 @@ export function sortRolesForPermissionSetup(roles: Role[]): Role[] {
 
 export function recommendedBomRoleLabel(roleCode: string): string | null {
   return RECOMMENDED_BOM_ROLE_LABEL[roleCode] ?? null;
+}
+
+/** Translate only shipped defaults; tenant-authored role text stays untouched. */
+export function localizedRoleText(
+  role: Pick<Role, 'code' | 'name' | 'description'>,
+  field: 'name' | 'description',
+  locale: string,
+): string {
+  const original = role[field] ?? '';
+  const defaults = (rolePresentation as Record<string, Record<string, Record<string, string>>>)[
+    role.code
+  ]?.[field];
+  if (!defaults || !Object.values(defaults).includes(original.trim())) return original;
+  return getLocalizedText(defaults, locale);
 }

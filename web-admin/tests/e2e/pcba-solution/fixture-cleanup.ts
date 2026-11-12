@@ -161,3 +161,26 @@ export function immutableQuoteArtifactCleanup(database: string, quoteId: string,
     values: [quoteId, artifactIds],
   };
 }
+
+/** Test-owned internal snapshots have no public mutation endpoint. */
+export function internalQuoteSnapshotCleanup(database: string, quoteId: string, row: FixtureRow) {
+  const targets: Record<string, { table: string; quoteColumn: string }> = {
+    qo_bom_import_row_common: { table: 'mt_qo_bom_import_row_common', quoteColumn: 'qo_bir_quote_id' },
+    qo_bom_import_common: { table: 'mt_qo_bom_import_common', quoteColumn: 'qo_bi_quote_id' },
+  };
+  if (!/^(enterprise|quote_bom|auraboot)_\d+$/.test(database)) {
+    throw new Error('Internal fixture purge requires an isolated numbered test database');
+  }
+  validateRow(row);
+  const target = targets[row.model];
+  if (!target || !/^[A-Za-z0-9_-]{1,128}$/.test(quoteId) || row.pid.length > 128) {
+    throw new Error('Internal fixture purge requires an allowed snapshot and exact quote identity');
+  }
+  return {
+    text: `DELETE FROM ${target.table} snapshot USING mt_qo_quote_common quote
+      WHERE quote.pid = $1 AND snapshot.tenant_id = quote.tenant_id
+      AND snapshot.${target.quoteColumn} = quote.pid AND snapshot.pid = $2 RETURNING snapshot.pid`,
+    values: [quoteId, row.pid],
+    absenceText: `SELECT pid FROM ${target.table} WHERE pid = $1`,
+  };
+}

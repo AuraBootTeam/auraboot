@@ -12,6 +12,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CommandIdempotencyIntentTest {
+    @Test void artifact_relationship_changes_alter_the_frozen_intent_without_changing_public_field_policy() {
+        var binding = new HashMap<String,String>(Map.of("project","a".repeat(64)));
+        var view = new com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionPlan(null,null,Map.of("root",
+                new com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionPlan.ModelFields(
+                        java.util.Set.of("file"),java.util.Set.of("file"),List.of(),List.of())));
+        var context = CommandPipelineContext.builder().commandCode("root:export").publicOutputProjection(view).artifactRootBinding(binding).build();
+        var before = CommandIdempotencyIntent.snapshot(context);
+        binding.put("project","b".repeat(64));
+        assertThat(before.get("artifactRootBinding")).isEqualTo(Map.of("project","a".repeat(64)));
+        assertThat(CommandIdempotencyIntent.snapshot(context)).isNotEqualTo(before);
+        context.setArtifactRootBinding(Map.of());
+        assertThat(CommandIdempotencyIntent.snapshot(context)).doesNotContainKey("artifactRootBinding");
+    }
 
     @Test
     void freezesEveryExecutionMeaningFieldBeforeLaterPhasesMutateThePayload() {

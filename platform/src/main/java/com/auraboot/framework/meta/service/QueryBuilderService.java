@@ -94,6 +94,10 @@ public interface QueryBuilderService {
         QueryType getQueryType();
         String getTableName();
         List<String> getSelectFields();
+        /** Add fixed host-only canonical authorization facts to an ordinary physical read. */
+        default QueryBuilder includeNativeReadAuthorization() {
+            throw new UnsupportedOperationException("Canonical native-read facts are unavailable");
+        }
         QueryBuilder addCondition(String field, String operator, Object value);
         QueryBuilder addRawCondition(String rawSql);
         default QueryBuilder addKeysetCondition(String field, String direction, Object value, String pid) {

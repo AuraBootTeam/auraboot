@@ -7,7 +7,10 @@ import { createPromptSubmissionFeedback } from '~/framework/meta/runtime/actions
 import { commandExecutionError } from '~/framework/meta/utils/commandExecutionError';
 import { useEffect, useState } from 'react';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
-import { downloadWithAuth } from '~/framework/meta/utils/commandDownload';
+import {
+  downloadWithAuth,
+  resolveCommandFileDownload,
+} from '~/framework/meta/utils/commandDownload';
 import { ActionCancelledError } from '~/framework/meta/runtime/actions/ActionCancelledError';
 import {
   pickFile,
@@ -388,6 +391,7 @@ function resolveDownloadUrl(commandResult: any, downloadConfig: any): string | u
   if (!downloadConfig) return undefined;
   const data = unwrapCommandData(commandResult);
   const config = downloadConfig === true ? {} : downloadConfig;
+  if (config.fileIdField) return resolveCommandFileDownload(commandResult, config);
   const url = readFirstPath(
     data,
     [config.urlField, config.downloadUrlField, 'downloadUrl', 'url'].filter(Boolean),
@@ -400,15 +404,6 @@ function resolveDownloadUrl(commandResult: any, downloadConfig: any): string | u
   );
   if (!fileId) return undefined;
   return `/api/file/download/${encodeURIComponent(String(fileId))}`;
-}
-
-function openDownloadUrl(url: string): void {
-  if (typeof window === 'undefined') return;
-  if (typeof window.location?.assign === 'function') {
-    window.location.assign(url);
-    return;
-  }
-  window.location.href = url;
 }
 
 /**
@@ -736,20 +731,23 @@ async function executePreparedWorkbenchAction(runtime: SchemaRuntime, config: an
           Boolean(resultData.message),
         );
       } else {
-        showCommandFeedback(runtime, feedback, 'successMessage', 'success');
-      }
-
-      const downloadUrl = resolveDownloadUrl(result, args.download);
-      if (downloadUrl) {
-        try {
-          await downloadWithAuth(downloadUrl);
-        } catch (error) {
-          console.error(
-            '[workbench] authenticated download failed, falling back to direct navigation:',
-            error,
-          );
-          openDownloadUrl(downloadUrl);
+        const downloadUrl = resolveDownloadUrl(result, args.download);
+        if (args.download?.fileIdField && !downloadUrl) {
+          const key = 'command.download.fileUnavailable';
+          const fallback =
+            'The record does not provide an accessible file. Ask an administrator to check access.';
+          const message = runtime.getContext?.().t?.(key);
+          throw new Error(!message || message === key ? fallback : message);
         }
+        if (downloadUrl) {
+          await downloadWithAuth(
+            downloadUrl,
+            args.download?.fileIdField
+              ? { requireAttachment: true, requireNonEmpty: true }
+              : undefined,
+          );
+        }
+        showCommandFeedback(runtime, feedback, 'successMessage', 'success');
       }
       return resultData;
     } catch (error) {

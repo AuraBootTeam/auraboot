@@ -114,6 +114,7 @@ import io.micrometer.observation.annotation.Observed;
 @Service
 @RequiredArgsConstructor
 public class PluginImportServiceImpl implements PluginImportService {
+    private final com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
     private static final int DEFAULT_IMPORT_LOCK_LEASE_MINUTES = 20;
     private static final int IMPORT_LOCK_LEASE_MINUTES = parseEnvInt(
             "plugin_import_lock_lease_minutes", DEFAULT_IMPORT_LOCK_LEASE_MINUTES);
@@ -649,7 +650,10 @@ public class PluginImportServiceImpl implements PluginImportService {
         try {
             // Run import in a programmatic transaction
             TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
-            return txTemplate.execute(status -> doExecute(context, request));
+            return txTemplate.execute(status -> {
+                authorizationWriteLock.mutate();
+                return doExecute(context, request);
+            });
         } catch (PluginException e) {
             markImportFailedInNewTransaction(importId, e);
             throw e;
@@ -1130,8 +1134,10 @@ public class PluginImportServiceImpl implements PluginImportService {
         // stage. Role declarations referencing them were silently skipped at that stage
         // ("Permission not found for role binding"), so plugin business roles ended up
         // without model write access on first import. Reconcile now that every generated
-        // action resolves; binding is idempotent.
-        pluginAccessResourceImporter().reconcileRolePermissionBindings(manifest, tenantId);
+        // action resolves. Only roles created by this batch receive deferred seed grants;
+        // existing roles are validated without restoring administrator-revoked access.
+        pluginAccessResourceImporter().reconcileRolePermissionBindings(manifest, tenantId, pluginPid, importId,
+                new java.util.HashSet<>(result.getCreatedResources().getOrDefault(ResourceType.ROLE.name(), List.of())));
 
         // Semantic resources reference imported model/field codes, so publication
         // must run only after model auto-publish and schema synchronization.
@@ -1244,6 +1250,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     @Override
     @Transactional
     public int reconcileDirectoryRolePermissions(String directoryPath) {
+        authorizationWriteLock.mutate();
         return resourceImporter.reconcileDirectoryRolePermissions(directoryPath, directoryLoader, pluginRecordMapper);
     }
 
@@ -1494,6 +1501,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ImportExecuteResult rollback(String importId) {
+        authorizationWriteLock.mutate();
         PluginImportHistory history = importHistoryMapper.findByImportId(importId);
         if (history == null) {
             throw new PluginException("Import not found: " + importId);

@@ -74,6 +74,26 @@ class CommandFieldMapExecutorFieldPermissionTest {
         MetaContext.clear();
     }
 
+    @Test void refusedNativeInsertCannotReachModelMutationObservers() {
+        when(metaModelService.getModelDefinition(MODEL)).thenReturn(Optional.of(modelDefinition()));
+        when(fieldPermissionService.getFieldPermissions(MEMBER_ID, MODEL))
+                .thenReturn(FieldPermissionSet.allAllowed(Set.of("name", "gross_margin")));
+        when(dynamicDataMapper.insert(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap())).thenReturn(1);
+        var definition = new CommandDefinition(); definition.setModelCode(MODEL); definition.setCode("quote:create");
+        var request = new CommandExecuteRequest(); request.setOperationType("create");
+        var configuration = Map.<String, Object>of("type", "create", "inputFields", List.of("name"),
+                "handlerParams", Map.of("targetRecordAuthorization", "business", "targetRecordAction", "create"));
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            assertThatThrownBy(() -> executor.executeImplicitFieldMapPhase(configuration, Map.of("name", "denied"),
+                    TENANT_ID, request, definition, Set.of("name"), pid -> {
+                        throw new org.springframework.security.access.AccessDeniedException("Rejected actual insert");
+                    })).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            verify(dynamicDataMapper).insert(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap());
+            org.mockito.Mockito.verifyNoInteractions(modelMutations);
+        } finally { org.springframework.transaction.support.TransactionSynchronizationManager.clear(); }
+    }
+
     @Test
     void implicitUpdatePreservesExplicitNullAndLeavesOmittedFieldsUnchanged() {
         assertUpdateClearsOnlySubmittedField(false);
@@ -301,6 +321,59 @@ class CommandFieldMapExecutorFieldPermissionTest {
                         field("name", "name"),
                         field("gross_margin", "gross_margin")))
                 .build();
+    }
+
+    @Test void implicitOwnerDerivedReadonlyFieldIsPersistedUnderItsExactCommandPermit() {
+        originFields();
+        when(dynamicDataMapper.insert(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyMap())).thenReturn(1);
+        var result = originWrite("crm.quote:create",MODEL,false);
+        assertThat(result).containsEntry(MODEL+"_inserted",1);
+        verify(dynamicDataMapper).insert(org.mockito.ArgumentMatchers.eq("crm_quote"),
+                org.mockito.ArgumentMatchers.argThat(row->"9.5".equals(row.get("gross_margin"))));
+    }
+
+    @Test void directInputCannotBecomeDerivedMerelyBecauseAutoSetDeclaresTheField() {
+        originFields();
+        assertThatThrownBy(()->originWrite("crm.quote:create",MODEL,true)).isInstanceOf(BusinessException.class);
+        verify(dynamicDataMapper,never()).insert(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test void explicitMappingRetainsTheOriginOfItsSourceField() {
+        originFields();
+        when(dynamicDataMapper.insert(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyMap())).thenReturn(1);
+        var request = new CommandExecuteRequest(); request.setOperationType("create");
+        var result = MetaContext.runWithCommandPermitPlan("ALL",null,MODEL,null,()->MetaContext.runWithAuthorizedCommandCode(
+                "crm.quote:create",()->executor.executeFieldMapPhase(
+                        List.of(bindingRule("name","name"),bindingRule("derived_margin","gross_margin")),
+                        Map.of("name","quote","derived_margin","9.5"),TENANT_ID,request,Set.of("name"),"crm.quote:create")));
+        assertThat(result).containsEntry(MODEL+"_inserted",1);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"wrong-command","wrong-model","global"})
+    void derivedOriginCannotBorrowAnotherBoundaryOrTheLegacyGlobalPermit(String boundary) {
+        originFields();
+        String command = "wrong-command".equals(boundary)?"other:create":"crm.quote:create";
+        String model = "wrong-model".equals(boundary)?"other_model":"global".equals(boundary)?null:MODEL;
+        assertThatThrownBy(()->originWrite(command,model,false)).isInstanceOf(BusinessException.class)
+                .satisfies(error->assertThat(((BusinessException)error).getResponseCode()).isEqualTo(ResponseCode.FORBIDDEN));
+        verify(dynamicDataMapper,never()).insert(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    private void originFields() {
+        when(metaModelService.getModelDefinition(MODEL)).thenReturn(Optional.of(modelDefinition()));
+        when(fieldPermissionService.getFieldPermissions(MEMBER_ID,MODEL)).thenReturn(
+                new FieldPermissionSet(Set.of("name","gross_margin"),Set.of("name"),Set.of()));
+    }
+
+    private Map<String,Object> originWrite(String activeCommand,String activeModel,boolean submittedMargin) {
+        var request = new CommandExecuteRequest(); request.setOperationType("create");
+        var command = new CommandDefinition(); command.setCode("crm.quote:create"); command.setModelCode(MODEL);
+        return MetaContext.runWithCommandPermitPlan("ALL",null,activeModel,null,()->MetaContext.runWithAuthorizedCommandCode(
+                activeCommand,()->executor.executeImplicitFieldMapPhase(
+                        Map.of("type","create","inputFields",List.of("name"),"autoSetFields",Map.of("gross_margin",Map.of("strategy","fixed_value","value","9.5"))),
+                        Map.of("name","quote","gross_margin","9.5"),TENANT_ID,request,command,
+                        submittedMargin?Set.of("name","gross_margin"):Set.of("name"))));
     }
 
     private ModelDefinition protectedModelDefinition() {

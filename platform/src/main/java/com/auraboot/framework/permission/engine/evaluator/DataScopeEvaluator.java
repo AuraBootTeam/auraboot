@@ -48,6 +48,24 @@ public class DataScopeEvaluator {
                 memberId, resource, action, record, false);
     }
 
+    /** One complete business-grant scope; no cross-role/share enrichment or legacy approximations. */
+    public EvaluationStep evaluateGrantScope(DataScopeCondition condition, Long memberId,
+                                              String model, String action, Map<String, Object> record) {
+        if (record == null || condition == null || condition.scopeType() == null || !java.util.Set.of("all", "none", "self", "dept", "dept_and_sub", "team").contains(condition.scopeType())) {
+            return new EvaluationStep(NAME, EvaluationVerdict.DENY, "Business target scope is unavailable");
+        }
+        return evaluateCondition(condition, memberId, model, action, record, true);
+    }
+
+    /** Current complete grants retain only explicitly declared shared aggregate edges. */
+    public EvaluationStep evaluateCurrentGrantScope(DataScopeCondition condition, Long memberId,
+                                                     String model, String action, Map<String,Object> record) {
+        if (record == null || condition == null || condition.scopeType() == null
+                || !java.util.Set.of("all", "none", "self", "dept", "dept_and_sub", "team").contains(condition.scopeType()))
+            return new EvaluationStep(NAME, EvaluationVerdict.DENY, "Business target scope is unavailable");
+        return evaluateCondition(condition, memberId, model, action, record, false);
+    }
+
     public DataScopeCondition getHistoricalCondition(Long memberId, String resource, String action) {
         return dataScopeService.resolveHistoricalScope(memberId, resource, action);
     }
@@ -99,19 +117,19 @@ public class DataScopeEvaluator {
 
         Map<String, Object> recordMap = (Map<String, Object>) record;
 
-        condition = strict ? condition
-                : enrichWithSharedRootSurface(condition, memberId, resource, action);
-
+        EvaluationStep base;
         if ("self".equals(scopeType)) {
-            return allowWithinSharedRootSurfaceOr(condition, recordMap, evaluateSelf(condition, recordMap));
+            base=evaluateSelf(condition,recordMap);
+        } else if ("dept".equals(scopeType) || "dept_and_sub".equals(scopeType) || "team".equals(scopeType)) {
+            base=evaluateDept(condition,recordMap,strict);
+        } else {
+            return new EvaluationStep(NAME,EvaluationVerdict.NOT_APPLICABLE,"Unknown scope type: "+scopeType);
         }
-
-        if ("dept".equals(scopeType) || "dept_and_sub".equals(scopeType) || "team".equals(scopeType)) {
-            return allowWithinSharedRootSurfaceOr(condition, recordMap, evaluateDept(condition, recordMap, strict));
-        }
-
-        return new EvaluationStep(NAME, EvaluationVerdict.NOT_APPLICABLE,
-                "Unknown scope type: " + scopeType);
+        // Sharing only adds an alternative audience. It cannot change an already allowed
+        // original scope, so do not load model declarations or sharing metadata in that case.
+        if (base.verdict()!=EvaluationVerdict.DENY) return base;
+        var withSurface=strict ? condition : enrichWithSharedRootSurface(condition,memberId,resource,action);
+        return allowWithinSharedRootSurfaceOr(withSurface,recordMap,base);
     }
 
     /**

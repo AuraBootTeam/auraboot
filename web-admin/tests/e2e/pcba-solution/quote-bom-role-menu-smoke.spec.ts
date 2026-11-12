@@ -84,7 +84,6 @@ const ORG_SYSTEM_ADMIN_CODES = [
   'org_teams',
   'member_management',
   'permission_roles',
-  'system_management',
   'enterprise_info',
   'account_security_policy',
   'llm_provider_settings',
@@ -142,11 +141,12 @@ const CONTRACTS: RoleContract[] = [
       MENU_CODE.customer,
       MENU_CODE.project,
       MENU_CODE.workbench,
+      MENU_CODE.kingdeeSync,
       MENU_CODE.quote,
       MENU_CODE.priceLibrary,
     ],
-    forbiddenCodes: [MENU_CODE.kingdeeSync, ...ORG_SYSTEM_ADMIN_CODES],
-    deniedDirectPaths: ['/p/bom_material_master'],
+    forbiddenCodes: ORG_SYSTEM_ADMIN_CODES,
+    deniedDirectPaths: [],
   },
   {
     user: SMOKE_USERS[2],
@@ -155,11 +155,12 @@ const CONTRACTS: RoleContract[] = [
       MENU_CODE.customer,
       MENU_CODE.project,
       MENU_CODE.workbench,
+      MENU_CODE.kingdeeSync,
       MENU_CODE.quote,
       MENU_CODE.priceLibrary,
     ],
-    forbiddenCodes: [MENU_CODE.kingdeeSync, ...ORG_SYSTEM_ADMIN_CODES],
-    deniedDirectPaths: ['/p/bom_material_master'],
+    forbiddenCodes: ORG_SYSTEM_ADMIN_CODES,
+    deniedDirectPaths: [],
   },
 ];
 
@@ -180,7 +181,7 @@ function attachForbiddenCollector(page: Page): { hits: ForbiddenHit[]; setMenu: 
   return { hits, setMenu: (m: string) => { currentMenu = m; } };
 }
 
-type LeafMenu = { code: string; path: string; name: string };
+type LeafMenu = { code: string; path: string; name: string; systemGroup: boolean };
 
 /** Fetch /api/menu/user and keep only leaf nodes (group headers also carry paths). */
 async function fetchLeafMenus(page: Page): Promise<LeafMenu[]> {
@@ -190,18 +191,19 @@ async function fetchLeafMenus(page: Page): Promise<LeafMenu[]> {
   const root = Array.isArray((body as any).data) ? (body as any).data : [];
   const leaves: LeafMenu[] = [];
   const seen = new Set<string>();
-  const visit = (items: unknown[]) => {
+  const visit = (items: unknown[], systemGroup = false) => {
     for (const item of items) {
       const menu = item as Record<string, unknown>;
       const children = (menu.children ?? menu.submenu) as unknown[] | undefined;
+      const inSystem = systemGroup || menu.code === 'system_management';
       if (Array.isArray(children) && children.length > 0) {
-        visit(children);
+        visit(children, inSystem);
         continue;
       }
       const path = String(menu.path ?? '');
       if (!path.startsWith('/') || seen.has(path)) continue;
       seen.add(path);
-      leaves.push({ code: String(menu.code ?? ''), path, name: String(menu.name ?? '') });
+      leaves.push({ code: String(menu.code ?? ''), path, name: String(menu.name ?? ''), systemGroup: inSystem });
     }
   };
   visit(root);
@@ -225,6 +227,7 @@ async function traverseMenus(
   page: Page,
   menus: LeafMenu[],
   setMenu: (m: string) => void,
+  sharedManagementDenied = false,
 ): Promise<string[]> {
   const problems: string[] = [];
   // land once and let the SPA hydrate before driving sidebar clicks
@@ -269,6 +272,10 @@ async function traverseMenus(
       continue;
     }
     await settle(page);
+    if (sharedManagementDenied && menu.code === MENU_CODE.kingdeeSync) {
+      await expect(page.getByTestId('toolbar-btn-sync_kingdee_incremental_now')).toHaveCount(0);
+      await expect(page.getByTestId('toolbar-btn-sync_kingdee_full_reconcile_now')).toHaveCount(0);
+    }
     // custom pages (/p/c/...) hydrate content after networkidle — poll instead of instant read
     let text = '';
     await expect
@@ -379,7 +386,11 @@ test.describe('Quote/BOM per-role menu smoke @smoke', () => {
         }
         // 3. walk EVERY visible menu via the sidebar; assert page renders, no forbidden text
         // (soft: keep going so a single run reports the FULL gap inventory)
-        const problems = await traverseMenus(page, await fetchLeafMenus(page), collector.setMenu);
+        const leaves = await fetchLeafMenus(page);
+        expect(leaves.filter(menu => menu.systemGroup).map(menu => menu.code).sort(),
+          'An audit-only navigation parent must not expose administrative leaves')
+          .toEqual(contract.roleCode === 'qo_procurement' ? ['audit_log_view'] : []);
+        const problems = await traverseMenus(page, leaves, collector.setMenu, true);
         expect
           .soft(problems, `${contract.user.key} traversal problems:\n${problems.join('\n')}`)
           .toEqual([]);

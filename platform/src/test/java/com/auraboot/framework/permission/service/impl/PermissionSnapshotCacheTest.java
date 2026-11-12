@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
@@ -66,6 +67,80 @@ class PermissionSnapshotCacheTest {
         manager.setAllowNullValues(false);
         cache = new PermissionSnapshotCache(
                 permissionMapper, userRoleMapper, rolePermissionMapper, roleMapper, List.of(), manager);
+    }
+
+    @Test
+    void domainOwnershipReplacesModelGrantsWithoutChangingOtherProducts() {
+        var read = permission(901L, "example.cap.read");
+        read.setResourceType("operation"); read.setResourceCode("example"); read.setAction("read");
+        read.setExtension(Map.of("domainModels", Map.of("example_record", List.of("read"))));
+        var write = permission(902L, "example.cap.write");
+        write.setResourceType("operation"); write.setResourceCode("example"); write.setAction("write");
+        write.setExtension(Map.of("domainModels", Map.of("example_record", List.of("read", "create", "update"))));
+        when(permissionMapper.findResolvableDefinitions(100L)).thenReturn(List.of(read, write));
+        assertThat(cache.resourcePermissionCodes(100L, "example_record", "read")).containsExactly("example.cap.read");
+        assertThat(cache.resourcePermissionCodes(100L, "example_record", "create")).containsExactly("example.cap.write");
+        assertThat(cache.resourcePermissionCodes(100L, "example_record", "delete")).isEmpty();
+        assertThat(cache.hasDomainModel(100L, "example_record")).isTrue();
+        assertThat(cache.hasDomainModel(100L, "unrelated")).isFalse();
+        assertThat(cache.domainPermissionAlternatives(100L, "example.cap.read")).containsExactly("example.cap.read", "example.cap.write");
+        assertThat(cache.domainPermissionAlternatives(100L, "example.cap.write")).containsExactly("example.cap.write");
+        assertThat(cache.resourcePermissionCodes(100L, "unrelated", "read")).containsExactly("unrelated:read", "unrelated.read", "model.unrelated.read");
+    }
+
+    @Test
+    void internalMutationUsesTheAuthorizedDomainWhileStandaloneCrudKeepsItsOwnMinimum() {
+        var write = permission(901L, "example.cap.write");
+        write.setResourceType("operation"); write.setResourceCode("example"); write.setAction("write");
+        write.setExtension(Map.of("domainModels", Map.of("derived", List.of("read"))));
+        var manage = permission(902L, "example.cap.manage");
+        manage.setResourceType("operation"); manage.setResourceCode("example"); manage.setAction("manage");
+        manage.setExtension(Map.of("domainModels", Map.of("derived", List.of("read", "create"))));
+        var read = permission(903L, "example.cap.read");
+        read.setResourceType("operation"); read.setResourceCode("example"); read.setAction("read");
+        read.setExtension(Map.of("domainModels", Map.of("derived", List.of("read"))));
+        when(permissionMapper.findResolvableDefinitions(100L)).thenReturn(List.of(read, write, manage));
+        assertThat(cache.resourcePermissionCodes(100L, "derived", "create")).containsExactly("example.cap.manage");
+        com.auraboot.framework.application.tenant.MetaContext.setContext(100L, 1L, "actor", "actor");
+        try {
+            com.auraboot.framework.application.tenant.MetaContext.runWithCommandAuthority("example.cap.write", () ->
+                assertThat(cache.resourcePermissionCodes(100L, "derived", "create")).containsExactly("example.cap.manage"));
+            com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitPlan("TARGET", null, "root", "root-pid", () ->
+                com.auraboot.framework.application.tenant.MetaContext.runWithAuthorizedCommandCode("example:view", () ->
+                    com.auraboot.framework.application.tenant.MetaContext.runWithCommandAuthority("example.cap.read", () ->
+                        assertThat(cache.resourcePermissionCodes(100L, "derived", "create")).containsExactly("example.cap.manage"))));
+            com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitPlan("TARGET", null, "root", "root-pid", () ->
+                com.auraboot.framework.application.tenant.MetaContext.runWithAuthorizedCommandCode("example:convert", () ->
+                    com.auraboot.framework.application.tenant.MetaContext.runWithCommandAuthority("example.cap.write", () -> {
+                        assertThat(cache.resourcePermissionCodes(100L, "derived", "create")).containsExactly("example.cap.write");
+                        assertThat(cache.resourcePermissionCodes(100L, "unrelated", "create")).doesNotContain("example.cap.write");
+                    })));
+            assertThat(cache.resourcePermissionCodes(100L, "derived", "create")).containsExactly("example.cap.manage");
+        } finally { com.auraboot.framework.application.tenant.MetaContext.clear(); }
+    }
+
+    @Test
+    void hiddenCommandEffectCandidatesNeverLeakFromTheCachedCatalog() {
+        var write = permission(901L, "example.cap.write");
+        write.setResourceType("operation"); write.setResourceCode("example"); write.setAction("write");
+        String child = "crm_customer_request_common";
+        write.setExtension(Map.of("domainModels", Map.of("quote_root", List.of("read", "create")),
+                "commandEffects", Map.of(child, List.of("read", "create"))));
+        when(permissionMapper.findResolvableDefinitions(100L)).thenReturn(List.of(write));
+        var ordinary = com.auraboot.framework.permission.engine.evaluator.PermissionCodeCandidates.forResourceAction(child, "create");
+        assertThat(cache.resourcePermissionCodes(100L, child, "create")).isEqualTo(ordinary);
+        com.auraboot.framework.application.tenant.MetaContext.setContext(100L, 1L, "actor", "actor");
+        try {
+            com.auraboot.framework.application.tenant.MetaContext.runWithCommandPermitPlan("SELF", null, "quote_root", null, () ->
+                com.auraboot.framework.application.tenant.MetaContext.runWithAuthorizedCommandCode("example:create", () ->
+                    com.auraboot.framework.application.tenant.MetaContext.runWithCommandAuthority("example.cap.write", () -> {
+                        assertThat(cache.resourcePermissionCodes(100L, child, "create")).containsExactly("example.cap.write");
+                        assertThat(cache.resourcePermissionCodes(100L, child, "read")).containsExactly("example.cap.write");
+                        assertThat(cache.resourcePermissionCodes(100L, child, "delete")).doesNotContain("example.cap.write");
+                    })));
+            assertThat(cache.resourcePermissionCodes(100L, child, "create")).isEqualTo(ordinary);
+        } finally { com.auraboot.framework.application.tenant.MetaContext.clear(); }
+        verify(permissionMapper, times(1)).findResolvableDefinitions(100L);
     }
 
     @Test
@@ -357,7 +432,8 @@ class PermissionSnapshotCacheTest {
 
     @Test
     void nestedFreshScopesAndExceptionalExitRestoreTheOriginalCacheMode() {
-        when(permissionMapper.findResolvableDefinitions(100L)).thenReturn(List.of(permission(50L,"code")),List.of(permission(60L,"code")));
+        when(permissionMapper.findResolvableDefinitions(100L)).thenReturn(List.of(permission(50L,"code")));
+        when(permissionMapper.findByTenantIdAndCode(100L,"code")).thenReturn(permission(60L,"code"));
         assertThat(cache.resolvePermissionId(100L,"code")).isEqualTo(50L);
         cache.withFreshReads(()->{
             assertThatThrownBy(()->cache.withFreshReads(()->{assertThat(cache.resolvePermissionId(100L,"code")).isEqualTo(60L);throw new IllegalStateException("fixture");}))
@@ -366,12 +442,14 @@ class PermissionSnapshotCacheTest {
             return null;
         });
         assertThat(cache.resolvePermissionId(100L,"code")).isEqualTo(50L);
-        verify(permissionMapper,times(3)).findResolvableDefinitions(100L);
+        verify(permissionMapper,times(1)).findResolvableDefinitions(100L);
+        verify(permissionMapper,times(2)).findByTenantIdAndCode(100L,"code");
     }
 
     @Test
     void freshScopeIsNotInheritedByWorkersOrOtherTenantCachedReaders() throws Exception {
-        when(permissionMapper.findResolvableDefinitions(100L)).thenReturn(List.of(permission(50L,"code")),List.of(permission(60L,"code")));
+        when(permissionMapper.findResolvableDefinitions(100L)).thenReturn(List.of(permission(50L,"code")));
+        when(permissionMapper.findByTenantIdAndCode(100L,"code")).thenReturn(permission(60L,"code"));
         when(permissionMapper.findResolvableDefinitions(200L)).thenReturn(List.of(permission(70L,"other")));
         assertThat(cache.resolvePermissionId(100L,"code")).isEqualTo(50L);
         assertThat(cache.resolvePermissionId(200L,"other")).isEqualTo(70L);
@@ -387,6 +465,100 @@ class PermissionSnapshotCacheTest {
             });
         } finally {worker.shutdownNow();}
         verify(permissionMapper,times(1)).findResolvableDefinitions(200L);
+    }
+
+    @Test
+    void freshCallbackReadsOnlyRequestedDefinitionsIncludingNegativeLookups() {
+        when(permissionMapper.findByTenantIdAndCode(100L, "read"))
+                .thenReturn(permission(50L, "read"), permission(60L, "read"));
+        when(permissionMapper.findByTenantIdAndCode(200L, "read"))
+                .thenReturn(permission(70L, "read"));
+        when(permissionMapper.findByTenantIdAndCode(100L, "missing")).thenReturn(null);
+
+        cache.withFreshReads(() -> {
+            assertThat(cache.resolvePermissionId(100L, "read")).isEqualTo(50L);
+            assertThat(cache.resolvePermissionId(100L, "missing")).isNull();
+            assertThat(cache.resolvePermissionId(100L, "missing")).isNull();
+            assertThat(cache.resolvePermissionId(100L, "READ")).isEqualTo(50L);
+            assertThat(cache.resolvePermissionId(200L, "read")).isEqualTo(70L);
+            return null;
+        });
+        assertThat(cache.withFreshReads(() -> cache.resolvePermissionId(100L, "read")))
+                .isEqualTo(60L);
+        verify(permissionMapper, times(2)).findByTenantIdAndCode(100L, "read");
+        verify(permissionMapper, times(1)).findByTenantIdAndCode(100L, "missing");
+        verify(permissionMapper, times(1)).findByTenantIdAndCode(200L, "read");
+        verify(permissionMapper, never()).findResolvableDefinitions(any());
+    }
+
+    @Test
+    void nestedFreshCallbackReadsAgainAndRestoresTheOuterSnapshotAfterFailure() {
+        when(permissionMapper.findByTenantIdAndCode(100L, "read"))
+                .thenReturn(permission(50L, "read"), permission(60L, "read"));
+        when(permissionMapper.findResolvableDefinitions(100L)).thenReturn(List.of(permission(70L, "read")));
+        cache.withFreshReads(() -> {
+            assertThat(cache.resolvePermissionId(100L, "read")).isEqualTo(50L);
+            assertThatThrownBy(() -> cache.withFreshReads(() -> {
+                assertThat(cache.resolvePermissionId(100L, "read")).isEqualTo(60L);
+                throw new IllegalStateException("fixture");
+            })).isInstanceOf(IllegalStateException.class);
+            assertThat(cache.resolvePermissionId(100L, "read")).isEqualTo(50L);
+            return null;
+        });
+        assertThat(cache.resolvePermissionId(100L, "read")).isEqualTo(70L);
+        verify(permissionMapper, times(1)).findResolvableDefinitions(100L);
+        verify(permissionMapper, times(2)).findByTenantIdAndCode(100L, "read");
+    }
+
+    @Test
+    void freshCallbackReusesAllEffectiveSnapshotLayersWithoutPublishingThem() {
+        stubUserRole(100L, 5L, 7L);
+        stubBaseline(100L, 8L);
+        when(rolePermissionMapper.findPermissionIdsByRole(7L))
+                .thenReturn(Set.of(50L), Set.of(51L));
+        when(rolePermissionMapper.findPermissionIdsByRole(8L))
+                .thenReturn(Set.of(60L), Set.of(61L));
+        cache.withFreshReads(() -> {
+            assertThat(cache.getEffectivePermissionIds(100L, 1L, 5L))
+                    .containsExactlyInAnyOrder(50L, 60L);
+            assertThat(cache.getEffectivePermissionIds(100L, 1L, 5L))
+                    .containsExactlyInAnyOrder(50L, 60L);
+            return null;
+        });
+        assertThat(cache.getEffectivePermissionIds(100L, 1L, 5L))
+                .containsExactlyInAnyOrder(51L, 61L);
+        verify(roleMapper, times(2)).findByTenantIdAndCode(100L, "tenant_member");
+        verify(userRoleMapper, times(2))
+                .findEffectiveByMemberIdAndTenantId(eq(5L), eq(100L), any(LocalDate.class));
+        verify(rolePermissionMapper, times(2)).findPermissionIdsByRole(7L);
+        verify(rolePermissionMapper, times(2)).findPermissionIdsByRole(8L);
+    }
+
+    @Test
+    void freshDomainOwnershipUsesOnlyDomainDefinitionsAndReloadsNextCallback() {
+        Permission read = permission(901L, "example.cap.read");
+        read.setResourceType("operation"); read.setResourceCode("example"); read.setAction("read");
+        read.setExtension(Map.of("domainModels", Map.of("example_record", List.of("read"))));
+        when(permissionMapper.findResolvableDomainDefinitions(100L)).thenReturn(List.of(read), List.of());
+        cache.withFreshReads(() -> {
+            assertThat(cache.hasDomainModel(100L, "example_record")).isTrue();
+            assertThat(cache.resourcePermissionCodes(100L, "example_record", "read")).containsExactly("example.cap.read");
+            assertThat(cache.domainPermissionAlternatives(100L, "example.cap.read")).containsExactly("example.cap.read");
+            return null;
+        });
+        assertThat(cache.withFreshReads(() -> cache.hasDomainModel(100L, "example_record"))).isFalse();
+        verify(permissionMapper, times(2)).findResolvableDomainDefinitions(100L);
+        verify(permissionMapper, never()).findResolvableDefinitions(any());
+        verify(permissionMapper, never()).findByTenantIdAndCode(100L, "example.cap.read");
+    }
+
+    @Test
+    void freshDomainOwnershipStillRejectsMalformedPublishedPolicies() {
+        Permission invalid = permission(901L, "example.cap.read");
+        invalid.setExtension(Map.of("domainModels", "invalid"));
+        when(permissionMapper.findResolvableDomainDefinitions(100L)).thenReturn(List.of(invalid));
+        assertThatThrownBy(() -> cache.withFreshReads(() -> cache.hasDomainModel(100L, "example_record")))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
     }
 
     private void stubUserRole(Long tenantId, Long memberId, Long roleId) {

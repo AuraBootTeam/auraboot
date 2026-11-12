@@ -23,6 +23,18 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class UserPermissionServiceImplTest {
 
+    @Test void ownedModelDoesNotUseRetainedChildFunctionGrants() {
+        when(permissionSnapshotCache.hasDomainModel(100L, "owned")).thenReturn(true);
+        when(permissionSnapshotCache.resourcePermissionCodes(100L, "owned", "update")).thenReturn(List.of("example.cap.write"));
+        when(permissionSnapshotCache.resolvePermissionId(100L, "example.cap.write")).thenReturn(900L);
+        when(permissionSnapshotCache.getEffectivePermissionIds(100L, 1L, 5L)).thenReturn(Set.of(42L));
+        when(permissionSnapshotCache.resolvePermissionId(100L, "*")).thenReturn(7L);
+        assertThat(service.hasPermission(1L, "model.owned.update")).isFalse();
+        when(permissionSnapshotCache.getEffectivePermissionIds(100L, 1L, 5L)).thenReturn(Set.of(900L));
+        assertThat(service.hasPermission(1L, "model.owned.update")).isTrue();
+        verify(permissionSnapshotCache, never()).resolvePermissionId(100L, "model.owned.update");
+    }
+
     @Test
     void currentEffectiveRolesUseNativeDatedBindingsAndRejectForeignDisabledDeletedRoles() {
         when(permissionSnapshotCache.getUserRoleIds(100L,1L,5L)).thenReturn(List.of(1L,2L,3L,4L));

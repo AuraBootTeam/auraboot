@@ -5,8 +5,6 @@ import com.auraboot.framework.integration.TestIdGenerator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentMatchers;
-import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -41,17 +39,23 @@ class AdminRoleCheckerIntegrationTest extends BaseIntegrationTest {
     private JdbcTemplate jdbc;
 
     private Long tenantId;
+    private Long ownedUserId;
+    private long roleIdForCleanup;
 
     @AfterEach
     void cleanup() {
         // Invalidate cache so seeded keys from one test never bleed into the next.
         adminRoleChecker.invalidateAll();
         if (tenantId != null) {
-            jdbc.update("DELETE FROM ab_user_role WHERE tenant_id = ?", tenantId);
-            jdbc.update("DELETE FROM ab_role WHERE tenant_id = ?", tenantId);
+            jdbc.update("DELETE FROM ab_user_role WHERE role_id = ?", roleIdForCleanup);
+            jdbc.update("DELETE FROM ab_role WHERE id = ?", roleIdForCleanup);
             jdbc.update("DELETE FROM ab_tenant_member WHERE tenant_id = ?", tenantId);
             jdbc.update("DELETE FROM ab_tenant WHERE id = ?", tenantId);
             tenantId = null;
+        }
+        if (ownedUserId != null) {
+            jdbc.update("DELETE FROM ab_user WHERE id=?", ownedUserId);
+            ownedUserId = null;
         }
     }
 
@@ -106,35 +110,47 @@ class AdminRoleCheckerIntegrationTest extends BaseIntegrationTest {
                 .isFalse();
     }
 
-    // =========================================================================
-    // Test 4: second call hits Caffeine cache — JDBC called only once
-    // =========================================================================
-
     @Test
-    @DisplayName("hasRole second call hits cache and skips JDBC")
-    void hasRole_secondCallHitsCache_skipsJdbc() {
+    @DisplayName("Privileged checks immediately observe revocation without clearing a cache")
+    void administratorRevocationIsEffectiveOnTheNextCheck() {
         tenantId = TestIdGenerator.uniqueTenantId();
         seedTenantAdminRole(tenantId, testUser.getId());
+        assertThat(adminRoleChecker.hasRole(tenantId, testUser.getId(), "tenant_admin")).isTrue();
+        jdbc.update("UPDATE ab_user_role SET status='inactive' WHERE tenant_id=?", tenantId);
+        assertThat(adminRoleChecker.hasRole(tenantId, testUser.getId(), "tenant_admin")).isFalse();
+        jdbc.update("UPDATE ab_user_role SET status='active' WHERE tenant_id=?", tenantId);
+        assertThat(adminRoleChecker.hasRole(tenantId, testUser.getId(), "tenant_admin")).isTrue();
+    }
 
-        // Clear spy invocations accumulated during seed writes so only the
-        // hasRole() calls are counted below.
-        Mockito.clearInvocations(jdbc);
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {
+            "assignment-disabled", "assignment-deleted", "expired", "future", "member-disabled",
+            "member-deleted", "user-disabled", "user-deleted", "role-disabled", "role-deleted",
+            "assignment-foreign-tenant", "role-foreign-tenant"})
+    void invalidSubjectsAndAssignmentsCannotRetainAdministration(String state) {
+        tenantId = TestIdGenerator.uniqueTenantId();
+        ownedUserId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        jdbc.update("INSERT INTO ab_user (id,pid,is_enabled,deleted_flag) VALUES (?,?,TRUE,FALSE)",
+                ownedUserId, com.auraboot.framework.common.util.UniqueIdGenerator.generate());
+        seedTenantAdminRole(tenantId, ownedUserId);
+        assertThat(adminRoleChecker.hasRole(tenantId, ownedUserId, "tenant_admin")).isTrue();
+        switch (state) {
+            case "assignment-disabled" -> jdbc.update("UPDATE ab_user_role SET status='inactive' WHERE tenant_id=?", tenantId);
+            case "assignment-deleted" -> jdbc.update("UPDATE ab_user_role SET deleted_flag=TRUE WHERE tenant_id=?", tenantId);
+            case "expired" -> jdbc.update("UPDATE ab_user_role SET expiry_date=CURRENT_DATE-1 WHERE tenant_id=?", tenantId);
+            case "future" -> jdbc.update("UPDATE ab_user_role SET effective_date=CURRENT_DATE+1 WHERE tenant_id=?", tenantId);
+            case "member-disabled" -> jdbc.update("UPDATE ab_tenant_member SET status='inactive' WHERE tenant_id=?", tenantId);
+            case "member-deleted" -> jdbc.update("UPDATE ab_tenant_member SET deleted_flag=TRUE WHERE tenant_id=?", tenantId);
+            case "user-disabled" -> jdbc.update("UPDATE ab_user SET is_enabled=FALSE WHERE id=?", ownedUserId);
+            case "user-deleted" -> jdbc.update("UPDATE ab_user SET deleted_flag=TRUE WHERE id=?", ownedUserId);
+            case "role-disabled" -> jdbc.update("UPDATE ab_role SET status='inactive' WHERE tenant_id=?", tenantId);
+            case "role-deleted" -> jdbc.update("UPDATE ab_role SET deleted_flag=TRUE WHERE tenant_id=?", tenantId);
+            case "assignment-foreign-tenant" -> jdbc.update("UPDATE ab_user_role SET tenant_id=? WHERE tenant_id=?", getTestTenant().getId(), tenantId);
+            case "role-foreign-tenant" -> jdbc.update("UPDATE ab_role SET tenant_id=? WHERE tenant_id=?", getTestTenant().getId(), tenantId);
+            default -> throw new IllegalArgumentException(state);
+        }
+        assertThat(adminRoleChecker.hasRole(tenantId, ownedUserId, "tenant_admin")).as(state).isFalse();
 
-        // When: same (tenantId, userId, roleCode) triple called twice
-        boolean r1 = adminRoleChecker.hasRole(tenantId, testUser.getId(), "tenant_admin");
-        boolean r2 = adminRoleChecker.hasRole(tenantId, testUser.getId(), "tenant_admin");
-
-        // Then: both return true and the COUNT query hits JDBC exactly once
-        assertThat(r1).as("first call should return true").isTrue();
-        assertThat(r2).as("second call should return true (from cache)").isTrue();
-
-        Mockito.verify(jdbc, Mockito.times(1))
-                .queryForObject(
-                        ArgumentMatchers.anyString(),
-                        ArgumentMatchers.eq(Long.class),
-                        ArgumentMatchers.any(),
-                        ArgumentMatchers.any(),
-                        ArgumentMatchers.any());
     }
 
     // =========================================================================
@@ -147,6 +163,7 @@ class AdminRoleCheckerIntegrationTest extends BaseIntegrationTest {
      */
     private void seedTenantAdminRole(Long tenantId, Long userId) {
         long roleId = System.nanoTime() & 0x7fffffffffffffffL;
+        roleIdForCleanup = roleId;
         long memberId = (System.nanoTime() ^ 0xdeadL) & 0x7fffffffffffffffL;
 
         jdbc.update(

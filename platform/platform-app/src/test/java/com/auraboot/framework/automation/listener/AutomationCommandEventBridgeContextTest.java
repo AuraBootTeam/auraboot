@@ -21,8 +21,17 @@ class AutomationCommandEventBridgeContextTest {
     private final AutomationTriggerService triggers = mock(AutomationTriggerService.class);
     private final CommandStateCheckExecutor states = mock(CommandStateCheckExecutor.class);
     private final AutomationCommandEventBridge bridge = new AutomationCommandEventBridge(triggers, states,
-            new com.auraboot.framework.event.context.ThreadContextScopes(java.util.List.of(
-                new com.auraboot.framework.agent.integration.context.AgentThreadContextContributor())));
+            actorScope());
+    private static com.auraboot.framework.permission.service.HumanActorContext actorScope() {
+        var mapper = mock(com.auraboot.framework.permission.mapper.HumanActorMapper.class);
+        when(mapper.findActive(any(), any(), any())).thenAnswer(call -> java.util.List.of(Map.of(
+                "user_id", 11L, "user_pid", "actor", "member_id", 321L, "username", "Current actor")));
+        var roles = mock(com.auraboot.framework.rbac.mapper.RoleMapper.class);
+        when(roles.findByMemberIdAndTenantId(any(), any())).thenReturn(java.util.List.of());
+        return new com.auraboot.framework.permission.service.HumanActorContext(mapper, roles,
+                new com.auraboot.framework.event.context.ThreadContextScopes(java.util.List.of(
+                        new com.auraboot.framework.agent.integration.context.AgentThreadContextContributor())));
+    }
     @AfterEach void cleanup() {
         MetaContext.clear();
         ExecutionPrincipalContext.clear();
@@ -44,6 +53,7 @@ class AutomationCommandEventBridgeContextTest {
         assertThat(observed.get()).isNotNull();
         assertThat(observed.get().tenantId()).isEqualTo(99L);
         assertThat(observed.get().userId()).isEqualTo(11L);
+        assertThat(observed.get().memberId()).isEqualTo(321L);
         assertThat(MetaContext.snapshot()).isNull();
     }
 
@@ -115,8 +125,7 @@ class AutomationCommandEventBridgeContextTest {
         event.addMetadata("actorId", 11L);
         event.addMetadata("beforeSnapshot", Map.of("order_status", "in_review"));
         new AutomationCommandEventBridge(triggers, states,
-            new com.auraboot.framework.event.context.ThreadContextScopes(java.util.List.of(
-                new com.auraboot.framework.agent.integration.context.AgentThreadContextContributor()))).onCommandCompleted(event);
+            actorScope()).onCommandCompleted(event);
         verify(triggers).onStateChange("orders", "owned-record", "in_review", "done");
         verify(triggers).onRecordUpdate(eq("orders"), eq("owned-record"), any(), any());
         verifyNoMoreInteractions(triggers);

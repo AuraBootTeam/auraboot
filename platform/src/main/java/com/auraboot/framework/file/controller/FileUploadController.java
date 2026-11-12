@@ -172,6 +172,7 @@ public class FileUploadController {
      */
     @PostMapping("/relation")
     @RequirePermission(MetaPermission.SYS_FILE_RELATION_MANAGE)
+    @org.springframework.transaction.annotation.Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public ApiResponse<Boolean> createFileRelation(
             @RequestBody FileRelationRequestDTO request,
             @CurrentUserId Long userId) {
@@ -302,6 +303,10 @@ public class FileUploadController {
 
     private void authorizeFileAccess(String fileId, FileEntity file, Long userId) {
         if (file == null) {
+            return;
+        }
+        if (file.getArtifactAuthorization() != null) {
+            fileService.assertFileReadAllowed(file);
             return;
         }
         List<FileRelationEntity> relations = fileService.getFileRelations(fileId);

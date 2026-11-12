@@ -46,6 +46,8 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class PermissionPolicyServiceImpl implements PermissionPolicyService {
+    private final com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
+
 
     private final RolePermissionMapper rolePermissionMapper;
     private final PermissionMapper permissionMapper;
@@ -56,6 +58,12 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
     private final DecisionModelFieldService decisionModelFieldService;
 
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
+
+    @Override
+    public ConditionGuard loadedConditionGuard(Permission permission, Long bindingId, String conditionAstJson, String conditionsJson) {
+        if (permission == null || bindingId == null) throw new IllegalArgumentException("Loaded permission binding is required");
+        return new ConditionGuard(bindingId,conditionAstJson,conditionsJson,runtimeValidationError(permission,conditionsJson));
+    }
 
     @Override
     @org.springframework.cache.annotation.Cacheable(value = "conditionGuards",
@@ -155,6 +163,7 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
     @Override
     @Transactional
     public void setPolicy(Long roleId, Long permissionId, Map<String, Object> policyValues) {
+        authorizationWriteLock.mutate();
         RolePermission rp = findRolePermission(roleId, permissionId);
         if (rp == null) {
             throw new RootUnCheckedException(ResponseCode.BadParam,

@@ -48,8 +48,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @SuppressWarnings("java/log-injection")
 public class DataScopeServiceImpl implements DataScopeService {
+    private final com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
+
 
     private final RoleDataScopeMapper roleDataScopeMapper;
+    private final com.auraboot.framework.rbac.mapper.RoleMapper roleMapper;
     private final UserRoleMapper userRoleMapper;
     private final TenantMemberMapper tenantMemberMapper;
     private final ApplicationEventPublisher eventPublisher;
@@ -64,12 +67,89 @@ public class DataScopeServiceImpl implements DataScopeService {
     @Autowired @Lazy
     private com.auraboot.framework.organization.service.TeamMemberService teamMemberService;
 
+    @Autowired @Lazy
+    private PermissionSnapshotCache snapshots;
+
+    @Autowired @Lazy
+    private com.auraboot.framework.permission.service.DomainCommandAuthorization domains;
+
     @Override
     @Cacheable(value = "dataScopeCondition",
             cacheManager = "permissionCacheManager",
             key = "T(com.auraboot.framework.meta.cache.DataAccessCacheEpoch).current() + ':' + #memberId + ':' + #resourceCode + ':' + #actionCode")
     public DataScopeCondition resolveScope(Long memberId, String resourceCode, String actionCode) {
         return resolveScopeInternal(memberId, resourceCode, actionCode, false);
+    }
+
+    @Override
+    public DataScopeCondition resolveScopeForRole(Long memberId, Long roleId, String permissionResource,
+                                                  String action, String recordModel) {
+        return resolveGrantScope(memberId,roleId,permissionResource,action,recordModel,false);
+    }
+
+    @Override
+    public DataScopeCondition resolveObjectBoundScopeForRole(Long memberId, Long roleId, String permissionResource,
+                                                             String action, String recordModel) {
+        return resolveGrantScope(memberId, roleId, permissionResource, action, recordModel, true, true);
+    }
+
+    @Override
+    public DataScopeCondition resolveOrdinaryReadScopeForRole(Long memberId, Long roleId, String recordModel) {
+        return resolveGrantScope(memberId,roleId,recordModel,"read",recordModel,true);
+    }
+
+    @Override
+    public DataScopeCondition resolveOrdinaryUpdateScopeForRole(Long memberId, Long roleId, String recordModel) {
+        return resolveGrantScope(memberId,roleId,recordModel,"update",recordModel,true);
+    }
+
+    @Override
+    public DataScopeCondition resolveOrdinaryCreateScopeForRole(Long memberId, Long roleId, String recordModel) {
+        return resolveGrantScope(memberId,roleId,recordModel,"create",recordModel,true);
+    }
+
+    private DataScopeCondition resolveGrantScope(Long memberId, Long roleId, String permissionResource,
+                                                String action, String recordModel, boolean ordinaryRead) {
+        return resolveGrantScope(memberId, roleId, permissionResource, action, recordModel, ordinaryRead, false);
+    }
+
+    private DataScopeCondition resolveGrantScope(Long memberId, Long roleId, String permissionResource,
+                                                String action, String recordModel, boolean ordinaryRead,
+                                                boolean inheritObjectScope) {
+        if (!MetaContext.exists() || memberId == null || roleId == null
+                || !java.util.Objects.equals(memberId, MetaContext.getCurrentMemberId())
+                || MetaContext.getCurrentTenantId() == null || MetaContext.getCurrentUserId() == null
+                || permissionResource == null || permissionResource.isBlank()
+                || action == null || action.isBlank() || recordModel == null || recordModel.isBlank()) {
+            return DataScopeCondition.none();
+        }
+        Long tenant = MetaContext.getCurrentTenantId();
+        var role = roleMapper.findEffectiveGrantOwner(tenant, MetaContext.getCurrentUserId(), memberId, roleId);
+        if (role == null) return DataScopeCondition.none();
+        var roleScopes = roleDataScopeMapper.findByTenantAndRole(tenant, roleId);
+        var entries = roleScopes.stream()
+                .filter(entry -> permissionResource.equals(entry.getResourceCode()) && action.equals(entry.getActionCode()))
+                .toList();
+        // An explicit action restriction always wins, including NONE or malformed metadata.
+        // The fallback is local to the exact grant owner; another role cannot lend its scope.
+        if (entries.isEmpty() && inheritObjectScope) {
+            entries = roleScopes.stream().filter(entry -> recordModel.equals(entry.getResourceCode())
+                    && "read".equals(entry.getActionCode())).toList();
+        }
+        // Never silently discard a custom restriction that this scope resolver cannot interpret.
+        if (entries.size() > 1 || entries.stream().anyMatch(entry -> entry.getScopeConfig() != null
+                && !(entry.getScopeConfig() instanceof Map<?, ?> config && config.isEmpty()))) {
+            return DataScopeCondition.none();
+        }
+        String type = entries.isEmpty() ? role.getDefaultDataScopeType() : entries.getFirst().getScopeType();
+        if (type == null) return ordinaryRead && entries.isEmpty()
+                ? DataScopeCondition.notConfigured() : DataScopeCondition.none();
+        try {
+            return resolveCondition(memberId, DataScopeType.fromCode(type), recordModel, true);
+        } catch (IllegalArgumentException invalid) {
+            // CATCH: corrupt authoring metadata cannot manufacture an unrestricted business grant.
+            return DataScopeCondition.none();
+        }
     }
 
     @Override
@@ -103,9 +183,10 @@ public class DataScopeServiceImpl implements DataScopeService {
         // 2. Query matching data scope entries
         List<RoleDataScope> scopes = roleDataScopeMapper.findByRoleIdsAndResource(roleIds, resourceCode, actionCode);
         if (scopes == null || scopes.isEmpty()) {
-            // No data scope configured for this resource/action — NOT_APPLICABLE, not ALL.
-            // This preserves deny-by-default: "not configured" != "explicitly allowed all".
-            return DataScopeCondition.notConfigured();
+            // Physical-row checks already use the owning business grant's role default.
+            // Query the same audience instead of selecting rows those checks must reject.
+            DataScopeCondition domainDefault = strict ? null : domainDefaultAudience(memberId, resourceCode, actionCode);
+            return domainDefault != null ? domainDefault : DataScopeCondition.notConfigured();
         }
 
         // 3. Merge across roles
@@ -113,6 +194,35 @@ public class DataScopeServiceImpl implements DataScopeService {
 
         // 4. Resolve concrete condition (pass resourceCode for model-specific field config)
         return resolveCondition(memberId, merged, resourceCode, strict);
+    }
+
+    /** Preserve explicit scopes and legacy absence; defaults belong only to effective read-grant owners. */
+    private DataScopeCondition domainDefaultAudience(Long member, String model, String action) {
+        if (!"read".equals(action) || snapshots == null || domains == null || !MetaContext.exists()
+                || MetaContext.getCurrentMemberId() == null || !member.equals(MetaContext.getCurrentMemberId())) return null;
+        var defaults = new java.util.ArrayList<RoleDataScope>();
+        var visited = new java.util.HashSet<Long>();
+        boolean domain = false;
+        for (String code : snapshots.resourcePermissionCodes(MetaContext.getCurrentTenantId(), model, action)) {
+            var definition = snapshots.resolvePermissionDefinition(MetaContext.getCurrentTenantId(), code);
+            // Command-local technical effects must not populate a shared query-scope configuration.
+            if (!com.auraboot.framework.permission.service.DomainPermissionPolicy.models(definition).containsKey(model)) continue;
+            domain = true;
+            var bindings = domains.grants(code);
+            if (bindings == null || bindings.stream().anyMatch(binding -> !"grant".equals(binding.getGrantType()))) continue;
+            for (var binding : bindings) {
+                if (binding.getRoleId() == null || !visited.add(binding.getRoleId())) continue;
+                var condition = resolveObjectBoundScopeForRole(member, binding.getRoleId(), model, action, model);
+                // An absent legacy scope remains absent; never persist or relabel it as ALL.
+                if (condition != null && "not_configured".equals(condition.scopeType())) return null;
+                var entry = new RoleDataScope();
+                entry.setScopeType(condition == null ? "none" : condition.scopeType());
+                entry.setMergeStrategy("MAX");
+                defaults.add(entry);
+            }
+        }
+        if (!domain) return null;
+        return defaults.isEmpty() ? DataScopeCondition.none() : resolveCondition(member, mergeScopes(defaults), model, true);
     }
 
     @Override
@@ -140,8 +250,10 @@ public class DataScopeServiceImpl implements DataScopeService {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public void setScope(Long tenantId, Long roleId, String resourceCode, String actionCode,
                          String scopeType, String mergeStrategy) {
+        authorizationWriteLock.mutate();
         try {
             DataScopeType.fromCode(scopeType);
         } catch (IllegalArgumentException e) {
@@ -150,6 +262,7 @@ public class DataScopeServiceImpl implements DataScopeService {
         if (mergeStrategy != null && !"MAX".equals(mergeStrategy) && !"MIN".equals(mergeStrategy)) {
             throw new RootUnCheckedException(ResponseCode.BadParam, "Invalid data scope merge strategy");
         }
+        requireWriteTarget(tenantId,roleId,resourceCode,actionCode);
         LambdaQueryWrapper<RoleDataScope> query = new LambdaQueryWrapper<RoleDataScope>()
                 .eq(RoleDataScope::getTenantId, tenantId)
                 .eq(RoleDataScope::getRoleId, roleId)
@@ -188,7 +301,10 @@ public class DataScopeServiceImpl implements DataScopeService {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public void removeScope(Long tenantId, Long roleId, String resourceCode, String actionCode) {
+        authorizationWriteLock.mutate();
+        requireWriteTarget(tenantId,roleId,resourceCode,actionCode);
         LambdaQueryWrapper<RoleDataScope> query = new LambdaQueryWrapper<RoleDataScope>()
                 .eq(RoleDataScope::getTenantId, tenantId)
                 .eq(RoleDataScope::getRoleId, roleId)
@@ -203,6 +319,20 @@ public class DataScopeServiceImpl implements DataScopeService {
     @Override
     public List<RoleDataScope> getScopesByRole(Long tenantId, Long roleId) {
         return roleDataScopeMapper.findByTenantAndRole(tenantId, roleId);
+    }
+
+    /** Structural boundary shared by administrative and code-owned metadata derivation. */
+    private void requireWriteTarget(Long tenant,Long roleId,String resource,String action) {
+        if(!MetaContext.exists() || tenant==null || !java.util.Objects.equals(tenant,MetaContext.getCurrentTenantId()))
+            throw new org.springframework.security.access.AccessDeniedException("Scope writer requires its current tenant");
+        var role=roleId==null?null:roleMapper.selectById(roleId);
+        boolean systemTemplate=role!=null && role.getTenantId()==null
+                && com.auraboot.framework.saas.executor.SystemTenantContextExecutor.SYSTEM_TENANT_ID.equals(tenant);
+        if(role==null || Boolean.TRUE.equals(role.getDeletedFlag())
+                || !systemTemplate && !java.util.Objects.equals(tenant,role.getTenantId()))
+            throw new org.springframework.security.access.AccessDeniedException("Scope role is unavailable in this tenant");
+        if(resource==null || resource.isBlank() || action==null || action.isBlank())
+            throw new RootUnCheckedException(ResponseCode.BadParam,"Scope writer requires a resource and action");
     }
 
     // ========================================================================
@@ -490,12 +620,12 @@ public class DataScopeServiceImpl implements DataScopeService {
             if (modelOpt.isEmpty()) {
                 return null;
             }
-            // ModelDefinition doesn't carry extension; look up the raw Model entity
-            var modelDto = metaModelService.findByCode(resourceCode);
-            if (modelDto == null || modelDto.getExtension() == null) {
+            // Preserve the fresh current-model policy source without presentation statistics.
+            var extension = metaModelService.findExtensionByCode(resourceCode);
+            if (extension == null) {
                 return null;
             }
-            Object dataScopeObj = modelDto.getExtension().get("dataScope");
+            Object dataScopeObj = extension.get("dataScope");
             if (dataScopeObj instanceof Map) {
                 return (Map<String, Object>) dataScopeObj;
             }

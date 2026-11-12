@@ -15,8 +15,6 @@ interface RoleFormDialogProps {
   }) => Promise<void>;
 }
 
-const ROLE_TYPES = ['custom', 'system', 'tenant'] as const;
-
 export default function RoleFormDialog({ open, role, onOpenChange, onSave }: RoleFormDialogProps) {
   const { t } = useI18n();
   const [code, setCode] = useState('');
@@ -35,7 +33,7 @@ export default function RoleFormDialog({ open, role, onOpenChange, onSave }: Rol
         setDescription(role.description || '');
         setType(role.type || 'custom');
       } else {
-        setCode('');
+        setCode('custom_' + crypto.randomUUID().replaceAll('-', ''));
         setName('');
         setDescription('');
         setType('custom');
@@ -73,22 +71,6 @@ export default function RoleFormDialog({ open, role, onOpenChange, onSave }: Rol
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="role-code" className={labelClass}>
-              {t('admin.permission.role.code') || 'Code'}
-            </label>
-            <input
-              id="role-code"
-              data-testid="role-form-code"
-              type="text"
-              required
-              disabled={isEdit}
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              className={`${inputClass} ${isEdit ? 'cursor-not-allowed bg-gray-100 dark:bg-gray-700' : ''}`}
-            />
-          </div>
-
-          <div>
             <label htmlFor="role-name" className={labelClass}>
               {t('admin.permission.role.name') || 'Name'}
             </label>
@@ -117,24 +99,33 @@ export default function RoleFormDialog({ open, role, onOpenChange, onSave }: Rol
             />
           </div>
 
-          <div>
-            <label htmlFor="role-type" className={labelClass}>
-              {t('admin.permission.role.type') || 'Type'}
-            </label>
-            <select
-              id="role-type"
-              data-testid="role-form-type"
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              className={inputClass}
-            >
-              {ROLE_TYPES.map((rt) => (
-                <option key={rt} value={rt}>
-                  {t(`admin.permission.role.type.${rt.toLowerCase()}`) || rt}
-                </option>
-              ))}
-            </select>
-          </div>
+          <details className="text-text-2 text-xs">
+            <summary className="cursor-pointer">
+              {t('rbacExperience.roleIdentifier', undefined, 'Advanced · integration identifier')}
+            </summary>
+            <p className="my-2">
+              {t(
+                'rbacExperience.roleIdentifierHelp',
+                undefined,
+                'An identifier is generated automatically. Integrations may reference it; it cannot change after creation. New roles start without menus or business grants.',
+              )}
+            </p>
+            <div>
+              <label htmlFor="role-code" className={labelClass}>
+                {t('admin.permission.role.code') || 'Code'}
+              </label>
+              <input
+                id="role-code"
+                data-testid="role-form-code"
+                type="text"
+                required
+                disabled={isEdit}
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                className={`${inputClass} ${isEdit ? 'cursor-not-allowed bg-gray-100 dark:bg-gray-700' : ''}`}
+              />
+            </div>
+          </details>
 
           <div className="flex justify-end gap-2 pt-2">
             <button
@@ -148,7 +139,7 @@ export default function RoleFormDialog({ open, role, onOpenChange, onSave }: Rol
             <button
               type="submit"
               data-testid="role-form-submit"
-              disabled={saving}
+              disabled={saving || !name.trim() || !code.trim()}
               className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving

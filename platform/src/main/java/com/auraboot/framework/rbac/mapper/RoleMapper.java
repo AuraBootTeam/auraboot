@@ -17,6 +17,77 @@ import java.util.Set;
 @Mapper
 public interface RoleMapper extends BaseMapper<Role> {
 
+    /** Live field-role projection, including governed team/department contributions. */
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    @org.apache.ibatis.annotations.Options(useCache = false,
+            flushCache = org.apache.ibatis.annotations.Options.FlushCachePolicy.TRUE)
+    @Select("""
+        <script>
+        SELECT DISTINCT r.code FROM ab_role r
+        JOIN ab_tenant_member m ON m.id=#{memberId} AND m.tenant_id=#{tenantId}
+        JOIN ab_user u ON u.id=m.user_id AND u.id=#{userId}
+        WHERE (r.tenant_id=#{tenantId} OR r.tenant_id IS NULL)
+          AND r.status='active' AND r.deleted_flag=FALSE
+          AND m.status='active' AND m.deleted_flag=FALSE
+          AND u.is_enabled=TRUE AND u.deleted_flag=FALSE
+          AND r.code IS NOT NULL
+          AND (EXISTS (
+            SELECT 1 FROM ab_user_role ur
+            WHERE ur.role_id=r.id AND ur.member_id=m.id AND ur.tenant_id=m.tenant_id
+              AND ur.status='active' AND ur.deleted_flag=FALSE
+              AND (ur.effective_date IS NULL OR ur.effective_date &lt;= CURRENT_DATE)
+              AND (ur.expiry_date IS NULL OR ur.expiry_date &gt;= CURRENT_DATE)
+          )
+          <if test="contributedRoleIds != null and !contributedRoleIds.isEmpty()">
+            OR r.id IN
+            <foreach collection="contributedRoleIds" item="roleId" open="(" separator="," close=")">
+              #{roleId}
+            </foreach>
+          </if>
+          ) ORDER BY r.code
+        </script>
+        """)
+    List<String> findEffectiveFieldRoleCodes(@Param("tenantId") Long tenantId, @Param("userId") Long userId,
+            @Param("memberId") Long memberId, @Param("contributedRoleIds") List<Long> contributedRoleIds);
+
+    /** Effective actor facts for business guards, read in the caller's authorization snapshot. */
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    @Select("""
+        SELECT DISTINCT r.code FROM ab_role r
+        JOIN ab_user_role ur ON ur.role_id=r.id
+        JOIN ab_tenant_member m ON m.id=ur.member_id AND m.tenant_id=ur.tenant_id
+        JOIN ab_user u ON u.id=m.user_id
+        WHERE ur.tenant_id=#{tenantId} AND ur.member_id=#{memberId} AND m.user_id=#{userId}
+          AND (r.tenant_id=#{tenantId} OR r.tenant_id IS NULL)
+          AND r.status='active' AND r.deleted_flag=FALSE
+          AND ur.status='active' AND ur.deleted_flag=FALSE
+          AND (ur.effective_date IS NULL OR ur.effective_date<=CURRENT_DATE)
+          AND (ur.expiry_date IS NULL OR ur.expiry_date>=CURRENT_DATE)
+          AND m.status='active' AND m.deleted_flag=FALSE AND u.is_enabled=TRUE AND u.deleted_flag=FALSE
+          AND r.code IS NOT NULL ORDER BY r.code
+        """)
+    List<String> findEffectiveActorRoleCodes(@Param("tenantId") Long tenantId, @Param("userId") Long userId,
+            @Param("memberId") Long memberId);
+
+    /** Current human grant owner; all tenant, membership and temporal joins are explicit. */
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    @Select("""
+        SELECT r.* FROM ab_role r
+        JOIN ab_user_role ur ON ur.role_id=r.id
+        JOIN ab_tenant_member m ON m.id=ur.member_id AND m.tenant_id=ur.tenant_id
+        JOIN ab_user u ON u.id=m.user_id
+        WHERE ur.tenant_id=#{tenantId} AND ur.member_id=#{memberId} AND m.user_id=#{userId}
+          AND r.id=#{roleId} AND (r.tenant_id=#{tenantId} OR r.tenant_id IS NULL)
+          AND r.status='active' AND r.deleted_flag=FALSE
+          AND ur.status='active' AND ur.deleted_flag=FALSE
+          AND (ur.effective_date IS NULL OR ur.effective_date<=CURRENT_DATE)
+          AND (ur.expiry_date IS NULL OR ur.expiry_date>=CURRENT_DATE)
+          AND m.status='active' AND m.deleted_flag=FALSE AND u.is_enabled=TRUE AND u.deleted_flag=FALSE
+        LIMIT 1
+        """)
+    Role findEffectiveGrantOwner(@Param("tenantId") Long tenantId, @Param("userId") Long userId,
+            @Param("memberId") Long memberId, @Param("roleId") Long roleId);
+
     /**
      * 根据角色编码查询角色
      */
@@ -128,9 +199,21 @@ public interface RoleMapper extends BaseMapper<Role> {
     /**
      * Find roles for a member in a tenant.
      */
-    @Select("SELECT r.* FROM ab_role r INNER JOIN ab_user_role ur ON r.id = ur.role_id " +
-            "WHERE ur.member_id = #{memberId} AND ur.tenant_id = #{tenantId} AND ur.status = 'active' " +
-            "AND r.deleted_flag = false AND ur.deleted_flag = false ORDER BY r.priority ASC")
+    @Select("""
+        SELECT r.* FROM ab_role r
+        JOIN ab_user_role ur ON r.id=ur.role_id
+        JOIN ab_tenant_member m ON m.id=ur.member_id AND m.tenant_id=ur.tenant_id
+        JOIN ab_user u ON u.id=m.user_id
+        WHERE ur.member_id=#{memberId} AND ur.tenant_id=#{tenantId}
+          AND (r.tenant_id=#{tenantId} OR r.tenant_id IS NULL)
+          AND r.status='active' AND r.deleted_flag=FALSE
+          AND ur.status='active' AND ur.deleted_flag=FALSE
+          AND (ur.effective_date IS NULL OR ur.effective_date<=CURRENT_DATE)
+          AND (ur.expiry_date IS NULL OR ur.expiry_date>=CURRENT_DATE)
+          AND m.status='active' AND m.deleted_flag=FALSE
+          AND u.is_enabled=TRUE AND u.deleted_flag=FALSE
+        ORDER BY r.priority ASC
+        """)
     List<Role> findByMemberIdAndTenantId(@Param("memberId") Long memberId, @Param("tenantId") Long tenantId);
 
 //    /**
@@ -177,6 +260,10 @@ public interface RoleMapper extends BaseMapper<Role> {
      */
     @Select("SELECT pid FROM ab_role WHERE tenant_id = #{tenantId} AND code = #{code} AND deleted_flag = false")
     String findPidByCode(@Param("tenantId") Long tenantId, @Param("code") String code);
+
+    /** A tenant's retired role identity prevents template re-import from resurrecting it. */
+    @Select("SELECT id,pid,tenant_id,code,deleted_flag FROM ab_role WHERE tenant_id=#{tenantId} AND code=#{code} AND deleted_flag=TRUE ORDER BY id DESC LIMIT 1")
+    Role findRetiredByTenantIdAndCode(@Param("tenantId") Long tenantId, @Param("code") String code);
 
     // ==================== Plugin Import Support ====================
 
@@ -240,4 +327,25 @@ public interface RoleMapper extends BaseMapper<Role> {
         </script>
         """)
     List<Map<String, Object>> findPrioritiesByIds(@Param("ids") Set<Long> ids);
+    /** One bounded query for displayed roles, without per-role member requests. */
+    @Select("""
+        <script>
+        SELECT r.id AS role_id,
+          (SELECT COUNT(DISTINCT ur.member_id) FROM ab_user_role ur
+           JOIN ab_tenant_member m ON m.id=ur.member_id AND m.tenant_id=#{tenantId} AND m.deleted_flag=FALSE
+           WHERE ur.role_id=r.id AND ur.tenant_id=#{tenantId} AND ur.deleted_flag=FALSE
+             AND ur.status='active') AS member_count,
+          (r.code IN ('tenant_admin','platform_admin') OR EXISTS (
+            SELECT 1 FROM ab_role_permission rp JOIN ab_permission p ON p.id=rp.permission_id
+            WHERE rp.role_id=r.id AND rp.tenant_id=#{tenantId} AND rp.deleted_flag=FALSE
+              AND rp.grant_type='grant'
+              AND p.code IN ('*','meta.menu.update','meta.permission.update','org.role.update')
+          )) AS management_role
+        FROM ab_role r WHERE (r.tenant_id=#{tenantId} OR r.tenant_id IS NULL)
+          AND r.deleted_flag=FALSE AND r.id IN
+        <foreach item="id" collection="ids" open="(" separator="," close=")">#{id}</foreach>
+        </script>
+        """)
+    List<com.auraboot.framework.rbac.dto.RoleDisplaySummary> findDisplaySummaries(
+            @Param("tenantId") Long tenantId, @Param("ids") List<Long> ids);
 }

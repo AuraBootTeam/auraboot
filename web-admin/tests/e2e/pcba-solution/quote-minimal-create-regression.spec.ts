@@ -171,7 +171,7 @@ test.describe('PCBA quote minimal create regression', () => {
   test.describe.configure({ timeout: 120_000 });
 
   test.beforeEach(async ({ page }) => {
-    await ensureTenantAdminRegisteredPermissions(page, ['qo.quote.read', 'qo.quote.create', 'qo.quote.manage', 'qo.price.manage']);
+    await ensureTenantAdminRegisteredPermissions(page, ['qo.cap.read', 'qo.cap.write']);
   });
 
   test('Q01-02 creates customer and linked project inside quote reference dropdowns', async ({ page }, testInfo) => {
@@ -228,6 +228,8 @@ test.describe('PCBA quote minimal create regression', () => {
       expect(persistedProject.bom_project_name).toBe(projectName);
       await page.screenshot({ path: testInfo.outputPath('quote-inline-customer-project-selected.png'), fullPage: true });
     } finally {
+      // Keep the business deadline; fixture teardown receives its own bounded allowance.
+      testInfo.setTimeout(testInfo.timeout + 60_000);
       await cleanupRows(page, created);
     }
   });
@@ -287,29 +289,8 @@ test.describe('PCBA quote minimal create regression', () => {
       expect(projectId, 'bom:create_project should return recordId').toBeTruthy();
       created.rows.push({ model: 'req_requirement_set_pcba_bom', pid: projectId });
 
-      // This golden owns the create/RFQ linkage contract, not the external-source contract. Seed
-      // fresh unbound Yunhan evidence (the quote-line binding is optional) for all three MPNs so the create task deterministically
-      // exercises cache reuse and does not consume Yunhan's shared 1-call/minute batch allowance.
-      // Dedicated Yunhan goldens below this suite still exercise the real upload/search lanes.
-      const validUntil = new Date(Date.now() + 7 * 24 * 3600 * 1000)
-        .toISOString()
-        .slice(0, 10);
-      for (const mpn of ['RC0603FR-0710KL', 'STM32F103C8T6', 'GRM188R71C104KA01D']) {
-        await dynamicCreate(
-          page,
-          'qo_price_evidence_common',
-          {
-            qo_pe_part_no: mpn,
-            qo_pe_source: 'yunhan',
-            qo_pe_source_ref: 'golden:minimal-create-cache',
-            qo_pe_status: 'captured',
-            qo_pe_unit_price: 0.1234,
-            qo_pe_currency: 'CNY',
-            qo_pe_valid_until: validUntil,
-          },
-          created.rows,
-        );
-      }
+      // Supplier pricing remains exercised through this runtime's managed protocol mock.
+      // Unbound price evidence is not a sourcing cache and must not be seeded as one.
 
       const accountOptionsLoaded = page
         .waitForResponse(
@@ -500,6 +481,7 @@ test.describe('PCBA quote minimal create regression', () => {
         if (pid) created.rows.push({ model: 'qo_bom_import_common', pid });
       }
 
+      console.info('[quote-minimal-phase] list', Date.now());
       await navigateToDynamicPage(page, 'qo_quote_common');
       expect(await tableHeaders(page)).toEqual([
         '客户',
@@ -525,6 +507,7 @@ test.describe('PCBA quote minimal create regression', () => {
       await expect(page.locator('thead, [role="rowgroup"]').first()).not.toContainText('折扣%');
       await expect(page.locator('thead, [role="rowgroup"]').first()).not.toContainText('有效期至');
 
+      console.info('[quote-minimal-phase] detail', Date.now());
       await openQuoteDetailFromList(page, created);
       await expect(page.getByRole('tab', { name: /资料上传|Source Upload/ })).toBeVisible({
         timeout: 20_000,
@@ -551,8 +534,10 @@ test.describe('PCBA quote minimal create regression', () => {
       expect(fs.readFileSync(downloadedPath)).toEqual(fs.readFileSync(cplFixture));
       expect(page.url()).toBe(detailUrlBeforeDownload);
       expect(page.context().pages()).toHaveLength(openPagesBeforeDownload);
+      console.info('[quote-minimal-phase] download-complete', Date.now());
       await page.screenshot({ path: testInfo.outputPath('created-quote-upload-readback.png'), fullPage: true });
 
+      console.info('[quote-minimal-phase] price-tab', Date.now());
       await page.getByRole('tab', { name: /BOM价格计算|BOM Price/i }).click();
       const priceTable = page.getByTestId('table-block').filter({
         has: page.getByTestId(`table-row-${String(quoteLines[0].pid)}`),
@@ -577,6 +562,8 @@ test.describe('PCBA quote minimal create regression', () => {
       await expect(main).not.toContainText('PCBA RFQ');
       await expect(main).not.toContainText('PCBA数量');
     } finally {
+      // Keep the business deadline; fixture teardown receives its own bounded allowance.
+      testInfo.setTimeout(testInfo.timeout + 60_000);
       await cleanupRows(page, created);
     }
   });

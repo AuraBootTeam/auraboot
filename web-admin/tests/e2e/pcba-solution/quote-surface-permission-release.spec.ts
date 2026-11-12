@@ -74,30 +74,30 @@ const EXPECTED_SURFACES: Record<
   { visibleTabs: string[]; hiddenTabs: string[]; probes: SurfaceProbe[] }
 > = {
   sales: {
-    visibleTabs: [TAB_LABELS.materials, TAB_LABELS.bomPrice],
-    hiddenTabs: [TAB_LABELS.processFee, TAB_LABELS.output],
-    probes: [
-      { queryCode: 'qo_quote_bom_price_metrics', expectedStatus: 200 },
-      { queryCode: 'qo_quote_process_fee_metrics', expectedStatus: 403 },
-      { queryCode: 'qo_quote_output_readiness', expectedStatus: 403 },
-      { queryCode: 'qo_quote_output_documents', expectedStatus: 403 },
-    ],
-  },
-  procurement: {
-    visibleTabs: [TAB_LABELS.materials, TAB_LABELS.bomPrice, TAB_LABELS.processFee],
-    hiddenTabs: [TAB_LABELS.output],
+    visibleTabs: [TAB_LABELS.materials, TAB_LABELS.bomPrice, TAB_LABELS.processFee, TAB_LABELS.output],
+    hiddenTabs: [],
     probes: [
       { queryCode: 'qo_quote_bom_price_metrics', expectedStatus: 200 },
       { queryCode: 'qo_quote_process_fee_metrics', expectedStatus: 200 },
-      { queryCode: 'qo_quote_output_readiness', expectedStatus: 403 },
-      { queryCode: 'qo_quote_output_documents', expectedStatus: 403 },
+      { queryCode: 'qo_quote_output_readiness', expectedStatus: 200 },
+      { queryCode: 'qo_quote_output_documents', expectedStatus: 200 },
+    ],
+  },
+  procurement: {
+    visibleTabs: [TAB_LABELS.materials, TAB_LABELS.bomPrice, TAB_LABELS.processFee, TAB_LABELS.output],
+    hiddenTabs: [],
+    probes: [
+      { queryCode: 'qo_quote_bom_price_metrics', expectedStatus: 200 },
+      { queryCode: 'qo_quote_process_fee_metrics', expectedStatus: 200 },
+      { queryCode: 'qo_quote_output_readiness', expectedStatus: 200 },
+      { queryCode: 'qo_quote_output_documents', expectedStatus: 200 },
     ],
   },
   approver: {
-    visibleTabs: [TAB_LABELS.materials, TAB_LABELS.processFee, TAB_LABELS.output],
-    hiddenTabs: [TAB_LABELS.bomPrice],
+    visibleTabs: [TAB_LABELS.materials, TAB_LABELS.bomPrice, TAB_LABELS.processFee, TAB_LABELS.output],
+    hiddenTabs: [],
     probes: [
-      { queryCode: 'qo_quote_bom_price_metrics', expectedStatus: 403 },
+      { queryCode: 'qo_quote_bom_price_metrics', expectedStatus: 200 },
       { queryCode: 'qo_quote_process_fee_metrics', expectedStatus: 200 },
       { queryCode: 'qo_quote_output_readiness', expectedStatus: 200 },
       { queryCode: 'qo_quote_output_documents', expectedStatus: 200 },

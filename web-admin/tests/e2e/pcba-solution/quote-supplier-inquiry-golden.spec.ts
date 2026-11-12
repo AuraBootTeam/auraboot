@@ -5,6 +5,7 @@ import {
   makeQuoteRoleUser,
   openQuoteRolePage,
   queryDynamicRecords,
+  reassignRecordOwnerByEmail,
   searchBusinessList,
   type CreatedRows,
 } from './quote-e2e-helpers';
@@ -20,6 +21,21 @@ test.describe('PCBA quote supplier inquiry golden', () => {
     const page = await ctx.newPage();
     users['sales'] = makeQuoteRoleUser('qo_sales', uid, ['qo_sales']);
     await ensureQuoteRoleUser(page, users['sales']);
+    const code = `e2e_inquiry_reader_${uid}`;
+    const roleResponse = await page.request.post('/api/roles', { data: { code, name: code, type: 'custom' } });
+    expect(roleResponse.ok()).toBe(true);
+    const roleBody = await roleResponse.json();
+    expect(String(roleBody.code)).toBe('0');
+    const role = roleBody.data;
+    expect(role.pid).toBeTruthy();
+    expect((await page.request.put(`/api/permissions/matrix/${role.pid}/default-scope`, {
+      data: { scopeType: 'self' },
+    })).status()).toBe(200);
+    expect((await page.request.put(`/api/permission/capabilities?rolePid=${role.pid}`, {
+      data: ['qo.cap.read'],
+    })).status()).toBe(200);
+    users['reader'] = makeQuoteRoleUser('inquiry_reader', uid, [code]);
+    await ensureQuoteRoleUser(page, users['reader']);
     await ctx.close();
   });
 
@@ -93,8 +109,8 @@ test.describe('PCBA quote supplier inquiry golden', () => {
     }
   });
 
-  // Q19-03: 非采购角色调用询价维护接口——按角色拒绝且记录不变。
-  test('Q19-03 non-procurement role is denied inquiry maintenance and the record stays unchanged', async ({
+  // Q19-03: Read-only duty rejects mutation; the domain write duty may maintain inquiries.
+  test('Q19-03 read-only inquiry mutation is denied and domain write remains allowed', async ({
     browser,
   }) => {
     const marker = `SRFDENY-${Date.now()}`;
@@ -108,6 +124,7 @@ test.describe('PCBA quote supplier inquiry golden', () => {
       expect(head.ok()).toBe(true);
       const headPid = String(((await head.json()).data ?? {}).pid ?? '');
       created.rows.push({ model: 'qo_supplier_request_common', pid: headPid });
+      await reassignRecordOwnerByEmail([{ model: 'qo_supplier_request_common', pid: headPid }], users['reader'].email);
 
       const before = await queryDynamicRecords(adminPage, 'qo_supplier_request_common', [
         { fieldName: 'qo_sr_code', operator: 'EQ', value: marker },
@@ -115,21 +132,38 @@ test.describe('PCBA quote supplier inquiry golden', () => {
       expect(before).toHaveLength(1);
       const beforeVersion = Number(before[0].row_version);
 
-      // 非采购角色(qo_sales)直接调用询价单维护更新 → 拒绝且记录不变
-      const { context, page } = await openQuoteRolePage(browser, users['sales']);
+      // The target is owned and readable, so this denial proves the functional boundary.
+      const { context, page } = await openQuoteRolePage(browser, users['reader']);
       try {
+        expect((await page.request.get(`/api/dynamic/qo_supplier_request_common/${headPid}`)).status()).toBe(200);
         const denied = await page.request.put(`/api/dynamic/qo_supplier_request_common/${headPid}`, {
           data: { qo_sr_supplier: 'Hijacked Supplier' },
         });
-        expect([403, 400], `denied status, got ${denied.status()}`).toContain(denied.status());
+        expect(denied.status(), 'Read alone cannot mutate an owned inquiry').toBe(403);
         const afterDenied = await queryDynamicRecords(adminPage, 'qo_supplier_request_common', [
           { fieldName: 'qo_sr_code', operator: 'EQ', value: marker },
         ]);
         expect(String(afterDenied[0].qo_sr_supplier ?? '')).not.toBe('Hijacked Supplier');
         expect(Number(afterDenied[0].row_version)).toBe(beforeVersion);
+        expect(afterDenied).toEqual(before);
       } finally {
         await context.close();
       }
+      // A writer still needs the existing object audience; use its own target for the positive control.
+      await reassignRecordOwnerByEmail([{ model: 'qo_supplier_request_common', pid: headPid }], users['sales'].email);
+      const writer = await openQuoteRolePage(browser, users['sales']);
+      try {
+        const allowed = await writer.page.request.put(`/api/dynamic/qo_supplier_request_common/${headPid}`, {
+          data: { qo_sr_supplier: 'Domain-authorized Supplier' },
+        });
+        expect(allowed.status()).toBe(200);
+        expect(String((await allowed.json()).code)).toBe('0');
+        const afterWrite = await queryDynamicRecords(adminPage, 'qo_supplier_request_common', [
+          { fieldName: 'qo_sr_code', operator: 'EQ', value: marker },
+        ]);
+        expect(afterWrite[0].qo_sr_supplier).toBe('Domain-authorized Supplier');
+        expect(Number(afterWrite[0].row_version)).toBe(beforeVersion + 1);
+      } finally { await writer.context.close(); }
     } finally {
       await cleanupRows(adminPage, created);
       await adminCtx.close();
