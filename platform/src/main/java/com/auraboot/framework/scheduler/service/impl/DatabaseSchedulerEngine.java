@@ -10,6 +10,7 @@ import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.TaskScheduler;
@@ -20,6 +21,7 @@ import java.time.Duration;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
@@ -42,6 +44,10 @@ public class DatabaseSchedulerEngine implements SchedulerEngine {
     private final TaskExecutor taskExecutor;
     private final TaskScheduler taskScheduler;
     private final TenantClock tenantClock;
+
+    /** Operational exclusion only; persisted task definitions are left intact. */
+    @Value("${aura.scheduler.excluded-task-pids:}")
+    private Set<String> excludedTaskPids = Set.of();
 
     private final Map<String, ScheduledFuture<?>> scheduledFutures = new ConcurrentHashMap<>();
 
@@ -66,7 +72,7 @@ public class DatabaseSchedulerEngine implements SchedulerEngine {
         for (ScheduledTask task : tasks) {
             try {
                 scheduleTask(task);
-                scheduled++;
+                if (scheduledFutures.containsKey(task.getPid())) scheduled++;
             } catch (Exception e) {
                 log.error("Failed to schedule task: pid={}, type={}, error={}",
                         task.getPid(), task.getTaskType(), e.getMessage(), e);
@@ -94,6 +100,11 @@ public class DatabaseSchedulerEngine implements SchedulerEngine {
 
         // Remove existing schedule if present
         unscheduleTask(task.getPid());
+
+        if (excludedTaskPids.contains(task.getPid())) {
+            log.warn("Scheduled task excluded by startup configuration: pid={}", task.getPid());
+            return;
+        }
 
         Runnable runnable = () -> {
             try {
