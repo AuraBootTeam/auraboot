@@ -254,7 +254,7 @@ function NodeDetailPanel({
   ]
   return (
     <aside
-      className="rounded-card border-border bg-panel border lg:w-80 lg:shrink-0"
+      className="rounded-card border-border bg-panel border w-80 shrink-0"
       data-testid="dag-node-panel"
     >
       <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
@@ -346,7 +346,7 @@ export const DagCanvasBlockRenderer: React.FC<DagCanvasBlockRendererProps> = ({ 
           </span>
         ) : null}
       </div>
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
+      <div className="flex flex-row gap-3 items-stretch">
         <div className="min-w-0 lg:flex-1" onClick={onCanvasClick}>
           <FlowCanvasCard
             nodes={flowNodes}
@@ -367,7 +367,7 @@ export const DagCanvasBlockRenderer: React.FC<DagCanvasBlockRendererProps> = ({ 
           />
         ) : (
           <aside
-            className="rounded-card border-border bg-panel text-text-2 flex items-center border border-dashed p-4 text-xs leading-5 lg:w-80 lg:shrink-0"
+            className="rounded-card border-border bg-panel text-text-2 flex w-80 shrink-0 items-center border border-dashed p-4 text-xs leading-5"
             data-testid="dag-node-panel-empty"
           >
             {getLocalizedText(
