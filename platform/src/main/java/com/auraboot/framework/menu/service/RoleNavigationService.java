@@ -36,6 +36,7 @@ public class RoleNavigationService {
     private final RoleAuthorizationAuthoringAccess authoring;
     private final RoleAuthorizationWriteLock writes;
     private final ObjectMapper json;
+    private final com.auraboot.framework.application.tenant.ApplicationCatalogPolicy catalogPolicy;
 
     public void initialize(Role role) {
         if(role.getTenantId()!=null) jdbc.update("INSERT INTO ab_role_navigation_state(tenant_id,role_id,updated_by) VALUES(?,?,?) ON CONFLICT DO NOTHING",
@@ -54,10 +55,14 @@ public class RoleNavigationService {
 
     /** Called by the role draft transaction, after its own authoring and revision checks. */
     public Selection selection(Role role) {
-        var base=configuration.effectiveMenus(role.getTenantId());
+        var scope=catalogPolicy.read(role.getTenantId());
+        var all=configuration.allEffectiveMenus(role.getTenantId());
+        var base=scope.menus(all);
         Set<String> codes=roleCodes(role);
         var protectedTargets=configuration.defaultTargetMenus(role.getTenantId());
-        var selected=selected(role,base,codes);
+        var stored=selected(role,all,codes,scope.active());
+        var selected=new TreeSet<>(stored);
+        if(scope.active())selected.retainAll(base.stream().map(Menu::getPid).toList());
         Map<Long,String> pids=new HashMap<>();base.forEach(m->pids.put(m.getId(),m.getPid()));
         var choices=new ArrayList<>(base.stream().map(menu->new Choice(menu.getPid(),menu.getName(),pids.get(menu.getParentId()),
                 Integer.valueOf(0).equals(menu.getType()),!Boolean.FALSE.equals(menu.getVisible())&&menu.getStatus()==com.auraboot.framework.menu.constant.MenuStatus.ACTIVE&&MenuEnvironmentScopeService.isVisibleIn(menu,MetaContext.getCurrentEnvironmentId()),
@@ -65,7 +70,7 @@ public class RoleNavigationService {
         for(String missing:selected)if(base.stream().noneMatch(m->missing.equals(m.getPid())))
             choices.add(new Choice(missing,"",null,false,false,"missing",false,null));
         String mode=explicit(role)?"explicit":"legacy";
-        return new Selection(role.getPid(),digest(List.of(role,mode,new TreeSet<>(selected),choices)),mode,selected,choices);
+        return new Selection(role.getPid(),digest(List.of(role,mode,new TreeSet<>(stored),choices,scope)),mode,selected,choices);
     }
 
     public void validate(Role role,Set<String> proposed) {
@@ -85,11 +90,21 @@ public class RoleNavigationService {
         if(!org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive() || !Objects.equals(role.getTenantId(),MetaContext.getCurrentTenantId()))throw new AccessDeniedException("Owned role navigation transaction required");
         requireManager();
         validate(role,proposed);var before=selection(role);
+        var retained=new TreeSet<String>();
+        var scope=catalogPolicy.read(role.getTenantId());
+        if(scope.active()) {
+            var all=configuration.allEffectiveMenus(role.getTenantId());
+            retained.addAll(selected(role,all,roleCodes(role),false));
+            retained.removeAll(scope.menus(all).stream().map(Menu::getPid).toList());
+        }
+        var persisted=new TreeSet<>(proposed);persisted.addAll(retained);
+        var existing=new HashSet<>(jdbc.queryForList("SELECT menu_pid FROM ab_role_navigation_menu WHERE tenant_id=? AND role_id=?",String.class,role.getTenantId(),role.getId()));
         initialize(role);
-        jdbc.update("DELETE FROM ab_role_navigation_menu WHERE tenant_id=? AND role_id=?",role.getTenantId(),role.getId());
-        for(String pid:new TreeSet<>(proposed))jdbc.update("INSERT INTO ab_role_navigation_menu(tenant_id,role_id,menu_pid) VALUES(?,?,?)",role.getTenantId(),role.getId(),pid);
+        var removed=existing.stream().filter(pid->!persisted.contains(pid)).map(pid->new Object[]{role.getTenantId(),role.getId(),pid}).toList();
+        if(!removed.isEmpty())jdbc.batchUpdate("DELETE FROM ab_role_navigation_menu WHERE tenant_id=? AND role_id=? AND menu_pid=?",removed);
+        for(String pid:persisted)if(!existing.contains(pid))jdbc.update("INSERT INTO ab_role_navigation_menu(tenant_id,role_id,menu_pid) VALUES(?,?,?)",role.getTenantId(),role.getId(),pid);
         jdbc.update("UPDATE ab_role_navigation_state SET updated_at=CURRENT_TIMESTAMP,updated_by=? WHERE tenant_id=? AND role_id=?",MetaContext.getCurrentUserId(),role.getTenantId(),role.getId());
-        audit(role,before,proposed);
+        audit(role,before,proposed,retained);
     }
 
     /** Fresh active roles, including the implicit member role and governed contributors. */
@@ -102,9 +117,10 @@ public class RoleNavigationService {
             var ids=new LinkedHashSet<>(snapshots.getUserRoleIds(tenant,user,member));
             var baseline=roles.findByTenantIdAndCode(tenant,"tenant_member");if(baseline!=null)ids.add(baseline.getId());
             var result=new HashSet<String>();
+            boolean scoped=catalogPolicy.read(tenant).active();
             if(!ids.isEmpty())for(Role role:roles.selectBatchIds(ids))
                 if(Objects.equals(tenant,role.getTenantId())&&!Boolean.TRUE.equals(role.getDeletedFlag())&&"active".equalsIgnoreCase(role.getStatus()))
-                    result.addAll(selected(role,menus,roleCodes(role)));
+                    result.addAll(selected(role,menus,roleCodes(role),scoped));
             return Set.copyOf(result);
         });
     }
@@ -132,9 +148,10 @@ public class RoleNavigationService {
     private void requireMenu(String pid){if(configuration.effectiveMenus(MetaContext.getCurrentTenantId()).stream().noneMatch(m->pid.equals(m.getPid())&&Integer.valueOf(1).equals(m.getType())))throw new AccessDeniedException("Assignable navigation entry required");}
     private String entryRevision(String menuPid){return digest(List.of(menuPid,tenantRoles().stream().map(this::selection).toList()));}
     private boolean explicit(Role role){return jdbc.queryForObject("SELECT count(*) FROM ab_role_navigation_state WHERE tenant_id=? AND role_id=?",Integer.class,role.getTenantId(),role.getId())>0;}
-    private Set<String> selected(Role role,List<Menu> menus,Set<String> codes){
+    private Set<String> selected(Role role,List<Menu> menus,Set<String> codes,boolean inheritDirectoryPermission){
         if(explicit(role))return new TreeSet<>(jdbc.queryForList("SELECT menu_pid FROM ab_role_navigation_menu WHERE tenant_id=? AND role_id=? ORDER BY menu_pid",String.class,role.getTenantId(),role.getId()));
-        return menus.stream().filter(m->!Integer.valueOf(0).equals(m.getType())&&!custom(m)&&legacyAllowed(m,codes)).map(Menu::getPid).collect(java.util.stream.Collectors.toCollection(TreeSet::new));
+        var byId=new HashMap<Long,Menu>();menus.forEach(menu->byId.put(menu.getId(),menu));
+        return menus.stream().filter(m->!Integer.valueOf(0).equals(m.getType())&&!custom(m)&&legacyAllowed(m,codes,byId,inheritDirectoryPermission)).map(Menu::getPid).collect(java.util.stream.Collectors.toCollection(TreeSet::new));
     }
     Set<String> roleCodes(Role role){return snapshots.withFreshReads(()->snapshots.resolvePermissionCodes(role.getTenantId(),snapshots.getEffectiveRolePermissionIds(role.getTenantId(),role.getId())));}
     private String targetPermission(Menu menu,List<Menu> sources){
@@ -144,7 +161,20 @@ public class RoleNavigationService {
         return target==null?null:target.getPermissionCode();
     }
     private boolean targetAllowed(Menu menu,List<Menu> sources,Set<String> codes){String code=targetPermission(menu,sources);return code==null||code.isBlank()||codes.contains(code);}
-    static boolean legacyAllowed(Menu menu,Set<String> codes){return menu.getPermissionCode()==null||menu.getPermissionCode().isBlank()||codes.contains(menu.getPermissionCode());}
+    /** Only scoped legacy fallback inherits an unspecified leaf's declared directory requirement.
+     * Explicit role selections stay independent; unrelated product behavior stays unchanged.
+     */
+    static boolean legacyAllowed(Menu menu,Set<String> codes,Map<Long,Menu> byId,boolean inheritDirectoryPermission){
+        Menu current=menu;var visited=new HashSet<Menu>();
+        while(current!=null){
+            if(!visited.add(current))return false;
+            String code=current.getPermissionCode();
+            if(code!=null&&!code.isBlank())return codes.contains(code);
+            if(!inheritDirectoryPermission)return true;
+            current=current.getParentId()==null?null:byId.get(current.getParentId());
+        }
+        return true;
+    }
     private static boolean custom(Menu menu){return menu.getExtension()!=null&&Boolean.TRUE.equals(menu.getExtension().get("navigationCustom"));}
     void requireManager(){
         Long user=MetaContext.getCurrentUserId();
@@ -166,11 +196,13 @@ public class RoleNavigationService {
         Set<String> selected=selection(role).selectedMenuPids();
         return configuration.effectiveMenus(role.getTenantId()).stream().filter(m->Integer.valueOf(0).equals(m.getType())||selected.contains(m.getPid())).toList();
     }
-    private void audit(Role role,Selection before,Set<String> after){
+    private void audit(Role role,Selection before,Set<String> after,Set<String> retained){
         Map<String,String> names=new HashMap<>();before.menus().forEach(m->names.put(m.pid(),m.name()));
         var added=after.stream().filter(pid->!before.selectedMenuPids().contains(pid)).map(pid->names.getOrDefault(pid,"")).sorted().toList();
         var removed=before.selectedMenuPids().stream().filter(pid->!after.contains(pid)).map(pid->names.getOrDefault(pid,"")).sorted().toList();
-        jdbc.update("INSERT INTO ab_role_navigation_audit(pid,tenant_id,role_pid,actor_id,before_selection,after_selection) VALUES(?,?,?,?,?::jsonb,?::jsonb)",UlidGenerator.generate(),role.getTenantId(),role.getPid(),MetaContext.getCurrentUserId(),encode(Map.of("name",role.getName(),"menuPids",before.selectedMenuPids())),encode(Map.of("name",role.getName(),"menuPids",after,"addedMenus",added,"removedMenus",removed,"previousMode",before.mode())));
+        var previous=new TreeSet<>(before.selectedMenuPids());previous.addAll(retained);
+        var persisted=new TreeSet<>(after);persisted.addAll(retained);
+        jdbc.update("INSERT INTO ab_role_navigation_audit(pid,tenant_id,role_pid,actor_id,before_selection,after_selection) VALUES(?,?,?,?,?::jsonb,?::jsonb)",UlidGenerator.generate(),role.getTenantId(),role.getPid(),MetaContext.getCurrentUserId(),encode(Map.of("name",role.getName(),"menuPids",previous)),encode(Map.of("name",role.getName(),"menuPids",persisted,"retainedMenuPids",retained,"addedMenus",added,"removedMenus",removed,"previousMode",before.mode())));
     }
     public void auditAuthorization(Role role,List<AuthorizationChange> changes) {
         if(changes.isEmpty())return;

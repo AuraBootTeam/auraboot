@@ -33,6 +33,7 @@ public class PluginController {
     private final PlatformVersionChecker platformVersionChecker;
     private final PlatformProperties platformProperties;
     private final com.auraboot.framework.plugin.pf4j.AuraPluginManager auraPluginManager;
+    private final com.auraboot.framework.application.tenant.ApplicationCatalogPolicy catalogPolicy;
 
     /**
      * List all installed plugins for the current tenant.
@@ -46,7 +47,7 @@ public class PluginController {
             return ApiResponse.success(List.of());
         }
 
-        List<PluginRecord> plugins = pluginRecordMapper.findByTenant();
+        List<PluginRecord> plugins = catalogPlugins(tenantId);
         List<PluginDTO> dtos = plugins.stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
@@ -134,7 +135,7 @@ public class PluginController {
     @RequirePermission(MetaPermission.PLUGIN_READ)
     public ApiResponse<VersionCheckResult> checkVersionCompatibility() {
         Long tenantId = MetaContext.getCurrentTenantId();
-        List<PluginRecord> plugins = tenantId == null ? List.of() : pluginRecordMapper.findByTenant();
+        List<PluginRecord> plugins = tenantId == null ? List.of() : catalogPlugins(tenantId);
 
         String platformVersion = platformProperties.getVersion();
         List<PluginCompatibilityDTO> results = plugins.stream()
@@ -155,6 +156,15 @@ public class PluginController {
                 .collect(Collectors.toList());
 
         return ApiResponse.success(new VersionCheckResult(platformVersion, results));
+    }
+
+    private List<PluginRecord> catalogPlugins(Long tenant) {
+        var catalog = catalogPolicy.read(tenant);
+        if (!catalog.active()) return pluginRecordMapper.findByTenant();
+        if (catalog.pluginIds().isEmpty()) return List.of();
+        return pluginRecordMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<PluginRecord>()
+                .eq("tenant_id", tenant).eq("deleted_flag", false).in("plugin_id", catalog.pluginIds())
+                .orderByDesc("created_at"));
     }
 
     private PluginDTO toDTO(PluginRecord plugin) {

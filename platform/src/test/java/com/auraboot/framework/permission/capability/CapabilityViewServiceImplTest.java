@@ -31,8 +31,48 @@ class CapabilityViewServiceImplTest {
     private final RolePermissionService rolePermissionService = mock(RolePermissionService.class);
     private final MenuMapper menuMapper = mock(MenuMapper.class);
     private final CapabilityResolver resolver = new CapabilityResolver();
+    private final com.auraboot.framework.tenant.service.TenantPreferenceService preferences = mock(com.auraboot.framework.tenant.service.TenantPreferenceService.class);
     private final CapabilityViewServiceImpl service =
-            new CapabilityViewServiceImpl(mock(com.auraboot.framework.permission.service.RoleAuthorizationWriteLock.class), authoringAccess, permissionService, registry, resolver, rolePermissionService, menuMapper);
+            new CapabilityViewServiceImpl(mock(com.auraboot.framework.permission.service.RoleAuthorizationWriteLock.class), authoringAccess, permissionService, registry, resolver, rolePermissionService, menuMapper,
+                    new com.auraboot.framework.application.tenant.ApplicationCatalogPolicy(preferences,"bom-quote"));
+
+    private void productCatalog() {
+        var policy = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode();
+        policy.put("version",1).put("applicationCode","bom-quote");
+        policy.putArray("pluginIds");
+        policy.putArray("menuCodes");policy.putArray("pageKeys");
+        policy.putArray("capabilityCodes").add("current.cap.write");
+        when(preferences.getPreference(42L,com.auraboot.framework.application.tenant.ApplicationCatalogPolicy.key("bom-quote"))).thenReturn(policy);
+        MetaContext.setContext(42L,1L,"user","User");
+        var active=List.of(perm(1L,"visible","current.record.write"),perm(2L,"hidden","legacy.record.read"),perm(3L,"shared","meta.command.execute"));
+        when(permissionService.findAllActive()).thenReturn(active);
+        when(permissionService.findRoleConfiguredPermissions(5L)).thenReturn(active);
+        when(registry.listDeclarations(42L)).thenReturn(List.of(
+                decl("current.cap.write","Current","current.record.write","meta.command.execute"),
+                decl("legacy.cap.read","Legacy","legacy.record.read","meta.command.execute")));
+        when(menuMapper.findAllActiveMenus()).thenReturn(List.of());
+    }
+
+    @Test void productEditorPreservesHiddenBindingsAndTheirSharedDependencies() {
+        productCatalog();
+        var preview=service.previewCapabilitySelection(5L,Set.of());
+        assertThat(preview.revokedCodes()).containsExactly("current.record.write");
+        assertThat(preview.preservedCodes()).containsExactlyInAnyOrder("legacy.record.read","meta.command.execute");
+        service.applyCapabilitySelection(5L,Set.of());
+        verify(rolePermissionService).removePermissionsFromRoleByPids(5L,List.of("visible"));
+        verify(rolePermissionService,org.mockito.Mockito.never()).assignPermissionsToRole(any(),any());
+    }
+
+    @Test void productCatalogHidesUnrelatedCandidatesAndRejectsTheirMutation() {
+        productCatalog();
+        assertThat(service.resolveForRole(5L)).flatExtracting(CapabilityGroup::getCapabilities)
+                .extracting(Capability::getCode).containsExactly("current.cap.write");
+        assertThatThrownBy(()->service.previewCapabilitySelection(5L,Set.of("legacy.cap.read")))
+                .isInstanceOf(com.auraboot.framework.exception.RootUnCheckedException.class);
+        assertThatThrownBy(()->service.previewCapabilitySelection(5L,Set.of(),Set.of("legacy.cap.read")))
+                .isInstanceOf(com.auraboot.framework.exception.RootUnCheckedException.class);
+        verifyNoInteractions(rolePermissionService);
+    }
 
     @Test void directCapabilityWriteMustPassAdministrationAndTargetChecks() {
         org.mockito.Mockito.doThrow(new org.springframework.security.access.AccessDeniedException("administrator required"))

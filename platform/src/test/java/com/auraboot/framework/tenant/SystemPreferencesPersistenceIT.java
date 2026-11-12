@@ -224,8 +224,10 @@ class SystemPreferencesPersistenceIT {
         }
 
         @Bean
-        TenantPreferenceService tenantPreferenceService(TenantPreferenceMapper mapper) {
-            return new TenantPreferenceServiceImpl(mapper);
+        TenantPreferenceService tenantPreferenceService(TenantPreferenceMapper mapper, javax.sql.DataSource source) {
+            return new TenantPreferenceServiceImpl(mapper,
+                    new com.auraboot.framework.permission.service.RoleAuthorizationWriteLock(
+                            new org.springframework.jdbc.core.JdbcTemplate(source), java.util.Map.of()));
         }
 
         @Bean

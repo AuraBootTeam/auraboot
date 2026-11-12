@@ -19,6 +19,7 @@ import java.util.Map;
 public class TenantPreferenceServiceImpl implements TenantPreferenceService {
 
     private final TenantPreferenceMapper preferenceMapper;
+    private final com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWrites;
 
     @Override
     public JsonNode getPreference(Long tenantId, String key) {
@@ -33,6 +34,13 @@ public class TenantPreferenceServiceImpl implements TenantPreferenceService {
     @Override
     @Transactional
     public void setPreference(Long tenantId, String key, JsonNode value) {
+        if (key != null && key.startsWith(com.auraboot.framework.application.tenant.ApplicationCatalogPolicy.KEY_PREFIX)) {
+            var scope = com.auraboot.framework.application.tenant.ApplicationCatalogPolicy.parse(value);
+            if (!key.equals(com.auraboot.framework.application.tenant.ApplicationCatalogPolicy.key(scope.applicationCode()))) {
+                throw new IllegalStateException("Application catalog identity mismatch");
+            }
+            authorizationWrites.mutateForTenant(tenantId);
+        }
         TenantPreference existing = preferenceMapper.selectOne(
                 new QueryWrapper<TenantPreference>()
                         .eq("tenant_id", tenantId)

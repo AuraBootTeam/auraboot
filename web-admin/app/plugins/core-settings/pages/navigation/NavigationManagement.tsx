@@ -4,6 +4,8 @@ import { Link, useBlocker } from 'react-router';
 import NavigationRoleAssignment from './NavigationRoleAssignment';
 import { usePermissions } from '~/contexts/AuthContext';
 import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import MESSAGES from './NavigationManagement.i18n.json';
 import { useToastContext } from '~/contexts/ToastContext';
 import { RouteAccessDenied } from '~/ui/PermissionGuard';
 import ConfirmDialog from '~/ui/ConfirmDialog';
@@ -47,7 +49,7 @@ export default function NavigationManagement() {
   return <Editor />;
 }
 function Editor() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { showSuccessToast, showErrorToast } = useToastContext();
   const [snapshot, setSnapshot] = useState<NavigationSnapshot | null>(null),
     [selected, setSelected] = useState<string | null>(null),
@@ -390,7 +392,7 @@ function Editor() {
                   ]),
                 ].map((icon) => (
                   <option key={icon} value={icon}>
-                    {t('navigation.icon.' + icon, undefined, 'Current icon')}
+                    {t('navigation.icon.' + icon, undefined, getLocalizedText(MESSAGES.currentIcon, locale))}
                   </option>
                 ))}
               </select>

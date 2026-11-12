@@ -40,6 +40,7 @@ public class NavigationConfigurationService {
     private final PermissionSnapshotCache snapshots;
     private final RoleAuthorizationWriteLock writes;
     private final jakarta.validation.Validator validator;
+    private final com.auraboot.framework.application.tenant.ApplicationCatalogPolicy catalogPolicy;
     private static final Set<String> KINDS = Set.of("directory", "page", "internal", "external", "embedded");
 
     @Transactional
@@ -124,6 +125,11 @@ public class NavigationConfigurationService {
 
     /** Fresh database reads: customization changes and removals do not depend on a stale menu cache. */
     public List<Menu> effectiveMenus(Long tenant) {
+        return catalogPolicy.read(tenant).menus(allEffectiveMenus(tenant));
+    }
+
+    /** Full stored navigation is retained for target protection and preservation during edits. */
+    public List<Menu> allEffectiveMenus(Long tenant) {
         if (tenant == null) throw new AccessDeniedException("Navigation tenant required");
         List<Menu> base = defaults(tenant);
         Map<String,Definition> overrides = overrides(tenant);
@@ -199,12 +205,14 @@ public class NavigationConfigurationService {
     }
 
     private Snapshot snapshot() {
-        var base = defaults();
+        var scope = catalogPolicy.read(tenant());
+        var all = allEffectiveMenus(tenant());
+        var base = scope.menus(all);
         var overrides = overrides(tenant());
         Set<String> published=publishedKeys(tenant());
         var entries = new ArrayList<>(base.stream().map(menu -> new Entry(menu.getPid(), overrides.getOrDefault(menu.getPid(), definition(menu,base)),
                 custom(menu) ? "custom" : "default", overrides.containsKey(menu.getPid()), targetAvailable(menu,overrides.getOrDefault(menu.getPid(),definition(menu,base)),published))).toList());
-        overrides.forEach((pid,definition) -> {if(base.stream().noneMatch(menu -> pid.equals(menu.getPid()))) entries.add(new Entry(pid,definition,"missing",true,false));});
+        overrides.forEach((pid,definition) -> {if(all.stream().noneMatch(menu -> pid.equals(menu.getPid()))) entries.add(new Entry(pid,definition,"missing",true,false));});
         List<Option> pages = jdbc.query("""
                 SELECT page_key,name FROM (
                     SELECT DISTINCT ON(page_key) page_key,name FROM ab_page_schema
@@ -212,7 +220,10 @@ public class NavigationConfigurationService {
                       AND (env_id=? OR env_id IS NULL)
                     ORDER BY page_key,(env_id IS NOT NULL) DESC,is_current DESC,published_at DESC,id DESC
                 ) current_pages ORDER BY name,page_key
-                """, (rs,i) -> new Option(rs.getString(1),rs.getString(2)), tenant(), MetaContext.getCurrentEnvironmentId());
+                """, (rs,i) -> new Option(rs.getString(1),rs.getString(2)), tenant(), MetaContext.getCurrentEnvironmentId()).stream()
+                .filter(page -> scope.page(page.value()) || base.stream().anyMatch(menu ->
+                        (custom(menu) || Boolean.TRUE.equals(extra(menu,"navigationCustomized")))
+                                && Objects.equals(menu.getPageKey(),page.value()))).toList();
         // Navigation audiences reference existing page-entry requirements, not technical model CRUD.
         Map<String,Option> audienceOptions=new TreeMap<>();
         for(Menu menu:base)if(!custom(menu) && Integer.valueOf(1).equals(menu.getType())
@@ -226,7 +237,7 @@ public class NavigationConfigurationService {
                 WHERE a.tenant_id=? ORDER BY a.created_at DESC,a.pid DESC LIMIT 30
                 """, (rs,i) -> new Audit(rs.getString(1),rs.getString(2),rs.getString(3),rs.getString(4),rs.getString(5),rs.getTimestamp(6).toInstant().toString()), tenant());
         // Defaults and overlays both participate; a plugin update invalidates an old editor.
-        String revision = digest(encode(List.of(base, new TreeMap<>(overrides), pages, availablePermissions)));
+        String revision = digest(encode(List.of(base, new TreeMap<>(overrides), pages, availablePermissions, scope)));
         return new Snapshot(revision, entries, pages, availablePermissions, audit);
     }
 

@@ -41,6 +41,28 @@ class NavigationTargetValidationTest {
         assertNull(NavigationConfigurationService.selectTargetAccessMenu(java.util.List.of(custom),"/p/bom_list"));
     }
 
+    @org.junit.jupiter.api.Test
+    void scopedLegacyLeavesInheritTheExistingDirectoryRequirementWithoutOverridingTheirOwn(){
+        var root=new com.auraboot.framework.menu.entity.Menu();root.setId(1L);root.setPermissionCode("ai_center");
+        var settings=new com.auraboot.framework.menu.entity.Menu();settings.setId(2L);settings.setParentId(1L);
+        var leaf=new com.auraboot.framework.menu.entity.Menu();leaf.setId(3L);leaf.setParentId(2L);
+        var menus=java.util.Map.of(1L,root,2L,settings,3L,leaf);
+        assertFalse(RoleNavigationService.legacyAllowed(leaf,java.util.Set.of("bom.cap.write"),menus,true));
+        assertTrue(RoleNavigationService.legacyAllowed(leaf,java.util.Set.of("ai_center"),menus,true));
+        assertTrue(RoleNavigationService.legacyAllowed(leaf,java.util.Set.of(),menus,false));
+        leaf.setPermissionCode("audit.read");
+        assertTrue(RoleNavigationService.legacyAllowed(leaf,java.util.Set.of("audit.read"),menus,true));
+        assertFalse(RoleNavigationService.legacyAllowed(leaf,java.util.Set.of("ai_center"),menus,true));
+    }
+
+    @org.junit.jupiter.api.Test
+    void scopedLegacyPublicRootsRemainPublicAndUnqualifiedCyclesFailClosed(){
+        var publicLeaf=new com.auraboot.framework.menu.entity.Menu();publicLeaf.setId(1L);
+        assertTrue(RoleNavigationService.legacyAllowed(publicLeaf,java.util.Set.of(),java.util.Map.of(1L,publicLeaf),true));
+        publicLeaf.setParentId(1L);
+        assertFalse(RoleNavigationService.legacyAllowed(publicLeaf,java.util.Set.of(),java.util.Map.of(1L,publicLeaf),true));
+    }
+
     @ParameterizedTest
     @CsvSource({"external,https://example.com/docs?tab=guide", "embedded,http://localhost:8000/guide", "internal,/p/qo_quote_common?status=draft", "page,qo_quote_common_list"})
     void acceptsSupportedNavigationTargets(String kind,String target) {
