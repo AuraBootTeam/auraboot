@@ -28421,7 +28421,7 @@
             "type": "string"
           },
           "rate": {
-            "minimum": 1e-08,
+            "minimum": 1e-8,
             "type": "number"
           },
           "source": {
