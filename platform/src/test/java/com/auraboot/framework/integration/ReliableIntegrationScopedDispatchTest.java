@@ -156,4 +156,31 @@ class ReliableIntegrationScopedDispatchTest {
         event.setHeaders("{}"); event.setRetryCount(0); event.setMaxRetries(1);
         return event;
     }
+
+    @Test
+    void eachConsumerAndFailureUseTheirOwnPersistedCorrelationAndRestoreTheCaller() {
+        when(registry.consumersFor(anyString())).thenReturn(List.of(consumer));
+        var first = event(10L, "first-event");first.setCorrelationId("first-http-request");
+        var second = event(11L, "second-event");second.setCorrelationId("second-http-request");
+        when(claims.claimTenant(anyLong(),anyString(),anyList(),anyInt(),anyString(),anyString(),any()))
+                .thenReturn(List.of(first,second));
+        doAnswer(call -> {
+            IntegrationEventEnvelope envelope = call.getArgument(0);
+            assertThat(org.slf4j.MDC.get("requestId")).isEqualTo(envelope.correlationId());
+            if (envelope.eventId().equals("second-event")) throw new IllegalStateException("Controlled failure");
+            return null;
+        }).when(executor).deliver(any(),same(consumer),anyString());
+        when(state.markDelivered(same(first),anyString())).thenAnswer(call -> {
+            assertThat(org.slf4j.MDC.get("requestId")).isEqualTo("first-http-request");return true;
+        });
+        when(state.recordFailure(same(second),anyString(),any(),anyString())).thenAnswer(call -> {
+            assertThat(org.slf4j.MDC.get("requestId")).isEqualTo("second-http-request");return true;
+        });
+        org.slf4j.MDC.put("requestId","original-worker-context");
+        try {
+            var result=worker.dispatchCurrentTenant("commerce",Set.of("commerce.a"),2);
+            assertThat(result.delivered()).isEqualTo(1);assertThat(result.failed()).isEqualTo(1);
+            assertThat(org.slf4j.MDC.get("requestId")).isEqualTo("original-worker-context");
+        } finally {org.slf4j.MDC.remove("requestId");}
+    }
 }
