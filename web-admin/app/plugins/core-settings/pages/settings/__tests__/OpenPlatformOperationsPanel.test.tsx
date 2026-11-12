@@ -44,7 +44,7 @@ describe('installation call audit receipts', () => {
   it('explains accepted202 without fabricating a final processing result', async () => {
     render(<OpenPlatformOperationsPanel installationPid="owned-installation" />);
     expect(await screen.findByTestId('call-audit-accepted-help')).toHaveTextContent(
-      'HTTP 202 confirms acceptance only. Query the event result using its receipt for the final processing outcome.');
+      'HTTP 202 confirms acceptance only. Query the event result using the original eventId for the final processing outcome.');
     const entry = screen.getByTestId('open-platform-call-audit-entry');
     expect(entry).not.toHaveTextContent('Completed');
     expect(entry).not.toHaveTextContent('Delivered');

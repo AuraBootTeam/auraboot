@@ -220,8 +220,8 @@ export default function OpenPlatformOperationsPanel({
               {audits.some((audit) => audit.status === 202 && audit.path.startsWith('/api/open/v1/event-sources/')) && (
                 <p className="mb-2 text-xs text-gray-500" data-testid="call-audit-accepted-help">
                   {getLocalizedText({
-                    'zh-CN': 'HTTP 202 仅表示已接收；最终处理结果请使用回执查询事件结果接口。',
-                    en: 'HTTP 202 confirms acceptance only. Query the event result using its receipt for the final processing outcome.',
+                    'zh-CN': 'HTTP 202 仅表示已接收；最终处理结果请使用原 eventId 查询事件结果接口。',
+                    en: 'HTTP 202 confirms acceptance only. Query the event result using the original eventId for the final processing outcome.',
                   }, locale, t)}
                 </p>
               )}
