@@ -858,9 +858,12 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
         var withScope=drafts.snapshot(rolePid);
         drafts.apply(rolePid,new RoleAuthorizationDraftRequest(withScope.revision(),Set.of(editCapability),Set.of(),false,null,false,
                 List.of(new DataScopeUpdateRequest(resource,"read","self",null))));
-        String visible=UniqueIdGenerator.generate(),hidden=UniqueIdGenerator.generate();
+        String visible=UniqueIdGenerator.generate(),hidden=UniqueIdGenerator.generate(),outside=UniqueIdGenerator.generate();
+        Long outsideId=IdWorker.getId();
+        jdbc.update("INSERT INTO ab_menu(id,pid,tenant_id,code,name,type,visible,status,deleted_flag) VALUES(?,?,?,?,?,0,TRUE,'active',FALSE)",outsideId,outside,getTestTenant().getId(),resource+"_outside","Outside group");
         for(var menu:Map.of(visible,resource+"_visible",hidden,resource+"_hidden").entrySet())
             jdbc.update("INSERT INTO ab_menu(id,pid,tenant_id,code,name,type,path,visible,status,deleted_flag) VALUES(?,?,?,?,?,1,'/home',TRUE,'active',FALSE)",IdWorker.getId(),menu.getKey(),getTestTenant().getId(),menu.getValue(),menu.getValue());
+        jdbc.update("UPDATE ab_menu SET parent_id=? WHERE tenant_id=? AND pid=?",outsideId,getTestTenant().getId(),visible);
         try {
             var navigationBefore=navigation.read(rolePid);
             navigation.save(rolePid,new com.auraboot.framework.menu.dto.RoleNavigation.Write(navigationBefore.revision(),Set.of(visible,hidden)));
@@ -874,18 +877,20 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
                     .extracting(com.auraboot.framework.permission.capability.Capability::getCode).containsExactly(editCapability);
             assertThat(before.navigation().selectedMenuPids()).containsExactly(visible);
             assertThat(before.navigation().menus()).extracting(com.auraboot.framework.menu.dto.RoleNavigation.Choice::pid).containsExactly(visible);
+            assertThat(before.navigation().menus().getFirst().parentPid()).isNull();
             var request=new RoleAuthorizationDraftRequest(before.revision(),Set.of(),Set.of(),false,null,false,List.of(),null,Set.of());
             drafts.apply(rolePid,request);
             assertThat(persistedCodes()).containsExactly(readCode);
             assertThat(jdbc.queryForObject("SELECT to_jsonb(g)::text FROM ab_role_permission g WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),binding.bindingPid())).isEqualTo(grantBefore);
             assertThat(jdbc.queryForObject("SELECT xmin::text FROM ab_role_navigation_menu WHERE tenant_id=? AND role_id=? AND menu_pid=?",String.class,getTestTenant().getId(),roleId,hidden)).isEqualTo(menuBefore);
             assertThat(jdbc.queryForList("SELECT menu_pid FROM ab_role_navigation_menu WHERE tenant_id=? AND role_id=?",String.class,getTestTenant().getId(),roleId)).containsExactly(hidden);
+            assertThat(jdbc.queryForObject("SELECT parent_id FROM ab_menu WHERE tenant_id=? AND pid=?",Long.class,getTestTenant().getId(),visible)).isEqualTo(outsideId);
             assertThat(jdbc.queryForList("SELECT * FROM ab_role_data_scope WHERE tenant_id=? AND role_id=? ORDER BY id",getTestTenant().getId(),roleId)).isEqualTo(scopesBefore);
             assertThat(fieldBindings.findByRolePid(getTestTenant().getId(),rolePid)).usingRecursiveComparison().isEqualTo(fieldsBefore);
         } finally {
             jdbc.update("DELETE FROM ab_role_navigation_menu WHERE tenant_id=? AND role_id=?",getTestTenant().getId(),roleId);
             jdbc.update("DELETE FROM ab_role_navigation_state WHERE tenant_id=? AND role_id=?",getTestTenant().getId(),roleId);
-            jdbc.update("DELETE FROM ab_menu WHERE tenant_id=? AND pid IN (?,?)",getTestTenant().getId(),visible,hidden);
+            jdbc.update("DELETE FROM ab_menu WHERE tenant_id=? AND pid IN (?,?,?)",getTestTenant().getId(),visible,hidden,outside);
         }
     }
 

@@ -76,6 +76,25 @@ class ApplicationCatalogPolicyTest {
         assertThat(scope.page("current_list")).isTrue();assertThat(scope.page("old_list")).isFalse();
     }
 
+    @Test void aRetainedDefaultProjectsToRootWithoutChangingTheSharedStoredParent() {
+        var outside=menu(1L,null,"outside");var current=menu(2L,1L,"current");
+        var projected=ApplicationCatalogPolicy.parse(declaration()).menus(List.of(outside,current));
+        assertThat(projected).singleElement().satisfies(menu->{
+            assertThat(menu.getPid()).isEqualTo(current.getPid());
+            assertThat(menu.getParentId()).isNull();
+            assertThat(menu).isNotSameAs(current);
+        });
+        assertThat(current.getParentId()).isEqualTo(1L);
+    }
+
+    @Test void aCustomChildPreservesTheWholeOriginalAncestorChain() {
+        var outside=menu(1L,null,"outside");var current=menu(2L,1L,"current");var custom=menu(3L,2L,"custom");
+        var extension=new ExtensionBean();extension.setDynamicProperty("navigationCustom",true);custom.setExtension(extension);
+        var all=List.of(outside,current,custom);
+        assertThat(ApplicationCatalogPolicy.parse(declaration()).menus(all)).containsExactlyElementsOf(all);
+        assertThat(current.getParentId()).isEqualTo(1L);assertThat(custom.getParentId()).isEqualTo(2L);
+    }
+
     @Test void catalogPreferenceWritesSerializeBeforeAccessingStoredPreferences() {
         var mapper=mock(com.auraboot.framework.tenant.dao.mapper.TenantPreferenceMapper.class);
         var lock=mock(com.auraboot.framework.permission.service.RoleAuthorizationWriteLock.class);

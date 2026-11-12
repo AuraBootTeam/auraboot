@@ -94,7 +94,7 @@ public class ApplicationCatalogPolicy {
                     .filter(group -> !group.getCapabilities().isEmpty()).toList();
         }
 
-        /** Preserve explicit tenant navigation and its ancestors, without modifying stored entries. */
+        /** Project default roots; preserve explicit tenant navigation and its original ancestors. */
         public List<Menu> menus(List<Menu> all) {
             if (!active()) return all;
             var byId = new HashMap<Long, Menu>();
@@ -102,13 +102,27 @@ public class ApplicationCatalogPolicy {
             var kept = new HashSet<Menu>();
             for (Menu menu : all) {
                 var extension = menu.getExtension();
-                if (!menuCodes.contains(menu.getCode()) && (extension == null
-                        || !Boolean.TRUE.equals(extension.get("navigationCustom"))
-                        && !Boolean.TRUE.equals(extension.get("navigationCustomized")))) continue;
+                boolean customized = extension != null && (Boolean.TRUE.equals(extension.get("navigationCustom"))
+                        || Boolean.TRUE.equals(extension.get("navigationCustomized")));
+                if (!customized) {
+                    if (menuCodes.contains(menu.getCode())) kept.add(menu);
+                    continue;
+                }
                 Menu current = menu;
-                while (current != null && kept.add(current)) current = byId.get(current.getParentId());
+                var visited = new HashSet<Menu>();
+                while (current != null && visited.add(current)) {
+                    kept.add(current);
+                    current = byId.get(current.getParentId());
+                }
             }
-            return all.stream().filter(kept::contains).toList();
+            var ids = kept.stream().map(Menu::getId).collect(java.util.stream.Collectors.toSet());
+            return all.stream().filter(kept::contains).map(menu -> {
+                if (menu.getParentId() == null || ids.contains(menu.getParentId())) return menu;
+                var projected = new Menu();
+                org.springframework.beans.BeanUtils.copyProperties(menu, projected);
+                projected.setParentId(null);
+                return projected;
+            }).toList();
         }
     }
 }
