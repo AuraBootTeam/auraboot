@@ -505,6 +505,41 @@ test.describe('BOM & Quote domain levels', () => {
             expect(
               (await actor.request.get(`/api/dynamic/${model}/${foreignQuotePid}`)).status(),
             ).toBe(403);
+            const queuedBefore = await client.query(
+              `SELECT task_code FROM ab_async_task WHERE input_params->>'recordPid'=$1 ORDER BY id`,
+              [createdPid],
+            );
+            const beforeAsync = (
+              await client.query(`SELECT * FROM mt_${model} WHERE pid=$1`, [createdPid])
+            ).rows;
+            const asyncDenied = await command(
+              'qo_quote_common:recompute_quantities',
+              { qo_quote_set_count: 7, qo_quote_price_factor: 1.37 },
+              createdPid,
+            );
+            const asyncBody = await asyncDenied.json();
+            const queuedAfter = await client.query(
+              `SELECT task_code FROM ab_async_task WHERE input_params->>'recordPid'=$1 ORDER BY id`,
+              [createdPid],
+            );
+            const afterAsync = (
+              await client.query(`SELECT * FROM mt_${model} WHERE pid=$1`, [createdPid])
+            ).rows;
+            await info.attach('qo-finite-fields-async-recompute', {
+              body: JSON.stringify({
+                quotePid: createdPid,
+                httpStatus: asyncDenied.status(),
+                responseCode: asyncBody.code,
+                result: asyncBody.data,
+                queuedBefore: queuedBefore.rows,
+                queuedAfter: queuedAfter.rows,
+                rowUnchangedAtResponse: JSON.stringify(beforeAsync) === JSON.stringify(afterAsync),
+              }),
+              contentType: 'application/json',
+            });
+            expect.soft(asyncDenied.status()).toBe(403);
+            expect.soft(queuedAfter.rows).toEqual(queuedBefore.rows);
+            expect.soft(afterAsync).toEqual(beforeAsync);
           }
           await info.attach(`${domain}-finite-fields-persistence`, {
             body: JSON.stringify({
