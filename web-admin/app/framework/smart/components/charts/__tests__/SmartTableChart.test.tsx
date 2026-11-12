@@ -24,6 +24,7 @@ vi.mock('~/shared/services/http-client', () => ({
 // LocalizedText resolution assertions below.
 
 import { SmartTableChart } from '../SmartTableChart';
+import { __resetDimensionLabelCaches } from '~/framework/smart/hooks/useDimensionLabels';
 
 describe('SmartTableChart - widget config columns + i18n', () => {
   beforeEach(() => {
@@ -262,5 +263,24 @@ describe('API enum and unavailable value presentation', () => {
       />,
     );
     await waitFor(() => expect(screen.getByText('打开分析看板后观察再次使用')).toBeInTheDocument());
+  });
+});
+
+
+describe('projected tables never read the page model as a fallback', () => {
+  beforeEach(() => {
+    __resetDimensionLabelCaches();
+    mockFetchResult.mockReset();mockUseChartData.mockReset();
+    mockFetchResult.mockResolvedValue({ code: '0', data: { records: [{ name: 'Projected item' }] } });
+    mockUseChartData.mockReturnValue({ data: { rows: [{ name: 'Projected item' }], summary: {}, meta: { dimensions: ['name'], metrics: [] } }, loading: false, error: null, refetch: vi.fn() });
+  });
+
+  it.each(['api', 'static'] as const)('keeps a %s projection independent of protected model reads', async (type) => {
+    render(<SmartTableChart modelCode="protected_projection_owner"
+      dataSource={type === 'api' ? { type: 'api', url: '/api/owned-projection' } : { type: 'static', staticData: [{ name: 'Projected item' }] }}
+      table={{ columns: [{ field: 'name', label: 'Item' }] }} />);
+    await waitFor(() => expect(screen.getByText('Projected item')).toBeInTheDocument());
+    expect(mockFetchResult.mock.calls.some(([url]) => String(url).startsWith('/api/dynamic/'))).toBe(false);
+    if (type === 'api') expect(mockFetchResult.mock.calls.map(([url]) => url)).toEqual(['/api/owned-projection']);
   });
 });
