@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ArrowPathIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
+import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { openPlatformApiFetch as apiFetch } from './open-platform-api';
 
 interface Overview {
@@ -20,6 +21,10 @@ interface Audit {
   status: number;
   durationMs: number;
   occurredAt: string;
+  resource?: string | null;
+  operation?: string | null;
+  recordPid?: string | null;
+  idempotentReplay?: boolean | null;
 }
 interface Delivery {
   pid: string;
@@ -212,6 +217,14 @@ export default function OpenPlatformOperationsPanel({
               <h4 className="mb-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
                 {t('openPlatform.callAudit', undefined, 'Call audit')}
               </h4>
+              {audits.some((audit) => audit.status === 202 && audit.path.startsWith('/api/open/v1/event-sources/')) && (
+                <p className="mb-2 text-xs text-gray-500" data-testid="call-audit-accepted-help">
+                  {getLocalizedText({
+                    'zh-CN': 'HTTP 202 仅表示已接收；最终处理结果请使用回执查询事件结果接口。',
+                    en: 'HTTP 202 confirms acceptance only. Query the event result using its receipt for the final processing outcome.',
+                  }, locale, t)}
+                </p>
+              )}
               {audits.length === 0 ? (
                 <Empty label={t('openPlatform.noCalls', undefined, 'No calls match this filter')} />
               ) : (
@@ -219,16 +232,40 @@ export default function OpenPlatformOperationsPanel({
                   {audits.map((audit) => (
                     <div
                       key={`${audit.requestId}-${audit.occurredAt}`}
+                      data-testid="open-platform-call-audit-entry"
                       className="rounded-md bg-gray-50 p-2 text-xs dark:bg-gray-950"
                     >
                       <div className="flex min-w-0 justify-between gap-2">
-                        <code className="min-w-0 truncate">
+                        <code className="min-w-0 break-all">
                           {audit.method} {audit.path}
                         </code>
                         <span className={audit.status >= 400 ? 'text-red-600' : 'text-emerald-600'}>
                           {audit.status}
                         </span>
                       </div>
+                      {(audit.resource || audit.operation || audit.recordPid || typeof audit.idempotentReplay === 'boolean') && (
+                        <dl className="mt-2 grid min-w-0 grid-cols-2 gap-x-3 gap-y-2">
+                          <div className="min-w-0">
+                            <dt className="text-gray-400">{getLocalizedText({ 'zh-CN': '资源', en: 'Resource' }, locale, t)}</dt>
+                            <dd className="break-all" data-testid="call-audit-resource">{audit.resource || '—'}</dd>
+                          </div>
+                          <div className="min-w-0">
+                            <dt className="text-gray-400">{getLocalizedText({ 'zh-CN': '操作', en: 'Operation' }, locale, t)}</dt>
+                            <dd className="break-all" data-testid="call-audit-operation">{audit.operation || '—'}</dd>
+                          </div>
+                          <div className="col-span-2 min-w-0">
+                            <dt className="text-gray-400">{getLocalizedText({ 'zh-CN': '记录／回执标识', en: 'Record / receipt ID' }, locale, t)}</dt>
+                            <dd className="break-all font-mono" data-testid="call-audit-record">{audit.recordPid || getLocalizedText({ 'zh-CN': '未记录', en: 'Not recorded' }, locale, t)}</dd>
+                          </div>
+                          <div className="col-span-2 min-w-0">
+                            <dt className="text-gray-400">{getLocalizedText({ 'zh-CN': '重复请求', en: 'Duplicate request' }, locale, t)}</dt>
+                            <dd data-testid="call-audit-replay">{getLocalizedText(
+                              audit.idempotentReplay === true ? { 'zh-CN': '重复请求', en: 'Duplicate request' }
+                                : audit.idempotentReplay === false ? { 'zh-CN': '首次请求', en: 'First request' }
+                                  : { 'zh-CN': '未记录', en: 'Not recorded' }, locale, t)}</dd>
+                          </div>
+                        </dl>
+                      )}
                       <div className="mt-1 flex min-w-0 flex-col gap-1 text-gray-400 sm:flex-row sm:justify-between">
                         <code className="min-w-0 break-all">{audit.requestId}</code>
                         <span>
