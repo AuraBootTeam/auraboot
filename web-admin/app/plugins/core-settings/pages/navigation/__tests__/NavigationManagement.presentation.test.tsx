@@ -6,6 +6,7 @@ import NavigationManagement from '../NavigationManagement';
 import type { NavigationSnapshot } from '../navigationService';
 const state = vi.hoisted(() => ({
   allowed: true,
+  locale: 'zh-CN',
   read: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
@@ -14,7 +15,7 @@ vi.mock('~/contexts/AuthContext', () => ({
   usePermissions: () => ({ hasPermission: () => state.allowed }),
 }));
 vi.mock('~/contexts/I18nContext', () => ({
-  useI18n: () => ({ t: (key: string, _args: unknown, fallback: string) => fallback ?? key }),
+  useI18n: () => ({ locale: state.locale, t: (key: string, _args: unknown, fallback: string) => fallback ?? key }),
 }));
 vi.mock('~/contexts/ToastContext', () => ({
   useToastContext: () => ({ showSuccessToast: vi.fn(), showErrorToast: vi.fn() }),
@@ -55,6 +56,7 @@ const snapshot: NavigationSnapshot = {
 };
 beforeEach(() => {
   state.allowed = true;
+  state.locale = 'zh-CN';
   state.read.mockReset().mockResolvedValue(snapshot);
   state.create.mockReset();
   state.update.mockReset();
@@ -162,4 +164,14 @@ describe('high-fidelity menu editor journeys', () => {
     expect(screen.getByText('Menu management unavailable')).toBeVisible();
     expect(state.read).not.toHaveBeenCalled();
   });
+});
+
+it.each([['zh-CN', '当前图标'], ['en-US', 'Current icon']])('localizes an unlisted stored menu icon in %s', async (locale, label) => {
+  state.locale = locale;
+  state.read.mockResolvedValue({ ...snapshot, entries: [{ ...snapshot.entries[0], definition: {
+    ...snapshot.entries[0].definition, icon: 'LegacyCustomIcon',
+  } }] });
+  show();
+  await screen.findByTestId('navigation-name');
+  expect(document.querySelector('option[value="LegacyCustomIcon"]')).toHaveTextContent(label);
 });

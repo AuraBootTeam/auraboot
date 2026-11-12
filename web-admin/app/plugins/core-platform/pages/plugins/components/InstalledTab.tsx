@@ -194,10 +194,10 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
       return minVersion ? (
         <span
           className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-600"
-          title="Compatible with this platform version"
+          title={text('compatibleHint')}
         >
           <CheckCircleIcon className="h-3 w-3" />
-          Compatible
+          {text('compatible')}
         </span>
       ) : null;
     }
@@ -205,10 +205,10 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
       CompatibilityStatus,
       { bg: string; text: string; label: string; icon: typeof CheckCircleIcon }
     > = {
-      compatible: { bg: 'bg-green-50', text: 'text-green-600', label: 'Compatible', icon: CheckCircleIcon },
-      warn_newer: { bg: 'bg-amber-50', text: 'text-amber-600', label: '⚠ Version mismatch', icon: ExclamationTriangleIcon },
-      warn_older: { bg: 'bg-amber-50', text: 'text-amber-600', label: '⚠ Platform too old', icon: ExclamationTriangleIcon },
-      incompatible: { bg: 'bg-red-50', text: 'text-red-600', label: '✗ Incompatible', icon: XCircleIcon },
+      compatible: { bg: 'bg-green-50', text: 'text-green-600', label: text('compatible'), icon: CheckCircleIcon },
+      warn_newer: { bg: 'bg-amber-50', text: 'text-amber-600', label: text('warn_newer'), icon: ExclamationTriangleIcon },
+      warn_older: { bg: 'bg-amber-50', text: 'text-amber-600', label: text('warn_older'), icon: ExclamationTriangleIcon },
+      incompatible: { bg: 'bg-red-50', text: 'text-red-600', label: text('incompatible'), icon: XCircleIcon },
     };
     const c = configs[status] ?? configs.compatible;
     const Icon = c.icon;

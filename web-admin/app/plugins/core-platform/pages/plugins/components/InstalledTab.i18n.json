@@ -78,5 +78,25 @@
   "plannedAction": {
     "zh-CN": "计划操作",
     "en-US": "Planned operation"
+  },
+  "compatible": {
+    "zh-CN": "兼容",
+    "en-US": "Compatible"
+  },
+  "compatibleHint": {
+    "zh-CN": "与当前平台版本兼容",
+    "en-US": "Compatible with this platform version"
+  },
+  "warn_newer": {
+    "zh-CN": "版本不匹配",
+    "en-US": "Version mismatch"
+  },
+  "warn_older": {
+    "zh-CN": "平台版本过旧",
+    "en-US": "Platform too old"
+  },
+  "incompatible": {
+    "zh-CN": "不兼容",
+    "en-US": "Incompatible"
   }
 }
