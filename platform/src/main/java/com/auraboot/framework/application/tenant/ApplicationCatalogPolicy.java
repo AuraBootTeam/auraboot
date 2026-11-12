@@ -20,8 +20,8 @@ import java.util.TreeSet;
 @Service
 public class ApplicationCatalogPolicy {
     public static final String KEY_PREFIX = "application.catalog.";
-    private static final Set<String> KEYS = Set.of("version", "applicationCode", "menuCodes", "capabilityCodes", "pageKeys");
-    private static final Scope UNSCOPED = new Scope(null, Set.of(), Set.of(), Set.of());
+    private static final Set<String> KEYS = Set.of("version", "applicationCode", "pluginIds", "menuCodes", "capabilityCodes", "pageKeys");
+    private static final Scope UNSCOPED = new Scope(null, Set.of(), Set.of(), Set.of(), Set.of());
     private final TenantPreferenceService preferences;
     private final String applicationCode;
 
@@ -63,7 +63,7 @@ public class ApplicationCatalogPolicy {
             throw new IllegalStateException("Invalid application catalog declaration");
         }
         return new Scope(value.path("applicationCode").asText(), codes(value, "menuCodes"),
-                codes(value, "capabilityCodes"), codes(value, "pageKeys"));
+                codes(value, "capabilityCodes"), codes(value, "pageKeys"), codes(value, "pluginIds"));
     }
 
     private static Set<String> codes(JsonNode value, String key) {
@@ -78,10 +78,11 @@ public class ApplicationCatalogPolicy {
         return Collections.unmodifiableSortedSet(result);
     }
 
-    public record Scope(String applicationCode, Set<String> menuCodes, Set<String> capabilityCodes, Set<String> pageKeys) {
+    public record Scope(String applicationCode, Set<String> menuCodes, Set<String> capabilityCodes, Set<String> pageKeys, Set<String> pluginIds) {
         public boolean active() { return applicationCode != null; }
-        public boolean capability(String code) { return !active() || capabilityCodes.contains(code); }
-        public boolean page(String key) { return !active() || pageKeys.contains(key); }
+        public boolean capability(String code) { return !active() || code != null && capabilityCodes.contains(code); }
+        public boolean page(String key) { return !active() || key != null && pageKeys.contains(key); }
+        public boolean plugin(String id) { return !active() || id != null && pluginIds.contains(id); }
 
         public List<CapabilityDefinitionDTO> declarations(List<CapabilityDefinitionDTO> all) {
             return !active() ? all : all.stream().filter(item -> capability(item.getCode())).toList();

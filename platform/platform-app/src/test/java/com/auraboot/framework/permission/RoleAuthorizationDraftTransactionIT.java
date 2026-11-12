@@ -848,6 +848,7 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
         String key=com.auraboot.framework.application.tenant.ApplicationCatalogPolicy.key("bom-quote");
         if(!productCatalog)assertThat(preferences.getPreference(getTestTenant().getId(),key)).isNull();
         var value=json.createObjectNode();value.put("version",1).put("applicationCode","bom-quote");
+        value.putArray("pluginIds");
         var menus=value.putArray("menuCodes");menuCodes.forEach(menus::add);
         var duties=value.putArray("capabilityCodes");capabilities.forEach(duties::add);
         value.putArray("pageKeys");
@@ -914,6 +915,7 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
         String key=com.auraboot.framework.application.tenant.ApplicationCatalogPolicy.key("other-product");
         assertThat(preferences.getPreference(getTestTenant().getId(),key)).isNull();
         var value=json.createObjectNode();value.put("version",1).put("applicationCode","other-product");
+        value.putArray("pluginIds");
         value.putArray("menuCodes");value.putArray("capabilityCodes");value.putArray("pageKeys");
         try {
             preferences.setPreference(getTestTenant().getId(),key,value);

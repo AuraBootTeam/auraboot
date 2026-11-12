@@ -39,6 +39,7 @@ class CapabilityViewServiceImplTest {
     private void productCatalog() {
         var policy = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode();
         policy.put("version",1).put("applicationCode","bom-quote");
+        policy.putArray("pluginIds");
         policy.putArray("menuCodes");policy.putArray("pageKeys");
         policy.putArray("capabilityCodes").add("current.cap.write");
         when(preferences.getPreference(42L,com.auraboot.framework.application.tenant.ApplicationCatalogPolicy.key("bom-quote"))).thenReturn(policy);

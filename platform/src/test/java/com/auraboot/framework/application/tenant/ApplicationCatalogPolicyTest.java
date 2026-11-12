@@ -24,6 +24,7 @@ class ApplicationCatalogPolicyTest {
 
     private ObjectNode declaration() {
         var value=json.createObjectNode();value.put("version",1).put("applicationCode","bom-quote");
+        value.putArray("pluginIds").add("com.auraboot.core-meta");
         value.putArray("menuCodes").add("current");
         value.putArray("capabilityCodes").add("current.cap.read");
         value.putArray("pageKeys").add("current_list");
