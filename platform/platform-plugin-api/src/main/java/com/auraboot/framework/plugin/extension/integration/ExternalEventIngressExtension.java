@@ -30,6 +30,12 @@ public interface ExternalEventIngressExtension extends ExtensionPoint {
     default Set<Set<String>> completedReceiptEventTypeSets() { return Set.of(); }
 
 
+    /** Explicit process-only model read grants added since an earlier completed receipt.
+     * The host may remove only entire read-only grants when proving the old full command digest.
+     * Accept/result commands, writes and binding identity remain pinned. Never applies to pending work.
+     */
+    default Set<String> completedReceiptProcessReadAdditions() { return Set.of(); }
+
     record Registration(String sourceCode, String capability, Set<String> eventTypes,
                         String requiredScope, String commandPermission,
                         String providerPluginId, String commandOwnerPluginId,

@@ -359,6 +359,101 @@ class InstalledIntegrationServiceTest {
         when(registry.completedReceiptRegistrations(source)).thenReturn(Set.of());
         assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"));
     }
+    @Test void completedReceiptAllowsOnlyDeclaredReadAdditionOnProcess() throws Exception {
+        service.accept(principal,source,event());var original=acceptedReceipt();
+        var completed=receiptWith(original,"completed","request-pid",original.bindingSha256(),original.commandSha256());
+        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(completed);when(receipts.claim(any())).thenReturn(0);
+        addMachineReadGrant(process,"internal_address_history");
+        when(registry.completedReceiptProcessReadAdditions(eq(registration),anyString())).thenReturn(Set.of("internal_address_history"));
+        upgradeProvider();clearInvocations(executor,receipts);
+        when(executor.execute(eq(result),any())).thenReturn(CommandExecuteResult.builder().phaseReached("completed")
+                .data(Map.of("recordPid","request-pid","state","completed")).build());
+        assertEquals("request-pid",service.result(principal,source,"evt-1").get("recordPid"));
+        clearInvocations(executor);
+        assertTrue(service.accept(principal,source,event()).duplicate());service.consume(event());verifyNoInteractions(executor);
+        assertThrows(ExternalEventIngressService.IdempotencyConflictException.class,()->service.accept(principal,source,event(Map.of("title","changed"))));
+        assertThrows(SecurityException.class,()->service.consume(event(Map.of("title","changed"))));
+        verify(receipts,never()).completed(anyLong(),anyString(),anyString(),anyString(),anyString());
+    }
+
+    private void addMachineReadGrant(String command,String model) throws Exception {
+        var config=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(metadata.get(command).getExecutionConfig());
+        var parameters=(com.fasterxml.jackson.databind.node.ObjectNode)config.get("handlerParams");
+        var grants=parameters.get("installedMachineData") instanceof com.fasterxml.jackson.databind.node.ObjectNode existing
+                ? existing : parameters.putObject("installedMachineData");
+        grants.putObject(model).putArray("read").add("pid").add("tenant_id").add("selected_address");
+        metadata.get(command).setExecutionConfig(config.toString());
+    }
+
+    @Test void declaredProcessReadCompatibilityNeverMigratesUnfinishedOrMalformedReceipts() throws Exception {
+        service.accept(principal,source,event());var original=acceptedReceipt();addMachineReadGrant(process,"internal_address_history");
+        when(registry.completedReceiptProcessReadAdditions(eq(registration),anyString())).thenReturn(Set.of("internal_address_history"));
+        when(receipts.claim(any())).thenReturn(0);
+        when(executor.execute(eq(result),any())).thenReturn(CommandExecuteResult.builder().phaseReached("completed")
+                .data(Map.of("recordPid","request-pid","state","accepted")).build());
+        clearInvocations(executor);
+        for(String state:List.of("accepting","accepted","failed","completed")) {
+            var r=receiptWith(original,state,state.equals("completed")?"invalid pid":"request-pid",original.bindingSha256(),original.commandSha256());
+            when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(r);
+            assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"),state);
+            assertThrows(SecurityException.class,()->service.accept(principal,source,event()),state);
+            assertThrows(SecurityException.class,()->service.consume(event()),state);
+        }
+        verifyNoInteractions(executor);
+    }
+
+    @Test void completedReadCompatibilityStillPinsResultWritesOtherConfigurationAndBinding() throws Exception {
+        service.accept(principal,source,event());var original=acceptedReceipt();
+        var completed=receiptWith(original,"completed","request-pid",original.bindingSha256(),original.commandSha256());
+        var initial=new HashMap<String,String>();metadata.forEach((code,value)->initial.put(code,value.getExecutionConfig()));
+        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(completed);when(receipts.claim(any())).thenReturn(0);
+        for(String fault:List.of("result","accept","other-process-setting","write-on-added-model","unrelated-write","binding","undeclared")) {
+            initial.forEach((code,value)->metadata.get(code).setExecutionConfig(value));addMachineReadGrant(process,"internal_address_history");
+            when(registry.completedReceiptProcessReadAdditions(eq(registration),anyString())).thenReturn(
+                    fault.equals("undeclared")?Set.of():Set.of("internal_address_history"));
+            String command=fault.equals("result")?result:fault.equals("accept")?accept:process;
+            var config=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(metadata.get(command).getExecutionConfig());
+            var params=(com.fasterxml.jackson.databind.node.ObjectNode)config.get("handlerParams");
+            switch(fault) {
+                case "result","accept" -> params.put("otherSetting",true);
+                case "other-process-setting" -> config.put("machineDataScope","changed");
+                case "write-on-added-model" -> ((com.fasterxml.jackson.databind.node.ObjectNode)params.path("installedMachineData").path("internal_address_history"))
+                        .putArray("update").add("selected_address");
+                case "unrelated-write" -> ((com.fasterxml.jackson.databind.node.ObjectNode)params.path("installedMachineData"))
+                        .putObject("other_model").putArray("update").add("value");
+                case "binding" -> ((com.fasterxml.jackson.databind.node.ObjectNode)params.at("/installedIntegration/bindings/0/parameters"))
+                        .put("connectionPid","another-connection");
+                case "undeclared" -> { }
+                default -> throw new AssertionError(fault);
+            }
+            metadata.get(command).setExecutionConfig(config.toString());
+            if(fault.equals("binding")) {
+                for(String other:List.of(accept,result)) {
+                    var root=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(metadata.get(other).getExecutionConfig());
+                    ((com.fasterxml.jackson.databind.node.ObjectNode)root.at("/handlerParams/installedIntegration/bindings/0/parameters"))
+                            .put("connectionPid","another-connection");
+                    metadata.get(other).setExecutionConfig(root.toString());
+                }
+            }
+            clearInvocations(executor);
+            assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"),fault);
+            assertThrows(SecurityException.class,()->service.accept(principal,source,event()),fault);
+            assertThrows(SecurityException.class,()->service.consume(event()),fault);
+            verifyNoInteractions(executor);
+        }
+    }
+
+    @Test void compatibleCompletedQueryStillRejectsAResultForAnotherRecord() throws Exception {
+        service.accept(principal,source,event());var original=acceptedReceipt();addMachineReadGrant(process,"internal_address_history");
+        when(registry.completedReceiptProcessReadAdditions(eq(registration),anyString())).thenReturn(Set.of("internal_address_history"));
+        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(receiptWith(original,"completed","request-pid",original.bindingSha256(),original.commandSha256()));
+        when(executor.execute(eq(result),any())).thenReturn(CommandExecuteResult.builder().phaseReached("completed")
+                .data(Map.of("recordPid","foreign-pid","state","completed")).build());
+        clearInvocations(executor);
+        assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"));
+        verify(executor,never()).execute(eq(accept),any());verify(executor,never()).execute(eq(process),any());
+    }
+
     @Test void completedReceiptSurvivesProviderUpgradeWithoutRepeatingBusinessCommands() {
         service.accept(principal,source,event());var r=acceptedReceipt();
         var completed=receiptWith(r,"completed","request-pid",r.bindingSha256(),r.commandSha256());

@@ -126,4 +126,39 @@ class InstalledIntegrationCommandFingerprintTest {
                     digest(current), original, this::digest));
         }
     }
+    @Test void processReadPredecessorPreservesOtherCommandsAndExistingGrants() throws Exception {
+        var old=commands(config("own"));var process=(ObjectNode)json.readTree(old.get("process"));
+        var grants=((ObjectNode)process.get("handlerParams")).putObject("installedMachineData");
+        grants.putObject("existing_model").putArray("read").add("pid");old.put("process",process.toString());
+        grants.putObject("new_model").putArray("read").add("pid").add("tenant_id");var current=new LinkedHashMap<>(old);
+        current.put("process",process.toString());var exactCurrent=current.get("process");
+        var previous=InstalledIntegrationCommandFingerprint.beforeProcessReadAdditions(json,current,"process",java.util.Set.of("new_model"));
+        assertEquals(1,previous.size());assertEquals(old.get("accept"),previous.getFirst().get("accept"));
+        assertEquals(old.get("result"),previous.getFirst().get("result"));
+        assertEquals(InstalledIntegrationCommandFingerprint.scoped(json,old,"own"),
+                InstalledIntegrationCommandFingerprint.scoped(json,previous.getFirst(),"own"));
+        assertEquals(exactCurrent,current.get("process"));
+    }
+
+    @Test void firstReadScopeCanProveTheOldAbsentContainerWithoutDroppingOtherSettings() throws Exception {
+        var old=commands(config("own"));var current=new LinkedHashMap<>(old);var process=(ObjectNode)json.readTree(old.get("process"));
+        ((ObjectNode)process.get("handlerParams")).putObject("installedMachineData")
+                .putObject("new_model").putArray("read").add("pid");current.put("process",process.toString());
+        var previous=InstalledIntegrationCommandFingerprint.beforeProcessReadAdditions(json,current,"process",java.util.Set.of("new_model"));
+        assertEquals(2,previous.size());var original=InstalledIntegrationCommandFingerprint.scoped(json,old,"own");
+        assertTrue(previous.stream().anyMatch(p->original.equals(InstalledIntegrationCommandFingerprint.scoped(json,p,"own"))));
+        assertTrue(InstalledIntegrationCommandFingerprint.beforeProcessReadAdditions(json,current,"process",java.util.Set.of()).isEmpty());
+        assertTrue(InstalledIntegrationCommandFingerprint.beforeProcessReadAdditions(json,current,"process",java.util.Set.of("absent_model")).isEmpty());
+    }
+
+    @Test void malformedReadOrAnyWriteOnTheDeclaredAdditionDoesNotProduceCompatibility() throws Exception {
+        for(String access:List.of("{}","{\"read\":[]}","{\"read\":[1]}","{\"read\":[\"*\"]}",
+                "{\"read\":[\"pid\",\"pid\"]}","{\"read\":[\"pid\"],\"update\":[\"value\"]}","{\"read\":[\"pid\"],\"filter\":{}}")) {
+            var commands=commands(config("own"));var process=(ObjectNode)json.readTree(commands.get("process"));
+            ((ObjectNode)process.get("handlerParams")).putObject("installedMachineData").set("new_model",json.readTree(access));
+            commands.put("process",process.toString());
+            assertTrue(InstalledIntegrationCommandFingerprint.beforeProcessReadAdditions(json,commands,"process",java.util.Set.of("new_model")).isEmpty(),access);
+        }
+    }
+
 }

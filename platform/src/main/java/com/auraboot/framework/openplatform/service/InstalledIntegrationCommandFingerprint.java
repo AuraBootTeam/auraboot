@@ -43,6 +43,37 @@ final class InstalledIntegrationCommandFingerprint {
         return result;
     }
 
+    /** Reconstruct only provider-declared process read additions. Every other command byte/field
+     * remains part of the digest; callers may use these candidates only for completed receipts.
+     */
+    static List<Map<String,String>> beforeProcessReadAdditions(ObjectMapper json,Map<String,String> configs,
+            String processCommand,java.util.Set<String> additions) {
+        if(additions.isEmpty() || !configs.containsKey(processCommand))return List.of();
+        var process=object(json,configs.get(processCommand));
+        if(!(process.path("handlerParams") instanceof ObjectNode parameters)
+                || !(parameters.path("installedMachineData") instanceof ObjectNode grants))return List.of();
+        for(String model:additions) {
+            JsonNode access=grants.get(model);
+            if(!(access instanceof ObjectNode grant) || grant.size()!=1 || !grant.has("read")
+                    || !grant.path("read").isArray() || grant.path("read").isEmpty())return List.of();
+            var fields=new java.util.HashSet<String>();
+            for(var field:grant.path("read")) {
+                if(!field.isTextual() || !field.asText().matches("[A-Za-z_][A-Za-z0-9_.]{0,127}")
+                        || !fields.add(field.asText()))return List.of();
+            }
+        }
+        additions.forEach(grants::remove);
+        var candidates=new ArrayList<Map<String,String>>();
+        var previous=new LinkedHashMap<>(configs);previous.put(processCommand,process.toString());
+        candidates.add(Map.copyOf(previous));
+        if(grants.isEmpty()) {
+            // A first read scope may introduce its container as well as its sole model grant.
+            parameters.remove("installedMachineData");previous=new LinkedHashMap<>(configs);
+            previous.put(processCommand,process.toString());candidates.add(Map.copyOf(previous));
+        }
+        return List.copyOf(candidates);
+    }
+
     static boolean legacyPrefixMatches(ObjectMapper json, Map<String, String> configs, String installation,
             String currentLegacyHash, String originalHash, Function<Map<String, String>, String> legacyHash) {
         if (originalHash == null || !originalHash.matches("[0-9a-f]{64}")) return false;

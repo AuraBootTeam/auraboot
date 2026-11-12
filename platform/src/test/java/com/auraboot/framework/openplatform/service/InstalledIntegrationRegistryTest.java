@@ -89,4 +89,39 @@ class InstalledIntegrationRegistryTest {
         assertThrows(SecurityException.class,()->registry.prepareBusinessRequest(registration.sourceCode(),Map.of()));
     }
 
+    @Test void processReadAdditionsRequireTheExactDeclaredProviderAndLoadedArtifact() {
+        var provider=mock(ExternalEventIngressExtension.class);when(provider.registration()).thenReturn(registration);
+        when(provider.completedReceiptProcessReadAdditions()).thenReturn(Set.of("internal_address_history"));
+        when(plugins.getExtensionsOfType(ExternalEventIngressExtension.class)).thenReturn(List.of(provider));
+        String digest="sha256:"+"a".repeat(64);
+        when(plugins.observeLoadedArtifact(provider.getClass())).thenReturn(Optional.of(
+                new AuraPluginManager.LoadedPluginArtifact(registration.providerPluginId(),Path.of("provider.jar"),digest)));
+        var registry=new InstalledIntegrationRegistry(plugins);
+        assertEquals(Set.of("internal_address_history"),registry.completedReceiptProcessReadAdditions(registration,digest));
+        assertThrows(SecurityException.class,()->registry.completedReceiptProcessReadAdditions(registration,"sha256:"+"b".repeat(64)));
+        when(plugins.getExtensionsOfType(ExternalEventIngressExtension.class)).thenReturn(List.of(provider,provider));
+        assertThrows(SecurityException.class,()->registry.completedReceiptProcessReadAdditions(registration,digest));
+        when(plugins.getExtensionsOfType(ExternalEventIngressExtension.class)).thenReturn(List.of(provider));
+        when(plugins.observeLoadedArtifact(provider.getClass())).thenReturn(Optional.empty());
+        assertThrows(SecurityException.class,()->registry.completedReceiptProcessReadAdditions(registration,digest));
+    }
+
+    @Test void oldProvidersDefaultToNoCompatibilityAndMalformedAdditionsFailClosed() {
+        var legacy=registry();String digest="sha256:"+"a".repeat(64);
+        assertEquals(Set.of(),legacy.completedReceiptProcessReadAdditions(registration,digest));
+        var provider=mock(ExternalEventIngressExtension.class);when(provider.registration()).thenReturn(registration);
+        when(plugins.getExtensionsOfType(ExternalEventIngressExtension.class)).thenReturn(List.of(provider));
+        when(plugins.observeLoadedArtifact(provider.getClass())).thenReturn(Optional.of(
+                new AuraPluginManager.LoadedPluginArtifact(registration.providerPluginId(),Path.of("provider.jar"),digest)));
+        var registry=new InstalledIntegrationRegistry(plugins);
+        var oversized=new HashSet<String>();for(int i=0;i<17;i++)oversized.add("model_"+i);
+        var nullModel=new HashSet<String>();nullModel.add(null);
+        for(Set<String> invalid:List.of(Set.of("invalid-model"),Set.of("WrongCase"),oversized,nullModel)) {
+            when(provider.completedReceiptProcessReadAdditions()).thenReturn(invalid);
+            assertThrows(SecurityException.class,()->registry.completedReceiptProcessReadAdditions(registration,digest));
+        }
+        when(provider.completedReceiptProcessReadAdditions()).thenReturn(null);
+        assertThrows(SecurityException.class,()->registry.completedReceiptProcessReadAdditions(registration,digest));
+    }
+
 }
