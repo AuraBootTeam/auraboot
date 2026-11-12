@@ -29,7 +29,11 @@ public class ExternalEventIngressController {
     @org.springframework.web.bind.annotation.GetMapping("/{sourceCode}/events/{externalEventId}")
     public Map<String,Object> result(@AuthenticationPrincipal MachinePrincipal principal,
             @PathVariable String sourceCode, @PathVariable String externalEventId) {
-        return installedIntegrations.result(principal,sourceCode,externalEventId);
+        com.auraboot.framework.openplatform.security.OpenApiBusinessAudit.attempt(sourceCode,"result",null);
+        var result=installedIntegrations.result(principal,sourceCode,externalEventId);
+        com.auraboot.framework.openplatform.security.OpenApiBusinessAudit.attempt(sourceCode,"result",
+                result.get("recordPid") instanceof String pid ? pid : null);
+        return result;
     }
 
     @PostMapping("/{sourceCode}/events")
@@ -38,8 +42,11 @@ public class ExternalEventIngressController {
             @PathVariable String sourceCode,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @RequestBody String rawBody) {
-        return ResponseEntity.accepted().body(
-                ingressService.accept(principal, sourceCode, idempotencyKey, rawBody).publicReceipt());
+        com.auraboot.framework.openplatform.security.OpenApiBusinessAudit.attempt(sourceCode,"accept",null);
+        var accepted=ingressService.accept(principal, sourceCode, idempotencyKey, rawBody);
+        com.auraboot.framework.openplatform.security.OpenApiBusinessAudit.result(sourceCode,"accept",
+                accepted.recordPid(),accepted.duplicate());
+        return ResponseEntity.accepted().body(accepted.publicReceipt());
     }
 
     @ExceptionHandler(SecurityException.class)
