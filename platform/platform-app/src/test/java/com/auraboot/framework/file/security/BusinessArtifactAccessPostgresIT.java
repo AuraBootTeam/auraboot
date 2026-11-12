@@ -211,6 +211,47 @@ class BusinessArtifactAccessPostgresIT extends BaseIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT "+projectField+" FROM "+table+" WHERE pid=?",String.class,rootPid)).isEqualTo("PROJECT-A");
     }
 
+    @Test void an_owner_backed_update_checks_finite_input_fields_before_warm_replay() throws Exception {
+        var entry=commands.selectById(commandId);
+        var config=json.readValue(entry.getExecutionConfig(),new com.fasterxml.jackson.core.type.TypeReference<Map<String,Object>>(){});
+        config.put("type","update");config.put("inputFields",List.of(secret));
+        entry.setExecutionConfig(json.writeValueAsString(config));commands.updateById(entry);
+        grantCommittedPermissionToTestRole(com.auraboot.framework.permission.constants.MetaPermission.COMMAND_EXECUTE,
+                "API","command","execute","Owner-backed update fixture");
+        var request=new CommandExecuteRequest();request.setTargetRecordId(rootPid);
+        request.setClientRequestId(UniqueIdGenerator.generate());request.setPayload(Map.of(secret,"BOARD"));
+        var first=commandExecutor.execute(command,request);
+        assertThat(first.getData()).containsEntry("success",true);
+        assertThat(owner.executions).hasValue(1);
+        long count=jdbc.queryForObject("SELECT count(*) FROM ab_file WHERE tenant_id=?",Long.class,testTenant.getId());
+        assertThat(commandExecutor.execute(command,request).isIdempotentReplay()).isTrue();
+        String outcome=jdbc.queryForObject("SELECT outcome::text FROM ab_idempotency_record WHERE tenant_id=? AND command_code=? AND client_request_id=?",
+                String.class,testTenant.getId(),command,command+":"+request.getClientRequestId());
+        var stale=json.readValue(outcome,new com.fasterxml.jackson.core.type.TypeReference<Map<String,Object>>(){});
+        stale.put(secret,"OLD_RAW_ROW_MUST_NOT_LEAVE_THE_BOUNDARY");
+        jdbc.update("UPDATE ab_idempotency_record SET outcome=?::jsonb WHERE tenant_id=? AND command_code=? AND client_request_id=?",
+                json.writeValueAsString(stale),testTenant.getId(),command,command+":"+request.getClientRequestId());
+        assertThatThrownBy(() -> commandExecutor.execute(command,request)).isInstanceOf(AccessDeniedException.class);
+        assertThat(owner.executions).hasValue(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_file WHERE tenant_id=?",Long.class,testTenant.getId())).isEqualTo(count);
+        jdbc.update("UPDATE ab_idempotency_record SET outcome=?::jsonb WHERE tenant_id=? AND command_code=? AND client_request_id=?",
+                outcome,testTenant.getId(),command,command+":"+request.getClientRequestId());
+        assertThat(commandExecutor.execute(command,request).isIdempotentReplay()).isTrue();
+        jdbc.update("UPDATE ab_role_permission SET field_scope=?::jsonb WHERE tenant_id=? AND role_id=? AND permission_id=(SELECT id FROM ab_permission WHERE tenant_id=? AND code=?)",
+                json.writeValueAsString(Map.of("modelCode",model,"readFields",List.of(secret,fileField),"writeFields",List.of())),
+                testTenant.getId(),testRole.getId(),testTenant.getId(),permission);
+        assertThatThrownBy(() -> commandExecutor.execute(command,request)).isInstanceOfSatisfying(BusinessException.class,
+                denied -> assertThat(denied.getResponseCode()).isEqualTo(ResponseCode.FORBIDDEN));
+        assertThat(owner.executions).hasValue(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_file WHERE tenant_id=?",Long.class,testTenant.getId())).isEqualTo(count);
+        var parameters=new HashMap<String,Object>((Map<String,Object>)config.get("handlerParams"));
+        parameters.put("dslPersistence",true);config.put("handlerParams",parameters);
+        entry.setExecutionConfig(json.writeValueAsString(config));commands.updateById(entry);
+        assertThatThrownBy(() -> commandExecutor.execute(command,request)).isInstanceOfSatisfying(BusinessException.class,
+                denied -> assertThat(denied.getResponseCode()).isEqualTo(ResponseCode.FORBIDDEN));
+        assertThat(owner.executions).hasValue(1);
+    }
+
     @Test void actual_command_cache_conflicts_on_root_relationship_change_and_restores_without_reexecution() {
         grantCommittedPermissionToTestRole(com.auraboot.framework.permission.constants.MetaPermission.COMMAND_EXECUTE,
                 "API","command","execute","Command fixture invocation");

@@ -93,6 +93,8 @@ public class NativeBusinessBoundaryCatalog {
                     || !Boolean.TRUE.equals(command.getIsCurrent()) || !Boolean.FALSE.equals(command.getDeletedFlag())
                     || !Status.PUBLISHED.getCode().equals(command.getStatus()) || command.getExecutionConfig() == null) throw denied();
         }
+        // Handler-owned entries are fingerprinted by ownerSources, not native single-record writers.
+        definitions = definitions.stream().filter(command -> extensions.getBusinessResourceOwner(command.getCode()).isEmpty()).toList();
         if (definitions.isEmpty()) return List.of();
         var commandIds = definitions.stream().map(command -> command.getId()).toList();
         var knownIds = new java.util.HashSet<>(commandIds);

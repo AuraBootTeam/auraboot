@@ -304,7 +304,8 @@ public class CommandTargetScopePhase implements CommandPhase {
         ctx.setTargetRecordVersion(resolveRecordVersion(record));
 
         if (businessTargetAuthorization(ctx)) {
-            boolean nativeCommand = !"custom".equals(ctx.getExecConfig().get("type"));
+            boolean nativeCommand = !"custom".equals(ctx.getExecConfig().get("type"))
+                    && extensionRegistry.getBusinessResourceOwner(resolveHandlerCode(ctx)).isEmpty();
             var nativeContract = nativeCommand
                     ? com.auraboot.framework.meta.security.NativeBusinessCommandContract.require(ctx, extensionRegistry) : null;
             Long member = resolveMemberId(ctx);

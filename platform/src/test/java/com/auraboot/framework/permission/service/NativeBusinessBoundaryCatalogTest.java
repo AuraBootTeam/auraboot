@@ -104,6 +104,16 @@ class NativeBusinessBoundaryCatalogTest {
         assertThat(catalog.snapshot()).isEmpty(); verifyNoInteractions(rules);
     }
 
+    @Test void anExplicitPluginOwnerIsNotMisclassifiedAsTheNativeWriter() {
+        var owned = command(10,"bom:update");
+        when(commands.findCurrentNativeBusinessDefinitions()).thenReturn(List.of(owned));
+        var owner=mock(com.auraboot.framework.plugin.extension.CommandHandlerExtension.class,
+                withSettings().extraInterfaces(com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.class));
+        when(extensions.getBusinessResourceOwner("bom:update")).thenReturn(java.util.Optional.of(owner));
+        assertThat(catalog.snapshot()).isEmpty();
+        verifyNoInteractions(rules);
+    }
+
     @Test void ambiguousCurrentDefinitionsCannotProduceTwoSupposedlyExecutableBoundaries() {
         when(commands.findCurrentNativeBusinessDefinitions()).thenReturn(List.of(command(10, "bom:update"), command(11, "bom:update")));
         assertThatThrownBy(catalog::snapshot).isInstanceOf(AccessDeniedException.class); verifyNoInteractions(rules);
