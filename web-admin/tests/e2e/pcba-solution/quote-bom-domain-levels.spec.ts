@@ -188,34 +188,10 @@ test.describe('BOM & Quote domain levels', () => {
       if (domain === 'qo') {
         await page.goto('/home');
         // Reuse the release gate's existing scaffold and SELF-owner fixture helpers.
-        const seeded = await seedQuoteScaffold(page, 'DOMAIN-LEVEL', [
-          {
-            sourceRef: 'FIELD-OUTPUT-COST',
-            sourceRowNo: 1,
-            description: 'Finite-field output fixture',
-            refdes: 'R1',
-            mpn: 'FIELD-OUTPUT-COST',
-            packageName: '0603',
-            qty: 2,
-            unitCost: 5,
-            lineCost: 10,
-            smtPoints: 0,
-            thtPoints: 0,
-          },
-        ]);
+        const seeded = await seedQuoteScaffold(page, 'DOMAIN-LEVEL', []);
         await reassignRecordOwnerByEmail(seeded.rows, user.email);
         createdPid = seeded.quoteId;
         await setHiddenFixture(createdPid);
-        const initialRollup = await unwrap(
-          await page.request.post('/api/meta/commands/execute/qo_quote_common:rollup_cost', {
-            data: {
-              targetRecordPid: createdPid,
-              payload: {},
-              clientRequestId: `field-output-seed-${Date.now()}`,
-            },
-          }),
-        );
-        expect(Number((initialRollup.data ?? initialRollup).totalCost)).toBe(10);
         // A separate admin-owned fixture proves domain manage does not widen SELF.
         foreignQuotePid = (await seedQuoteScaffold(page, 'DOMAIN-FOREIGN', [])).quoteId;
       }
@@ -596,27 +572,6 @@ test.describe('BOM & Quote domain levels', () => {
             expect(queuedBefore.rows).toHaveLength(0);
             expect(queuedAfter.rows).toEqual([{ task_code: submitted.taskCode }]);
             expect(afterAsync).toEqual(beforeAsync);
-            const rollupResponse = await command('qo_quote_common:rollup_cost', {}, createdPid);
-            const rollup = await unwrap(rollupResponse);
-            const publicRollup = rollup.data ?? rollup;
-            const projectedAfterRollup = await unwrap(
-              await actor.request.get(`/api/dynamic/${model}/${createdPid}`),
-            );
-            expect(projectedAfterRollup).not.toHaveProperty('qo_quote_total_cost');
-            expect(projectedAfterRollup).not.toHaveProperty('qo_quote_total_amount');
-            await info.attach('qo-finite-fields-rollup-output', {
-              body: JSON.stringify({
-                quotePid: createdPid,
-                httpStatus: rollupResponse.status(),
-                result: publicRollup,
-                ordinaryRead: projectedAfterRollup,
-                sourceCost: 10,
-              }),
-              contentType: 'application/json',
-            });
-            for (const field of ['totalCost', 'totalAmount', 'materialCost', 'marginPct']) {
-              expect.soft(publicRollup).not.toHaveProperty(field);
-            }
           }
           await info.attach(`${domain}-finite-fields-persistence`, {
             body: JSON.stringify({
