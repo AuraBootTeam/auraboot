@@ -442,6 +442,63 @@ describe('settings-card field presentation', () => {
 });
 
 describe('collectDetailDictCodes', () => {
+  it('loads dictionary dependencies used by nested read-only sub-table columns without model metadata', () => {
+    expect(
+      collectDetailDictCodes(
+        {
+          blocks: [
+            {
+              id: 'shipment_batches',
+              blockType: 'sub-table',
+              dataPath: 'shipments',
+              columns: [{ field: 'state', dictCode: 'shipment_status', renderType: 'tag' }],
+            },
+          ],
+        },
+        new Map(),
+      ),
+    ).toEqual(['shipment_status']);
+  });
+
+  it('collects table column dictionaries inside tabs and deduplicates field dependencies', () => {
+    expect(
+      collectDetailDictCodes(
+        {
+          blocks: [
+            {
+              id: 'detail_tabs',
+              blockType: 'tabs',
+              tabs: [
+                {
+                  key: 'batches',
+                  label: 'Batches',
+                  blocks: [
+                    {
+                      id: 'batches',
+                      blockType: 'table',
+                      table: {
+                        columns: [
+                          { field: 'state', dictCode: 'shipment_status' },
+                          { field: 'source', dictCode: 'shipment_source' },
+                        ],
+                      },
+                    },
+                    {
+                      id: 'summary',
+                      blockType: 'detail-section',
+                      fields: [{ field: 'state', dictCode: 'shipment_status' }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        new Map(),
+      ),
+    ).toEqual(['shipment_status', 'shipment_source']);
+  });
+
   it('collects dict codes declared by settings-card detail sections', () => {
     expect(
       collectDetailDictCodes(

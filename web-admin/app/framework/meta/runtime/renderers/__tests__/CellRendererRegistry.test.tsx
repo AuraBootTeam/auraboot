@@ -3,6 +3,29 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { cellRendererRegistry } from '../CellRendererRegistry';
 import { StatusDot } from '../statusTone';
+import { columnSchema } from '../../../validation/schemas/column.schema';
+
+describe('CellRendererRegistry multiline text', () => {
+  it('accepts only an explicit boolean multiline option in the column contract', () => {
+    expect(columnSchema.safeParse({ field: 'material', multiline: true }).success).toBe(true);
+    expect(columnSchema.safeParse({ field: 'material', multiline: 'true' }).success).toBe(false);
+  });
+  it('preserves line breaks and treats material descriptions as text rather than markup or links', () => {
+    const value = 'MAT-12345678901234567890\n<script>bad()</script>\n20 → 25';
+    const { container } = render(<>{cellRendererRegistry.render('text', { value, record: {}, column: { field: 'material', multiline: true, width: 220 } })}</>);
+    expect(container.textContent).toBe(value);
+    expect(container.querySelector('script')).toBeNull();
+    expect(container.querySelector('a')).toBeNull();
+    expect(container.querySelector('span')).toHaveStyle({ overflowWrap: 'anywhere', maxWidth: '220px' });
+    expect(container.querySelector('span')).toHaveClass('whitespace-pre-wrap');
+  });
+  it('retains ordinary URL text behaviour and does not expose objects in multiline cells', () => {
+    const { container } = render(<>{cellRendererRegistry.render('text', { value: 'https://example.invalid', record: {}, column: { field: 'url' } })}</>);
+    expect(container.querySelector('a')).toHaveAttribute('href', 'https://example.invalid');
+    const result = render(<>{cellRendererRegistry.render('text', { value: { private: 'hidden' }, record: {}, column: { field: 'material', multiline: true } })}</>);
+    expect(result.container.textContent).toBe('-');
+  });
+});
 
 describe('CellRendererRegistry tag renderer', () => {
   it('renders localized tag labels from tagMap without throwing', () => {

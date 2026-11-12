@@ -3729,6 +3729,32 @@
         },
         "type": "object"
       },
+      "ApiResponseCatalog": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Catalog"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseCategory": {
         "properties": {
           "code": {
@@ -14404,6 +14430,32 @@
         },
         "type": "object"
       },
+      "ApiResponseRecorded": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Recorded"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseRedeemInstallTokenResponse": {
         "properties": {
           "code": {
@@ -19258,6 +19310,17 @@
         },
         "type": "object"
       },
+      "Catalog": {
+        "properties": {
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/Template"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "Category": {
         "properties": {
           "categoryType": {
@@ -19819,6 +19882,26 @@
             ]
           }
         },
+        "type": "object"
+      },
+      "Choice": {
+        "properties": {
+          "status": {
+            "minLength": 1,
+            "pattern": "accept|reject|ban|filter",
+            "type": "string"
+          },
+          "templateId": {
+            "maxLength": 128,
+            "minLength": 0,
+            "pattern": "[A-Za-z0-9_-]+",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "templateId"
+        ],
         "type": "object"
       },
       "ClientConfig": {
@@ -43717,6 +43800,17 @@
         ],
         "type": "object"
       },
+      "Recorded": {
+        "properties": {
+          "delivered": {
+            "type": "boolean"
+          },
+          "recorded": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "RedeemInstallTokenRequest": {
         "properties": {
           "targetInstanceUrl": {
@@ -49566,6 +49660,20 @@
         },
         "type": "object"
       },
+      "Template": {
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "templateId": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "TemplateDef": {
         "properties": {
           "category": {
@@ -52379,6 +52487,29 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "WechatSubscriptionObservationRequest": {
+        "properties": {
+          "idempotencyKey": {
+            "maxLength": 120,
+            "minLength": 0,
+            "pattern": "[A-Za-z0-9._:-]+",
+            "type": "string"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/Choice"
+            },
+            "maxItems": 20,
+            "minItems": 0,
+            "type": "array"
+          }
+        },
+        "required": [
+          "idempotencyKey",
+          "results"
+        ],
         "type": "object"
       },
       "WindowMetrics": {
@@ -64595,7 +64726,7 @@
     },
     "/api/authoring/change-sets/{changeSetPid}/sessions": {
       "post": {
-        "operationId": "observe",
+        "operationId": "observe_1",
         "parameters": [
           {
             "in": "path",
@@ -92269,6 +92400,56 @@
         },
         "tags": [
           "Notifications"
+        ]
+      }
+    },
+    "/api/notifications/wechat-subscription/observations": {
+      "post": {
+        "operationId": "observe",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WechatSubscriptionObservationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRecorded"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "wechat-subscription-preference-controller"
+        ]
+      }
+    },
+    "/api/notifications/wechat-subscription/templates": {
+      "get": {
+        "operationId": "templates",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCatalog"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "wechat-subscription-preference-controller"
         ]
       }
     },

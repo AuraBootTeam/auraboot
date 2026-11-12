@@ -14,6 +14,17 @@ const beta = { value: 'person-b', label: 'Beta member' };
 describe('bounded authorized choice field', () => {
   beforeEach(() => { vi.clearAllMocks(); state.user = { tenantId: 1, pid: 'publisher' }; });
 
+  it('single selection replaces the previous value while preserving bounded authorized hydration', async () => {
+    state.fetchResult.mockResolvedValue(response([alpha, beta]));
+    const change = vi.fn();
+    render(<PagedChoiceField endpoint="/api/choices" value={[alpha.value]} label="RFQ" onChange={change} multiple={false} />);
+    await waitFor(() => expect(screen.getByRole('radio', { name: alpha.label })).toBeChecked());
+    fireEvent.click(screen.getByRole('radio', { name: beta.label }));
+    expect(change).toHaveBeenCalledWith([beta.value]);
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(state.fetchResult).toHaveBeenCalledWith('/api/choices', expect.objectContaining({ params: { pageNum: 1, pageSize: 50, values: alpha.value } }));
+  });
+
   it('pages and searches on the server while retaining selected labels outside the current page', async () => {
     state.fetchResult.mockImplementation(async (_endpoint: string, { params }: any) => {
       if (params.values) return response([alpha]);

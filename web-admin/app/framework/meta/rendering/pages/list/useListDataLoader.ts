@@ -13,7 +13,7 @@ import { isImplicitSavedView } from '~/framework/smart/utils/savedViewPersistenc
 import { buildApiEndpoint } from '~/routes/_shared/dynamic-route-utils';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
-import { type ListQueryFilterCondition } from './listFilterConditions';
+import { applyApiTabCondition, type ListQueryFilterCondition } from './listFilterConditions';
 import {
   type ListApiReadRequest,
   type useListApiReadRetry,
@@ -213,6 +213,7 @@ export function useListDataLoader({
                 }
               }
             }
+            applyApiTabCondition(queryParams, getTabFilter());
             if (requestedSorts.length === 1) {
               queryParams.sortField = requestedSorts[0].fieldCode;
               queryParams.sortOrder = requestedSorts[0].direction;

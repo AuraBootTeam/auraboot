@@ -156,6 +156,27 @@ describe('CardGridBlockRenderer', () => {
     expect(screen.getByTestId('card-grid-block').className).toContain('sm:grid-cols-2');
   });
 
+  it('offers native disclosure groups without unmounting card content and bounds compact tracks', () => {
+    const runtime = makeRuntime({ data: [
+      { ...sampleRows[0], source: 'one', material: 'Material A', demand: '10 PCS' },
+      { ...sampleRows[1], source: 'two', material: 'Material B', demand: '20 PCS' },
+    ] });
+    const { rerender } = render(<CardGridBlockRenderer runtime={runtime as any}
+      block={{ ...baseBlock, autoFitColumns: true, minCardWidth: 220, groupByField: 'source',
+        groupTitleField: 'material', groupDescriptionField: 'demand', collapsibleGroups: true, groupsDefaultOpen: false }} />);
+    const groups = screen.getAllByTestId('card-grid-group');
+    expect(groups[0].tagName).toBe('DETAILS');
+    expect(groups[0].hasAttribute('open')).toBe(false);
+    expect(screen.getByText('10 PCS')).toBeTruthy();
+    expect(screen.getByText('Template A')).toBeTruthy();
+    expect((groups[0].lastElementChild as HTMLElement).style.gridTemplateColumns)
+      .toBe('repeat(auto-fit, minmax(min(100%, 220px), 1fr))');
+    rerender(<CardGridBlockRenderer runtime={runtime as any}
+      block={{ ...baseBlock, autoFitColumns: true, minCardWidth: 10, groupByField: 'source', collapsibleGroups: true }} />);
+    expect((screen.getAllByTestId('card-grid-group')[0].lastElementChild as HTMLElement).style.gridTemplateColumns)
+      .toBe('repeat(auto-fit, minmax(min(100%, 20rem), 1fr))');
+  });
+
   it('renders a card badge through its declared dictionary', () => {
     const runtime = makeRuntime({ data: [{ pid: 'r1', name: '蜜蜂', status: 'published' }] });
     render(

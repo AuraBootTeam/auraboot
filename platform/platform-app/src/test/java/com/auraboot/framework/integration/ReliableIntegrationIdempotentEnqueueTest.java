@@ -14,7 +14,8 @@ import static org.mockito.Mockito.*;
 class ReliableIntegrationIdempotentEnqueueTest {
     private final OutboxEventMapper mapper = mock(OutboxEventMapper.class);
     private final ReliableIntegrationAccessorImpl accessor = new ReliableIntegrationAccessorImpl(
-            mapper, new ObjectMapper().findAndRegisterModules(), mock(ReliableIntegrationMetrics.class));
+            mapper, new ObjectMapper().findAndRegisterModules(), mock(ReliableIntegrationMetrics.class), null,
+            mock(org.springframework.context.ApplicationEventPublisher.class));
     private final IntegrationEventEnvelope event = new IntegrationEventEnvelope("1.0", "event", "type", "source",
             "subject", Instant.parse("2026-10-13T00:00:00Z"), 42L, "correlation", null, "order", 0,
             Map.of("content", "original"), Map.of());

@@ -96,9 +96,12 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   const cardActions: Array<{ code: string; label?: any; variant?: string; action?: any }> =
     Array.isArray(cfg.cardActions) ? cfg.cardActions : [];
   const autoFitColumns = cfg.autoFitColumns === true;
-  const columnsClass: string = autoFitColumns ? '' : cfg.columns || 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
-  const columnsStyle = autoFitColumns
-    ? { gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 20rem), 1fr))' }
+  const autoFillColumns = cfg.autoFillColumns === true;
+  const minCardWidth = Number.isFinite(cfg.minCardWidth) && cfg.minCardWidth >= 180 && cfg.minCardWidth <= 640
+    ? `${cfg.minCardWidth}px` : '20rem';
+  const columnsClass: string = autoFitColumns || autoFillColumns ? '' : cfg.columns || 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
+  const columnsStyle = autoFitColumns || autoFillColumns
+    ? { gridTemplateColumns: `repeat(${autoFillColumns ? 'auto-fill' : 'auto-fit'}, minmax(min(100%, ${minCardWidth}), 1fr))` }
     : undefined;
   // A declared form field stores draft card rows; data-source refreshes never replace edits.
   const formField = typeof cfg.field === 'string' && cfg.field.trim() ? cfg.field : undefined;
@@ -266,22 +269,28 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
         const currentSelectionRow = selectionRule ? currentSelectionRows?.get(readOwnPath(row,selectionRule.identityField) as string) : undefined;
         const rowSelectable = !selectionRule || Boolean(currentSelectionRow && positiveRowValue(readOwnPath(currentSelectionRow,selectionRule.positiveField)));
         const rowSelected = selectionRule ? readOwnPath(row,selectionRule.selectedField) === true : false;
-        const renderField = (field: FieldConfig) => (
+        const renderField = (field: FieldConfig) => {
+          const rowContext = { ...runtime.getContext(), row } as any;
+          if (field.visibleWhen && !runtime.getEvaluator().evaluateCondition(field.visibleWhen, rowContext)) return null;
+          const conditionalReadOnly = Boolean(field.readOnlyWhen && runtime.getEvaluator().evaluateCondition(field.readOnlyWhen, rowContext));
+          return (
           <FieldRenderer
             key={field.field}
             runtime={runtime}
             field={{ ...field,
               field: `${formField || block.id}.${idx}.${field.field}`,
-              readOnly: !formField || !rowSelectable || field.field===selectionRule?.positiveField || Boolean(field.valueWhen) || field.readOnly,
+              visibleWhen: undefined, readOnlyWhen: undefined,
+              readOnly: !formField || !rowSelectable || field.field===selectionRule?.positiveField || Boolean(field.valueWhen) || conditionalReadOnly || field.readOnly,
             }}
             value={field.valueWhen ? runtime.getEvaluator().evaluate(field.valueWhen, { ...runtime.getContext(), row } as any) : (currentSelectionRow && (field.readOnly || field.field===selectionRule?.positiveField) ? readOwnPath(currentSelectionRow,field.field) : row[field.field])}
             onChange={(value) => {
-              if (!formField || !rowSelectable || field.field===selectionRule?.positiveField || field.readOnly || field.valueWhen) return;
+              if (!formField || !rowSelectable || field.field===selectionRule?.positiveField || conditionalReadOnly || field.readOnly || field.valueWhen) return;
               stateManager.updateField(scopeId, formField,
                 rows.map((current, index) => index === idx ? { ...current, [field.field]: value } : current));
             }}
           />
-        );
+          );
+        };
         return (
           <div
             key={rowKey}
@@ -416,7 +425,20 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
     return (
       <div data-testid="card-grid-block" className="space-y-6">
         {selectionHint}
-        {Array.from(groups.entries()).map(([key, group], index) => (
+        {Array.from(groups.entries()).map(([key, group], index) => cfg.collapsibleGroups === true ? (
+          <details key={key} data-testid="card-grid-group" open={cfg.groupsDefaultOpen !== false}
+            className={`rounded-lg border border-border p-3 ${cfg.groupWarningField && group.entries.some(({ row }) => row[cfg.groupWarningField] === true) ? 'bg-amber-50' : 'bg-surface'}`}>
+            <summary className="cursor-pointer select-none text-sm font-semibold text-text">
+              {group.title}
+              {cfg.groupDescriptionField && <span className="ml-3 font-normal text-text-2 whitespace-pre-wrap">
+                {getLocalizedText(group.entries[0]?.row[cfg.groupDescriptionField], locale, t)}
+              </span>}
+            </summary>
+            <div className={`mt-3 grid gap-3 ${columnsClass}`} style={columnsStyle}>
+              {group.entries.map(({ row, index: originalIndex }) => renderCard(row, originalIndex))}
+            </div>
+          </details>
+        ) : (
           <section key={key} data-testid="card-grid-group"
             aria-labelledby={group.title ? `${block.id}-group-${index}` : undefined}>
             {group.title && <h2 id={`${block.id}-group-${index}`}

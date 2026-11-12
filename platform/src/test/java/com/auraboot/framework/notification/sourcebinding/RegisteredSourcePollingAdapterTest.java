@@ -170,6 +170,26 @@ class RegisteredSourcePollingAdapterTest {
     }
 
     @Test
+    void unavailableWechatIsPartialWithoutTurningValidInAppIntoASchedulerFailure() {
+        var f=new RegisteredSourcePlanResolverTest.Fixture();var worker=mock(RegisteredSourceWorker.class);
+        when(worker.runPage(1,"notice",1,2)).thenReturn(new RegisteredSourceWorker.BatchResult(2,1,1,1,
+                List.of(new RegisteredSourceWorker.SourceFailure("src",null,SourceFailureCode.WECHAT_DELIVERY_BLOCKED))));
+        var adapter=new RegisteredSourcePollingAdapter(configured(),f.resolver,worker,factory());adapter.initialize();
+        var result=adapter.tick();assertThat(result.status()).isEqualTo(RegisteredSourcePollingAdapter.Status.PARTIAL);
+        assertThat(result.processedPlans()).isEqualTo(2);assertThat(result.failures()).hasSize(1);
+        org.assertj.core.api.Assertions.assertThatCode(adapter::poll).doesNotThrowAnyException();
+    }
+    @Test
+    void actualSourceFailureCannotBeDowngradedToPartialWechat() {
+        var f=new RegisteredSourcePlanResolverTest.Fixture();var worker=mock(RegisteredSourceWorker.class);
+        when(worker.runPage(1,"notice",1,2)).thenReturn(new RegisteredSourceWorker.BatchResult(2,2,2,1,List.of(
+                new RegisteredSourceWorker.SourceFailure("src",null,SourceFailureCode.WECHAT_DELIVERY_BLOCKED),
+                new RegisteredSourceWorker.SourceFailure("src2",IllegalArgumentException.class.getName(),SourceFailureCode.BINDING_INVALID))));
+        var adapter=new RegisteredSourcePollingAdapter(configured(),f.resolver,worker,factory());adapter.initialize();
+        assertThat(adapter.tick().status()).isEqualTo(RegisteredSourcePollingAdapter.Status.FAILED);
+        assertThatThrownBy(adapter::poll).hasMessage("NOTIFICATION_SOURCE_POLL_FAILED");
+    }
+    @Test
     void managedDedicatedResourceStartsOnceAndShutdownCancelsOnlyOwnedFuture() {
         var f = new RegisteredSourcePlanResolverTest.Fixture();
         var worker = mock(RegisteredSourceWorker.class);

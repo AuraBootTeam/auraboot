@@ -30,6 +30,24 @@ public class InstalledIntegrationRegistry {
         return matches.stream().findFirst();
     }
 
+    /** Adapt only through the exact discovered provider and its loaded artifact. */
+    public Optional<ExternalEventIngressExtension.BusinessRequest> prepareBusinessRequest(String source,Map<String,Object> input) {
+        record Provider(ExternalEventIngressExtension extension,Registration registration) {}
+        var matches=new ArrayList<Provider>();
+        for(var extension:plugins.getExtensionsOfType(ExternalEventIngressExtension.class)) {
+            var declared=Objects.requireNonNull(extension.registration());
+            if(!source.equals(declared.sourceCode()))continue;
+            var artifact=plugins.observeLoadedArtifact(extension.getClass()).orElseThrow(InstalledIntegrationRegistry::denied);
+            if(!declared.providerPluginId().equals(artifact.pluginId()))throw denied();
+            matches.add(new Provider(extension,declared));
+        }
+        if(matches.size()!=1)throw denied();
+        var provider=matches.getFirst();
+        var result=Objects.requireNonNull(provider.extension().prepareBusinessRequest(Collections.unmodifiableMap(new LinkedHashMap<>(input))));
+        if(result.isPresent() && !provider.registration().eventTypes().contains(result.get().eventType()))throw denied();
+        return result;
+    }
+
     public Set<Registration> completedReceiptRegistrations(String source) {
         var current = registration(source).orElseThrow(InstalledIntegrationRegistry::denied).getKey();
         var matches = plugins.getExtensionsOfType(ExternalEventIngressExtension.class).stream()
@@ -47,6 +65,24 @@ public class InstalledIntegrationRegistry {
                     current.resultCommand(), current.serverActorParameter()));
         }
         return Set.copyOf(result);
+    }
+
+    /** Read compatibility must come from the exact currently authenticated provider artifact. */
+    public Set<String> completedReceiptProcessReadAdditions(Registration current,String expectedArtifact) {
+        var matches=new ArrayList<ExternalEventIngressExtension>();
+        for(var extension:plugins.getExtensionsOfType(ExternalEventIngressExtension.class)) {
+            var declared=Objects.requireNonNull(extension.registration());
+            if(!current.sourceCode().equals(declared.sourceCode()))continue;
+            var artifact=plugins.observeLoadedArtifact(extension.getClass()).orElseThrow(InstalledIntegrationRegistry::denied);
+            if(!current.equals(declared) || !current.providerPluginId().equals(artifact.pluginId())
+                    || !Objects.equals(expectedArtifact,artifact.digest()))throw denied();
+            matches.add(extension);
+        }
+        if(matches.size()!=1)throw denied();
+        var additions=matches.getFirst().completedReceiptProcessReadAdditions();
+        if(additions==null || additions.size()>16
+                || additions.stream().anyMatch(model->model==null || !model.matches("[a-z][a-z0-9_]{1,99}")))throw denied();
+        return Set.copyOf(additions);
     }
 
     private static SecurityException denied() { return new SecurityException("Installed integration provider denied"); }

@@ -648,20 +648,14 @@ final class ProcurementLinkedForeignNativeFixture extends ProcurementPublicSourc
         assertEquals("35000",response.path("code").asText());assertTrue(response.path("data").isNull() || response.path("data").isMissingNode());
         assertEquals("$i18n:qo_pr.error.phone_not_registered",response.path("context").path("messageKey").asText());
     }
-    private static final List<String> FOREIGN_MODELS=List.of("pr_supplier_common","pr_supplier_pcba_contact","s2p_sourcing_event","pr_purchase_request","s2p_bid",
-            "pr_purchase_order","pr_purchase_order_line","qo_procurement_membership_common","qo_procurement_quote_line_common","qo_procurement_history_common",
-            "qo_procurement_allocation_common","qo_procurement_execution_common","qo_procurement_address_common","qo_procurement_shipment_common",
-            "qo_procurement_shipment_line_common","qo_procurement_receipt_common","qo_procurement_reminder_common","qo_procurement_submission_common",
-            "qo_procurement_submission_line_common","qo_procurement_category_policy_common","qo_procurement_category_supplier_common",
-            "qo_procurement_inquiry_request_common");
-    static List<String> foreignSnapshotModels() { return FOREIGN_MODELS; }
+    static List<String> foreignSnapshotModels() { return ProcurementForeignSnapshotModels.all(); }
     static Map<String,Object> foreignSnapshotMetadata(Map<String,Object> actualModel,String table) {
         assertTrue(actualModel.get("pid") instanceof String && !actualModel.get("pid").toString().isBlank(),"Actual published model PID is required");
         return Map.of("pid",actualModel.get("pid"),"tableName",table);
     }
     private Map<String,Object> foreignSnapshots(ProcurementLinkedForeignNativeFixture foreign) {
         var snapshot=new LinkedHashMap<String,Object>();
-        for(String model:FOREIGN_MODELS) {
+        for(String model:foreignSnapshotModels()) {
             context();String table=actualMetadata.getTableName(model);assertTrue(table.matches("[A-Za-z_][A-Za-z0-9_]{0,62}"));
             var tenants=new LinkedHashMap<String,Object>();
             for(var current:List.of(this,foreign)) {

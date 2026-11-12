@@ -660,6 +660,18 @@ describe('FormDialog grouped choices', () => {
     required: true,
     props: { groupField: 'category', valuesField: 'supplierPids' },
   };
+  it('opt-in partial groups require at least one explicit selection and preserve empty groups', () => {
+    const onSubmit = vi.fn();
+    renderDialog({ fields: [{ ...field, props: { ...field.props, allowEmptyGroups: true } }], fieldOptions: { categorySuppliers: groups }, defaults: {}, onSubmit });
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).not.toHaveBeenCalled();
+    fireEvent.click(screen.getAllByRole('checkbox', { name: '供应商甲' })[0]);
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).toHaveBeenCalledWith({ categorySuppliers: [
+      { category: 'resistors', supplierPids: ['supplier-a'] },
+      { category: 'capacitors', supplierPids: [] },
+    ] });
+  });
   it('requires explicit selection in every group and submits independent multi selections', () => {
     const onSubmit = vi.fn();
     renderDialog({

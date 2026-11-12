@@ -129,6 +129,16 @@ export interface BlockConfig {
   rowSelection?: CardRowSelection;
   /** Fit card-grid tracks to the available width, collapsing unused tracks. */
   autoFitColumns?: boolean;
+  /** Reserve unused adaptive tracks so a short row does not stretch each card. */
+  autoFillColumns?: boolean;
+  /** Optional adaptive-card minimum in logical pixels, bounded to 180..640. */
+  minCardWidth?: number;
+  /** Accessible native disclosure groups retain mounted row inputs when closed. */
+  collapsibleGroups?: boolean;
+  groupsDefaultOpen?: boolean;
+  groupDescriptionField?: string;
+  /** Boolean row fact: highlight a group if any member requires attention. */
+  groupWarningField?: string;
   buttons?: ButtonConfig[];
 
   // 表格相关
@@ -345,6 +355,8 @@ export interface ColumnConfig {
   align?: 'left' | 'center' | 'right';
   width?: number | string;
   ellipsis?: boolean;
+  /** Text renderer: preserve line breaks and wrap long identifiers without HTML interpretation. */
+  multiline?: boolean;
   fixed?: 'left' | 'right'; // sticky column
 
   // Format
@@ -613,6 +625,24 @@ export interface ButtonConfig {
 }
 
 // Table 配置
+/** Lazy, read-only child records; the parent list and its navigation remain independent. */
+export interface RowExpansionConfig {
+  endpoint: string;
+  titleField?: string;
+  label?: string | LocalizedText;
+  rowKey?: string;
+  pageParam?: string;
+  sizeParam?: string;
+  pageIndexBase?: 0 | 1;
+  pageSize?: number;
+  columns: Array<{
+    field: string;
+    label: string | LocalizedText;
+    multiline?: boolean;
+    width?: number;
+  }>;
+}
+
 export interface TableConfig {
   rowKey?: string;
   dataSource?: string;
@@ -633,6 +663,7 @@ export interface TableConfig {
   rowActions?: ButtonConfig[];
   /** Tree configuration — enables hierarchical expandable rows */
   treeConfig?: TreeConfig;
+  rowExpansion?: RowExpansionConfig;
   /**
    * Show the column summary/footer row (T10). Defaults to showing the footer
    * automatically when any column declares an `aggregate`; set explicitly to
@@ -810,6 +841,8 @@ export interface CrossRowValidationRule {
 }
 
 export interface TreeConfig {
+  /** Optional nested children array; pagination counts root records. */
+  childrenField?: string;
   /** Self-referencing field (e.g., 'parent_id') */
   parentField: string;
   /** Max nesting depth (default: 5) */

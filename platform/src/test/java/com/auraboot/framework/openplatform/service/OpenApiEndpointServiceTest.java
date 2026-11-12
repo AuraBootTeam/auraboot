@@ -19,13 +19,25 @@ class OpenApiEndpointServiceTest {
     private final OpenApiQueryService queries = mock(OpenApiQueryService.class);
     private final OpenApiPublicationMapper mapper = mock(OpenApiPublicationMapper.class);
     private final ObjectMapper json = new ObjectMapper();
+    private final OpenApiSynchronousIntegrationService integrations = mock(OpenApiSynchronousIntegrationService.class);
     private final OpenApiEndpointService service = new OpenApiEndpointService(publications,validator,resources,actions,queries,mapper,
-            new OpenApiProtocolHash(json,new OpenPlatformSecretCodec()),json);
+            new OpenApiProtocolHash(json,new OpenPlatformSecretCodec()),json,integrations);
     private final MachinePrincipal principal = new MachinePrincipal(1L,"token","machine",Set.of("office.endpoint.invoke"),"app","installation","development","token");
     private OpenApiEndpointContract allow(OpenApiEndpointKind kind) {
         var contract = new OpenApiEndpointContract("office.endpoint","dynamic.get",kind.code(),"office.devices",1,"a".repeat(64),Map.of("invoke","office.endpoint.invoke"),5000,2);
         when(publications.authority(principal,contract.code())).thenReturn(Optional.of(new OpenApiEndpointPublicationService.Authority(contract,new OpenApiEndpointPolicy(true),1L)));
         when(mapper.tryQuerySlot(anyLong(),anyString(),anyInt())).thenReturn(true);return contract;
+    }
+    @Test void integrationUsesPublishedAuthorityAndCannotAcceptAnInternalTargetOrCallerSelectedAdapter() {
+        var contract=allow(OpenApiEndpointKind.INTEGRATION);
+        var input=Map.<String,Object>of("orderIds",List.of("10"));
+        var expected=new OpenApiResourceService.Result(200,Map.of("requestId","request-123","status","completed"),Map.of(),false);
+        when(integrations.execute(principal,contract.bindingCode(),contract.code(),"request-123",input)).thenReturn(expected);
+        assertThat(service.invoke(principal,contract.code(),"POST",null,Map.of(),Map.of("input",input),"request-123",null)).isEqualTo(expected);
+        clearInvocations(integrations);
+        assertThatThrownBy(()->service.invoke(principal,contract.code(),"POST",null,Map.of(),Map.of("input",input,"targetPid","foreign"),"request-123",null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(()->service.invoke(principal,contract.code(),"POST",null,Map.of(),Map.of("input",input),"request-123","7")).isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(integrations,resources,actions,queries);
     }
     @Test void unavailableOrDisallowedEndpointNeverReachesBusinessServices() {
         assertThatThrownBy(() -> service.invoke(null,"office.endpoint","GET",null,Map.of(),null,null,null)).isInstanceOf(AccessDeniedException.class);

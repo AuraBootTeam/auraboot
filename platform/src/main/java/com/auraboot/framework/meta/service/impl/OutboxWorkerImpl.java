@@ -31,9 +31,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Outbox polling worker.
- * Periodically polls the outbox table for pending events and dispatches them
- * via Spring ApplicationEventPublisher with exponential backoff retry.
+ * Durable outbox worker, triggered after reliable enqueue commits.
+ * Scheduled scans recover missed notifications, expired leases and due retries.
  *
  * @author AuraBoot Team
  * @since 2.3.0
@@ -122,41 +121,49 @@ public class OutboxWorkerImpl implements ReliableIntegrationDispatcher {
         int leaseLost = 0;
         List<String> dead = new ArrayList<>();
         for (OutboxEvent event : events) {
-            metrics.record("claimed");
-            if ("failed".equals(event.getStatus())) {
-                // The claim transaction atomically exhausted a crashed worker's budget and wrote its DLQ.
-                failed++;
-                dead.add(event.getEventId());
-                metrics.record("dead_lettered");
-                continue;
-            }
+            String previousRequestId = org.slf4j.MDC.get("requestId");
             try {
-                if (event.getSchemaVersion() == null) dispatchLegacy(event);
-                else dispatchReliable(event, leaseToken);
-                if (MetaContext.runWithoutTenantFilter(() -> stateService.markDelivered(event, leaseToken))) {
-                    delivered++;
-                } else {
-                    leaseLost++;
-                    log.warn("Outbox event {} finished after its lease fence was lost", event.getEventId());
-                }
-            } catch (Exception error) {
-                Instant nextRetry = Instant.now().plus(BACKOFF.delayForRetry(event.getRetryCount()));
-                String message = truncateError(error.getMessage());
-                boolean changed = MetaContext.runWithoutTenantFilter(
-                        () -> stateService.recordFailure(event, leaseToken, nextRetry, message));
-                if (!changed) {
-                    leaseLost++;
+                if (event.getCorrelationId() == null) org.slf4j.MDC.remove("requestId");
+                else org.slf4j.MDC.put("requestId", event.getCorrelationId());
+                metrics.record("claimed");
+                if ("failed".equals(event.getStatus())) {
+                    // The claim transaction atomically exhausted a crashed worker's budget and wrote its DLQ.
+                    failed++;
+                    dead.add(event.getEventId());
+                    metrics.record("dead_lettered");
                     continue;
                 }
-                failed++;
-                if (event.getRetryCount() + 1 >= event.getMaxRetries()) {
-                    dead.add(event.getEventId());
-                    log.error("Outbox event {} entered the DLQ. EventType={}, CommandCode={}",
-                            event.getEventId(), event.getEventType(), event.getCommandCode(), error);
-                } else {
-                    log.warn("Outbox event {} dispatch failed (retry {}), next retry at {}",
-                            event.getEventId(), event.getRetryCount() + 1, nextRetry);
+                try {
+                    if (event.getSchemaVersion() == null) dispatchLegacy(event);
+                    else dispatchReliable(event, leaseToken);
+                    if (MetaContext.runWithoutTenantFilter(() -> stateService.markDelivered(event, leaseToken))) {
+                        delivered++;
+                    } else {
+                        leaseLost++;
+                        log.warn("Outbox event {} finished after its lease fence was lost", event.getEventId());
+                    }
+                } catch (Exception error) {
+                    Instant nextRetry = Instant.now().plus(BACKOFF.delayForRetry(event.getRetryCount()));
+                    String message = truncateError(error.getMessage());
+                    boolean changed = MetaContext.runWithoutTenantFilter(
+                            () -> stateService.recordFailure(event, leaseToken, nextRetry, message));
+                    if (!changed) {
+                        leaseLost++;
+                        continue;
+                    }
+                    failed++;
+                    if (event.getRetryCount() + 1 >= event.getMaxRetries()) {
+                        dead.add(event.getEventId());
+                        log.error("Outbox event {} entered the DLQ. EventType={}, CommandCode={}",
+                                event.getEventId(), event.getEventType(), event.getCommandCode(), error);
+                    } else {
+                        log.warn("Outbox event {} dispatch failed (retry {}), next retry at {}",
+                                event.getEventId(), event.getRetryCount() + 1, nextRetry);
+                    }
                 }
+            } finally {
+                if (previousRequestId == null) org.slf4j.MDC.remove("requestId");
+                else org.slf4j.MDC.put("requestId", previousRequestId);
             }
         }
         return new DispatchResult(events.size(), delivered, failed, leaseLost, dead);

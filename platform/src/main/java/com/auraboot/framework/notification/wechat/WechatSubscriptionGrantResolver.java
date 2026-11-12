@@ -6,7 +6,7 @@ import java.util.Optional;
 
 /**
  * Host-owned authority for an explicit, trusted template consent and recipient resolution.
- * No production implementation is provided until authorization/recipient rules are supplied.
+ * The default-off host implementation requires explicit source and field mappings and verified provider facts.
  * claim atomically creates or reads the same delivery-bound reservation idempotently; it never issues a replacement
  * reservation for a used/unknown delivery reference. This is an attempt fence, not a default consent/quota policy.
  * Implementations must not treat login, phone grants or a posted accept string as subscription consent.

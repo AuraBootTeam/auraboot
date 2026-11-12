@@ -13,6 +13,8 @@ import type { PromptSubmissionFeedback, PromptSubmissionState } from './promptSu
  */
 
 import RecordListField, { validRecordList, type RecordListConfig } from './RecordListField';
+import AddressField from '~/ui/smart/picker/AddressField';
+import { validAddressInput } from './addressInput';
 import {
   createContext,
   useContext,
@@ -67,6 +69,7 @@ interface FormFieldConfig {
   helpText?: string | Record<string, string>;
   type?:
     | 'text'
+    | 'address'
     | 'string-map'
     | 'record-list'
     | 'select'
@@ -437,6 +440,16 @@ function FormDialogHost() {
     );
     for (const field of visibleFields) {
       const value = formData[field.field];
+      if (
+        field.type === 'address' &&
+        !validAddressInput(value, {
+          required: field.required,
+          requireDistrict: field.props?.requireDistrict,
+          showDetailAddress: field.props?.showDetailAddress,
+          detailMaxLength: field.props?.detailMaxLength,
+        })
+      )
+        newErrors[field.field] = getLocalizedText(FORM_DIALOG_TEXT.invalidAddress, locale, t);
       if (field.type === 'uploaded-files') {
         try {
           const config = uploadedFilesConfig(field.uploadedFiles);
@@ -449,7 +462,7 @@ function FormDialogHost() {
           newErrors[field.field] = getLocalizedText(UPLOAD_TEXT.invalid, locale, t);
         }
       }
-      if (field.required) {
+      if (field.required && field.type !== 'address') {
         if (isMissing(value) || (field.mustBeTrue && value !== true)) {
           const label = field.label ? getLocalizedText(field.label, locale, t) : field.field;
           newErrors[field.field] = buildRequiredFieldMessage(label, {
@@ -487,16 +500,20 @@ function FormDialogHost() {
         const groupKey = field.props?.groupField || 'group';
         const valuesKey = field.props?.valuesField || 'values';
         const selections = Array.isArray(value) ? value : [];
+        const allowEmpty = field.props?.allowEmptyGroups === true;
         const valid =
           groups.length > 0 &&
           selections.length === groups.length &&
+          (!allowEmpty ||
+            selections.some(
+              (item: any) => Array.isArray(item?.[valuesKey]) && item[valuesKey].length > 0,
+            )) &&
           groups.every((group) => {
             const matching = selections.filter((item: any) => item?.[groupKey] === group.value);
             if (matching.length !== 1 || !Array.isArray(matching[0][valuesKey])) return false;
             const values = matching[0][valuesKey];
             return (
-              !group.disabled &&
-              values.length > 0 &&
+              ((allowEmpty && values.length === 0) || (!group.disabled && values.length > 0)) &&
               new Set(values).size === values.length &&
               values.every((selected: unknown) =>
                 (group.options || []).some(
@@ -513,6 +530,16 @@ function FormDialogHost() {
             t,
           });
         }
+      }
+      if (
+        field.type === 'multiselect' &&
+        field.props?.selectionMode === 'single' &&
+        (!Array.isArray(value) || value.length !== 1)
+      ) {
+        newErrors[field.field] = buildRequiredFieldMessage(
+          getLocalizedText(field.label, locale, t),
+          { dataType: 'text', locale, t },
+        );
       }
       if (field.type === 'bom-upload-review') {
         const review = value as BomUploadReviewValue | undefined;
@@ -858,7 +885,30 @@ function FormDialogHost() {
                       )}
                     </label>
 
-                    {component === 'memberpicker' ? (
+                    {fieldType === 'address' ? (
+                      <div
+                        role="group"
+                        aria-label={label}
+                        aria-required={field.required || undefined}
+                        aria-invalid={Boolean(error)}
+                        aria-describedby={error ? `form-dialog-error-${sourceIndex}` : undefined}
+                      >
+                        <AddressField
+                          name={field.field}
+                          value={formData[field.field]}
+                          onChange={(value) => updateField(field.field, value)}
+                          requireDistrict={field.props?.requireDistrict !== false}
+                          showDetailAddress={field.props?.showDetailAddress !== false}
+                          detailMaxLength={field.props?.detailMaxLength ?? 200}
+                          allowManualEntry={field.props?.allowManualEntry === true}
+                          detailPlaceholder={
+                            field.props?.detailPlaceholder
+                              ? getLocalizedText(field.props.detailPlaceholder, locale, t)
+                              : undefined
+                          }
+                        />
+                      </div>
+                    ) : component === 'memberpicker' ? (
                       <MemberPicker
                         name={field.field}
                         required={field.required}
@@ -1098,6 +1148,7 @@ function FormDialogHost() {
                       <div data-testid={`form-dialog-field-${field.field}`}>
                         <PagedChoiceField
                           endpoint={field.dataSource.endpoint}
+                          multiple={field.props?.selectionMode !== 'single'}
                           label={getLocalizedText(field.label, locale, t)}
                           value={Array.isArray(formData[field.field]) ? formData[field.field] : []}
                           onChange={(value) => updateField(field.field, value)}
@@ -1410,7 +1461,14 @@ function FormDialogHost() {
                       />
                     )}
 
-                    {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+                    {error && (
+                      <p
+                        id={`form-dialog-error-${sourceIndex}`}
+                        className="mt-1 text-xs text-red-500"
+                      >
+                        {error}
+                      </p>
+                    )}
                     {helpText && (
                       <p
                         className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400"

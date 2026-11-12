@@ -152,6 +152,69 @@ class ExternalEventIngressServiceTest {
         assertTrue(response.duplicate());assertEquals("original-pid",response.recordPid());verify(accessor,never()).enqueue(any());
     }
 
+
+    private InstalledIntegrationService businessProvider() {
+        var installed=mock(InstalledIntegrationService.class);service.setInstalledIntegrations(installed);
+        when(installed.registered("erp")).thenReturn(true);
+        when(installed.prepareBusinessRequest(eq("erp"),any())).thenAnswer(call->{
+            @SuppressWarnings("unchecked") var input=(java.util.Map<String,Object>)call.getArgument(1);
+            return java.util.Optional.of(new com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension.BusinessRequest(
+                "external.erp.order.snapshot.v2","purchase-order","300001",java.time.Instant.parse(input.get("occurredAt").toString()),
+                java.util.Map.of("snapshot",input)));
+        });
+        when(installed.accept(eq(principal),eq("erp"),any())).thenReturn(new InstalledIntegrationService.Acceptance("accepted-pid",false));
+        when(idempotencyMapper.claim(anyLong(),anyLong(),anyString(),anyString(),anyString(),any())).thenReturn(1);
+        when(idempotencyMapper.complete(anyLong(),anyLong(),anyString(),anyString(),anyString(),anyString())).thenReturn(1);
+        return installed;
+    }
+    private String businessBody(){return "{\"occurredAt\":\"2026-11-10T00:00:00Z\",\"data\":{\"order\":{\"orderId\":\"300001\"}}}";}
+    @Test void businessProviderNormalizesWithoutExternalEventIdentityOrIdempotencyHeader() {
+        businessProvider();var result=service.accept(principal,"erp",null,businessBody());
+        assertEquals(java.util.Map.of("recordPid","accepted-pid"),result.publicReceipt());
+        var envelope=ArgumentCaptor.forClass(IntegrationEventEnvelope.class);verify(accessor).enqueue(envelope.capture());
+        assertEquals("external.erp.order.snapshot.v2",envelope.getValue().eventType());
+        assertEquals(0,envelope.getValue().sequence());
+        assertEquals("purchase-order/300001",envelope.getValue().subject());
+        assertEquals(new ObjectMapper().convertValue(readBusiness(),java.util.Map.class),envelope.getValue().payload().get("snapshot"));
+    }
+    private com.fasterxml.jackson.databind.JsonNode readBusiness() {
+        try{return new ObjectMapper().readTree(businessBody());}catch(com.fasterxml.jackson.core.JsonProcessingException invalid){throw new AssertionError(invalid);}
+    }
+    @Test void optionalBusinessIdIsEchoedButBusinessDuplicateDecisionIsNotExposed() {
+        var installed=businessProvider();
+        when(installed.accept(eq(principal),eq("erp"),any())).thenReturn(new InstalledIntegrationService.Acceptance("accepted-pid",true));
+        var result=service.accept(principal,"erp",null,businessBody().replace("{\"occurredAt\"","{\"id\":\"kd-1\",\"occurredAt\""));
+        assertEquals(java.util.Map.of("recordPid","accepted-pid","eventId","kd-1"),result.publicReceipt());
+        verify(accessor,never()).enqueue(any());
+    }
+    @Test void businessBodiesRejectRoutingFieldsNonUtcDuplicateKeysAndTrailingTokens() {
+        businessProvider();
+        for(String body:java.util.List.of(businessBody().replace("{\"occurredAt\"","{\"sequence\":1,\"occurredAt\""),
+                businessBody().replace("2026-11-10T00:00:00Z","2026-11-10T08:00:00+08:00"),
+                businessBody()+" {}",businessBody().replace("\"orderId\":\"300001\"","\"orderId\":\"300002\",\"orderId\":\"300001\"")))
+            assertThrows(ExternalEventIngressService.InvalidExternalEventException.class,()->service.accept(principal,"erp",null,body));
+        verifyNoClaim();verify(accessor,never()).enqueue(any());
+    }
+    @Test void simplifiedInputRequiresExplicitProviderSupportAndLegacyStillRequiresItsHeader() {
+        var installed=businessProvider();
+        when(installed.prepareBusinessRequest(eq("erp"),any())).thenReturn(java.util.Optional.empty());
+        assertEquals("business_contract_not_registered",assertThrows(ExternalEventIngressService.InvalidExternalEventException.class,
+            ()->service.accept(principal,"erp",null,businessBody())).getMessage());
+        assertEquals("invalid_idempotency_key",assertThrows(ExternalEventIngressService.InvalidExternalEventException.class,
+            ()->service.accept(principal,"erp",null,strictBody())).getMessage());
+        verifyNoClaim();verify(accessor,never()).enqueue(any());
+    }
+    @Test void missingNativeAcceptanceStopsBeforeEnqueueAndCompletion() {
+        var installed=businessProvider();when(installed.accept(eq(principal),eq("erp"),any())).thenReturn(null);
+        assertThrows(IllegalStateException.class,()->service.accept(principal,"erp",null,businessBody()));
+        verify(accessor,never()).enqueue(any());
+        verify(idempotencyMapper,never()).complete(anyLong(),anyLong(),anyString(),anyString(),anyString(),anyString());
+    }
+    @Test void missingBusinessAcceptanceRecordCannotBecomeAPublicSuccess() {
+        assertThrows(IllegalStateException.class,()->new ExternalEventIngressService.IngressResult("id",false,null,true,false).publicReceipt());
+        assertEquals(java.util.Map.of("eventId","id","duplicate",false),new ExternalEventIngressService.IngressResult("id",false).publicReceipt());
+    }
+
     private String strictBody() { return body("evt-1").replace("\"data\":", "\"sequence\":0,\"data\":"); }
 
     @Test

@@ -18,7 +18,7 @@ import java.util.*;
 
 /** Durable external intent and one-attempt fence. Integration receipts mean materialized intent, never external delivery. */
 @Service
-public class WechatSubscriptionDeliveryJournal implements ReliableEventConsumerExtension {
+public class WechatSubscriptionDeliveryJournal implements ReliableEventConsumerExtension, com.auraboot.framework.integration.HostSerializableEventConsumer {
     public static final String EVENT_TYPE="notification.wechat.intent-requested.v1";
     public enum Status { BLOCKED, QUEUED, REPLAYED }
     public record QueueResult(Status status, WechatSubscriptionMessageSender.Reason reason, String deliveryKey) {}
@@ -48,6 +48,9 @@ public class WechatSubscriptionDeliveryJournal implements ReliableEventConsumerE
         return new QueueResult(created?Status.QUEUED:Status.REPLAYED,null,key);
     }
     @Override public String consumerCode(){return "core.notification.wechat.intent.v1";}
+    @Override public boolean requiresSerializableTransaction(IntegrationEventEnvelope event) {
+        return event != null && EVENT_TYPE.equals(event.eventType());
+    }
     @Override public Set<String> subscribedEventTypes(){return Set.of(EVENT_TYPE);}
     @Override public void consume(IntegrationEventEnvelope event) {
         requireTenant(event.tenantId());

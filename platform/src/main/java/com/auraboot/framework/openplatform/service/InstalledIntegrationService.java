@@ -43,7 +43,9 @@ public class InstalledIntegrationService {
     }
 
     record Resolved(Registration registration, String artifact, InstalledIntegrationBinding binding,
-                    Map<String,String> configs, Map<String,Object> handlers, String bindingHash, String commandHash, Set<String> completedCommandHashes, String conflictMessageKey) {}
+                    Map<String,String> configs, Map<String,Object> handlers, String bindingHash, String commandHash,
+                    String legacyCommandHash, Set<String> completedCommandHashes, Set<String> completedReadPredecessorHashes,
+                    Set<Registration> completedRegistrations, String conflictMessageKey) {}
     public record Acceptance(String recordPid, boolean duplicate) {}
 
     public boolean registered(String source) { return registry.registration(source).isPresent(); }
@@ -138,10 +140,28 @@ public class InstalledIntegrationService {
         }
         InstalledIntegrationBinding binding = new InstalledIntegrationBinding(principal.tenantId(), principal.applicationPid(),
                 principal.installationPid(), source, eventId, durableId, bindingRevision, parameters);
+        var previousRegistrations=registry.completedReceiptRegistrations(source);
+        var previousReadHashes=new HashSet<String>();
+        var readAdditions=registry.completedReceiptProcessReadAdditions(registration,entry.getValue());
+        var declarations=new HashSet<>(previousRegistrations);declarations.add(registration);
+        for(var previous:InstalledIntegrationCommandFingerprint.beforeProcessReadAdditions(
+                json,configs,registration.processCommand(),readAdditions)) {
+            for(var declaration:declarations) {
+                previousReadHashes.add(commandHash(declaration,previous));
+                previousReadHashes.add(scopedCommandHash(declaration,previous,principal.installationPid()));
+            }
+        }
+
         return new Resolved(registration, entry.getValue(), binding, Map.copyOf(configs), Map.copyOf(approvedHandlers), hash(binding),
-                commandHash(registration,configs),
-                registry.completedReceiptRegistrations(source).stream()
-                        .map(previous -> commandHash(previous,configs)).collect(java.util.stream.Collectors.toUnmodifiableSet()), common.path("conflictMessageKey").asText(null));
+                scopedCommandHash(registration,configs,principal.installationPid()), commandHash(registration,configs),
+                previousRegistrations.stream().flatMap(previous -> java.util.stream.Stream.of(
+                        commandHash(previous,configs),scopedCommandHash(previous,configs,principal.installationPid())))
+                        .collect(java.util.stream.Collectors.toUnmodifiableSet()),
+                Set.copyOf(previousReadHashes),Set.copyOf(previousRegistrations),common.path("conflictMessageKey").asText(null));
+    }
+
+    public Optional<ExternalEventIngressExtension.BusinessRequest> prepareBusinessRequest(String source,Map<String,Object> input) {
+        return registry.prepareBusinessRequest(source,input);
     }
 
     @Transactional
@@ -160,14 +180,7 @@ public class InstalledIntegrationService {
                 if (!Set.of("accepted","completed").contains(original.state()) || original.requestPid() == null) throw denied();
                 return new Acceptance(original.requestPid(), true);
             }
-            if (envelope.payload().containsKey("requestId") && !external.equals(envelope.payload().get("requestId")))
-                throw new IllegalArgumentException("External event id must equal business requestId");
-            if (envelope.payload().containsKey("externalSubject"))
-                throw new IllegalArgumentException("External subject is host-owned");
-            Map<String,Object> payload = new LinkedHashMap<>(envelope.payload());
-            payload.put("requestId", external);
-            payload.put("externalSubject",Map.of("type",envelope.headers().get("externalSubjectType"),
-                    "pid",envelope.headers().get("externalSubjectPid")));
+            Map<String,Object> payload = installedPayload(envelope, external);
             Map<String,Object> data = execute(resolved, resolved.registration().acceptCommand(), payload, null, false, envelope);
             Object record = data.get("recordPid");
             if (!(record instanceof String pid) || !pid.matches("[A-Za-z0-9_-]{1,100}")
@@ -200,6 +213,68 @@ public class InstalledIntegrationService {
         });
     }
 
+    /** Runs the installed business boundary in the caller transaction without enqueueing work. */
+    @Transactional
+    public Map<String,Object> executeSynchronously(MachinePrincipal principal, String source,
+            IntegrationEventEnvelope envelope) {
+        return executeSynchronouslyWithReceipt(principal, source, envelope).data();
+    }
+
+    public record SynchronousResult(Map<String,Object> data, boolean replay) { }
+
+    @Transactional
+    public SynchronousResult executeSynchronouslyWithReceipt(MachinePrincipal principal, String source,
+            IntegrationEventEnvelope envelope) {
+        if (principal == null || envelope == null) throw denied();
+        return inTenant(principal.tenantId(), principal.installationPid(), () -> {
+            String external = envelope.headers().get("externalEventId");
+            Resolved resolved = resolve(principal, source, external, envelope.eventId());
+            verifyEnvelope(resolved, envelope);
+            var receipt = new InstalledIntegrationReceiptMapper.Receipt(principal.tenantId(), principal.installationPid(),
+                    source, external, envelope.eventId(), envelopeHash(envelope), resolved.bindingHash(),
+                    resolved.commandHash(), resolved.artifact(), null, "accepting");
+            if (receipts.claim(receipt) == 0) {
+                var original = receipts.find(receipt.tenantId(), receipt.installationPid(), source, external);
+                verifyReceipt(resolved, envelope, original, true);
+                // Never take over a pending asynchronous request or repeat an unknown write.
+                if (!"completed".equals(original.state()) || !validRequestPid(original.requestPid()))
+                    throw new ExternalEventIngressService.IdempotencyConflictException();
+                return new SynchronousResult(completedResult(resolved, external, original.requestPid()), true);
+            }
+            Map<String,Object> payload = installedPayload(envelope, external);
+            Map<String,Object> accepted = execute(resolved, resolved.registration().acceptCommand(), payload, null, false, envelope);
+            Object record = accepted.get("recordPid");
+            if (!(record instanceof String pid) || !validRequestPid(pid) || !"accepted".equals(accepted.get("state")))
+                throw new IllegalStateException("Invalid native acceptance result");
+            if (receipts.accepted(receipt.tenantId(), receipt.installationPid(), source, external, pid) != 1) throw denied();
+            try (var machine = com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal)) {
+                execute(resolved, resolved.registration().processCommand(), Map.of("requestPid", pid), pid, false, envelope);
+            }
+            Map<String,Object> result = completedResult(resolved, external, pid);
+            if (receipts.completed(receipt.tenantId(), receipt.installationPid(), source, external, pid) != 1) throw denied();
+            return new SynchronousResult(result, false);
+        });
+    }
+
+    private Map<String,Object> completedResult(Resolved resolved, String external, String pid) {
+        Map<String,Object> result = execute(resolved, resolved.registration().resultCommand(), Map.of("requestId", external), null, true);
+        if (!pid.equals(result.get("recordPid")) || !"completed".equals(result.get("state")))
+            throw new IllegalStateException("Installed synchronous business result is not complete");
+        return Collections.unmodifiableMap(new LinkedHashMap<>(result));
+    }
+
+    private Map<String,Object> installedPayload(IntegrationEventEnvelope envelope, String external) {
+        if (envelope.payload().containsKey("requestId") && !Objects.equals(external, envelope.payload().get("requestId")))
+            throw new IllegalArgumentException("External event id must equal business requestId");
+        if (envelope.payload().containsKey("externalSubject"))
+            throw new IllegalArgumentException("External subject is host-owned");
+        Map<String,Object> payload = new LinkedHashMap<>(envelope.payload());
+        payload.put("requestId", external);
+        payload.put("externalSubject", Map.of("type", envelope.headers().get("externalSubjectType"),
+                "pid", envelope.headers().get("externalSubjectPid")));
+        return payload;
+    }
+
     @Transactional
     public Map<String,Object> result(MachinePrincipal principal, String source, String eventId) {
         return inTenant(principal.tenantId(),principal.installationPid(), () -> {
@@ -210,11 +285,15 @@ public class InstalledIntegrationService {
                     || !providerMatches(resolved,r) || !validRequestPid(r.requestPid())) throw denied();
             Map<String,Object> result = new LinkedHashMap<>(execute(resolved,resolved.registration().resultCommand(),Map.of("requestId",eventId),null,true));
             if (!r.requestPid().equals(result.get("recordPid"))) throw denied();
-            String delivery = receipts.deliveryStatus(r.tenantId(),r.durableEventId());
-            if (delivery == null) delivery = "unavailable";
+            var observation = receipts.delivery(r.tenantId(),r.durableEventId());
+            String delivery = observation == null ? "unavailable" : observation.status();
             if (!Set.of("pending","processing","delivered","failed","unavailable").contains(delivery)) throw denied();
             result.put("deliveryStatus",delivery);
-            if ("failed".equals(delivery)) result.put("deliveryFailureCode","integration_delivery_failed");
+            result.remove("deliveryFailureCode");
+            // A queued retry must not hide its preceding failed attempt. Never expose raw last_error.
+            if ("failed".equals(delivery) || observation != null && observation.failedAttempt()
+                    && Set.of("pending","processing").contains(delivery))
+                result.put("deliveryFailureCode","integration_delivery_failed");
             return Collections.unmodifiableMap(result);
         });
     }
@@ -280,9 +359,19 @@ public class InstalledIntegrationService {
                 || !r.durableEventId().equals(event.eventId())) throw denied();
     }
     private boolean commandMatches(Resolved resolved, InstalledIntegrationReceiptMapper.Receipt receipt) {
-        return receipt.commandSha256().equals(resolved.commandHash())
-                || ("completed".equals(receipt.state()) && validRequestPid(receipt.requestPid())
-                    && resolved.completedCommandHashes().contains(receipt.commandSha256()));
+        if(receipt.commandSha256().equals(resolved.commandHash())
+                || receipt.commandSha256().equals(resolved.legacyCommandHash())
+                || legacyCommandPrefixMatches(resolved.registration(),resolved,receipt.commandSha256()))return true;
+        if(!"completed".equals(receipt.state()) || !validRequestPid(receipt.requestPid()))return false;
+        return resolved.completedReadPredecessorHashes().contains(receipt.commandSha256())
+                || resolved.completedCommandHashes().contains(receipt.commandSha256())
+                || resolved.completedRegistrations().stream()
+                        .anyMatch(previous -> legacyCommandPrefixMatches(previous,resolved,receipt.commandSha256()));
+    }
+    private boolean legacyCommandPrefixMatches(Registration registration, Resolved resolved, String original) {
+        return InstalledIntegrationCommandFingerprint.legacyPrefixMatches(json,resolved.configs(),
+                resolved.binding().installationPid(),commandHash(registration,resolved.configs()),original,
+                candidate -> commandHash(registration,candidate));
     }
     private boolean providerMatches(Resolved resolved, InstalledIntegrationReceiptMapper.Receipt receipt) {
         // Terminal replay never invokes old business code; the current result query is PID-bound.
@@ -323,6 +412,12 @@ public class InstalledIntegrationService {
         // Sets have no stable JVM iteration order; preserve legacy record layout and sort only this set.
         declaration.set("eventTypes",json.valueToTree(registration.eventTypes().stream().sorted().toList()));
         return hash(Map.of("registration",declaration,"configs",configs));
+    }
+    String scopedCommandHash(Registration registration,Map<String,String> configs,String installation) {
+        var declaration=(com.fasterxml.jackson.databind.node.ObjectNode)json.valueToTree(registration);
+        declaration.set("eventTypes",json.valueToTree(registration.eventTypes().stream().sorted().toList()));
+        return hash(Map.of("scheme","installation-command-v1","registration",declaration,
+                "configs",InstalledIntegrationCommandFingerprint.scoped(json,configs,installation)));
     }
     private boolean bindingDeclaration(JsonNode declaration) {
         Set<String> fields=keys(declaration);

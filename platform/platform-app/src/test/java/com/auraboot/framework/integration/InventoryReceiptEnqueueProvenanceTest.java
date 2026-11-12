@@ -107,7 +107,8 @@ class InventoryReceiptEnqueueProvenanceTest {
         when(owners.findByPid("owner")).thenReturn(PluginRecord.builder().pid("owner").tenantId(31L)
                 .pluginId("com.auraboot.inventory").deletedFlag(false).build());
         provenance = new InventoryReceiptEnqueueProvenance(plugins,new InventoryOwnerModelAuthority(definitions,models,owners),outbox,json);
-        accessor = new ReliableIntegrationAccessorImpl(outbox,json,mock(ReliableIntegrationMetrics.class),provenance);
+        accessor = new ReliableIntegrationAccessorImpl(outbox,json,mock(ReliableIntegrationMetrics.class),provenance,
+                mock(org.springframework.context.ApplicationEventPublisher.class));
         context = CommandHandlerExtension.CommandContext.builder().tenantId(31L).commandType("inv:confirm_warehouse_in")
                 .modelCode("inv_inbound").recordId("receipt").payload(Map.of()).build();
         MetaContext.setContext(31L,17L,"actor","actor");

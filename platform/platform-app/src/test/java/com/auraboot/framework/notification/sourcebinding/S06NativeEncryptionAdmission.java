@@ -42,7 +42,7 @@ public final class S06NativeEncryptionAdmission {
         String key = requiredKey(environment);
         Path app = Path.of(required(environment, "S06_NATIVE_APPLICATION_ROOT")).toRealPath();
         require(Files.isSameFile(Path.of(testClass.getProtectionDomain().getCodeSource().getLocation().toURI()),
-                app.resolve("platform/build/classes/java/test")), "S06_NATIVE_APPLICATION_CODE_SOURCE_MISMATCH");
+                app.resolve("platform/platform-app/build/classes/java/test")), "S06_NATIVE_APPLICATION_CODE_SOURCE_MISMATCH");
         Path evidence = NativeProcurementWorkspace.root().resolve(".workspace/evidence").resolve(RUNTIME).toRealPath();
         Path proofPath = Path.of(required(environment, "S06_NATIVE_ENCRYPTION_PROOF_PATH")).toRealPath();
         require(proofPath.startsWith(evidence), "S06_ENCRYPTION_PROOF_NOT_OWNED");

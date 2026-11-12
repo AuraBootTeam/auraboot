@@ -1,0 +1,38 @@
+{
+  "loadFailed": {
+    "zh-CN": "加载通知失败",
+    "en-US": "Failed to load notifications",
+    "zh-TW": "載入通知失敗",
+    "ja": "通知の読み込みに失敗しました"
+  },
+  "markReadSuccess": {
+    "zh-CN": "已标记为已读",
+    "en-US": "Notification marked as read",
+    "zh-TW": "已標記為已讀",
+    "ja": "通知を既読にしました"
+  },
+  "markReadFailed": {
+    "zh-CN": "标记已读失败",
+    "en-US": "Failed to mark notification as read",
+    "zh-TW": "標記已讀失敗",
+    "ja": "既読にできませんでした"
+  },
+  "markAllReadSuccess": {
+    "zh-CN": "已全部标为已读",
+    "en-US": "All notifications marked as read",
+    "zh-TW": "已全部標為已讀",
+    "ja": "すべての通知を既読にしました"
+  },
+  "deleted": {
+    "zh-CN": "已删除 {count} 条通知",
+    "en-US": "Deleted {count} notifications",
+    "zh-TW": "已刪除 {count} 則通知",
+    "ja": "{count}件の通知を削除しました"
+  },
+  "deleteFailed": {
+    "zh-CN": "删除通知失败",
+    "en-US": "Failed to delete notifications",
+    "zh-TW": "刪除通知失敗",
+    "ja": "通知の削除に失敗しました"
+  }
+}

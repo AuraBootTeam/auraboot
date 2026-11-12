@@ -15,6 +15,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -55,7 +56,9 @@ class UserServiceImplTest {
         persisted.setUserName("吴书生");
         when(userMapper.selectById(10L)).thenReturn(persisted);
 
+        Instant before = Instant.now();
         User result = service.signUp(null, "jjzz@1234", "吴书生", "吴书生");
+        Instant after = Instant.now();
 
         assertThat(result).isSameAs(persisted);
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
@@ -65,6 +68,8 @@ class UserServiceImplTest {
         assertThat(inserted.getUserName()).isEqualTo("吴书生");
         assertThat(inserted.getNickName()).isEqualTo("吴书生");
         assertThat(inserted.getPassword()).isEqualTo("encoded");
+        assertThat(inserted.getCreatedAt()).isBetween(before, after);
+        assertThat(inserted.getUpdatedAt()).isEqualTo(inserted.getCreatedAt());
     }
 
     @Test

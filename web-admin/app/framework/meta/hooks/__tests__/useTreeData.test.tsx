@@ -120,3 +120,47 @@ describe('useTreeData', () => {
     expect(result.current.flatTree).toHaveLength(1);
   });
 });
+
+
+describe('nested tree payloads', () => {
+  it('expands asynchronously loaded batches while keeping explicit collapsed choices on refresh', () => {
+    const config: TreeConfig = { parentField: 'parent', childrenField: 'children', defaultExpanded: true };
+    const loaded = [{ pid: 'batch', children: [{ pid: 'line' }] }];
+    const { result, rerender } = renderHook(({ rows }: { rows: Record<string, any>[] }) => useTreeData(rows, config), {
+      initialProps: { rows: [] as Record<string, any>[] },
+    });
+    rerender({ rows: loaded });
+    expect(result.current.visibleRows.map((row: { pid: string }) => row.pid)).toEqual(['batch', 'line']);
+    act(() => result.current.toggleExpand('batch'));
+    rerender({ rows: [] });
+    rerender({ rows: [
+      { pid: 'batch', children: [{ pid: 'line' }, { pid: 'another-line' }] },
+      { pid: 'new-batch', children: [{ pid: 'new-line' }] },
+    ] });
+    expect(result.current.visibleRows.map((row: { pid: string }) => row.pid)).toEqual(['batch', 'new-batch', 'new-line']);
+    act(() => result.current.toggleExpand('batch'));
+    expect(result.current.visibleRows.map((row: { pid: string }) => row.pid)).toEqual(['batch', 'line', 'another-line', 'new-batch', 'new-line']);
+  });
+  it('keeps asynchronously loaded batches collapsed when the declared default is false', () => {
+    const config: TreeConfig = { parentField: 'parent', childrenField: 'children', defaultExpanded: false };
+    const { result, rerender } = renderHook(({ rows }: { rows: Record<string, any>[] }) => useTreeData(rows, config), {
+      initialProps: { rows: [] as Record<string, any>[] },
+    });
+    rerender({ rows: [{ pid: 'batch', children: [{ pid: 'line' }] }] });
+    expect(result.current.visibleRows.map((row: { pid: string }) => row.pid)).toEqual(['batch']);
+    act(() => result.current.toggleExpand('batch'));
+    rerender({ rows: [{ pid: 'batch', children: [{ pid: 'line' }, { pid: 'later-line' }] }] });
+    expect(result.current.visibleRows.map((row: { pid: string }) => row.pid)).toEqual(['batch', 'line', 'later-line']);
+  });
+  it('keeps root pagination separate from expandable children without modifying the payload', () => {
+    const rows = [{ pid: 'batch', children: [{ pid: 'line', name: 'Original material' }] }];
+    const original = JSON.stringify(rows);
+    const { result } = renderHook(() => useTreeData(rows, { parentField: 'parent', childrenField: 'children' }));
+    expect(result.current.visibleRows.map((row: { pid: string }) => row.pid)).toEqual(['batch', 'line']);
+    act(() => result.current.toggleExpand('batch'));
+    expect(result.current.visibleRows.map((row: { pid: string }) => row.pid)).toEqual(['batch']);
+    expect(JSON.stringify(rows)).toBe(original);
+    act(() => result.current.toggleExpand('batch'));
+    expect(result.current.visibleRows[1].name).toBe('Original material');
+  });
+});

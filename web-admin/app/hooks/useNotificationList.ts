@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useToastContext } from '~/contexts/ToastContext';
+import { useLocalizedText } from '~/utils/i18n';
+import TEXT from './useNotificationList.i18n.json';
 
 /**
  * Notification DTO matching backend NotificationDTO
@@ -38,6 +40,7 @@ export function useNotificationList() {
   const [total, setTotal] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
   const { showSuccessToast, showErrorToast } = useToastContext();
+  const lt = useLocalizedText();
 
   /**
    * Fetch notification list
@@ -72,16 +75,16 @@ export function useNotificationList() {
             setTotal(data?.total || 0);
           }
         } else {
-          showErrorToast(result.desc || 'Failed to load notifications');
+          showErrorToast(result.desc || lt(TEXT.loadFailed));
         }
       } catch (error) {
         console.error('Failed to fetch notifications:', error);
-        showErrorToast('Failed to load notifications');
+        showErrorToast(lt(TEXT.loadFailed));
       } finally {
         setLoading(false);
       }
     },
-    [showErrorToast],
+    [showErrorToast, lt],
   );
 
   /**
@@ -123,16 +126,16 @@ export function useNotificationList() {
             ),
           );
           setUnreadCount((prev) => Math.max(0, prev - 1));
-          showSuccessToast('Notification marked as read');
+          showSuccessToast(lt(TEXT.markReadSuccess));
         } else {
-          showErrorToast(result.desc || 'Failed to mark notification as read');
+          showErrorToast(result.desc || lt(TEXT.markReadFailed));
         }
       } catch (error) {
         console.error('Failed to mark notification as read:', error);
-        showErrorToast('Failed to mark notification as read');
+        showErrorToast(lt(TEXT.markReadFailed));
       }
     },
-    [showSuccessToast, showErrorToast],
+    [showSuccessToast, showErrorToast, lt],
   );
 
   /**
@@ -149,15 +152,15 @@ export function useNotificationList() {
           prev.map((n) => ({ ...n, isRead: true, readAt: n.readAt || new Date().toISOString() })),
         );
         setUnreadCount(0);
-        showSuccessToast('已全部标为已读');
+        showSuccessToast(lt(TEXT.markAllReadSuccess));
       } else {
-        showErrorToast(result.desc || '标记已读失败');
+        showErrorToast(result.desc || lt(TEXT.markReadFailed));
       }
     } catch (error) {
       console.error('Failed to mark all notifications as read:', error);
-      showErrorToast('标记已读失败');
+      showErrorToast(lt(TEXT.markReadFailed));
     }
-  }, [showSuccessToast, showErrorToast]);
+  }, [showSuccessToast, showErrorToast, lt]);
 
   /**
    * Delete multiple notifications by ID.
@@ -185,16 +188,16 @@ export function useNotificationList() {
           if (deletedUnreadCount > 0) {
             setUnreadCount((prev) => Math.max(0, prev - deletedUnreadCount));
           }
-          showSuccessToast(`已删除 ${ids.length} 条通知`);
+          showSuccessToast(lt(TEXT.deleted).replace('{count}', String(ids.length)));
         } else {
-          showErrorToast(result.desc || '删除通知失败');
+          showErrorToast(result.desc || lt(TEXT.deleteFailed));
         }
       } catch (error) {
         console.error('Failed to delete notifications:', error);
-        showErrorToast('删除通知失败');
+        showErrorToast(lt(TEXT.deleteFailed));
       }
     },
-    [notifications, showSuccessToast, showErrorToast],
+    [notifications, showSuccessToast, showErrorToast, lt],
   );
 
   return {

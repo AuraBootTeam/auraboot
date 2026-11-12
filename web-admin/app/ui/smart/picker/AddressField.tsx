@@ -1,4 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import TEXT from './AddressField.i18n.json';
 import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
 import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';
 import { FieldBase } from '~/ui/ui/field-base';
@@ -29,6 +32,7 @@ export interface AddressFieldProps {
   detailMaxLength?: number;
   detailPlaceholder?: string;
   requireDistrict?: boolean;
+  allowManualEntry?: boolean;
   loadRegions?: () => Promise<RegionNode[]>;
   className?: string;
 }
@@ -75,11 +79,14 @@ export const AddressField: React.FC<AddressFieldProps> = ({
   readOnly = false,
   showDetailAddress = true,
   detailMaxLength = 200,
-  detailPlaceholder = '请输入详细地址',
+  detailPlaceholder,
   requireDistrict = false,
+  allowManualEntry = false,
   loadRegions,
   className = '',
 }) => {
+  const { locale, t } = useI18n();
+  const text = (key: keyof typeof TEXT) => getLocalizedText(TEXT[key], locale, t);
   const {
     labelText,
     required: requiredValue,
@@ -109,6 +116,17 @@ export const AddressField: React.FC<AddressFieldProps> = ({
     parseValue(value ?? defaultValue),
   );
 
+  const [manualEntry, setManualEntry] = useState(() => {
+    if (!allowManualEntry) return false;
+    const initial = parseValue(value ?? defaultValue);
+    const province = REGIONS.find((node) => node.name === initial.province);
+    const city = province?.children?.find((node) => node.name === initial.city);
+    return Boolean(
+      (initial.province && !province) ||
+      (initial.city && !city) ||
+      (initial.district && !city?.children?.some((node) => node.name === initial.district)),
+    );
+  });
   const controlled = value !== undefined;
   const state: AddressValue = controlled ? parseValue(value) : localState;
 
@@ -181,59 +199,98 @@ export const AddressField: React.FC<AddressFieldProps> = ({
       error={meta.showError ? String(meta.meta.error ?? '') : undefined}
       className={`space-y-3 ${className}`}
     >
+      {allowManualEntry && (
+        <div>
+          <label className="inline-flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={manualEntry}
+              disabled={!isInteractive}
+              onChange={(event) => {
+                setManualEntry(event.target.checked);
+                if (!event.target.checked)
+                  updateState({ province: '', city: '', district: '', detail: state.detail });
+              }}
+            />
+            {text('manual')}
+          </label>
+          <p className="text-text-2 mt-1 text-xs">{text('manualHelp')}</p>
+        </div>
+      )}
       {/* Province / City / District row */}
-      <div className="grid grid-cols-3 gap-2">
-        {/* Province */}
-        <select
-          data-testid={`address-province-${name}`}
-          aria-label="province"
-          value={state.province}
-          onChange={handleProvinceChange}
-          disabled={!isInteractive}
-          className={selectBase}
-        >
-          <option value="">请选择省份</option>
-          {regions.map((p) => (
-            <option key={p.code} value={p.name}>
-              {p.name}
-            </option>
+      {manualEntry ? (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {(['province', 'city', 'district'] as const).map((key) => (
+            <input
+              key={key}
+              type="text"
+              aria-label={text(key)}
+              placeholder={text(key)}
+              value={state[key]}
+              maxLength={100}
+              disabled={!isInteractive}
+              className={selectBase}
+              onChange={(event) => updateState({ ...state, [key]: event.target.value })}
+            />
           ))}
-        </select>
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-2">
+          {/* Province */}
+          <select
+            data-testid={`address-province-${name}`}
+            aria-label={text('province')}
+            value={state.province}
+            onChange={handleProvinceChange}
+            disabled={!isInteractive}
+            className={selectBase}
+          >
+            <option value="">{text('chooseProvince')}</option>
+            {regions.map((p) => (
+              <option key={p.code} value={p.name}>
+                {p.name}
+              </option>
+            ))}
+          </select>
 
-        {/* City */}
-        <select
-          data-testid={`address-city-${name}`}
-          aria-label="city"
-          value={state.city}
-          onChange={handleCityChange}
-          disabled={!isInteractive || !state.province}
-          className={selectBase}
-        >
-          <option value="">请选择城市</option>
-          {cityNodes.map((c) => (
-            <option key={c.code} value={c.name}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+          {/* City */}
+          <select
+            data-testid={`address-city-${name}`}
+            aria-label={text('city')}
+            value={state.city}
+            onChange={handleCityChange}
+            disabled={!isInteractive || !state.province}
+            className={selectBase}
+          >
+            <option value="">{text('chooseCity')}</option>
+            {cityNodes.map((c) => (
+              <option key={c.code} value={c.name}>
+                {c.name}
+              </option>
+            ))}
+          </select>
 
-        {/* District */}
-        <select
-          data-testid={`address-district-${name}`}
-          aria-label="district"
-          value={state.district}
-          onChange={handleDistrictChange}
-          disabled={!isInteractive || !state.city}
-          className={selectBase}
-        >
-          <option value="">{requireDistrict ? '请选择区县 *' : '请选择区县'}</option>
-          {districtNodes.map((d) => (
-            <option key={d.code} value={d.name}>
-              {d.name}
+          {/* District */}
+          <select
+            data-testid={`address-district-${name}`}
+            aria-label={text('district')}
+            value={state.district}
+            onChange={handleDistrictChange}
+            disabled={!isInteractive || !state.city}
+            className={selectBase}
+          >
+            <option value="">
+              {text('chooseDistrict')}
+              {requireDistrict ? ' *' : ''}
             </option>
-          ))}
-        </select>
-      </div>
+            {districtNodes.map((d) => (
+              <option key={d.code} value={d.name}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {state.province && state.city && state.district && (
         <div className="text-text-2 text-xs">
@@ -245,12 +302,12 @@ export const AddressField: React.FC<AddressFieldProps> = ({
       {showDetailAddress && (
         <textarea
           data-testid={`address-detail-${name}`}
-          aria-label="detail-address"
+          aria-label={text('detail')}
           rows={2}
           value={state.detail}
           onChange={handleDetailChange}
           disabled={!isInteractive}
-          placeholder={detailPlaceholder}
+          placeholder={detailPlaceholder ?? text('detailPlaceholder')}
           maxLength={detailMaxLength}
           className={textareaBase}
         />
