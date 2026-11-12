@@ -559,6 +559,11 @@ bootRun {
 }
 
 tasks.withType(Test).configureEach {
+    if (providers.environmentVariable('OUTBOX_COMMIT_PRIMARY_PG_IT').getOrElse('false') == 'true') {
+        inputs.property('outboxCommitPrimarySchemaPrefix', providers.environmentVariable('OUTBOX_COMMIT_PRIMARY_SCHEMA_PREFIX').getOrElse(''))
+        outputs.upToDateWhen { false }
+        outputs.doNotCacheIf('Commit-primary qualification must execute against owned PostgreSQL') { true }
+    }
     def procurementHostJar = providers.environmentVariable('PROCUREMENT_PLUGIN_JAR').orNull
     if (procurementHostJar) {
         inputs.file(procurementHostJar).withPropertyName('procurementHostPluginJar')
