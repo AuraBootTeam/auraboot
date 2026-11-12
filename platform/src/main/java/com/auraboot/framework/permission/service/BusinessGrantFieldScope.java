@@ -16,7 +16,8 @@ import java.util.TreeMap;
 
 /** Strict materialized grant fields, interpreted only after its scope and conditions match. */
 final class BusinessGrantFieldScope {
-    private static final int MAX_MODELS = 32;
+    // A domain grant covers more objects than one command; keep the v2 document finite.
+    private static final int MAX_MODELS = 128;
     private BusinessGrantFieldScope() { }
 
     record Document(boolean legacy, boolean versionTwo, Map<String, BusinessGrantDecision.Fields> models) {

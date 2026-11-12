@@ -1,6 +1,7 @@
 package com.auraboot.framework.permission.service;
 
 import com.auraboot.framework.meta.exception.MetaServiceException;
+import com.auraboot.framework.permission.engine.model.BusinessGrantDecision;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -48,6 +49,31 @@ class BusinessGrantFieldScopeTest {
     })
     void badVersionOrAnotherModelsInvalidConfigurationCannotHide(String raw) {
         assertThatThrownBy(() -> BusinessGrantFieldScope.parse(json, raw, "receipt")).isInstanceOf(MetaServiceException.class);
+    }
+
+    @ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(ints={51,128})
+    void oneDomainCanRetainItsObjectsWhileNarrowingOnlyOne(int count) {
+        var models = new java.util.TreeMap<String,BusinessGrantDecision.Fields>();
+        for (int index=0;index<count;index++) models.put("domain_object_"+index,
+                index==0 ? new BusinessGrantDecision.Fields(false,java.util.Set.of("remark"),java.util.Set.of())
+                        : BusinessGrantDecision.Fields.legacy());
+        String encoded = BusinessGrantFieldScope.encode(json,models,true);
+        assertThat(BusinessGrantFieldScope.decode(json,encoded).models()).hasSize(count);
+        assertThat(BusinessGrantFieldScope.parse(json,encoded,"domain_object_0").readable()).containsExactly("remark");
+        assertThat(BusinessGrantFieldScope.parse(json,encoded,"domain_object_1").unrestricted()).isTrue();
+        assertThat(BusinessGrantFieldScope.select(json,encoded,"future_object")).isEmpty();
+    }
+
+    @Test void domainCapacityStillRejectsMoreThan128ObjectsOnReadAndWrite() throws Exception {
+        var models = new java.util.TreeMap<String,BusinessGrantDecision.Fields>();
+        var raw = new java.util.TreeMap<String,Object>();
+        for(int index=0;index<129;index++) {
+            models.put("domain_object_"+index,BusinessGrantDecision.Fields.legacy());
+            raw.put("domain_object_"+index,java.util.Map.of("unrestricted",true));
+        }
+        assertThatThrownBy(() -> BusinessGrantFieldScope.encode(json,models,true)).isInstanceOf(MetaServiceException.class);
+        String encoded=json.writeValueAsString(java.util.Map.of("version",2,"models",raw));
+        assertThatThrownBy(() -> BusinessGrantFieldScope.decode(json,encoded)).isInstanceOf(MetaServiceException.class);
     }
 
     @Test void omittedModelIsDifferentFromAnExplicitEmptyFieldList() {

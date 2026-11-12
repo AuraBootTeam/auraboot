@@ -435,16 +435,24 @@ test.describe('BOM & Quote domain levels', () => {
             level === 'write' ? writeFields.slice().sort() : [],
           );
         }
+        const otherObjects = finiteSnapshot.grantFields.filter(
+          (binding: any) =>
+            binding.modelCode !== model &&
+            [`${domain}.cap.read`, `${domain}.cap.write`].includes(binding.permissionCode),
+        );
+        expect(otherObjects.length).toBeGreaterThan(0);
+        expect(otherObjects.every((binding: any) => binding.legacy === true)).toBe(true);
         // The actor keeps the original session; the newly saved field allowance must drive real execution.
         const allowed = await unwrap(
           await command(normal, fixture, domain === 'qo' ? createdPid : undefined),
         );
+        expect.soft(allowed.data ?? allowed).not.toHaveProperty(hiddenField);
         if (domain === 'bom') {
           createdPid = (allowed.data ?? allowed).recordPid ?? (allowed.data ?? allowed).recordId;
           expect(createdPid).toMatch(/^[A-Z0-9]{26}$/);
           await setHiddenFixture(createdPid!);
         }
-        const excluded = domain === 'bom' ? 'bom_pcba_code' : 'qo_quote_price_factor';
+        const excluded = domain === 'bom' ? 'bom_pcba_code' : 'qo_quote_tax_rate';
         const { client } = await openPgClient();
         try {
           if (domain === 'bom') {
@@ -469,15 +477,20 @@ test.describe('BOM & Quote domain levels', () => {
           const deniedPayload =
             domain === 'bom'
               ? { ...fixture, bom_project_name: rejectedName, [excluded]: 'DISALLOWED' }
-              : { qo_quote_discount_pct: 0.07, [excluded]: 200 };
-          expect(
-            (
-              await command(normal, deniedPayload, domain === 'qo' ? createdPid : undefined)
-            ).status(),
-          ).toBe(403);
-          expect(
-            (await client.query(`SELECT * FROM mt_${model} WHERE pid=$1`, [createdPid])).rows,
-          ).toEqual(beforeDenied);
+              : { qo_quote_discount_pct: 0.07, [excluded]: 0.2 };
+          const denied = await command(
+            normal,
+            deniedPayload,
+            domain === 'qo' ? createdPid : undefined,
+          );
+          const deniedBody = await denied.json();
+          expect.soft(denied.status()).toBe(403);
+          const afterDenied = (
+            await client.query(`SELECT * FROM mt_${model} WHERE pid=$1`, [createdPid])
+          ).rows;
+          const deniedWritePreservedRow =
+            JSON.stringify(afterDenied) === JSON.stringify(beforeDenied);
+          expect.soft(afterDenied).toEqual(beforeDenied);
           if (domain === 'bom') {
             expect(
               (
@@ -501,7 +514,10 @@ test.describe('BOM & Quote domain levels', () => {
               defaultScopeType: finiteSnapshot.defaultScopeType,
               scopes: finiteSnapshot.scopes,
               projected,
-              deniedWritePreservedRow: true,
+              deniedWritePreservedRow,
+              deniedHttpStatus: denied.status(),
+              deniedResponseCode: deniedBody.code,
+              publicCommandOutputFieldNames: Object.keys(allowed.data ?? allowed),
               sameSession: true,
             }),
             contentType: 'application/json',
