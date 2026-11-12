@@ -841,6 +841,10 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
     }
 
     private void productCatalog(List<String> capabilities,List<String> menuCodes) {
+        String configured=System.getenv("TEST_DATABASE_URL");
+        assertThat(configured).as("Explicit product catalog PostgreSQL test target").startsWith("jdbc:postgresql://");
+        String database=java.net.URI.create(configured.substring(5)).getPath().substring(1);
+        assertThat(jdbc.queryForObject("SELECT current_database()",String.class)).isEqualTo(database);
         String key=com.auraboot.framework.application.tenant.ApplicationCatalogPolicy.key("bom-quote");
         if(!productCatalog)assertThat(preferences.getPreference(getTestTenant().getId(),key)).isNull();
         var value=json.createObjectNode();value.put("version",1).put("applicationCode","bom-quote");
