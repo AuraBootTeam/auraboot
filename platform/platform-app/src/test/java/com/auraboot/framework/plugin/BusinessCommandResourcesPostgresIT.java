@@ -45,6 +45,7 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
     @Autowired com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionService publicProjection;
     @Autowired com.auraboot.framework.meta.service.impl.CommandResultProjectionService resultProjection;
     @Autowired FieldMaskService masks;
+    @Autowired com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization recordAuthorization;
     @Autowired org.springframework.context.ApplicationContext relationContext;
     @Autowired com.auraboot.framework.permission.service.UserPermissionService relationPermissions;
     @Autowired com.auraboot.framework.file.dao.mapper.FileMapper sourceFiles;
@@ -134,6 +135,12 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
                 .businessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization(command.getCode(),rootModel,rootPid,"update",
                         getTestTenant().getId(),getTestUser().getId(),getTestTenantMember().getId()))
                 .permitPlan(new CommandPermitPlan(CommandPermitPlan.Decision.PERMIT,null,null,rootPid,CommandPermitPlan.ScopeGrade.TARGET,rootVersion)).build();
+        if (owner.independentRead) {
+            var canonical=MetaContext.runWithCommandPermitScope("ALL",()->data.getByIdForAuthorization(rootModel,rootPid));
+            var decision=recordAuthorization.resolve(getTestTenantMember().getId(),List.of("fixture.receipt.confirm"),rootModel,canonical);
+            assertThat(decision.result().granted()).as("Real root grant remains admitted").isTrue();
+            context.setBusinessGrantDecision(decision);
+        }
         if (owner.publicOutput) {
             context.setBusinessGrantDecision(new com.auraboot.framework.permission.engine.model.BusinessGrantDecision(
                     com.auraboot.framework.permission.engine.model.PermissionResult.allow(List.of()),
@@ -153,11 +160,12 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
     }
     <T> T command(Function<BusinessCommandDataAccessorFactory.Scope,T> operation) {
         var template = new TransactionTemplate(transactions);
-        if (owner.paged || owner.publicOutput || owner.jsonResult) template.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        if (owner.paged || owner.publicOutput || owner.jsonResult || owner.independentRead) template.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
         return template.execute(tx->MetaContext.runWithCommandPermitPlan("TARGET",rootVersion,rootModel,rootPid,()->
-                MetaContext.runWithAuthorizedCommandCode("fixture:receipt_confirm",()->{
-                    try(var scope=factory.open(context(),owner)) {return operation.apply(scope);}
-                })));
+                MetaContext.runWithAuthorizedCommandCode("fixture:receipt_confirm",()->
+                    MetaContext.runWithCommandAuthority("fixture.receipt.confirm",()->{
+                        try(var scope=factory.open(context(),owner)) {return operation.apply(scope);}
+                    }))));
     }
     String storedQty() {return jdbc.queryForObject("SELECT "+qty+" FROM "+physicalTables.get(lineModel)+" WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),linePid);}
     long ledgerCount() {return jdbc.queryForObject("SELECT COUNT(*) FROM "+physicalTables.get(ledgerModel)+" WHERE tenant_id=?",Long.class,getTestTenant().getId());}
@@ -623,9 +631,70 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
         }
     }
 
+    @Test void independentReferenceReadRetainsItsOwnScopeWithoutASecondFunctionGrant() throws Exception {
+        owner.independentRead=true;
+        long tenant=getTestTenant().getId(),role=com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        Long permission=null;
+        jdbc.update("INSERT INTO ab_role(id,pid,tenant_id,code,name,type,status,deleted_flag,default_data_scope_type) VALUES(?,?,?,?,?,'custom','active',FALSE,'none')",
+                role,UniqueIdGenerator.generate(),tenant,rootModel+"_reference","Owned reference scope fixture");
+        jdbc.update("INSERT INTO ab_user_role(id,pid,tenant_id,member_id,role_id,status,deleted_flag) VALUES(?,?,?,?,?,'active',FALSE)",
+                com.baomidou.mybatisplus.core.toolkit.IdWorker.getId(),UniqueIdGenerator.generate(),tenant,getTestTenantMember().getId(),role);
+        try {
+            String extension=new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(Map.of(
+                    "domainModels",Map.of(rootModel,List.of("read","update")),
+                    "commandEffects",Map.of(lineModel,List.of("read"))));
+            permission=jdbc.queryForObject("INSERT INTO ab_permission(pid,tenant_id,code,name,resource_type,resource_code,action,source,status,deleted_flag,extension) VALUES(?,?,?,?,'operation',?,'write','test','active',FALSE,?::jsonb) RETURNING id",
+                    Long.class,UniqueIdGenerator.generate(),tenant,"fixture.receipt.confirm","Root domain write",rootModel,extension);
+            jdbc.update("INSERT INTO ab_role_permission(id,pid,tenant_id,role_id,permission_id,grant_type,status,deleted_flag) VALUES(?,?,?,?,?,'grant','active',FALSE)",
+                    com.baomidou.mybatisplus.core.toolkit.IdWorker.getId(),UniqueIdGenerator.generate(),tenant,role,permission);
+            for(String model:List.of(rootModel,lineModel))
+                jdbc.update("INSERT INTO ab_role_data_scope(pid,tenant_id,role_id,resource_code,action_code,scope_type,merge_strategy) VALUES(?,?,?,?,'read',?,'MAX')",
+                        UniqueIdGenerator.generate(),tenant,role,model,model.equals(rootModel)?"all":"none");
+            relationPermissions.evictPermissionDefinitions(tenant);relationPermissions.evictUserPermissions(tenant,getTestUser().getId());
+            assertThat(permissions.canAction(getTestTenantMember().getId(),lineModel,"read"))
+                    .as("No standalone child model-read permission is granted").isFalse();
+            assertThatThrownBy(()->command(scope->scope.accessor().getById(lineModel,linePid)))
+                    .as("A root relationship must not override independent object NONE").isInstanceOf(DataAccessorException.class);
+            jdbc.update("UPDATE ab_role_data_scope SET scope_type='self' WHERE tenant_id=? AND role_id=? AND resource_code=?",tenant,role,lineModel);
+            assertThat(this.<Map<String,Object>>command(scope->scope.accessor().getById(lineModel,linePid))).containsEntry(qty,"2");
+            assertThatThrownBy(()->command(scope->scope.accessor().update(lineModel,linePid,Map.of(qty,"9"))))
+                    .as("An independent read contract cannot mutate that object").isInstanceOf(DataAccessorException.class);
+            jdbc.update("UPDATE "+physicalTables.get(lineModel)+" SET created_by=? WHERE tenant_id=? AND pid=?",getTestUser().getId()+1,tenant,linePid);
+            assertThatThrownBy(()->command(scope->scope.accessor().getById(lineModel,linePid)))
+                    .as("SELF still rejects another creator even under the same root").isInstanceOf(DataAccessorException.class);
+            assertThatThrownBy(()->command(scope->scope.accessor().query(lineModel,Map.of(parent,rootPid))))
+                    .as("A bounded query cannot bypass the independent row policy").isInstanceOf(DataAccessorException.class);
+            long before=ledgerCount();
+            assertThatThrownBy(()->command(scope->{
+                scope.accessor().create(ledgerModel,Map.of(ledgerParent,rootPid,ledgerQty,"3"));
+                try {scope.accessor().getById(lineModel,linePid);} catch(DataAccessorException denied) { /* CATCH: prove poison survives a swallowed denial. */ }
+                return true;
+            })).as("Denied source poisons earlier effects in the same transaction").isInstanceOf(org.springframework.transaction.UnexpectedRollbackException.class);
+            assertThat(ledgerCount()).isEqualTo(before);
+            jdbc.update("UPDATE ab_role_data_scope SET scope_type='all' WHERE tenant_id=? AND role_id=? AND resource_code=?",tenant,role,lineModel);
+            assertThat(this.<Map<String,Object>>command(scope->scope.accessor().getById(lineModel,linePid))).containsEntry(qty,"2");
+            String fieldScope=new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(Map.of("version",2,"models",Map.of(
+                    rootModel,Map.of("unrestricted",true),lineModel,Map.of("readFields",List.of(parent),"writeFields",List.of()))));
+            jdbc.update("UPDATE ab_role_permission SET field_scope=?::jsonb WHERE tenant_id=? AND role_id=? AND permission_id=?",fieldScope,tenant,role,permission);
+            relationPermissions.evictRoleUsers(tenant,role);relationPermissions.evictUserPermissions(tenant,getTestUser().getId());
+            assertThat(this.<Map<String,Object>>command(scope->scope.accessor().getById(lineModel,linePid)))
+                    .containsEntry(parent,rootPid).doesNotContainKey(qty).doesNotContainKey(cost);
+            assertThat(storedQty()).isEqualTo("2");
+        } finally {
+            jdbc.update("DELETE FROM ab_role_data_scope WHERE tenant_id=? AND role_id=?",tenant,role);
+            jdbc.update("DELETE FROM ab_role_permission WHERE tenant_id=? AND role_id=?",tenant,role);
+            jdbc.update("DELETE FROM ab_user_role WHERE tenant_id=? AND role_id=?",tenant,role);
+            jdbc.update("DELETE FROM ab_role WHERE tenant_id=? AND id=?",tenant,role);
+            if(permission!=null)jdbc.update("DELETE FROM ab_permission WHERE tenant_id=? AND id=?",tenant,permission);
+            relationPermissions.evictPermissionDefinitions(tenant);relationPermissions.evictUserPermissions(tenant,getTestUser().getId());
+        }
+    }
+
     class Owner implements CommandHandlerExtension,BusinessResourceAuthorization {
         Runnable onUpdate;
         boolean paged;
+        boolean independentRead;
+        public Set<String> independentBusinessReadModels(){return independentRead ? Set.of(lineModel) : Set.of();}
         boolean publicOutput;
         boolean allowDelete;
         boolean jsonResult;
@@ -633,7 +702,7 @@ class BusinessCommandResourcesPostgresIT extends BaseIntegrationTest {
         public Map<String,Integer> businessSourceFileFields(){return sourceRead ? Map.of(rootLabel,16) : Map.of();}
         int pagedLimit = 2000;
         String deniedLine;
-        public ReadIsolation resourceReadIsolation(){return paged || publicOutput || jsonResult ? ReadIsolation.REPEATABLE_READ : null;}
+        public ReadIsolation resourceReadIsolation(){return paged || publicOutput || jsonResult || independentRead ? ReadIsolation.REPEATABLE_READ : null;}
         public Map<String,Set<String>> publicBusinessResourceFields(){return publicOutput ? Map.of(lineModel, Set.of(qty)) : Map.of();}
         public Map<String,Integer> pagedBusinessResourceRowLimits(){return paged ? Map.of(lineModel,pagedLimit) : Map.of();}
         public String getCommandType(){return "fixture:receipt_confirm";}

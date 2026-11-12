@@ -85,6 +85,30 @@ class BusinessCommandRecordAuthorizationTest {
         assertThat(authorization.resolveNative(5L,List.of(CODE),MODEL,record(1,"Shanghai"),"update").result().granted()).isFalse();
     }
 
+    @Test void independentReadCannotBorrowARoleThatFailedTheRootAndRetainsFieldLimits() {
+        var definition=permission(CODE);definition.setResourceCode("domain");definition.setAction("write");
+        definition.setExtension(Map.of("domainModels",Map.of(MODEL,List.of("read","update"))));
+        when(snapshots.resolvePermissionDefinition(100L,CODE)).thenReturn(definition);
+        var admitted=grant(11,101,CODE);var otherRole=grant(22,202,CODE);
+        grants(admitted,otherRole);guards(CODE,new PermissionPolicyService.ConditionGuard(11L,null),new PermissionPolicyService.ConditionGuard(22L,null));
+        when(scopes.resolveObjectBoundScopeForRole(5L,101L,MODEL,"read",MODEL)).thenReturn(DataScopeCondition.none());
+        when(scopes.resolveObjectBoundScopeForRole(5L,202L,MODEL,"read",MODEL)).thenReturn(DataScopeCondition.all());
+        var boundary=new com.auraboot.framework.permission.engine.model.BusinessGrantDecision(
+                com.auraboot.framework.permission.engine.model.PermissionResult.allow(List.of()),100L,1L,5L,"root","root-pid",
+                List.of(new com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Grant(11L,101L,CODE,
+                        com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Fields.legacy())));
+        assertThat(authorization.resolveIndependentRead(boundary,MODEL,record(1,"Shanghai")).result().granted()).isFalse();
+        when(scopes.resolveObjectBoundScopeForRole(5L,101L,MODEL,"read",MODEL)).thenReturn(DataScopeCondition.all());
+        admitted.setFieldScopeJson("{\"modelCode\":\"receipt\",\"readFields\":[\"warehouse\"],\"writeFields\":[]}");
+        var result=authorization.resolveIndependentRead(boundary,MODEL,record(1,"Shanghai"));
+        assertThat(result.result().granted()).isTrue();assertThat(result.canRead("warehouse")).isTrue();
+        assertThat(result.canRead("city")).isFalse();assertThat(result.canWrite("warehouse")).isFalse();
+        assertThat(result.grants()).extracting(com.auraboot.framework.permission.engine.model.BusinessGrantDecision.Grant::roleId).containsExactly(101L);
+        MetaContext.setMemberId(6L);
+        assertThat(authorization.resolveIndependentRead(boundary,MODEL,record(1,"Shanghai")).result().granted()).isFalse();
+        assertThat(authorization.resolveIndependentRead(null,MODEL,record(1,"Shanghai")).result().granted()).isFalse();
+    }
+
     @Test void domainUsesOneFunctionBindingAndOriginalObjectScopeForInternalRows() {
         var definition = permission(CODE);
         definition.setResourceCode("domain"); definition.setAction("write");

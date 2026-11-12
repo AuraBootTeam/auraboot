@@ -48,6 +48,10 @@ public class BusinessCommandDataAccessorFactory {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.auraboot.framework.infrastructure.storage.StorageProvider sourceStorage;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization recordAuthorization;
+
     public Scope open(CommandPipelineContext context, CommandHandlerExtension handler) {
         if (!(handler instanceof BusinessResourceAuthorization owner)) throw denied();
         var source = sessions.getConfiguration().getEnvironment().getDataSource();
@@ -66,6 +70,7 @@ public class BusinessCommandDataAccessorFactory {
         if (!Objects.equals(owner.businessDeletableResourceModels(), invocationOwner.businessDeletableResourceModels())
                 || !Objects.equals(owner.businessInputContract(), invocationOwner.businessInputContract())
                 || !Objects.equals(owner.resourceReadIsolation(), invocationOwner.resourceReadIsolation())
+                || !Objects.equals(owner.independentBusinessReadModels(), invocationOwner.independentBusinessReadModels())
                 || !Objects.equals(owner.publicBusinessResourceFields(), invocationOwner.publicBusinessResourceFields())
                 || !Objects.equals(owner.businessArtifactFields(), invocationOwner.businessArtifactFields())
                 || !Objects.equals(owner.businessSourceFileFields(), invocationOwner.businessSourceFileFields())
@@ -104,7 +109,7 @@ public class BusinessCommandDataAccessorFactory {
         private final Long rootVersion;
         private final TransactionSynchronization lifetime = new TransactionSynchronization() {};
         private final Accessor accessor = new Accessor();
-        private Set<String> dependencies, optionalModels, resultFields, deletableModels;
+        private Set<String> dependencies, optionalModels, resultFields, deletableModels, independentReads;
         private Map<String,Integer> pagedLimits;
         private final Map<List<Object>,List<Map<String,Object>>> pagedSnapshots = new HashMap<>();
         private boolean pagedReadsDirty;
@@ -213,6 +218,11 @@ public class BusinessCommandDataAccessorFactory {
         private void initialize() {
             BusinessResourcePermissionContract.require(context,owner);
             dependencies = Set.copyOf(owner.businessResourceModels());
+            independentReads = Set.copyOf(owner.independentBusinessReadModels());
+            if (!dependencies.containsAll(independentReads) || independentReads.contains(rootModel)
+                    || !independentReads.isEmpty() && (recordAuthorization == null
+                        || readIsolation != BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ
+                            && readIsolation != BusinessResourceAuthorization.ReadIsolation.SERIALIZABLE)) throw denied();
             deletableModels = Set.copyOf(owner.businessDeletableResourceModels());
             if (!dependencies.containsAll(deletableModels) || deletableModels.contains(rootModel)) throw denied();
             resultFields = Set.copyOf(owner.businessResultFields());
@@ -367,7 +377,16 @@ public class BusinessCommandDataAccessorFactory {
                     || !tenant.toString().equals(String.valueOf(row.get("tenant_id")))
                     || Boolean.TRUE.equals(row.get("deleted_flag"))) throw denied();
             if (++rowsRead > 10_000) throw denied();
+            independentRead(model, row);
             return BusinessResourceAuthorization.snapshot(row);
+        }
+
+        private com.auraboot.framework.permission.engine.model.BusinessGrantDecision independentRead(
+                String model, Map<String,Object> row) {
+            if (!independentReads.contains(model)) return null;
+            var decision = recordAuthorization.resolveIndependentRead(context.getBusinessGrantDecision(), model, row);
+            if (!decision.result().granted()) throw denied();
+            return decision;
         }
 
         private BusinessResourceAuthorization.Grant authorize(BusinessResourceAuthorization.Request request) {
@@ -397,12 +416,23 @@ public class BusinessCommandDataAccessorFactory {
                     });
                 }
             };
+            if (independentReads.contains(request.modelCode())
+                    && request.action() != BusinessResourceAuthorization.Action.READ
+                    && request.action() != BusinessResourceAuthorization.Action.QUERY) throw denied();
+            var independent = request.action() == BusinessResourceAuthorization.Action.READ
+                    && !request.record().isEmpty() ? independentRead(request.modelCode(), request.record()) : null;
             callbacks++;
             try {
                 var target = new CommandHandlerExtension.TargetAuthorizationContext(command, rootModel, rootPid,
                         witness.action(), tenant, actor, root, reads);
                 var grant = owner.authorizeResource(target, request);
                 if (grant == null) throw denied();
+                if (independent != null) {
+                    var fields = new HashSet<>(grant.readableFields());
+                    fields.removeIf(field -> !Set.of("pid", "tenant_id", "row_version").contains(field)
+                            && !independent.canRead(field));
+                    grant = new BusinessResourceAuthorization.Grant(fields, Set.of(), grant.maximumRows());
+                }
                 verify();
                 return grant;
             } catch (RuntimeException failure) {

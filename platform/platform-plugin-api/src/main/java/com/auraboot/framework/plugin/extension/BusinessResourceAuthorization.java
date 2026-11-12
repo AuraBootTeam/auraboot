@@ -53,6 +53,11 @@ public interface BusinessResourceAuthorization {
         public int jdbcLevel() { return jdbcLevel; }
     }
 
+    /** Independent referenced objects keep their own record/field policies under the admitted duty.
+     * These are read-only effects, not additional user-grantable function permissions.
+     */
+    default Set<String> independentBusinessReadModels() { return Set.of(); }
+
     /** Optional installed dependencies may yield null only on an approved nullable read. */
     default Set<String> optionalBusinessResourceModels() { return Set.of(); }
 

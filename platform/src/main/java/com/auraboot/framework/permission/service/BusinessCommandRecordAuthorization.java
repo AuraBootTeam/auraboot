@@ -179,6 +179,27 @@ public class BusinessCommandRecordAuthorization {
                 model, record, "read", true);
     }
 
+    /** Apply independent-object policies using only grant alternatives that admitted the root.
+     * The current domain invocation already owns function authority; no child CRUD grant is added.
+     */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public BusinessGrantDecision resolveIndependentRead(BusinessGrantDecision boundary, String model,
+                                                       Map<String,Object> record) {
+        if (boundary == null || !boundary.result().granted() || boundary.grants().isEmpty()
+                || !Objects.equals(boundary.tenantId(), MetaContext.getCurrentTenantId())
+                || !Objects.equals(boundary.userId(), MetaContext.getCurrentUserId())
+                || !Objects.equals(boundary.memberId(), MetaContext.getCurrentMemberId()))
+            return decision(denied("Admitted business grant is unavailable", List.of()),
+                    MetaContext.getCurrentMemberId(), model, record, List.of());
+        var resolved = resolveInternal(boundary.memberId(), boundary.grants().stream()
+                .map(BusinessGrantDecision.Grant::permissionCode).distinct().toList(), model, record, "read");
+        var matched = resolved.grants().stream().filter(candidate -> boundary.grants().stream().anyMatch(root ->
+                Objects.equals(root.grantId(), candidate.grantId()) && Objects.equals(root.roleId(), candidate.roleId())
+                        && Objects.equals(root.permissionCode(), candidate.permissionCode()))).toList();
+        return decision(matched.isEmpty() ? denied("Independent record is outside the admitted grant", List.of())
+                : resolved.result(), boundary.memberId(), model, record, matched);
+    }
+
     /** Ordinary native updates use generated model grants, retaining their role-local scope and shares. */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public BusinessGrantDecision resolveOrdinaryUpdate(Long memberId, String model, Map<String,Object> record) {
