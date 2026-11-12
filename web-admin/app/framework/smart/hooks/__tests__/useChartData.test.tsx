@@ -21,6 +21,7 @@ vi.mock('~/shared/services/http-client', () => ({
 }));
 
 import { useChartData } from '../useChartData';
+import { __resetDimensionLabelCaches } from '../useDimensionLabels';
 import type { ChartDataSource } from '../../types/chart';
 
 describe('useChartData', () => {
@@ -379,4 +380,17 @@ describe('chart request ownership', () => {
     expect(result.current.error).toBeNull();
     expect(fetchChartDataMock).toHaveBeenCalledTimes(1);
   });
+});
+
+
+it('does not discover protected model dictionaries while an aggregate is disabled', async () => {
+  __resetDimensionLabelCaches();fetchResultMock.mockReset();fetchChartDataMock.mockReset();
+  fetchResultMock.mockResolvedValue({ code: '0', data: [] });
+  const { result } = renderHook(() => useChartData({ enabled: false, dataSource: {
+    type: 'aggregate', modelCode: 'disabled_analysis_projection', dimensions: ['state'],
+    metrics: [{ field: 'pid', aggregation: 'count', alias: 'count' }], dimensionDicts: { state: 'analysis_state' },
+  } }));
+  await act(async () => { await Promise.resolve(); });
+  expect(result.current.loading).toBe(false);
+  expect(fetchResultMock).not.toHaveBeenCalled();expect(fetchChartDataMock).not.toHaveBeenCalled();
 });
