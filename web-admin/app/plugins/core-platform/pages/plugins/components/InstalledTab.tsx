@@ -43,7 +43,7 @@ export interface PluginRecord {
   updatedAt: string;
   minPlatformVersion?: string;
   maxPlatformVersion?: string;
-  compatibilityStatus?: CompatibilityStatus;
+  compatibilityStatus?: CompatibilityStatus | Uppercase<CompatibilityStatus>;
   compatibilityMessage?: string;
 }
 
@@ -186,12 +186,13 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
     minVersion,
     message,
   }: {
-    status?: CompatibilityStatus;
+    status?: PluginRecord['compatibilityStatus'];
     minVersion?: string;
     message?: string;
   }) => {
-    if (!status || status === 'compatible') {
-      return minVersion ? (
+    const normalizedStatus = status?.toLowerCase() as CompatibilityStatus | undefined;
+    if (!normalizedStatus || normalizedStatus === 'compatible') {
+      return minVersion || status ? (
         <span
           className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-600"
           title={text('compatibleHint')}
@@ -210,12 +211,12 @@ export default function InstalledTab({ onCountChange, onImportSuccess }: Props) 
       warn_older: { bg: 'bg-amber-50', text: 'text-amber-600', label: text('warn_older'), icon: ExclamationTriangleIcon },
       incompatible: { bg: 'bg-red-50', text: 'text-red-600', label: text('incompatible'), icon: XCircleIcon },
     };
-    const c = configs[status] ?? configs.compatible;
+    const c = configs[normalizedStatus] ?? configs.compatible;
     const Icon = c.icon;
     return (
       <span
         className={`inline-flex cursor-help items-center gap-1 rounded-full px-2 py-0.5 text-xs ${c.bg} ${c.text}`}
-        title={message ?? status}
+        title={message && message !== status ? message : c.label}
       >
         <Icon className="h-3 w-3" />
         {c.label}

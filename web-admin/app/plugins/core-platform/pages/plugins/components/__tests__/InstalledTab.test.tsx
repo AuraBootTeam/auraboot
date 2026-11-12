@@ -76,7 +76,7 @@ it.each([
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ code: '0', data: [{
     pid: 'compatible-one', pluginId: 'com.customer.delivery', displayName: 'Customer delivery',
     namespace: 'cde', version: '1.0.0', status: 'active', installedAt: '2026-10-20T00:00:00Z',
-    minPlatformVersion: '1.0.0', compatibilityStatus: 'compatible',
+    minPlatformVersion: '1.0.0', compatibilityStatus: 'COMPATIBLE',
   }] }) })));
   render(<InstalledTab />);
   expect(await screen.findByText(label, { exact: true })).toHaveAttribute('title', hint);
