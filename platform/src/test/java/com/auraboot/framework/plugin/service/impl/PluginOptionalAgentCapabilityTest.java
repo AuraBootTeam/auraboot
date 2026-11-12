@@ -101,6 +101,8 @@ class PluginOptionalAgentCapabilityTest {
         var resources = mock(PluginResourceMapper.class);
         var importer = mock(PluginResourceImporter.class);
         var rename = mock(ModelFieldRenameMigrator.class);
+        ReflectionTestUtils.setField(service, "authorizationWriteLock",
+                mock(com.auraboot.framework.permission.service.RoleAuthorizationWriteLock.class));
         ReflectionTestUtils.setField(service, "importHistoryMapper", history);
         ReflectionTestUtils.setField(service, "pluginResourceMapper", resources);
         ReflectionTestUtils.setField(service, "resourceImporter", importer);
