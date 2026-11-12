@@ -505,7 +505,7 @@ public class BusinessCommandDataAccessorFactory {
                         collected.add(snapshot);
                     }
                     pageNumber++;
-                } while (collected.size() < total);
+                } while (collected.size() < total.intValue());
                 rows = List.copyOf(collected);
                 pagedSnapshots.put(key, rows);
             }
