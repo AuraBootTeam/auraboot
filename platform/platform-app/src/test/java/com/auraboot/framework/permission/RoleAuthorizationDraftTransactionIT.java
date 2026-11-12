@@ -38,7 +38,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.reset;
 
 /** Real PostgreSQL transactions; faults occur after actual writes, never in a mocked database. */
-@SpringBootTest(classes = TestApplication.class, properties = "spring.data.redis.host=")
+@SpringBootTest(classes = TestApplication.class, properties = {"spring.data.redis.host=", "auraboot.application-catalog-code=bom-quote"})
 @Transactional(propagation = Propagation.NEVER)
 class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
     @Autowired private RoleAuthorizationDraftService drafts;
@@ -50,6 +50,8 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
     @Autowired private com.auraboot.framework.permission.service.PermissionMatrixService matrix;
     @Autowired private com.auraboot.framework.rbac.service.RoleService roleAuthoring;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private com.auraboot.framework.tenant.service.TenantPreferenceService preferences;
+    private boolean productCatalog;
     @Autowired private com.auraboot.framework.permission.service.PermissionService effectivePermissions;
     @Autowired private org.mybatis.spring.SqlSessionTemplate sqlSession;
     @Autowired private com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper policyMapper;
@@ -105,6 +107,8 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
     }
 
     @AfterEach void cleanup() {
+        if(productCatalog)jdbc.update("DELETE FROM ab_tenant_preference WHERE tenant_id=? AND preference_key=?",
+                getTestTenant().getId(),com.auraboot.framework.application.tenant.ApplicationCatalogPolicy.key("bom-quote"));
         reset(scopes, fieldBindings);
         org.springframework.test.util.ReflectionTestUtils.setField(drafts, "extensions", originalExtensions);
         if (administrator != null) administrator.close();
@@ -834,6 +838,82 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
             com.auraboot.framework.permission.dto.RoleGrantFields.Change change) {
         return new RoleAuthorizationDraftRequest(baseline.revision(), Set.of(editCapability), Set.of(), false,
                 null, false, List.of(), null, null, null, List.of(change));
+    }
+
+    private void productCatalog(List<String> capabilities,List<String> menuCodes) {
+        String key=com.auraboot.framework.application.tenant.ApplicationCatalogPolicy.key("bom-quote");
+        if(!productCatalog)assertThat(preferences.getPreference(getTestTenant().getId(),key)).isNull();
+        var value=json.createObjectNode();value.put("version",1).put("applicationCode","bom-quote");
+        var menus=value.putArray("menuCodes");menuCodes.forEach(menus::add);
+        var duties=value.putArray("capabilityCodes");capabilities.forEach(duties::add);
+        value.putArray("pageKeys");
+        preferences.setPreference(getTestTenant().getId(),key,value);productCatalog=true;
+    }
+
+    @Test void productEditorRetainsHiddenNavigationGrantsAndOriginalScopeAndFields() {
+        var baseline=grantFieldsBaseline();
+        var binding=baseline.grantFields().stream().filter(row->readCode.equals(row.permissionCode())).findFirst().orElseThrow();
+        drafts.apply(rolePid,grantFieldsRequest(baseline,new com.auraboot.framework.permission.dto.RoleGrantFields.Change(
+                binding.bindingPid(),List.of(resource+"_secret"),List.of())));
+        var withScope=drafts.snapshot(rolePid);
+        drafts.apply(rolePid,new RoleAuthorizationDraftRequest(withScope.revision(),Set.of(editCapability),Set.of(),false,null,false,
+                List.of(new DataScopeUpdateRequest(resource,"read","self",null))));
+        String visible=UniqueIdGenerator.generate(),hidden=UniqueIdGenerator.generate();
+        for(var menu:Map.of(visible,resource+"_visible",hidden,resource+"_hidden").entrySet())
+            jdbc.update("INSERT INTO ab_menu(id,pid,tenant_id,code,name,type,path,visible,status,deleted_flag) VALUES(?,?,?,?,?,1,'/home',TRUE,'active',FALSE)",IdWorker.getId(),menu.getKey(),getTestTenant().getId(),menu.getValue(),menu.getValue());
+        try {
+            var navigationBefore=navigation.read(rolePid);
+            navigation.save(rolePid,new com.auraboot.framework.menu.dto.RoleNavigation.Write(navigationBefore.revision(),Set.of(visible,hidden)));
+            String grantBefore=jdbc.queryForObject("SELECT to_jsonb(g)::text FROM ab_role_permission g WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),binding.bindingPid());
+            String menuBefore=jdbc.queryForObject("SELECT xmin::text FROM ab_role_navigation_menu WHERE tenant_id=? AND role_id=? AND menu_pid=?",String.class,getTestTenant().getId(),roleId,hidden);
+            var scopesBefore=jdbc.queryForList("SELECT * FROM ab_role_data_scope WHERE tenant_id=? AND role_id=? ORDER BY id",getTestTenant().getId(),roleId);
+            var fieldsBefore=fieldBindings.findByRolePid(getTestTenant().getId(),rolePid);
+            productCatalog(List.of(editCapability),List.of(resource+"_visible"));
+            var before=drafts.snapshot(rolePid);
+            assertThat(before.groups()).flatExtracting(com.auraboot.framework.permission.capability.CapabilityGroup::getCapabilities)
+                    .extracting(com.auraboot.framework.permission.capability.Capability::getCode).containsExactly(editCapability);
+            assertThat(before.navigation().selectedMenuPids()).containsExactly(visible);
+            assertThat(before.navigation().menus()).extracting(com.auraboot.framework.menu.dto.RoleNavigation.Choice::pid).containsExactly(visible);
+            var request=new RoleAuthorizationDraftRequest(before.revision(),Set.of(),Set.of(),false,null,false,List.of(),null,Set.of());
+            drafts.apply(rolePid,request);
+            assertThat(persistedCodes()).containsExactly(readCode);
+            assertThat(jdbc.queryForObject("SELECT to_jsonb(g)::text FROM ab_role_permission g WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),binding.bindingPid())).isEqualTo(grantBefore);
+            assertThat(jdbc.queryForObject("SELECT xmin::text FROM ab_role_navigation_menu WHERE tenant_id=? AND role_id=? AND menu_pid=?",String.class,getTestTenant().getId(),roleId,hidden)).isEqualTo(menuBefore);
+            assertThat(jdbc.queryForList("SELECT menu_pid FROM ab_role_navigation_menu WHERE tenant_id=? AND role_id=?",String.class,getTestTenant().getId(),roleId)).containsExactly(hidden);
+            assertThat(jdbc.queryForList("SELECT * FROM ab_role_data_scope WHERE tenant_id=? AND role_id=? ORDER BY id",getTestTenant().getId(),roleId)).isEqualTo(scopesBefore);
+            assertThat(fieldBindings.findByRolePid(getTestTenant().getId(),rolePid)).usingRecursiveComparison().isEqualTo(fieldsBefore);
+        } finally {
+            jdbc.update("DELETE FROM ab_role_navigation_menu WHERE tenant_id=? AND role_id=?",getTestTenant().getId(),roleId);
+            jdbc.update("DELETE FROM ab_role_navigation_state WHERE tenant_id=? AND role_id=?",getTestTenant().getId(),roleId);
+            jdbc.update("DELETE FROM ab_menu WHERE tenant_id=? AND pid IN (?,?)",getTestTenant().getId(),visible,hidden);
+        }
+    }
+
+    @Test void productCatalogChangeRejectsAnOlderJointDraftBeforeAnyGrantWrites() {
+        productCatalog(List.of(readCapability,editCapability),List.of());
+        var before=drafts.snapshot(rolePid);String facts=migrationBindingBytes();
+        productCatalog(List.of(readCapability),List.of());
+        assertThat(drafts.snapshot(rolePid).revision()).isNotEqualTo(before.revision());
+        assertThatThrownBy(()->drafts.apply(rolePid,new RoleAuthorizationDraftRequest(before.revision(),Set.of(),Set.of(),false,null,false,List.of())))
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
+        assertThat(migrationBindingBytes()).isEqualTo(facts);
+    }
+
+    @Test void anotherProductsCatalogDoesNotInvalidateOrFilterThisProductsDraft() {
+        productCatalog(List.of(readCapability,editCapability),List.of());
+        var before=drafts.snapshot(rolePid);
+        String key=com.auraboot.framework.application.tenant.ApplicationCatalogPolicy.key("other-product");
+        assertThat(preferences.getPreference(getTestTenant().getId(),key)).isNull();
+        var value=json.createObjectNode();value.put("version",1).put("applicationCode","other-product");
+        value.putArray("menuCodes");value.putArray("capabilityCodes");value.putArray("pageKeys");
+        try {
+            preferences.setPreference(getTestTenant().getId(),key,value);
+            var after=drafts.snapshot(rolePid);
+            assertThat(after.revision()).isEqualTo(before.revision());
+            assertThat(after.groups()).usingRecursiveComparison().isEqualTo(before.groups());
+        } finally {
+            jdbc.update("DELETE FROM ab_tenant_preference WHERE tenant_id=? AND preference_key=?",getTestTenant().getId(),key);
+        }
     }
 
     private RoleAuthorizationDraftSnapshot grantFieldsBaseline() {

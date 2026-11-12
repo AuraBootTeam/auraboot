@@ -34,6 +34,7 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
     private final CapabilityResolver capabilityResolver;
     private final RolePermissionService rolePermissionService;
     private final MenuMapper menuMapper;
+    private final com.auraboot.framework.application.tenant.ApplicationCatalogPolicy catalogPolicy;
 
     @Override
     public List<CapabilityGroup> resolveForRole(Long roleId) {
@@ -58,7 +59,7 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
         Set<String> granted = roleCodes(roleId);
         List<CapabilityDefinitionDTO> declarations = capabilityRegistryService.listDeclarations(tenantId);
         List<CapabilityGroup> groups = capabilityResolver.resolve(declarations, allCodes, granted, names, extensions);
-        return annotateNavigation(groups);
+        return catalogPolicy.read(tenantId).groups(annotateNavigation(groups));
     }
 
     /**
@@ -143,7 +144,9 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
     private CapabilitySelectionPreview calculateSelection(
             Long roleId, Set<String> selectedCapabilityCodes, Set<String> revokedPartialCapabilityCodes,
             List<PermissionDTO> all) {
-        List<CapabilityDefinitionDTO> declarations = capabilityRegistryService.listDeclarations(MetaContext.getCurrentTenantId());
+        var scope = catalogPolicy.read(MetaContext.getCurrentTenantId());
+        List<CapabilityDefinitionDTO> allDeclarations = capabilityRegistryService.listDeclarations(MetaContext.getCurrentTenantId());
+        List<CapabilityDefinitionDTO> declarations = scope.declarations(allDeclarations);
         Map<String, Set<String>> capabilityCodes = new LinkedHashMap<>();
         declarations.stream().filter(CapabilityDefinitionDTO::isValid)
                 .forEach(d -> capabilityCodes.put(d.getCode(), new LinkedHashSet<>(d.getIncludes())));
@@ -166,6 +169,10 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
                 .flatMap(Set::stream).collect(Collectors.toSet());
         explicitRevocations.stream().flatMap(code -> capabilityCodes.get(code).stream())
                 .filter(current::contains).forEach(revokable::add);
+        // A product editor cannot revoke hidden grants, including shared dependency codes.
+        allDeclarations.stream().filter(CapabilityDefinitionDTO::isValid)
+                .filter(declaration -> !scope.capability(declaration.getCode()))
+                .flatMap(declaration -> declaration.getIncludes().stream()).forEach(revokable::remove);
         List<String> grant = desired.stream().filter(code -> !current.contains(code)).sorted().toList();
         List<String> revoke = revokable.stream().filter(code -> !desired.contains(code)).sorted().toList();
         if (!grant.isEmpty() || !revoke.isEmpty()) {
@@ -178,7 +185,7 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
         resulting.removeAll(revoke);
         resulting.addAll(grant);
         List<CapabilityGroup> groups = capabilityResolver.resolve(declarations, new ArrayList<>(available), resulting);
-        groups = annotateNavigation(groups);
+        groups = scope.groups(annotateNavigation(groups));
         List<Capability> affected = groups.stream().flatMap(group -> group.getCapabilities().stream())
                 .filter(cap -> !cap.isConventionDerived())
                 .filter(cap -> cap.getIncludes().stream().anyMatch(code -> grant.contains(code) || revoke.contains(code)))
