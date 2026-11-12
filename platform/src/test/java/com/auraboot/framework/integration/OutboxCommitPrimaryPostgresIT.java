@@ -21,6 +21,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,6 +40,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import static org.awaitility.Awaitility.await;
 
 /** Real production queue/transaction/listener/worker seam; no scheduler, HTTP, PF4J or native ERP qualification. */
 @EnabledIfEnvironmentVariable(named = "OUTBOX_COMMIT_PRIMARY_PG_IT", matches = "true")
@@ -57,6 +59,7 @@ class OutboxCommitPrimaryPostgresIT {
     private ThreadPoolTaskExecutor executor;
     private String schema;
     private final Map<String, String> publicQueueHashes = new LinkedHashMap<>();
+    private final AtomicBoolean failNextEffect = new AtomicBoolean();
 
     @org.springframework.context.annotation.Configuration
     @EnableTransactionManagement
@@ -138,6 +141,7 @@ class OutboxCommitPrimaryPostgresIT {
                 assertEquals(event.correlationId(), org.slf4j.MDC.get("requestId"));
                 assertEquals(1, jdbc.update("INSERT INTO dispatch_effect VALUES (?,?,?,?)", event.eventId(),
                         event.tenantId(), Thread.currentThread().getName(), event.correlationId()));
+                if (failNextEffect.getAndSet(false)) throw new IllegalStateException("Controlled transactional consumer failure");
             }
         });
         context.registerBean(ReliableEventConsumerRegistry.class);
@@ -252,6 +256,44 @@ class OutboxCommitPrimaryPostgresIT {
         catch (Exception failure) { throw new IllegalStateException(failure); }
         assertDelivered(event); assertEquals(1, metric("delivered"));
         assertEquals(0, metric("commit_dispatch_started"));
+    }
+
+    @Test void conflictingReplayCannotReplaceTheCommittedEnvelope() throws Exception {
+        start(true);
+        var event = event();
+        new TransactionTemplate(transactions).executeWithoutResult(status -> assertTrue(accessor.enqueueIdempotent(event)));
+        finishedDispatch(); assertDelivered(event);
+        var changed = new IntegrationEventEnvelope(event.schemaVersion(), event.eventId(), event.eventType(), event.source(),
+                event.subject(), event.occurredAt(), event.tenantId(), event.correlationId(), event.causationId(),
+                event.orderingKey(), event.sequence(), Map.of("fixtureOnly", true, "changed", true), event.headers());
+        var failure = assertThrows(IllegalArgumentException.class, () -> new TransactionTemplate(transactions)
+                .executeWithoutResult(status -> accessor.enqueueIdempotent(changed)));
+        assertEquals("RELIABLE_ENVELOPE_CONFLICT", failure.getMessage());
+        finishedDispatch(); assertDelivered(event);
+        assertEquals(new ObjectMapper().readTree("{\"fixtureOnly\":true}"), new ObjectMapper().readTree(
+                jdbc.queryForObject("SELECT payload::text FROM ab_outbox WHERE event_id=?", String.class, event.eventId())));
+        assertEquals(1, metric("enqueued")); assertEquals(1, metric("commit_dispatch_started"));
+        assertEquals(1, metric("receipt_applied")); assertEquals(1, metric("delivered"));
+    }
+
+    @Test void failedConsumerRollsBackEffectAndReceiptBeforeDueRecovery() throws Exception {
+        start(true); failNextEffect.set(true);
+        var event = event();
+        new TransactionTemplate(transactions).executeWithoutResult(status -> accessor.enqueue(event));
+        finishedDispatch();
+        var state = jdbc.queryForMap("SELECT status,retry_count,last_error FROM ab_outbox WHERE event_id=?", event.eventId());
+        assertEquals("pending", state.get("status")); assertEquals(1, state.get("retry_count"));
+        assertEquals("Controlled transactional consumer failure", state.get("last_error"));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM dispatch_effect", Integer.class));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM ab_integration_receipt", Integer.class));
+        assertEquals(1, metric("retry_scheduled")); assertEquals(0, metric("delivered"));
+        // Only observe the due time here: this wait does not execute a worker or a scheduled scan.
+        await().atMost(java.time.Duration.ofSeconds(5)).until(() -> Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT next_retry_at<=now() FROM ab_outbox WHERE event_id=?", Boolean.class, event.eventId())));
+        executor.submit(worker::pollAndDispatch).get(10, TimeUnit.SECONDS);
+        assertDelivered(event);
+        assertEquals(1, metric("receipt_applied")); assertEquals(1, metric("delivered"));
+        assertEquals(2, metric("claimed")); assertEquals(1, metric("commit_dispatch_started"));
     }
 
     @Test void saturatedSignalLeavesCommittedWorkForRecovery() throws Exception {
