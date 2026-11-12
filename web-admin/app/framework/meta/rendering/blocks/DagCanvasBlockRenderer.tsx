@@ -189,11 +189,16 @@ function FlowCanvasCard({
   edges,
   statusMap,
   className,
+  style,
 }: {
   nodes: unknown[]
   edges: unknown[]
   statusMap: NodeStatusMap
   className?: string
+  /** Explicit canvas height. Tailwind v4 content detection does not reliably emit the
+   * spacing scale this block used before (h-44 was absent from the built CSS), so the
+   * delivery canvas passes an inline height instead of trusting a generated class. */
+  style?: React.CSSProperties
 }) {
   const importData = useFlowStore((store) => store.importData)
   useEffect(() => {
@@ -201,7 +206,7 @@ function FlowCanvasCard({
   }, [importData, nodes, edges])
   return (
     <NodeRuntimeStatusProvider statuses={statusMap}>
-      <div className={`flex flex-col ${className || ''}`}>
+      <div className={`flex flex-col ${className || ''}`} style={style}>
         <FlowCanvas readOnly showMinimap={false} showControls={false} fitExistingGraph className="flex-1 min-h-0" />
       </div>
     </NodeRuntimeStatusProvider>
@@ -352,7 +357,8 @@ export const DagCanvasBlockRenderer: React.FC<DagCanvasBlockRendererProps> = ({ 
             nodes={flowNodes}
             edges={flowEdges}
             statusMap={statusMap}
-            className="h-44 rounded-control border-border border"
+            className="rounded-control border-border border"
+            style={{ height: '11rem' }}
           />
         </div>
         {selectedNode ? (
