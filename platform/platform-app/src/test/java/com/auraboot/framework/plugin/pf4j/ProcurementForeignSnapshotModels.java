@@ -12,7 +12,7 @@ final class ProcurementForeignSnapshotModels {
             "qo_procurement_inquiry_request_common","qo_procurement_deletion_scope_common","qo_procurement_deletion_notice_common",
             "qo_procurement_order_notice_common","qo_procurement_logistics_common","qo_procurement_branding_common",
             "qo_procurement_supplier_category_common","qo_procurement_supplier_categories_common","qo_procurement_material_type_common",
-            "qo_procurement_receiving_address_common");
+            "qo_procurement_receiving_address_common","qo_procurement_address_update_common");
     private ProcurementForeignSnapshotModels() {}
     static List<String> all() { return MODELS; }
 }

@@ -23,8 +23,8 @@ class ProcurementLinkedForeignNativeContractTest {
                 "qo_procurement_submission_line_common","qo_procurement_category_policy_common","qo_procurement_category_supplier_common",
                 "qo_procurement_inquiry_request_common","qo_procurement_deletion_scope_common","qo_procurement_deletion_notice_common",
                 "qo_procurement_order_notice_common","qo_procurement_logistics_common","qo_procurement_branding_common","qo_procurement_supplier_category_common",
-                "qo_procurement_supplier_categories_common","qo_procurement_material_type_common","qo_procurement_receiving_address_common");
-        assertEquals(31,models.size());assertEquals(expected,Set.copyOf(models));
+                "qo_procurement_supplier_categories_common","qo_procurement_material_type_common","qo_procurement_receiving_address_common","qo_procurement_address_update_common");
+        assertEquals(32,models.size());assertEquals(expected,Set.copyOf(models));
         assertThrows(UnsupportedOperationException.class,()->models.add("unexpected_model"));
     }
 
