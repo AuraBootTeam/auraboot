@@ -50,6 +50,7 @@ class InstalledIntegrationServiceTest {
     @BeforeEach void setup() throws Exception {
         service = new InstalledIntegrationService(registry,handlers,plugins,installations,scopes,commands,owners,receipts,executor,users,members,json,new OpenPlatformSecretCodec());
         when(registry.registration(source)).thenReturn(Optional.of(Map.entry(registration,"sha256:"+"a".repeat(64))));
+        when(registry.completedReceiptProcessReadFieldAdditions(eq(registration),anyString())).thenReturn(Map.of());
         var install=new ApplicationInstallation(); install.setId(9L); install.setPid("inst");install.setTenantId(42L);install.setStatus("active");
         when(installations.findByTenantAndPid(42L,"inst")).thenReturn(install);
         when(installations.findActiveIdentity(42L,"inst")).thenReturn(new ApplicationInstallationMapper.ActiveIdentity(9L,"app"));
@@ -374,6 +375,77 @@ class InstalledIntegrationServiceTest {
         assertThrows(ExternalEventIngressService.IdempotencyConflictException.class,()->service.accept(principal,source,event(Map.of("title","changed"))));
         assertThrows(SecurityException.class,()->service.consume(event(Map.of("title","changed"))));
         verify(receipts,never()).completed(anyLong(),anyString(),anyString(),anyString(),anyString());
+    }
+
+    @Test void completedReceiptAllowsExactReadFieldsWhileKeepingExistingProcessWritesPinned() throws Exception {
+        addMachineReadGrant(process,"native_source");
+        var baseline=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(metadata.get(process).getExecutionConfig());
+        ((com.fasterxml.jackson.databind.node.ObjectNode)baseline.at("/handlerParams/installedMachineData/native_source"))
+                .putArray("update").add("selected_address");
+        metadata.get(process).setExecutionConfig(baseline.toString());
+        service.accept(principal,source,event());var original=acceptedReceipt();
+        var completed=receiptWith(original,"completed","request-pid",original.bindingSha256(),original.commandSha256());
+        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(completed);when(receipts.claim(any())).thenReturn(0);
+        appendReadFields();
+        when(registry.completedReceiptProcessReadFieldAdditions(eq(registration),anyString()))
+                .thenReturn(Map.of("native_source",Set.of("closed","project","organization_snapshot")));
+        upgradeProvider();clearInvocations(executor);
+        when(executor.execute(eq(result),any())).thenReturn(CommandExecuteResult.builder().phaseReached("completed")
+                .data(Map.of("recordPid","request-pid","state","completed")).build());
+        assertEquals("request-pid",service.result(principal,source,"evt-1").get("recordPid"));
+        clearInvocations(executor);assertTrue(service.accept(principal,source,event()).duplicate());service.consume(event());verifyNoInteractions(executor);
+        assertThrows(ExternalEventIngressService.IdempotencyConflictException.class,()->service.accept(principal,source,event(Map.of("title","changed"))));
+        for(String state:List.of("accepting","accepted","failed")) {
+            when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(receiptWith(original,state,"request-pid",original.bindingSha256(),original.commandSha256()));
+            assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"),state);
+            assertThrows(SecurityException.class,()->service.accept(principal,source,event()),state);
+            assertThrows(SecurityException.class,()->service.consume(event()),state);
+        }
+        verifyNoInteractions(executor);
+    }
+
+    @Test void fieldReadPredecessorNeverAllowsOtherWritesReadsCommandsOrBindingChanges() throws Exception {
+        addMachineReadGrant(process,"native_source");service.accept(principal,source,event());var original=acceptedReceipt();
+        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(receiptWith(original,"completed","request-pid",original.bindingSha256(),original.commandSha256()));
+        when(receipts.claim(any())).thenReturn(0);
+        var initial=new HashMap<String,String>();metadata.forEach((code,value)->initial.put(code,value.getExecutionConfig()));
+        for(String fault:List.of("undeclared","missing-field","other-read","lost-original-read","write","accept","result","binding")) {
+            initial.forEach((code,value)->metadata.get(code).setExecutionConfig(value));appendReadFields();
+            when(registry.completedReceiptProcessReadFieldAdditions(eq(registration),anyString())).thenReturn(
+                    fault.equals("undeclared")?Map.of():Map.of("native_source",fault.equals("missing-field")?Set.of("missing"):Set.of("closed","project","organization_snapshot")));
+            String target=fault.equals("accept")?accept:fault.equals("result")?result:process;
+            var config=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(metadata.get(target).getExecutionConfig());
+            var processConfig=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(metadata.get(process).getExecutionConfig());
+            var grant=(com.fasterxml.jackson.databind.node.ObjectNode)processConfig.at("/handlerParams/installedMachineData/native_source");
+            switch(fault) {
+                case "other-read" -> ((com.fasterxml.jackson.databind.node.ArrayNode)grant.get("read")).add("other");
+                case "lost-original-read" -> ((com.fasterxml.jackson.databind.node.ArrayNode)grant.get("read")).remove(2);
+                case "write" -> grant.putArray("update").add("project");
+                case "accept","result" -> config.put("description","changed");
+                case "binding" -> ((com.fasterxml.jackson.databind.node.ObjectNode)config.at("/handlerParams/installedIntegration/bindings/0/parameters"))
+                        .put("connectionPid","changed-connection");
+                default -> { }
+            }
+            if(target.equals(process) && List.of("other-read","lost-original-read","write").contains(fault)) config=processConfig;
+            metadata.get(target).setExecutionConfig(config.toString());
+            if(fault.equals("binding"))for(String other:List.of(accept,result)) {
+                var root=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(metadata.get(other).getExecutionConfig());
+                ((com.fasterxml.jackson.databind.node.ObjectNode)root.at("/handlerParams/installedIntegration/bindings/0/parameters"))
+                        .put("connectionPid","changed-connection");metadata.get(other).setExecutionConfig(root.toString());
+            }
+            clearInvocations(executor);
+            assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"),fault);
+            assertThrows(SecurityException.class,()->service.accept(principal,source,event()),fault);
+            assertThrows(SecurityException.class,()->service.consume(event()),fault);
+            verifyNoInteractions(executor);
+        }
+    }
+
+    private void appendReadFields() throws Exception {
+        var config=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(metadata.get(process).getExecutionConfig());
+        ((com.fasterxml.jackson.databind.node.ArrayNode)config.at("/handlerParams/installedMachineData/native_source/read"))
+                .add("closed").add("project").add("organization_snapshot");
+        metadata.get(process).setExecutionConfig(config.toString());
     }
 
     private void addMachineReadGrant(String command,String model) throws Exception {

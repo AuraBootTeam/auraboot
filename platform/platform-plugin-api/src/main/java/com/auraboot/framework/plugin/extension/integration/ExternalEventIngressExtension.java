@@ -2,6 +2,7 @@ package com.auraboot.framework.plugin.extension.integration;
 
 import org.pf4j.ExtensionPoint;
 import java.util.Set;
+import java.util.Map;
 
 /** Declares a fixed installed-integration command surface. No client-selected commands. */
 public interface ExternalEventIngressExtension extends ExtensionPoint {
@@ -35,6 +36,12 @@ public interface ExternalEventIngressExtension extends ExtensionPoint {
      * Accept/result commands, writes and binding identity remain pinned. Never applies to pending work.
      */
     default Set<String> completedReceiptProcessReadAdditions() { return Set.of(); }
+
+    /** Exact fields added only to an existing process read grant. The host may reconstruct
+     * its predecessor for completed receipt reads/replays, retaining all existing write grants
+     * and every other command/binding field in the original digest. Never migrates pending work.
+     */
+    default Map<String,Set<String>> completedReceiptProcessReadFieldAdditions() { return Map.of(); }
 
     record Registration(String sourceCode, String capability, Set<String> eventTypes,
                         String requiredScope, String commandPermission,

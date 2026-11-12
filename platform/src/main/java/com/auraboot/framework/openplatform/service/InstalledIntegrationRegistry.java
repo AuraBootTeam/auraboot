@@ -85,5 +85,33 @@ public class InstalledIntegrationRegistry {
         return Set.copyOf(additions);
     }
 
+    /** Field-level declarations have the same current artifact/registration pin as model additions. */
+    public Map<String,Set<String>> completedReceiptProcessReadFieldAdditions(Registration current,String expectedArtifact) {
+        var matches=new ArrayList<ExternalEventIngressExtension>();
+        for(var extension:plugins.getExtensionsOfType(ExternalEventIngressExtension.class)) {
+            var declared=Objects.requireNonNull(extension.registration());
+            if(!current.sourceCode().equals(declared.sourceCode()))continue;
+            var artifact=plugins.observeLoadedArtifact(extension.getClass()).orElseThrow(InstalledIntegrationRegistry::denied);
+            if(!current.equals(declared) || !current.providerPluginId().equals(artifact.pluginId())
+                    || !Objects.equals(expectedArtifact,artifact.digest()))throw denied();
+            matches.add(extension);
+        }
+        if(matches.size()!=1)throw denied();
+        Map<?,?> additions=matches.getFirst().completedReceiptProcessReadFieldAdditions();
+        if(additions==null || additions.size()>16)throw denied();
+        var result=new LinkedHashMap<String,Set<String>>();
+        for(var entry:additions.entrySet()) {
+            if(!(entry.getKey() instanceof String model) || !model.matches("[a-z][a-z0-9_]{1,99}")
+                    || !(entry.getValue() instanceof Set<?> fields) || fields.isEmpty() || fields.size()>64)throw denied();
+            var names=new HashSet<String>();
+            for(var value:fields) {
+                if(!(value instanceof String field) || !field.matches("[A-Za-z_][A-Za-z0-9_.]{0,127}"))throw denied();
+                names.add(field);
+            }
+            result.put(model,Set.copyOf(names));
+        }
+        return Map.copyOf(result);
+    }
+
     private static SecurityException denied() { return new SecurityException("Installed integration provider denied"); }
 }

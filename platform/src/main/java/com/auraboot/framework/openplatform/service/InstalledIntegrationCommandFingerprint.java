@@ -48,19 +48,32 @@ final class InstalledIntegrationCommandFingerprint {
      */
     static List<Map<String,String>> beforeProcessReadAdditions(ObjectMapper json,Map<String,String> configs,
             String processCommand,java.util.Set<String> additions) {
-        if(additions.isEmpty() || !configs.containsKey(processCommand))return List.of();
+        return beforeProcessReadAdditions(json,configs,processCommand,additions,Map.of());
+    }
+
+    static List<Map<String,String>> beforeProcessReadAdditions(ObjectMapper json,Map<String,String> configs,
+            String processCommand,java.util.Set<String> additions,Map<String,java.util.Set<String>> fieldAdditions) {
+        if(additions==null || fieldAdditions==null || additions.size()>16 || fieldAdditions.size()>16
+                || additions.isEmpty() && fieldAdditions.isEmpty() || !configs.containsKey(processCommand)
+                || !java.util.Collections.disjoint(additions,fieldAdditions.keySet()))return List.of();
         var process=object(json,configs.get(processCommand));
         if(!(process.path("handlerParams") instanceof ObjectNode parameters)
                 || !(parameters.path("installedMachineData") instanceof ObjectNode grants))return List.of();
         for(String model:additions) {
             JsonNode access=grants.get(model);
-            if(!(access instanceof ObjectNode grant) || grant.size()!=1 || !grant.has("read")
-                    || !grant.path("read").isArray() || grant.path("read").isEmpty())return List.of();
-            var fields=new java.util.HashSet<String>();
-            for(var field:grant.path("read")) {
-                if(!field.isTextual() || !field.asText().matches("[A-Za-z_][A-Za-z0-9_.]{0,127}")
-                        || !fields.add(field.asText()))return List.of();
-            }
+            if(!(access instanceof ObjectNode grant) || grant.size()!=1 || !validReadFields(grant.path("read")))return List.of();
+        }
+        for(var entry:fieldAdditions.entrySet()) {
+            String model=entry.getKey();var added=entry.getValue();
+            if(model==null || !model.matches("[a-z][a-z0-9_]{1,99}") || added==null || added.isEmpty() || added.size()>64
+                    || added.stream().anyMatch(field->field==null || !field.matches("[A-Za-z_][A-Za-z0-9_.]{0,127}")))return List.of();
+            if(!(grants.get(model) instanceof ObjectNode grant) || !validReadFields(grant.path("read")))return List.of();
+            var current=new java.util.HashSet<String>();grant.path("read").forEach(field->current.add(field.asText()));
+            // This declaration extends an existing read array, rather than creating its container.
+            if(!current.containsAll(added) || current.size()<=added.size())return List.of();
+            var previousReads=json.createArrayNode();
+            for(var field:grant.path("read"))if(!added.contains(field.asText()))previousReads.add(field.deepCopy());
+            grant.set("read",previousReads); // Existing create/update/delete and every other model key stay pinned.
         }
         additions.forEach(grants::remove);
         var candidates=new ArrayList<Map<String,String>>();
@@ -72,6 +85,14 @@ final class InstalledIntegrationCommandFingerprint {
             previous.put(processCommand,process.toString());candidates.add(Map.copyOf(previous));
         }
         return List.copyOf(candidates);
+    }
+
+    private static boolean validReadFields(JsonNode raw) {
+        if(!raw.isArray() || raw.isEmpty())return false;
+        var fields=new java.util.HashSet<String>();
+        for(var field:raw)if(!field.isTextual() || !field.asText().matches("[A-Za-z_][A-Za-z0-9_.]{0,127}")
+                || !fields.add(field.asText()))return false;
+        return true;
     }
 
     static boolean legacyPrefixMatches(ObjectMapper json, Map<String, String> configs, String installation,

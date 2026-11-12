@@ -106,6 +106,33 @@ class InstalledIntegrationRegistryTest {
         assertThrows(SecurityException.class,()->registry.completedReceiptProcessReadAdditions(registration,digest));
     }
 
+    @Test void fieldReadAdditionsPinCurrentArtifactAndRejectMalformedDeclarations() {
+        String digest="sha256:"+"a".repeat(64);
+        assertEquals(Map.of(),registry().completedReceiptProcessReadFieldAdditions(registration,digest));
+        var provider=mock(ExternalEventIngressExtension.class);when(provider.registration()).thenReturn(registration);
+        when(provider.completedReceiptProcessReadFieldAdditions()).thenReturn(Map.of("native_source",Set.of("project","closed")));
+        when(plugins.getExtensionsOfType(ExternalEventIngressExtension.class)).thenReturn(List.of(provider));
+        when(plugins.observeLoadedArtifact(provider.getClass())).thenReturn(Optional.of(
+                new AuraPluginManager.LoadedPluginArtifact(registration.providerPluginId(),Path.of("provider.jar"),digest)));
+        var registry=new InstalledIntegrationRegistry(plugins);
+        assertEquals(Map.of("native_source",Set.of("project","closed")),registry.completedReceiptProcessReadFieldAdditions(registration,digest));
+        assertThrows(SecurityException.class,()->registry.completedReceiptProcessReadFieldAdditions(registration,"sha256:"+"b".repeat(64)));
+        when(plugins.getExtensionsOfType(ExternalEventIngressExtension.class)).thenReturn(List.of(provider,provider));
+        assertThrows(SecurityException.class,()->registry.completedReceiptProcessReadFieldAdditions(registration,digest));
+        when(plugins.getExtensionsOfType(ExternalEventIngressExtension.class)).thenReturn(List.of(provider));
+        var manyFields=new HashSet<String>();for(int i=0;i<65;i++)manyFields.add("field_"+i);
+        var manyModels=new HashMap<String,Set<String>>();for(int i=0;i<17;i++)manyModels.put("model_"+i,Set.of("field"));
+        for(var invalid:List.<Map<String,Set<String>>>of(Map.of("invalid-model",Set.of("field")),Map.of("native_source",Set.<String>of()),
+                Map.of("native_source",Set.of("*")),Map.of("native_source",manyFields),manyModels)) {
+            when(provider.completedReceiptProcessReadFieldAdditions()).thenReturn(invalid);
+            assertThrows(SecurityException.class,()->registry.completedReceiptProcessReadFieldAdditions(registration,digest));
+        }
+        when(provider.completedReceiptProcessReadFieldAdditions()).thenReturn(null);
+        assertThrows(SecurityException.class,()->registry.completedReceiptProcessReadFieldAdditions(registration,digest));
+        when(plugins.observeLoadedArtifact(provider.getClass())).thenReturn(Optional.empty());
+        assertThrows(SecurityException.class,()->registry.completedReceiptProcessReadFieldAdditions(registration,digest));
+    }
+
     @Test void oldProvidersDefaultToNoCompatibilityAndMalformedAdditionsFailClosed() {
         var legacy=registry();String digest="sha256:"+"a".repeat(64);
         assertEquals(Set.of(),legacy.completedReceiptProcessReadAdditions(registration,digest));

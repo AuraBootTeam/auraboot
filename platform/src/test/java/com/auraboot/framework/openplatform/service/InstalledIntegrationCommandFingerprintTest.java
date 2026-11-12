@@ -35,6 +35,39 @@ class InstalledIntegrationCommandFingerprintTest {
         return result;
     }
 
+    @Test void exactProcessReadFieldsReconstructAnExistingMutatingGrantOnly() throws Exception {
+        var original=commands(config("own"));
+        var root=(ObjectNode)json.readTree(original.get("process"));
+        var source=((ObjectNode)root.get("handlerParams")).putObject("installedMachineData").putObject("native_source");
+        source.putArray("read").add("pid").add("tenant_id").add("value");source.putArray("update").add("value");
+        original.put("process",root.toString());
+        ((ArrayNode)source.get("read")).add("closed").add("project").add("organization_snapshot");
+        var current=new LinkedHashMap<>(original);current.put("process",root.toString());
+        var candidates=InstalledIntegrationCommandFingerprint.beforeProcessReadAdditions(json,current,"process",java.util.Set.of(),
+                Map.of("native_source",java.util.Set.of("closed","project","organization_snapshot")));
+        assertEquals(1,candidates.size());
+        assertEquals(InstalledIntegrationCommandFingerprint.scoped(json,original,"own"),
+                InstalledIntegrationCommandFingerprint.scoped(json,candidates.getFirst(),"own"));
+        assertEquals(current.get("accept"),candidates.getFirst().get("accept"));
+        assertEquals(current.get("result"),candidates.getFirst().get("result"));
+        assertEquals(List.of("value"),json.convertValue(json.readTree(candidates.getFirst().get("process"))
+                .at("/handlerParams/installedMachineData/native_source/update"),List.class));
+    }
+
+    @Test void missingEmptyOverlappingOrUnboundedReadFieldDeclarationsHaveNoPredecessor() throws Exception {
+        var root=(ObjectNode)json.readTree(config("own"));
+        var grant=((ObjectNode)root.get("handlerParams")).putObject("installedMachineData").putObject("native_source");
+        grant.putArray("read").add("pid").add("value").add("project");
+        var configs=commands(config("own"));configs.put("process",root.toString());
+        for(var declaration:List.of(Map.of("missing",java.util.Set.of("project")),Map.of("native_source",java.util.Set.<String>of()),
+                Map.of("native_source",java.util.Set.of("absent")),Map.of("native_source",java.util.Set.of("pid","value","project")),
+                Map.of("native_source",java.util.Set.of("*")))) {
+            assertTrue(InstalledIntegrationCommandFingerprint.beforeProcessReadAdditions(json,configs,"process",java.util.Set.of(),declaration).isEmpty());
+        }
+        assertTrue(InstalledIntegrationCommandFingerprint.beforeProcessReadAdditions(json,configs,"process",java.util.Set.of("native_source"),
+                Map.of("native_source",java.util.Set.of("project"))).isEmpty());
+    }
+
     private String digest(Map<String, String> configs) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")

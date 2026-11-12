@@ -266,6 +266,18 @@ supports multiple operations in one transaction without reusing the first operat
 The reliable consumer reconstructs the same machine principal after verifying the original durable
 receipt and envelope. Neither path clears machine context or impersonates a human member.
 
+For completed receipts with a retained valid request PID, the current authenticated provider may
+declare exact process-only read additions through `completedReceiptProcessReadAdditions()`
+(whole new read-only models) or `completedReceiptProcessReadFieldAdditions()` (fields appended
+to an existing nonempty model read grant). The host reconstructs that single declared predecessor
+and requires the original complete command digest to match. Model/field declarations are finite,
+artifact-pinned, disjoint and non-wildcard; missing fields, duplicate read entries, empty predecessors
+and malformed declarations do not create compatibility. Existing create/update/delete grants,
+accept/result commands, other reads/settings, installation binding and request content remain pinned.
+The compatibility path may query the original result or return the original acceptance only; it never
+reruns processing or migrates accepting, accepted, failed or malformed receipts. A read repair is not
+authorization to rewrite historical data, and its actual native receipt replay requires separate evidence.
+
 ## Managed installation binding lookup
 
 An installed provider may choose `handlerParams.installedIntegration.bindingLookup`

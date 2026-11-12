@@ -143,9 +143,10 @@ public class InstalledIntegrationService {
         var previousRegistrations=registry.completedReceiptRegistrations(source);
         var previousReadHashes=new HashSet<String>();
         var readAdditions=registry.completedReceiptProcessReadAdditions(registration,entry.getValue());
+        var readFieldAdditions=registry.completedReceiptProcessReadFieldAdditions(registration,entry.getValue());
         var declarations=new HashSet<>(previousRegistrations);declarations.add(registration);
         for(var previous:InstalledIntegrationCommandFingerprint.beforeProcessReadAdditions(
-                json,configs,registration.processCommand(),readAdditions)) {
+                json,configs,registration.processCommand(),readAdditions,readFieldAdditions)) {
             for(var declaration:declarations) {
                 previousReadHashes.add(commandHash(declaration,previous));
                 previousReadHashes.add(scopedCommandHash(declaration,previous,principal.installationPid()));
