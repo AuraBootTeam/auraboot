@@ -3,6 +3,8 @@ package com.auraboot.framework.file.security;
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.file.dao.mapper.FileMapper;
 import com.auraboot.framework.file.entity.FileEntity;
 import com.auraboot.framework.file.service.FileService;
@@ -91,7 +93,7 @@ class BusinessArtifactAccessPostgresIT extends BaseIntegrationTest {
         var definition = new Model(); definition.setPid(UniqueIdGenerator.generate()); definition.setTenantId(testTenant.getId());
         definition.setCode(model); definition.setVersion(1); definition.setIsCurrent(true); definition.setStatus("published"); definition.setDeletedFlag(false);
         definition.setCreatedAt(Instant.now()); definition.setUpdatedAt(Instant.now());
-        var extension = new ExtensionBean(); extension.setExtension(new HashMap<>(Map.of("modelType", "entity"))); definition.setExtension(extension);
+        var extension = new ExtensionBean(); extension.setExtension(new HashMap<>(Map.of("modelType", "entity", "softDelete", true))); definition.setExtension(extension);
         models.insert(definition); modelId = definition.getId(); bind(fileField, "file"); bind(secret, "string"); bind(projectField,"string"); bind(intentField,"string"); metadata.clearAllCache();
         var created = schema.createTableByModel(model); assertThat(created.isSuccess()).as(created.getErrorMessage()).isTrue();
         table = metadata.getModelDefinition(model).orElseThrow().getTableName();
@@ -232,6 +234,62 @@ class BusinessArtifactAccessPostgresIT extends BaseIntegrationTest {
         assertThat(commandExecutor.execute(command,request).isIdempotentReplay()).isTrue();
         assertThat(owner.executions).hasValue(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_file WHERE tenant_id=?",Long.class,testTenant.getId())).isEqualTo(count);
+    }
+
+    @Test void a_soft_deleted_root_blocks_known_artifact_routes_but_retains_audit_bytes() throws Exception {
+        var original = fileService.findByPid(filePid);
+        try (var bytes = accessor().open(filePid)) { assertThat(bytes.readAllBytes()).isEqualTo(BYTES); }
+        assertThat(accessor().describe(filePid)).isNotNull();
+        assertThat(fileService.getFileDownloadUrl(filePid)).isNotBlank();
+        long count = jdbc.queryForObject("SELECT count(*) FROM ab_file WHERE tenant_id=?",Long.class,testTenant.getId());
+
+        assertThat(jdbc.update("UPDATE "+table+" SET deleted_flag=true, row_version=row_version+1 WHERE tenant_id=? AND pid=?",
+                testTenant.getId(),rootPid)).isEqualTo(1);
+        assertThatThrownBy(() -> accessor().open(filePid)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> accessor().describe(filePid)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> fileService.getFileDownloadUrl(filePid)).isInstanceOf(AccessDeniedException.class);
+        assertThat(jdbc.queryForObject("SELECT deleted_flag FROM "+table+" WHERE tenant_id=? AND pid=?",
+                Boolean.class,testTenant.getId(),rootPid)).isTrue();
+        var retained = fileService.findByPid(filePid);
+        assertThat(retained.getArtifactAuthorization()).isEqualTo(original.getArtifactAuthorization());
+        assertThat(retained.getRetentionLocked()).isTrue();
+        assertThat(storage.exists(original.getFileName())).isTrue();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_file WHERE tenant_id=?",Long.class,testTenant.getId())).isEqualTo(count);
+
+        // Restore only this test's fixture: the unchanged grants still allow the same retained file.
+        assertThat(jdbc.update("UPDATE "+table+" SET deleted_flag=false, row_version=row_version+1 WHERE tenant_id=? AND pid=?",
+                testTenant.getId(),rootPid)).isEqualTo(1);
+        try (var bytes = accessor().open(filePid)) { assertThat(bytes.readAllBytes()).isEqualTo(BYTES); }
+    }
+
+    @Test void a_soft_deleted_root_cannot_replay_a_warm_command_or_generate_another_artifact() throws Exception {
+        grantCommittedPermissionToTestRole(com.auraboot.framework.permission.constants.MetaPermission.COMMAND_EXECUTE,
+                "API","command","execute","Command fixture invocation");
+        var request = new CommandExecuteRequest(); request.setTargetRecordId(rootPid); request.setOperationType("update");
+        request.setClientRequestId(UniqueIdGenerator.generate()); request.setPayload(Map.of());
+        var first = commandExecutor.execute(command,request);
+        assertThat(first.isIdempotentReplay()).isFalse();
+        assertThat(first.getData()).containsEntry("success",true);
+        String saved = first.getData().get("fileId").toString();
+        try (var bytes = accessor().open(saved)) { assertThat(bytes.readAllBytes()).isEqualTo(BYTES); }
+        String outcome = jdbc.queryForObject("SELECT outcome::text FROM ab_idempotency_record WHERE tenant_id=? AND command_code=? AND client_request_id=?",
+                String.class,testTenant.getId(),command,command+":"+request.getClientRequestId());
+        long count = jdbc.queryForObject("SELECT count(*) FROM ab_file WHERE tenant_id=?",Long.class,testTenant.getId());
+        assertThat(jdbc.update("UPDATE "+table+" SET deleted_flag=true, row_version=row_version+1 WHERE tenant_id=? AND pid=?",
+                testTenant.getId(),rootPid)).isEqualTo(1);
+
+        assertThatThrownBy(() -> commandExecutor.execute(command,request)).isInstanceOfSatisfying(BusinessException.class,
+                denied -> assertThat(denied.getResponseCode()).isEqualTo(ResponseCode.FORBIDDEN));
+        var fresh = new CommandExecuteRequest(); fresh.setTargetRecordId(rootPid); fresh.setOperationType("update");
+        fresh.setClientRequestId(UniqueIdGenerator.generate()); fresh.setPayload(Map.of());
+        assertThatThrownBy(() -> commandExecutor.execute(command,fresh)).isInstanceOfSatisfying(BusinessException.class,
+                denied -> assertThat(denied.getResponseCode()).isEqualTo(ResponseCode.FORBIDDEN));
+        assertThatThrownBy(() -> accessor().open(saved)).isInstanceOf(AccessDeniedException.class);
+        assertThat(owner.executions).hasValue(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_file WHERE tenant_id=?",Long.class,testTenant.getId())).isEqualTo(count);
+        assertThat(jdbc.queryForObject("SELECT outcome::text FROM ab_idempotency_record WHERE tenant_id=? AND command_code=? AND client_request_id=?",
+                String.class,testTenant.getId(),command,command+":"+request.getClientRequestId())).isEqualTo(outcome);
+        assertThat(storage.exists(fileService.findByPid(saved).getFileName())).isTrue();
     }
 
     @Test void an_intent_only_run_change_blocks_regeneration_replay_without_retiring_historical_bytes() throws Exception {
