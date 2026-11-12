@@ -347,7 +347,7 @@ export const DagCanvasBlockRenderer: React.FC<DagCanvasBlockRendererProps> = ({ 
         ) : null}
       </div>
       <div className="flex flex-row gap-3 items-stretch">
-        <div className="min-w-0 lg:flex-1" onClick={onCanvasClick}>
+        <div className="min-w-0 flex-1" onClick={onCanvasClick}>
           <FlowCanvasCard
             nodes={flowNodes}
             edges={flowEdges}
