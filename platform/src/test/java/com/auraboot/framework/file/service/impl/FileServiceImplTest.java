@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Spy;
-import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
+import org.springframework.boot.servlet.autoconfigure.MultipartProperties;
 import org.springframework.util.unit.DataSize;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;

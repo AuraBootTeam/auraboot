@@ -45,7 +45,7 @@ import java.util.List;
 public class FileUploadController {
     public record UploadLimits(long maxFileBytes,long maxRequestBytes) {}
     @Autowired
-    private org.springframework.boot.autoconfigure.web.servlet.MultipartProperties multipartProperties;
+    private org.springframework.boot.servlet.autoconfigure.MultipartProperties multipartProperties;
 
     @GetMapping("/limits")
     @RequirePermission(MetaPermission.SYS_FILE_UPLOAD)

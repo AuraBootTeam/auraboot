@@ -140,6 +140,18 @@ jobs:
         # and this goes red.
         run: ./scripts/quickstart.sh
 
+      - name: Prepare the public project-delivery example through the documented entry
+        if: steps.changes.outputs.run == 'true'
+        env:
+          DELIVERY_EVIDENCE_ROOT: ${{ runner.temp }}/project-delivery-example
+        run: |
+          # Preserve the foundation quickstart check above. This additional entry
+          # imports the separate public example and creates fictional records.
+          # No Enterprise module or private fixture database is required.
+          bash scripts/project-delivery-demo.sh
+          test -s "$DELIVERY_EVIDENCE_ROOT/fixture.json"
+          test -s "$DELIVERY_EVIDENCE_ROOT/seed-receipts.json"
+
       - name: Internal contract capture and cleanup self-tests
         if: steps.changes.outputs.run == 'true'
         run: python3 scripts/ci/capture-internal-document.test.py

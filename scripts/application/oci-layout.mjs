@@ -3,7 +3,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } f
 import { dirname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
-const LINUX_JRE_BASE = 'eclipse-temurin:21-jre@sha256:a80c51f2d09a3e7e00d521f1c817bbceb6b3be94109b4a784d46078099882dda';
+const LINUX_JRE_BASE = 'eclipse-temurin:21-jre-noble@sha256:0eda5830ed7b669abc246a8dc520ea8a23cab06f9a8d4b6964109e2f2394e46f';
 
 function commandExists(command) {
   return spawnSync('which', [command], { stdio: 'ignore' }).status === 0;
@@ -27,6 +27,17 @@ function createRunnableLayout({ output, rootfs, labels, entrypoint }) {
     cpSync(rootfs, contextRootfs, { recursive: true });
     writeFileSync(resolve(context, 'Dockerfile'), [
       `FROM ${LINUX_JRE_BASE}`,
+      // CVE-2026-109518 is still present in the pinned upstream JRE image.
+      // HTTPS plus zero retries protects the old APT during its own signed update.
+      "RUN cp /etc/apt/sources.list.d/ubuntu.sources /tmp/auraboot-ubuntu.sources " +
+        "&& sed -i -e 's|http://|https://|g' -e 's/^Components:.*/Components: main/' " +
+        "/etc/apt/sources.list.d/ubuntu.sources " +
+        "&& apt-get -o Acquire::Retries=0 -o Acquire::https::Timeout=30 update --error-on=any " +
+        "&& apt-get -o Acquire::Retries=0 -o Acquire::https::Timeout=30 install --no-install-recommends -y " +
+        "apt=2.8.4ubuntu0.1 libapt-pkg6.0t64=2.8.4ubuntu0.1 libpcre2-8-0=10.42-4ubuntu2.2 " +
+        "&& dpkg-query -W apt libapt-pkg6.0t64 libpcre2-8-0 " +
+        "&& sed 's|http://|https://|g' /tmp/auraboot-ubuntu.sources > /etc/apt/sources.list.d/ubuntu.sources " +
+        "&& rm /tmp/auraboot-ubuntu.sources && rm -rf /var/lib/apt/lists/*",
       'COPY rootfs/ /',
       `ENTRYPOINT ${JSON.stringify(entrypoint)}`,
       '',

@@ -1,10 +1,18 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto';
-import { lstatSync, readFileSync, readdirSync } from 'node:fs';
+import { closeSync, constants, fstatSync, lstatSync, openSync, readFileSync, readdirSync } from 'node:fs';
 import { basename, relative, resolve } from 'node:path';
 
 const sha256 = (value) => `sha256:${createHash('sha256').update(value).digest('hex')}`;
+
+function readRegular(path) {
+  const descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  try {
+    if (!fstatSync(descriptor).isFile()) throw new Error(`unsupported staged artifact type: ${path}`);
+    return readFileSync(descriptor);
+  } finally { closeSync(descriptor); }
+}
 
 function canonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
@@ -17,7 +25,7 @@ function canonicalJson(value) {
 function sha256Path(path) {
   const stat = lstatSync(path);
   if (stat.isSymbolicLink()) throw new Error(`symbolic links are not valid staged artifacts: ${path}`);
-  if (stat.isFile()) return sha256(readFileSync(path));
+  if (stat.isFile()) return sha256(readRegular(path));
   if (!stat.isDirectory()) throw new Error(`unsupported staged artifact type: ${path}`);
   const entries = [];
   const walk = (directory, prefix = '') => {
@@ -27,7 +35,7 @@ function sha256Path(path) {
       const childStat = lstatSync(child);
       if (childStat.isSymbolicLink()) throw new Error(`symbolic links are not valid staged artifacts: ${child}`);
       if (childStat.isDirectory()) walk(child, childRelative);
-      else if (childStat.isFile()) entries.push(`${childRelative}\0${sha256(readFileSync(child))}`);
+      else if (childStat.isFile()) entries.push(`${childRelative}\0${sha256(readRegular(child))}`);
       else throw new Error(`unsupported artifact type: ${child}`);
     }
   };

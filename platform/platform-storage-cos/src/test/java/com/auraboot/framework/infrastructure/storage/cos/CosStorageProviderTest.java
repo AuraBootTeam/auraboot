@@ -39,5 +39,18 @@ class CosStorageProviderTest {
         acl.grantPermission(authenticated,com.qcloud.cos.model.Permission.Read);assertFalse(CosAclIT.ownerOnly(acl));acl.revokeAllPermissions(authenticated);
         acl.grantPermission(new com.qcloud.cos.model.UinGrantee("another-account"),com.qcloud.cos.model.Permission.Read);assertFalse(CosAclIT.ownerOnly(acl));assertFalse(CosAclIT.ownerOnly(null));
     }
+    @Test void maintainedCredentialParserAndKmsSdkRetainLocalCompatibility() throws Exception {
+        var ini = new org.apache.commons.configuration2.INIConfiguration();
+        ini.read(new StringReader("[default]\nsecret_id=fixture-id\nsecret_key=fixture-secret\n"));
+        assertEquals("fixture-id", ini.getString("default.secret_id"));
+        assertEquals("fixture-secret", ini.getString("default.secret_key"));
+        assertThrows(ClassNotFoundException.class, () -> Class.forName(
+                "org.ini4j.BasicProfile", false, CosStorageProvider.class.getClassLoader()));
+        // Constructor wiring only: never invokes a remote KMS operation or
+        // searches the host's real credential/profile files.
+        var kms = new com.tencentcloudapi.kms.v20190118.KmsClient(
+                new com.tencentcloudapi.common.Credential("fixture-id", "fixture-secret"), "ap-nanjing");
+        assertNotNull(kms);
+    }
     @Test void shutdownClosesSdkResources(){provider.destroy();verify(client).shutdown();verifyNoMoreInteractions(client);}
 }

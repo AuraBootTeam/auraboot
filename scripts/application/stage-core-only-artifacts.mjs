@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {hydrateCapsuleOverrides} from './web-shell-capsule.mjs';
 
 import { execFileSync } from 'node:child_process';
 import {createHash} from 'node:crypto';
@@ -87,16 +88,6 @@ function extractTarball(tarball, target) {
   run('tar', ['-xzf', tarball, '-C', target, '--strip-components=1']);
 }
 
-function hydrateCapsuleOverrides(root) {
-  const manifestPath = resolve(root, 'package.json');
-  const overridesPath = resolve(root, 'pnpm-overrides.json');
-  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-  manifest.pnpm = {
-    ...(manifest.pnpm ?? {}),
-    overrides: JSON.parse(readFileSync(overridesPath, 'utf8')),
-  };
-  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-}
 
 function materializeAndBuildCoreWeb({ repoRoot, output, webShell, npmArtifacts }) {
   const workRoot = mkdtempSync(resolve(tmpdir(), 'auraboot-core-web-build-'));
@@ -479,6 +470,11 @@ async function main() {
 
   mkdirSync(output, { recursive: false });
   copyFileSync(manifestPath, resolve(output, 'app.yaml'));
+  copyFileSync(resolve(repoRoot, 'LICENSE.txt'), resolve(output, 'LICENSE.txt'));
+  copyFileSync(resolve(repoRoot, 'NOTICE'), resolve(output, 'NOTICE'));
+  copyFileSync(resolve(repoRoot, 'distribution/application/native-install.md'), resolve(output, 'INSTALL.md'));
+  mkdirSync(resolve(output, 'bin/lib'), { recursive: true });
+  copyFileSync(resolve(repoRoot, 'scripts/lib/runtime-process-owner.sh'), resolve(output, 'bin/lib/runtime-process-owner.sh'));
 
   const runtime = copyArtifact(
     resolve(repoRoot, `platform/build/libs/AuraBoot-${version}-boot.jar`),
@@ -512,6 +508,7 @@ async function main() {
     resolve(output, 'migrations/core'),
   );
   const coreMeta = copyArtifact(resolve(repoRoot, 'plugins/core-meta'), resolve(output, 'config/core-meta'));
+  const pageManager = copyArtifact(resolve(repoRoot, 'plugins/page-manager'), resolve(output, 'config/page-manager'));
   const orgManagement = copyArtifact(
     resolve(repoRoot, 'plugins/org-management'),
     resolve(output, 'config/org-management'),
@@ -565,8 +562,11 @@ async function main() {
     runtimeImage = resolve(output, 'oci/auraboot-runtime');
     const runtimeRootfs = prepareRootfs([
       { source: runtime, destination: '/opt/auraboot/runtime/application.jar' },
+      { source: resolve(output, 'LICENSE.txt'), destination: '/opt/auraboot/LICENSE.txt' },
+      { source: resolve(output, 'NOTICE'), destination: '/opt/auraboot/NOTICE' },
       { source: coreMigrations, destination: '/opt/auraboot/migrations/core' },
       { source: coreMeta, destination: '/opt/auraboot/config/core-meta' },
+      { source: pageManager, destination: '/opt/auraboot/config/page-manager' },
       { source: platformAdmin, destination: '/opt/auraboot/config/platform-admin' },
       { source: orgManagement, destination: '/opt/auraboot/config/org-management' },
       { source: coreOwnership, destination: '/opt/auraboot/config/core-ownership' },
@@ -603,6 +603,7 @@ async function main() {
     { type: 'npm', id: '@auraboot/web-testkit', version, path: webTestkit },
     { type: 'migration', id: 'core', version, path: coreMigrations },
     { type: 'config', id: 'core-meta', version, path: coreMeta },
+    { type: 'config', id: 'page-manager', version, path: pageManager },
     { type: 'config', id: 'platform-admin', version: JSON.parse(readFileSync(resolve(platformAdmin, 'plugin.json'), 'utf8')).version, path: platformAdmin },
     { type: 'config', id: 'org-management', version, path: orgManagement },
     { type: 'config', id: 'core-ownership', version, path: coreOwnership },

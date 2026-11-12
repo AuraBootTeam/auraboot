@@ -1,3 +1,5 @@
+import { safeLoginRedirect } from './auth/login-redirect';
+import { trustedProxyPolicy } from './auth/trusted-proxies';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
@@ -50,7 +52,7 @@ const app = express();
 // react-router v7 single-fetch submissions validate the request Origin against
 // the derived origin, so without trust proxy every .data POST (e.g. logout)
 // fails 400 Bad Request behind the reverse proxy.
-app.set('trust proxy', true);
+app.set('trust proxy', trustedProxyPolicy(process.env.AURA_TRUSTED_PROXIES));
 const PORT = parseInt(process.env.BFF_PORT || '3500', 10);
 // Resolution order: explicit override → reset/runtime contract (AURA_BE_BASE is
 // exported by scripts/oss-reset-and-init.sh) → BE_PORT slot → host-mode default.
@@ -188,12 +190,6 @@ app.use((req, res, next) => {
   next();
 });
 
-function safeLoginRedirect(value: unknown): string {
-  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//')) {
-    return '/';
-  }
-  return value;
-}
 
 function isMobileDevice(userAgent: string): boolean {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);

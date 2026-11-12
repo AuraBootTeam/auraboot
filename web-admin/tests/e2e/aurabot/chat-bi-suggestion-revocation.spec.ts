@@ -1288,7 +1288,11 @@ test('revoked source access rejects adoption and suggestion content reads', asyn
         expect(originalData === '' || originalData == null || typeof originalData === 'object').toBe(true);
         const originalPolicy = originalData && typeof originalData === 'object' ? originalData : {};
         const savePolicy = async (policy: Record<string, unknown>) => {
-          const saved = await admin.request.put(policyUrl, { data: policy });
+          const snapshot = await admin.request.get(policyUrl + '/snapshot');
+          expect(snapshot.status()).toBe(200);
+          const { revision } = (await snapshot.json()).data;
+          expect(revision).toEqual(expect.any(String));
+          const saved = await admin.request.put(policyUrl, { data: { expectedRevision: revision, values: policy } });
           expect(saved.status(), await saved.text()).toBe(200);
           const loaded = await admin.request.get(policyUrl);
           expect(loaded.status()).toBe(200);

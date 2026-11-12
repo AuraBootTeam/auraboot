@@ -24,7 +24,7 @@ dependencyManagement {
 dependencies {
     api project(':')
     api project(':platform-plugin-api')
-    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
@@ -32,12 +32,12 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'io.micrometer:micrometer-tracing'
-    implementation 'com.baomidou:mybatis-plus-spring-boot3-starter'
+    implementation 'com.baomidou:mybatis-plus-spring-boot4-starter'
     implementation 'com.baomidou:mybatis-plus-jsqlparser'
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
     implementation 'com.github.ben-manes.caffeine:caffeine:3.3.1'
     implementation 'com.networknt:json-schema-validator:1.5.9'
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.1'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.2.0'
     implementation 'org.apache.poi:poi:5.5.1'
     implementation 'org.apache.poi:poi-ooxml:5.5.1'
     implementation 'org.apache.poi:poi-scratchpad:5.5.1'

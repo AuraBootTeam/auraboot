@@ -8,7 +8,7 @@ import com.auraboot.framework.plugin.extension.approval.ApprovalContract;
 import com.auraboot.framework.plugin.pf4j.WorkflowCapabilityRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
+import org.springframework.boot.servlet.autoconfigure.MultipartProperties;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.*;

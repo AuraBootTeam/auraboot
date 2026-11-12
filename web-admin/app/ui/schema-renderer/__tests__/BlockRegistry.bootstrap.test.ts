@@ -1,11 +1,13 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { BlockRegistry, initBlockRegistry } from '../BlockRegistry';
 
 describe('BlockRegistry bootstrap', () => {
-  it('initBlockRegistry registers all 34 runtime block types', () => {
+  it('initBlockRegistry registers the complete 36-type runtime block contract', () => {
     initBlockRegistry();
+    expect(BlockRegistry.size()).toBe(36);
 
-    expect(BlockRegistry.size()).toBe(34);
 
     // Must mirror the dispatch table in
     // web-admin/app/framework/meta/rendering/BlockRenderer.tsx — every
@@ -34,6 +36,7 @@ describe('BlockRegistry bootstrap', () => {
       'selection-info',
       'metric-strip',
       'stage-rail',
+      'dag-canvas',
       'record-inspector',
       'candidate-list',
       'workbench-action-bar',
@@ -47,7 +50,13 @@ describe('BlockRegistry bootstrap', () => {
       'trace-graph',
       'card-grid',
       'code-snippet',
+      'conversation-panel',
+      'prerequisite-table',
     ];
+    expect(existsSync(resolve(process.cwd(), 'app/ui/schema-renderer/BlockRegistry.ts'))).toBe(true);
+    expect(existsSync(resolve(process.cwd(), 'app/framework/meta/rendering/blocks/PrerequisiteTableBlockRenderer.tsx'))).toBe(true);
+    expect(expected).toHaveLength(36);
+    expect(BlockRegistry.list().map(([type]) => type).sort()).toEqual([...expected].sort());
     for (const type of expected) {
       const spec = BlockRegistry.get(type);
       expect(spec, `blockType "${type}" must be registered`).toBeDefined();

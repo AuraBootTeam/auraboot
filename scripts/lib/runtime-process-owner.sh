@@ -268,7 +268,7 @@ aura_reset_owner_init() {
     local pg_db="$6"
     local backend_port="$7"
     local web_port="$8"
-    local bff_port="$9"
+    local bff_port="${9:-}"
     local identity
     local db_identity
     local normalized_pg_host
@@ -282,7 +282,9 @@ aura_reset_owner_init() {
     }
     [ -n "$AURA_RESET_OWNER_RUNTIME_LABEL" ] || AURA_RESET_OWNER_RUNTIME_LABEL="default"
 
-    for value in "$pg_port" "$backend_port" "$web_port" "$bff_port"; do
+    local service_ports=("$backend_port" "$web_port")
+    [ -z "$bff_port" ] || service_ports+=("$bff_port")
+    for value in "$pg_port" "${service_ports[@]}"; do
         [[ "$value" =~ ^[1-9][0-9]*$ ]] || {
             aura_reset_owner_error "ports must be positive integers (got '$value')"
             return 1
@@ -293,14 +295,13 @@ aura_reset_owner_init() {
         return 1
     }
     [ "$backend_port" != "$web_port" ] \
-        && [ "$backend_port" != "$bff_port" ] \
-        && [ "$web_port" != "$bff_port" ] || {
+        && { [ -z "$bff_port" ] || { [ "$backend_port" != "$bff_port" ] && [ "$web_port" != "$bff_port" ]; }; } || {
             aura_reset_owner_error "backend, web and BFF ports must be distinct"
             return 1
         }
 
     normalized_pg_host="$(aura_reset_normalize_host "$pg_host")"
-    identity="product=$AURA_RESET_OWNER_PRODUCT|runtime=$AURA_RESET_OWNER_RUNTIME_LABEL|source=$AURA_RESET_OWNER_SOURCE_ROOT|pg=$normalized_pg_host:$pg_port/$pg_db|ports=$backend_port,$web_port,$bff_port"
+    identity="product=$AURA_RESET_OWNER_PRODUCT|runtime=$AURA_RESET_OWNER_RUNTIME_LABEL|source=$AURA_RESET_OWNER_SOURCE_ROOT|pg=$normalized_pg_host:$pg_port/$pg_db|ports=$backend_port,$web_port${bff_port:+,$bff_port}"
     db_identity="pg=$normalized_pg_host:$pg_port/$pg_db"
     AURA_RESET_OWNER_IDENTITY_HASH="$(printf '%s' "$identity" | aura_reset_hash)" || return 1
     AURA_RESET_OWNER_DB_HASH="$(printf '%s' "$db_identity" | aura_reset_hash)" || return 1
@@ -317,7 +318,7 @@ aura_reset_owner_init() {
         "$(aura_reset_normalize_host "$AURA_RESET_OWNER_HOSTNAME")" | aura_reset_hash)" || return 1
     AURA_RESET_OWNER_NONCE="${AURA_RESET_OWNER_HOSTNAME}-$$-$(date +%s)-${RANDOM:-0}"
     AURA_RESET_OWNER_DB_IDENTITY="$db_identity"
-    AURA_RESET_OWNER_PORTS=("$backend_port" "$web_port" "$bff_port")
+    AURA_RESET_OWNER_PORTS=("${service_ports[@]}")
     AURA_RESET_OWNER_HELD_LOCKS=()
 
     export AURA_RESET_OWNER_RUNTIME_ID

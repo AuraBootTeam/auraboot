@@ -31,6 +31,11 @@ class AuraPluginManagerStartupTest {
         public java.util.List<Class<?>> configurationTypes() { return java.util.List.of(); }
     }
 
+    @Test void pluginHostDoesNotExposeTheUnusedLegacyCommonsLangRuntime() {
+        assertThrows(ClassNotFoundException.class, () -> Class.forName(
+                "org.apache.commons.lang.StringUtils", false, getClass().getClassLoader()));
+    }
+
     @Test void aPackagedSharedApplicationCannotBeHotRemovedButNormalHostShutdownStillStopsIt() throws Exception {
         jar(GoodPlugin.class, null, SharedApplicationModule.class);
         var manager = new AuraPluginManager(directory.toString());

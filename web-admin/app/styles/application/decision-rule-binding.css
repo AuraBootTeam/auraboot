@@ -15,6 +15,17 @@
   min-width: 0;
 }
 
+.decision-rule-condition-notice {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  background: var(--color-subtle);
+  color: var(--color-text-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .decision-rule-binding-section,
 .decision-rule-binding-summary {
   display: grid;
@@ -201,7 +212,7 @@
   margin-top: 10px;
 }
 
-.decision-rule-binding-block input,
+.decision-rule-binding-block input:not([type='checkbox']),
 .decision-rule-binding-block select,
 .decision-rule-binding-block textarea {
   min-height: 34px;
@@ -220,7 +231,7 @@
   resize: vertical;
 }
 
-.decision-rule-binding-block input:focus,
+.decision-rule-binding-block input:not([type='checkbox']):focus,
 .decision-rule-binding-block select:focus,
 .decision-rule-binding-block textarea:focus {
   border-color: var(--color-accent);
@@ -666,4 +677,3 @@
   font-size: 12px;
   overflow-wrap: anywhere;
 }
-

@@ -13,7 +13,7 @@ import com.auraboot.framework.organization.service.TeamGovernanceService;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

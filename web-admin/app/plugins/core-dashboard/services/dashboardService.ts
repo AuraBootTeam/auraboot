@@ -173,6 +173,7 @@ function normalizeWidget(raw: Record<string, unknown>, index: number): Widget {
   }
   for (const key of [
     'defaultSort',
+    'defaultFilters',
     'filters',
     'pageSize',
     'showPagination',

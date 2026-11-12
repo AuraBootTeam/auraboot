@@ -1,12 +1,36 @@
 import { describe, expect, it } from 'vitest';
 import type { CapabilityRegistry } from '~/framework/meta/authoring/types';
 import type { PageSchemaV3 } from '../types';
+import { validatePageSchemaV3 } from '../validation/validatePageSchemaV3';
 import {
   authoringSnapshotToPageSchemaV3,
   buildStudioThreeWayMerge,
   planStudioAuthoringPatches,
   resolveStudioThreeWayMerge,
 } from '../persistence/contextualAuthoringAdapter';
+
+describe('generated list recovery validation', () => {
+  it('accepts the existing native selection text and toolbar without weakening unknown-block checks', () => {
+    const snapshot = {
+      schemaVersion: 4, pageKey: 'security_followup_list', kind: 'list', modelCode: 'security_followup',
+      blocks: [{ id: 'list_security_followup', blockType: 'list', blocks: [
+        { id: 'filters', blockType: 'filter-bar', fields: [] },
+        { id: 'selected', blockType: 'text', contentKey: 'common.selectedCount', visibleWhen: 'selectedCount > 0' },
+        { id: 'toolbar', blockType: 'form-buttons', buttons: [{ code: 'create', commandCode: 'security:create' }] },
+        { id: 'table', blockType: 'table', table: { columns: [] } },
+      ] }],
+    };
+    const document = authoringSnapshotToPageSchemaV3(snapshot);
+    expect(validatePageSchemaV3(document).errors).toEqual([]);
+    expect(document.blocks[0].blocks?.[1]).toEqual(snapshot.blocks[0].blocks[1]);
+    expect(document.blocks[0].blocks?.[2]).toEqual(snapshot.blocks[0].blocks[2]);
+    const unknown = structuredClone(document);
+    unknown.blocks[0].blocks![1].blockType = 'unregistered-security-fixture';
+    expect(validatePageSchemaV3(unknown).errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'unknown_block_type', blockId: 'selected' }),
+    ]));
+  });
+});
 
 const capabilities: CapabilityRegistry = {
   checksum: 'registry-1',

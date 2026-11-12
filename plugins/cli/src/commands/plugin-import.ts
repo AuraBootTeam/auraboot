@@ -297,6 +297,7 @@ function buildExtendedManifest(plugin: ReturnType<typeof loadPlugin>): any {
     pages:               plugin.resourceFiles.get('pages')         ?? [],
     permissions:         plugin.resourceFiles.get('permissions')   ?? [],
     roles:               plugin.resourceFiles.get('roles')         ?? [],
+    capabilities: plugin.resourceFiles.get('capabilities') ?? [],
     menus:               plugin.resourceFiles.get('menus')         ?? [],
     dicts:               plugin.resourceFiles.get('dicts')         ?? [],
     i18nResources:       plugin.resourceFiles.get('i18n')          ?? [],

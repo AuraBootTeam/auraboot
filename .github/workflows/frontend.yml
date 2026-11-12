@@ -110,6 +110,8 @@ jobs:
 
       - name: Type-check web-admin
         working-directory: web-admin
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: pnpm typecheck
 
       - name: CLI capability and MCP regression
@@ -122,9 +124,26 @@ jobs:
       - name: Optional plugin assembly contract
         run: node --test scripts/dev/plugin-assembly.test.mjs
 
+      - name: Dependency toolchain compatibility
+        env:
+          AURA_NPM_COMPAT_ARTIFACTS: ${{ runner.temp }}/npm-toolchain-compatibility
+        run: node --test scripts/ci/npm-toolchain-compat.test.mjs
+
+      - name: CodeQL state boundary regressions
+        run: node --test scripts/ci/codeql-state-boundaries.test.mjs
+
       - name: Unit tests (vitest)
+        id: unit_tests
         working-directory: web-admin
         run: pnpm test:unit
+
+      - name: Retain unit test results
+        if: always() && (steps.unit_tests.outcome == 'success' || steps.unit_tests.outcome == 'failure')
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-unit-results
+          path: web-admin/test-results/results.json
+          if-no-files-found: error
 
       - name: Validate dashboard contracts
         run: node scripts/validate-plugin-dashboards.mjs
@@ -139,3 +158,11 @@ jobs:
           name: internal-api-foundation
           path: ${{ runner.temp }}/internal-api-foundation
           if-no-files-found: ignore
+
+      - name: Retain dependency compatibility evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: npm-toolchain-compatibility
+          path: ${{ runner.temp }}/npm-toolchain-compatibility
+          if-no-files-found: error

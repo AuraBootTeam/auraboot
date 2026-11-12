@@ -33,6 +33,7 @@ import DataScopeBar from './DataScopeBar';
 import { scopeOption } from '../scopeConfig';
 import CapabilityDiagnostics from './CapabilityDiagnostics';
 import CapabilityScopeSettings from './CapabilityScopeSettings';
+import CapabilityPolicySettings from './CapabilityPolicySettings';
 import ConfirmDialog from '~/ui/ConfirmDialog';
 import FieldPolicyChecklist from './FieldPolicyChecklist';
 import RoleMenuChecklist from './RoleMenuChecklist';
@@ -108,6 +109,7 @@ export default function CapabilityRoleEditor({
   const [draftPreview, setDraftPreview] = useState<AuthorizationPreview | null>(null);
   const loadRequest = useRef(0);
   const reviewedDraft = useRef<AuthorizationDraft | null>(null);
+  const [policyCapability, setPolicyCapability] = useState<Capability | null>(null);
 
   const capabilityView = useMemo(() => splitCapabilityGroupsForPrimaryView(groups), [groups]);
   const primaryCodes = useMemo(
@@ -187,6 +189,17 @@ export default function CapabilityRoleEditor({
     );
   }, [projectedMatrix, capabilityView.primaryGroups]);
   const primarySelected = selected.filter((code) => primaryCodes.has(code));
+  const policyConfigurableCodes = useMemo(() => {
+    const actions = (matrix?.modules ?? [])
+      .flatMap((module) => module.resources.flatMap((resource) => resource.actions))
+      .filter((action) => action.granted && action.supported && action.policySchema);
+    return new Set(
+      capabilityView.primaryGroups
+        .flatMap((group) => group.capabilities)
+        .filter((cap) => actions.some((action) => cap.includes.includes(action.code)))
+        .map((cap) => cap.code),
+    );
+  }, [matrix, capabilityView.primaryGroups]);
   // Data visibility controls are retained in the saved draft but are not operation levels.
   // Omitting these existing bindings would revoke them during an unrelated level change.
   const dataCodes = new Set(
@@ -242,8 +255,15 @@ export default function CapabilityRoleEditor({
   }, [loading, loadError, conflict, saving, previewLoading, dirty, onStatusChange]);
 
   useEffect(() => {
-    onDirtyChange?.(dirty || saving || previewLoading || scopeCapability !== null || scopeOpen);
-  }, [dirty, saving, previewLoading, scopeCapability, scopeOpen, onDirtyChange]);
+    onDirtyChange?.(
+      dirty ||
+        saving ||
+        previewLoading ||
+        scopeCapability !== null ||
+        scopeOpen ||
+        policyCapability !== null,
+    );
+  }, [dirty, saving, previewLoading, scopeCapability, scopeOpen, policyCapability, onDirtyChange]);
 
   const acceptSnapshot = useCallback((snapshot: AuthorizationSnapshot) => {
     const data = draftMatrix(snapshot.matrix);
@@ -374,6 +394,7 @@ export default function CapabilityRoleEditor({
     setLoadError(false);
     setScopeCapability(null);
     setScopeOpen(false);
+    setPolicyCapability(null);
     setRevokedPartial([]);
     setPreview(false);
     setPreviewPlan(null);
@@ -388,6 +409,14 @@ export default function CapabilityRoleEditor({
       if (request === loadRequest.current) setLoading(false);
     }
   }, [rolePid, readOnly, scopeReadOnly, acceptSnapshot]);
+
+  const refreshPolicySnapshot = useCallback(async () => {
+    const request = loadRequest.current;
+    const snapshot = await authorizationDraftService.read(rolePid);
+    if (request !== loadRequest.current) throw new Error('Authorization role changed');
+    acceptSnapshot(snapshot);
+    return draftMatrix(snapshot.matrix);
+  }, [rolePid, acceptSnapshot]);
 
   useEffect(() => {
     void load();
@@ -1015,6 +1044,10 @@ export default function CapabilityRoleEditor({
               }}
               onConfigureScope={scopeReadOnly || conflict ? undefined : setScopeCapability}
               scopeConfigurableCodes={scopeConfigurableCodes}
+              policyConfigurableCodes={policyConfigurableCodes}
+              onConfigurePolicy={
+                scopeReadOnly || dirty || saving || previewLoading ? undefined : setPolicyCapability
+              }
               disabled={readOnly || saving || previewLoading}
             />
           </div>
@@ -1217,6 +1250,18 @@ export default function CapabilityRoleEditor({
               ...changes,
             ]);
           }}
+        />
+      )}
+
+      {policyCapability && !scopeReadOnly && (
+        <CapabilityPolicySettings
+          key={`${rolePid}:${policyCapability.code}`}
+          rolePid={rolePid}
+          capability={policyCapability}
+          matrix={matrix}
+          onClose={() => setPolicyCapability(null)}
+          onRefresh={refreshPolicySnapshot}
+          onReadFailure={() => setLoadError(true)}
         />
       )}
 

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -68,6 +69,26 @@ class AssertEvaluatorTest {
     }
 
     // --- Pattern ---
+
+    @Test
+    void hostileNestedPatternDoesNotConsumeBacktrackingCpuOrStack() {
+        var assertion = new RuleAssert();
+        assertion.setField("name");
+        assertion.setPattern("^(a+)+$");
+        assertTimeoutPreemptively(Duration.ofSeconds(3), () ->
+                assertFalse(AssertEvaluator.evaluate(assertion,
+                        Map.of("name", "a".repeat(100_000) + "!")).passed()));
+    }
+
+    @Test
+    void unsupportedOrMalformedPatternsFailClosed() {
+        for (String pattern : List.of("[", "(a)\\1", "a(?=b)")) {
+            var assertion = new RuleAssert();
+            assertion.setField("name");
+            assertion.setPattern(pattern);
+            assertEquals("pattern", AssertEvaluator.evaluate(assertion, Map.of("name", "aa")).failedOperator());
+        }
+    }
 
     @Test
     void pattern_matches() {

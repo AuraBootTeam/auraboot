@@ -33,6 +33,23 @@ describe('auraBotApi SSE requests', () => {
     expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/chat/stream'))).toHaveLength(1);
   });
 
+  it.each([false, true])('requires a terminal event for draft extraction (terminal=%s)', async (terminal) => {
+    const text = 'event: tool_result\ndata: {"toolId":"fill","result":{"action":"form_fill","fields":{"name":"Task"}},"success":true}\n\n'
+      + (terminal ? 'event: done\ndata: {}\n\n' : '');
+    const fetchMock = vi.fn().mockResolvedValue(new Response(text));
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ schemaVersion: 1, agent: { state: 'installed' } })));
+    vi.stubGlobal('fetch', fetchMock);
+    const onError = vi.fn(); const onDone = vi.fn(); const onToolResult = vi.fn();
+    await auraBotApi.chatStream({ sessionId: 'draft', message: 'Fill current form', formFill: {
+      targetId: 'draft', modelCode: 'task', fields: [{ code: 'name', label: 'Name', type: 'string' }],
+      currentDate: '2026-11-05', timeZone: 'Asia/Shanghai',
+    } }, { onChunk: vi.fn(), onToolResult, onDone, onError });
+    expect(onToolResult).toHaveBeenCalledTimes(1);
+    expect(onDone).toHaveBeenCalledTimes(terminal ? 1 : 0);
+    expect(onError).toHaveBeenCalledTimes(terminal ? 0 : 1);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/chat/stream'))).toHaveLength(1);
+  });
+
   it('requests SSE for chat streams', async () => {
     const fetchMock = vi.fn().mockResolvedValue(sseResponse());
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ schemaVersion: 1, agent: { state: 'installed' } })));

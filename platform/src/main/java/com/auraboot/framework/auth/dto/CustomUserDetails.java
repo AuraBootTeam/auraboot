@@ -1,16 +1,21 @@
 package com.auraboot.framework.auth.dto;
 
 import lombok.Data;
+import lombok.ToString;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
+import java.util.List;
 
 @Data
+@ToString(onlyExplicitlyIncluded = true)
 public class CustomUserDetails implements UserDetails {
     private final String username;
     private final String password;
+    @ToString.Include
     private final Long userId;
+    @ToString.Include
     private final String userPid;
     private Long memberId;
     private int securityVersion;
@@ -35,7 +40,7 @@ public class CustomUserDetails implements UserDetails {
         this.password = password;
         this.userId = userId;
         this.userPid = userPid;
-        this.authorities = authorities;
+        this.authorities = authorities == null ? List.of() : authorities;
         this.accountNonExpired = accountNonExpired;
         this.accountNonLocked = accountNonLocked;
         this.credentialsNonExpired = credentialsNonExpired;

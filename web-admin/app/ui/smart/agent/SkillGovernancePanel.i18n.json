@@ -1,0 +1,254 @@
+{
+  "governanceUnavailable": {
+    "zh-CN": "治理状态不可用",
+    "en-US": "Governance unavailable"
+  },
+  "loadFailedRetry": {
+    "zh-CN": "加载失败，请重试。",
+    "en-US": "Load failed. Retry."
+  },
+  "versionReadFailed": {
+    "zh-CN": "读取版本失败",
+    "en-US": "Version read failed"
+  },
+  "activeVersionChangedUnpublishedEditsAreRetained": {
+    "zh-CN": "生效版本已切换，未发布草稿已保留。",
+    "en-US": "Active version changed. Unpublished edits are retained."
+  },
+  "decisionFailedReloadAndReview": {
+    "zh-CN": "操作失败，请重新核对。",
+    "en-US": "Decision failed. Reload and review."
+  },
+  "configurationChangedPrivateValuesHidden": {
+    "zh-CN": "配置指纹变化（不展示私有配置值）",
+    "en-US": "Configuration changed (private values hidden)"
+  },
+  "unset": {
+    "zh-CN": "未设置",
+    "en-US": "Unset"
+  },
+  "versionsAndPublication": {
+    "zh-CN": "版本与发布",
+    "en-US": "Versions and publication"
+  },
+  "refreshGovernance": {
+    "zh-CN": "刷新治理状态",
+    "en-US": "Refresh governance"
+  },
+  "checkingVersions": {
+    "zh-CN": "正在核对版本…",
+    "en-US": "Checking versions…"
+  },
+  "activeVersionSavingEditsChangesTheDraft": {
+    "zh-CN": "当前生效：版本 {value1}。修改和保存只更新草稿，发布或回退才改变下一次运行。",
+    "en-US": "Active: version {value1}. Saving edits changes the draft; publish or restore to change future executions."
+  },
+  "legacyDefinitionFirstPublicationOptsIntoImmutable": {
+    "zh-CN": "尚未纳入版本发布，沿用原有启停状态。首次发布后按快照运行。",
+    "en-US": "Legacy definition. First publication opts into immutable snapshots."
+  },
+  "publicationChecksTheEditorSCurrentTool": {
+    "zh-CN": "发布校验当前维护者的工具可用性；运行仍按实际 AI 身份检查权限。外部业务命令实现不会随本快照冻结。",
+    "en-US": "Publication checks the editor’s current tool access. Runs still authorize the actual AI actor. External command implementations are not frozen by this snapshot."
+  },
+  "saveTheDraftThenRefreshAndReview": {
+    "zh-CN": "请先保存草稿，再刷新并评审发布差异。",
+    "en-US": "Save the draft, then refresh and review publication changes."
+  },
+  "resolveBeforePublication": {
+    "zh-CN": "发布前需处理：",
+    "en-US": "Resolve before publication:"
+  },
+  "draftChanges": {
+    "zh-CN": "草稿与生效版本差异（{value1} 项）",
+    "en-US": "Draft changes ({value1})"
+  },
+  "published": {
+    "zh-CN": "发布",
+    "en-US": "Published"
+  },
+  "draft": {
+    "zh-CN": "草稿",
+    "en-US": "Draft"
+  },
+  "publicationHistory": {
+    "zh-CN": "发布历史",
+    "en-US": "Publication history"
+  },
+  "noPublishedVersionsYet": {
+    "zh-CN": "尚无发布版本。",
+    "en-US": "No published versions yet."
+  },
+  "version": {
+    "zh-CN": "版本",
+    "en-US": "Version"
+  },
+  "restored": {
+    "zh-CN": "回退",
+    "en-US": "Restored"
+  },
+  "actorUnknown": {
+    "zh-CN": "操作者未知",
+    "en-US": "Actor unknown"
+  },
+  "timeUnknown": {
+    "zh-CN": "时间未知",
+    "en-US": "Time unknown"
+  },
+  "reviewThisVersion": {
+    "zh-CN": "查看并评审此版本",
+    "en-US": "Review this version"
+  },
+  "reviewRestorationOfVersion": {
+    "zh-CN": "正在评审版本 {value1} 的回退",
+    "en-US": "Review restoration of version {value1}"
+  },
+  "returnToDraftPublication": {
+    "zh-CN": "返回发布当前草稿",
+    "en-US": "Return to draft publication"
+  },
+  "iReviewedTheHistoricalDefinitionAndWill": {
+    "zh-CN": "我已核对目标历史版本，确认切换生效版本并保留草稿。",
+    "en-US": "I reviewed the historical definition and will activate it while retaining the draft."
+  },
+  "iReviewedTheDraftChangesAndValidation": {
+    "zh-CN": "我已核对草稿差异和校验结果，确认发布供后续运行使用。",
+    "en-US": "I reviewed the draft changes and validation, and authorize publication for future runs."
+  },
+  "activateReviewedVersion": {
+    "zh-CN": "回退到已评审版本",
+    "en-US": "Activate reviewed version"
+  },
+  "publishReviewedDraft": {
+    "zh-CN": "发布已评审草稿",
+    "en-US": "Publish reviewed draft"
+  },
+  "recentExecutionReceiptsUpTo": {
+    "zh-CN": "最近运行回执（最多 50 条）",
+    "en-US": "Recent execution receipts (up to 50)"
+  },
+  "noRecordedExecutions": {
+    "zh-CN": "暂无已记录运行。",
+    "en-US": "No recorded executions."
+  },
+  "succeeded": {
+    "zh-CN": "执行成功",
+    "en-US": "Succeeded"
+  },
+  "incompleteFailed": {
+    "zh-CN": "未完成",
+    "en-US": "Incomplete"
+  },
+  "version2": {
+    "zh-CN": "版本 {value1}",
+    "en-US": "Version {value1}"
+  },
+  "legacyDefinition": {
+    "zh-CN": "沿用未纳管定义",
+    "en-US": "Legacy definition"
+  },
+  "durationUnknown": {
+    "zh-CN": "耗时未知",
+    "en-US": "Duration unknown"
+  },
+  "executionIdentity": {
+    "zh-CN": "执行身份",
+    "en-US": "Execution identity"
+  },
+  "field_skill_code": {
+    "zh-CN": "技能标识",
+    "en-US": "Skill code"
+  },
+  "field_skill_name": {
+    "zh-CN": "名称",
+    "en-US": "Skill name"
+  },
+  "field_skill_description": {
+    "zh-CN": "说明",
+    "en-US": "Skill description"
+  },
+  "field_skill_level": {
+    "zh-CN": "层级",
+    "en-US": "Skill level"
+  },
+  "field_skill_category": {
+    "zh-CN": "分类",
+    "en-US": "Skill category"
+  },
+  "field_skill_icon": {
+    "zh-CN": "图标",
+    "en-US": "Skill icon"
+  },
+  "field_skill_version": {
+    "zh-CN": "业务版本号",
+    "en-US": "Skill version"
+  },
+  "field_skill_tools": {
+    "zh-CN": "工具绑定",
+    "en-US": "Skill tools"
+  },
+  "field_prompt_template": {
+    "zh-CN": "执行指导",
+    "en-US": "Prompt template"
+  },
+  "field_skill_input_schema": {
+    "zh-CN": "输入契约",
+    "en-US": "Skill input schema"
+  },
+  "field_execution_mode": {
+    "zh-CN": "执行方式",
+    "en-US": "Execution mode"
+  },
+  "field_max_steps": {
+    "zh-CN": "最大步骤",
+    "en-US": "Max steps"
+  },
+  "field_timeout_sec": {
+    "zh-CN": "超时",
+    "en-US": "Timeout sec"
+  },
+  "field_max_retry": {
+    "zh-CN": "重试上限",
+    "en-US": "Max retry"
+  },
+  "field_failure_mode": {
+    "zh-CN": "失败策略",
+    "en-US": "Failure mode"
+  },
+  "field_output_type": {
+    "zh-CN": "输出类型",
+    "en-US": "Output type"
+  },
+  "field_output_schema": {
+    "zh-CN": "输出契约",
+    "en-US": "Output schema"
+  },
+  "field_render_hint": {
+    "zh-CN": "展示提示",
+    "en-US": "Render hint"
+  },
+  "field_actionability": {
+    "zh-CN": "操作边界",
+    "en-US": "Actionability"
+  },
+  "field_produced_action_types": {
+    "zh-CN": "操作类型",
+    "en-US": "Produced action types"
+  },
+  "field_idempotency_mode": {
+    "zh-CN": "幂等策略",
+    "en-US": "Idempotency mode"
+  },
+  "field_step_input_mappings": {
+    "zh-CN": "步骤映射",
+    "en-US": "Step input mappings"
+  },
+  "field_execution_config": {
+    "zh-CN": "执行配置",
+    "en-US": "Execution config"
+  },
+  "field_guardrails": {
+    "zh-CN": "防护配置",
+    "en-US": "Guardrails"
+  }
+}

@@ -956,6 +956,20 @@ $$;
 
 
 --
+-- Name: ab_role_permission_advance_policy_revision(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ab_role_permission_advance_policy_revision() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    NEW.policy_revision := OLD.policy_revision + 1;
+    RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: ab_tenant_binding_guard(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1037,6 +1051,24 @@ BEGIN
         NEW.current_release_id, NEW.status, NEW.updated_at, current_user, actor, operation);
     RETURN NEW;
 END $_$;
+
+
+--
+-- Name: agent_task_metadata_v1(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.agent_task_metadata_v1(value text) RETURNS jsonb
+    LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE
+    AS $$
+DECLARE parsed JSONB;
+BEGIN
+    parsed := value::JSONB;
+    IF jsonb_typeof(parsed) <> 'object' THEN RETURN NULL; END IF;
+    RETURN parsed;
+EXCEPTION WHEN data_exception THEN
+    RETURN NULL;
+END;
+$$;
 
 
 --
@@ -16628,6 +16660,8 @@ CREATE TABLE public.ab_role_permission (
     created_by bigint,
     updated_by bigint,
     field_scope jsonb,
+    policy_revision bigint DEFAULT 1 NOT NULL,
+    CONSTRAINT ab_role_permission_policy_revision_check CHECK ((policy_revision > 0)),
     CONSTRAINT chk_ab_role_permission_grant_type CHECK ((grant_type = ANY (ARRAY['grant'::text, 'deny'::text]))),
     CONSTRAINT chk_role_permission_field_scope_object CHECK (((field_scope IS NULL) OR (jsonb_typeof(field_scope) = 'object'::text)))
 );
@@ -32350,6 +32384,13 @@ CREATE TRIGGER trg_platform_registry_validate BEFORE INSERT ON public.ab_platfor
 --
 
 CREATE TRIGGER trg_promotion_drift_event_append_only BEFORE DELETE OR UPDATE ON public.ab_promotion_drift_event FOR EACH ROW EXECUTE FUNCTION public.ab_authoring_reject_history_mutation();
+
+
+--
+-- Name: ab_role_permission trg_role_permission_policy_revision; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_role_permission_policy_revision BEFORE UPDATE ON public.ab_role_permission FOR EACH ROW EXECUTE FUNCTION public.ab_role_permission_advance_policy_revision();
 
 
 --

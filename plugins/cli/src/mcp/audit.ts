@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync } from 'fs';
+import { closeSync, constants, fchmodSync, fstatSync, mkdirSync, openSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import type { ApiClient } from '../client/api-client.js';
@@ -22,10 +22,16 @@ export interface AuditEntry {
  * Append one JSON-line entry to `~/.aura/mcp-audit.log`.
  * Audit failures MUST NOT break tool execution — we swallow IO errors.
  */
-function writeLocal(entry: AuditEntry): void {
+function writeLocal(entry: AuditEntry, directory = AURA_DIR): void {
   try {
-    mkdirSync(AURA_DIR, { recursive: true });
-    appendFileSync(AUDIT_FILE, JSON.stringify(entry) + '\n');
+    mkdirSync(directory, { recursive: true, mode: 0o700 });
+    const descriptor = openSync(join(directory, 'mcp-audit.log'), constants.O_WRONLY | constants.O_APPEND
+      | constants.O_CREAT | constants.O_NOFOLLOW | constants.O_NONBLOCK, 0o600);
+    try {
+      if (!fstatSync(descriptor).isFile()) throw new Error('Audit journal must be a regular file');
+      fchmodSync(descriptor, 0o600);
+      writeFileSync(descriptor, JSON.stringify(entry) + '\n');
+    } finally { closeSync(descriptor); }
   } catch {
     // Audit failures are intentionally silenced.
   }
@@ -103,7 +109,7 @@ export function makeAuditWrapper(
       throw e;
     } finally {
       const durationMs = Date.now() - start;
-      writeLocal({
+      _internal.writeLocal({
         ts: new Date().toISOString(),
         tool: toolName,
         tenantId: ctx.tenantId,

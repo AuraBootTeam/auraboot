@@ -63,6 +63,12 @@ public class GenAiUsageRecorder {
                        Integer inputTokens, Integer outputTokens,
                        Integer cacheReadTokens, Integer cacheWriteTokens,
                        BigDecimal ignoredDiagnosticCost) {
+        recordForRun(tenantId, traceId, null, providerCode, model, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens);
+    }
+
+    /** Explicit turn identity captured at the provider seam, independent of shared OTel traces. */
+    public void recordForRun(Long tenantId, String traceId, String runId, String providerCode, String model,
+                             Integer inputTokens, Integer outputTokens, Integer cacheReadTokens, Integer cacheWriteTokens) {
         try {
             Long resolvedTenantId = tenantId != null ? tenantId : MetaContext.getCurrentTenantId();
             if (resolvedTenantId == null) {
@@ -76,6 +82,7 @@ public class GenAiUsageRecorder {
             GenAiUsageRecord usage = new GenAiUsageRecord();
             usage.setTenantId(resolvedTenantId);
             usage.setTraceId(traceId);
+            usage.setRunId(runId);
             usage.setProvider(providerCode);
             usage.setRequestModel(model);
             usage.setResponseModel(model);

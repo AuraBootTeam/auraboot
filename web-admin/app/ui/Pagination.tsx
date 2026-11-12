@@ -25,6 +25,7 @@
  */
 
 import React from 'react';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 
 export interface PaginationProps {
   /** Keep record count and navigation visible for a single-page workspace. */
@@ -50,6 +51,8 @@ export interface PaginationProps {
 
   /** 翻译函数 (可选) */
   t?: (key: string) => string;
+  /** Runtime locale for missing translation keys. */
+  locale?: string;
 
   /** 是否显示快速跳转 */
   showQuickJumper?: boolean;
@@ -68,10 +71,17 @@ export const Pagination: React.FC<PaginationProps> = ({
   onPageSizeChange,
   pageSizeOptions = [10, 20, 50, 100],
   t = (key) => key,
+  locale = 'zh-CN',
   showQuickJumper: _showQuickJumper = true,
   showPageSizeSelector = true,
 }) => {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const label = (key: string, zh: string, en: string) => {
+    const translated = t(key);
+    return translated && translated !== key
+      ? translated
+      : getLocalizedText({ 'zh-CN': zh, en }, locale);
+  };
 
   // 处理页码变化
   const handlePageChange = (newPage: number) => {
@@ -184,19 +194,14 @@ export const Pagination: React.FC<PaginationProps> = ({
     <div className="border-border flex flex-col items-center justify-between gap-3 border-t px-3 py-4 sm:flex-row sm:flex-wrap sm:px-6">
       {/* 左侧：统计信息 */}
       <div className="text-text-2 shrink-0 text-sm whitespace-nowrap">
-        {(() => {
-          const pageText = t('common.page_of');
-          return pageText && pageText !== 'common.page_of'
-            ? pageText.replace('{current}', String(current)).replace('{total}', String(totalPages))
-            : `第 ${current} 页，共 ${totalPages} 页`;
-        })()}
+        {label('common.page_of', '第 {current} 页，共 {total} 页', 'Page {current} of {total}')
+          .replace('{current}', String(current))
+          .replace('{total}', String(totalPages))}
         {' · '}
-        {(() => {
-          const itemsText = t('common.items_total');
-          return itemsText && itemsText !== 'common.items_total'
-            ? itemsText.replace('{total}', String(total))
-            : `共 ${total} 条`;
-        })()}
+        {label('common.items_total', '共 {total} 条', '{total} items').replace(
+          '{total}',
+          String(total),
+        )}
       </div>
 
       {/* 中间：页码按钮 */}
@@ -209,10 +214,7 @@ export const Pagination: React.FC<PaginationProps> = ({
             disabled={current === 1}
             className="border-border-strong bg-panel text-text-2 hover:bg-subtle min-h-11 rounded border px-3 py-1 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0"
           >
-            {(() => {
-              const v = t('common.first_page');
-              return v !== 'common.first_page' ? v : '首页';
-            })()}
+            {label('common.first_page', '首页', 'First')}
           </button>
         )}
 
@@ -223,10 +225,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           disabled={current === 1}
           className="border-border-strong bg-panel text-text-2 hover:bg-subtle min-h-11 rounded border px-3 py-1 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0"
         >
-          {(() => {
-            const v = t('common.previous_page');
-            return v !== 'common.previous_page' ? v : '上一页';
-          })()}
+          {label('common.previous_page', '上一页', 'Previous')}
         </button>
 
         {/* 页码 */}
@@ -239,10 +238,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           disabled={current === totalPages}
           className="border-border-strong bg-panel text-text-2 hover:bg-subtle min-h-11 rounded border px-3 py-1 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0"
         >
-          {(() => {
-            const v = t('common.next_page');
-            return v !== 'common.next_page' ? v : '下一页';
-          })()}
+          {label('common.next_page', '下一页', 'Next')}
         </button>
 
         {/* Last page */}
@@ -253,10 +249,7 @@ export const Pagination: React.FC<PaginationProps> = ({
             disabled={current === totalPages}
             className="border-border-strong bg-panel text-text-2 hover:bg-subtle min-h-11 rounded border px-3 py-1 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0"
           >
-            {(() => {
-              const v = t('common.last_page');
-              return v !== 'common.last_page' ? v : '末页';
-            })()}
+            {label('common.last_page', '末页', 'Last')}
           </button>
         )}
       </div>
@@ -265,11 +258,7 @@ export const Pagination: React.FC<PaginationProps> = ({
       {showPageSizeSelector && onPageSizeChange && (
         <div className="flex items-center space-x-2">
           <span className="text-text-2 text-sm">
-            {(() => {
-              const v = t('common.items_per_page');
-              return v !== 'common.items_per_page' ? v : '每页';
-            })()}
-            :
+            {label('common.items_per_page', '每页', 'Per page')}:
           </span>
           <select
             data-testid="pagination-page-size"

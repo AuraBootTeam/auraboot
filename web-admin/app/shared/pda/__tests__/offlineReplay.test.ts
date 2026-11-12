@@ -5,11 +5,14 @@ vi.mock('~/shared/services/http-client/HttpClient', () => ({ fetchResult }));
 
 describe('PDA replay scheduling boundary', () => {
   const listeners = new Map<string, (event: Event) => void>();
+  const workerListeners = new Map<string, (event: MessageEvent) => void>();
+  const controller = {};
 
   beforeEach(() => {
     vi.resetModules();
     vi.useFakeTimers();
     listeners.clear();
+    workerListeners.clear();
     fetchResult.mockReset().mockResolvedValue({ code: '0', data: { records: [] } });
     vi.stubGlobal('caches', {
       open: vi.fn().mockResolvedValue({ keys: vi.fn().mockResolvedValue([]) }),
@@ -17,11 +20,52 @@ describe('PDA replay scheduling boundary', () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
     Object.defineProperty(navigator, 'serviceWorker', {
       configurable: true,
-      value: { register: vi.fn().mockResolvedValue({}) },
+      value: {
+        register: vi.fn().mockResolvedValue({}),
+        controller,
+        addEventListener: vi.fn((name: string, listener: (event: MessageEvent) => void) =>
+          workerListeners.set(name, listener),
+        ),
+      },
     });
     vi.spyOn(window, 'addEventListener').mockImplementation((name, listener) => {
       if (typeof listener === 'function') listeners.set(name, listener as (event: Event) => void);
     });
+  });
+
+  it('accepts outbox notifications only from the current same-origin service worker', async () => {
+    window.history.replaceState({}, '', '/inventory/pda-pick');
+    const replay = await import('../offlineReplay');
+    replay.startPdaOfflineShell();
+    const handler = workerListeners.get('message')!;
+    expect(handler).toBeTypeOf('function');
+    expect(listeners.has('message')).toBe(false);
+    const message = {
+      origin: window.location.origin,
+      source: controller,
+      data: { type: 'PDA_OUTBOX_STASHED' },
+    };
+    for (const rejected of [
+      { ...message, origin: 'https://untrusted.example' },
+      { ...message, source: {} },
+      { ...message, source: null },
+      { ...message, data: { type: 'OTHER' } },
+    ]) {
+      handler(rejected as MessageEvent);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(fetchResult).not.toHaveBeenCalled();
+    }
+    handler(message as MessageEvent);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchResult).toHaveBeenCalledWith('/api/dynamic/inv_pda_offline_queue/list', {
+      method: 'get',
+      params: { pageNum: 1, pageSize: 100 },
+    });
+    fetchResult.mockClear();
+    Object.defineProperty(navigator.serviceWorker, 'controller', { value: null });
+    handler(message as MessageEvent);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchResult).not.toHaveBeenCalled();
   });
 
   afterEach(() => {

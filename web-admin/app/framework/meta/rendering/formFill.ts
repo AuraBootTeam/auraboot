@@ -36,7 +36,9 @@ export interface FormFillTarget {
   apply: (
     fields: Record<string, unknown>,
     reviews?: Record<string, FormFillReview>,
+    placement?: 'form' | 'chat',
   ) => FormFillResult;
+  undo?: () => void;
 }
 
 type FieldNode = Record<string, any>;

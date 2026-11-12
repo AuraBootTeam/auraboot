@@ -5,6 +5,7 @@ import { Select, decodeBooleanChoice } from '../Select';
 
 let mockOptions: Array<{ label: string; value: string }> = [];
 let mockLoading = false;
+let mockError: string | null = null;
 let mockRefetch = vi.fn();
 
 vi.mock('react-router', async () => {
@@ -19,7 +20,7 @@ vi.mock('~/framework/meta/hooks/useFieldDataSource', () => ({
   useFieldDataSource: () => ({
     options: mockOptions,
     loading: mockLoading,
-    error: null,
+    error: mockError,
     refetch: mockRefetch,
   }),
 }));
@@ -28,29 +29,47 @@ describe('Smart Select', () => {
   beforeEach(() => {
     mockOptions = [];
     mockLoading = false;
+    mockError = null;
     mockRefetch = vi.fn();
   });
 
   it('exposes an external field label on the interactive select trigger', () => {
-    render(<div><label htmlFor="rfq_state">RFQ state</label>
-      <Select name="rfq_state" aria-label="RFQ state"
-        options={[{ label: 'Draft', value: 'draft' }]} /></div>);
+    render(
+      <div>
+        <label htmlFor="rfq_state">RFQ state</label>
+        <Select
+          name="rfq_state"
+          aria-label="RFQ state"
+          options={[{ label: 'Draft', value: 'draft' }]}
+        />
+      </div>,
+    );
     const trigger = screen.getByRole('combobox', { name: 'RFQ state' });
     expect(screen.getByLabelText('RFQ state')).toBe(trigger);
     expect(trigger).toHaveAttribute('id', 'rfq_state');
   });
 
   it('names the interactive trigger from its own localized label', () => {
-    render(<Select name="source_type" label="Source type"
-      options={[{ label: 'FQC', value: 'fqc' }]} />);
+    render(
+      <Select name="source_type" label="Source type" options={[{ label: 'FQC', value: 'fqc' }]} />,
+    );
     expect(screen.getByRole('combobox', { name: 'Source type' })).toBeInTheDocument();
   });
 
   it('provides a keyboard-accessible named clear action without changing the clear value contract', () => {
     const onChange = vi.fn();
     const onClear = vi.fn();
-    render(<Select name="source_type" label="Source type" value="fqc"
-      options={[{ label: 'FQC', value: 'fqc' }]} clearable onChange={onChange} onClear={onClear} />);
+    render(
+      <Select
+        name="source_type"
+        label="Source type"
+        value="fqc"
+        options={[{ label: 'FQC', value: 'fqc' }]}
+        clearable
+        onChange={onChange}
+        onClear={onClear}
+      />,
+    );
     const clear = screen.getByRole('button', { name: /Source type/ });
     expect(clear.tabIndex).toBe(0);
     fireEvent.click(clear);
@@ -59,14 +78,29 @@ describe('Smart Select', () => {
   });
 
   it('names the clear action from an external wrapper accessible label', () => {
-    render(<Select name="source_type" aria-label="来源类型" value="fqc"
-      options={[{ label: 'FQC', value: 'fqc' }]} clearable />);
+    render(
+      <Select
+        name="source_type"
+        aria-label="来源类型"
+        value="fqc"
+        options={[{ label: 'FQC', value: 'fqc' }]}
+        clearable
+      />,
+    );
     expect(screen.getByRole('button', { name: '清空来源类型' })).toBeInTheDocument();
   });
 
   it('does not expose a clear action for a read-only selection', () => {
-    render(<Select name="source_type" label="Source type" value="fqc"
-      options={[{ label: 'FQC', value: 'fqc' }]} clearable readOnly />);
+    render(
+      <Select
+        name="source_type"
+        label="Source type"
+        value="fqc"
+        options={[{ label: 'FQC', value: 'fqc' }]}
+        clearable
+        readOnly
+      />,
+    );
     expect(screen.queryByRole('button', { name: /Source type/ })).not.toBeInTheDocument();
   });
 
@@ -75,33 +109,37 @@ describe('Smart Select', () => {
       <Select
         name="wd_req_type"
         value="annual"
-        dataSource={{
-          type: 'api',
-          endpoint: '/api/meta/dict/by-code/wd_leave_type/data',
-          method: 'get',
-          adaptor: 'dictData',
-        } as any}
+        dataSource={
+          {
+            type: 'api',
+            endpoint: '/api/meta/dict/by-code/wd_leave_type/data',
+            method: 'get',
+            adaptor: 'dictData',
+          } as any
+        }
       />,
     );
 
     const trigger = screen.getByTestId('select-trigger-wd_req_type');
-    expect(trigger).not.toHaveTextContent('年假');
+    expect(trigger).not.toHaveValue('年假');
 
     mockOptions = [{ label: '年假', value: 'annual' }];
     rerender(
       <Select
         name="wd_req_type"
         value="annual"
-        dataSource={{
-          type: 'api',
-          endpoint: '/api/meta/dict/by-code/wd_leave_type/data',
-          method: 'get',
-          adaptor: 'dictData',
-        } as any}
+        dataSource={
+          {
+            type: 'api',
+            endpoint: '/api/meta/dict/by-code/wd_leave_type/data',
+            method: 'get',
+            adaptor: 'dictData',
+          } as any
+        }
       />,
     );
 
-    expect(screen.getByTestId('select-trigger-wd_req_type')).toHaveTextContent('年假');
+    expect(screen.getByTestId('select-trigger-wd_req_type')).toHaveValue('年假');
   });
 
   it('keeps the Radix select controlled when an empty value later becomes populated', () => {
@@ -126,12 +164,14 @@ describe('Smart Select', () => {
     render(
       <Select
         name="bom_project_id"
-        dataSource={{
-          type: 'api',
-          endpoint: '/api/dynamic/req_requirement_set_pcba_bom/list',
-          method: 'get',
-          autoFetch: false,
-        } as any}
+        dataSource={
+          {
+            type: 'api',
+            endpoint: '/api/dynamic/req_requirement_set_pcba_bom/list',
+            method: 'get',
+            autoFetch: false,
+          } as any
+        }
       />,
     );
 
@@ -140,7 +180,7 @@ describe('Smart Select', () => {
     expect(mockRefetch).toHaveBeenCalledTimes(1);
   });
 
-  it('filters single-select options with an in-dropdown search input while keeping create available', () => {
+  it('filters options by typing in the select itself while keeping create available', () => {
     mockOptions = [
       { label: 'Alpha Project', value: 'alpha' },
       { label: 'Beta Project', value: 'beta' },
@@ -149,17 +189,19 @@ describe('Smart Select', () => {
     render(
       <Select
         name="bom_project_id"
-        dataSource={{
-          type: 'api',
-          endpoint: '/api/dynamic/bom_project/list',
-          method: 'get',
-        } as any}
+        dataSource={
+          {
+            type: 'api',
+            endpoint: '/api/dynamic/bom_project/list',
+            method: 'get',
+          } as any
+        }
         canCreateNew
       />,
     );
 
     fireEvent.click(screen.getByTestId('select-trigger-bom_project_id'));
-    fireEvent.change(screen.getByTestId('select-search-bom_project_id'), {
+    fireEvent.change(screen.getByTestId('select-trigger-bom_project_id'), {
       target: { value: 'beta' },
     });
 
@@ -168,7 +210,89 @@ describe('Smart Select', () => {
     expect(screen.getByTestId('select-create-new-bom_project_id')).toBeInTheDocument();
   });
 
-  it('does not render an empty dropdown panel when there are no options', () => {
+  it('matches partial Chinese names and codes without committing the query', () => {
+    mockOptions = [
+      { label: 'C0237-新光维', value: 'customer-1' },
+      { label: 'C0246-歌风智能', value: 'customer-2' },
+    ];
+    const onChange = vi.fn();
+    render(<Select name="customer" label="客户" onChange={onChange} />);
+    const input = screen.getByRole('combobox', { name: '客户' });
+    fireEvent.click(input);
+    expect(screen.getAllByRole('combobox')).toHaveLength(1);
+    expect(document.querySelectorAll('input[type="text"]')).toHaveLength(1);
+    fireEvent.change(input, { target: { value: '光维' } });
+    expect(screen.getByRole('option', { name: 'C0237-新光维' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'C0246-歌风智能' })).not.toBeInTheDocument();
+    fireEvent.change(input, { target: { value: '  c024  ' } });
+    expect(screen.getByRole('option', { name: 'C0246-歌风智能' })).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+    expect(document.querySelector('input[type="hidden"]')).toHaveValue('');
+    fireEvent.click(screen.getByRole('option', { name: 'C0246-歌风智能' }));
+    expect(onChange).toHaveBeenLastCalledWith('customer-2');
+    expect(input).toHaveValue('C0246-歌风智能');
+  });
+
+  it('keeps the committed ID and restores its label on Escape, blur and Tab', () => {
+    mockOptions = [{ label: 'Acme', value: 'customer-1' }];
+    const onChange = vi.fn();
+    render(<Select name="customer" label="Customer" value="customer-1" onChange={onChange} />);
+    const input = screen.getByRole('combobox');
+    for (const key of ['Escape', 'Tab', 'blur']) {
+      fireEvent.click(input);
+      fireEvent.change(input, { target: { value: 'unmatched' } });
+      if (key === 'blur') fireEvent.blur(input);
+      else fireEvent.keyDown(input, { key });
+      expect(input).toHaveValue('Acme');
+      expect(input).toHaveAttribute('aria-expanded', 'false');
+      expect(document.querySelector('input[type="hidden"]')).toHaveValue('customer-1');
+    }
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('navigates enabled matches with arrows and commits only an explicit keyboard choice', () => {
+    mockOptions = [
+      { label: 'Acme blocked', value: 'blocked', disabled: true } as any,
+      { label: 'Acme enabled', value: 'enabled' },
+    ];
+    const onChange = vi.fn();
+    render(<Select name="customer" onChange={onChange} />);
+    const input = screen.getByRole('combobox');
+    fireEvent.change(input, { target: { value: 'acme' } });
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true, keyCode: 229 });
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    const activeId = input.getAttribute('aria-activedescendant');
+    expect(document.getElementById(activeId!)).toHaveTextContent('Acme enabled');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onChange).toHaveBeenLastCalledWith('enabled');
+    expect(input).toHaveValue('Acme enabled');
+  });
+
+  it('closes a dependent picker and discards its query when the parent is cleared', () => {
+    mockOptions = [{ label: 'Project', value: 'project-1' }];
+    const dataSource = { type: 'api', endpoint: '/projects', dependOn: ['form.customer'] } as any;
+    const { rerender } = render(
+      <Select
+        name="project"
+        dataSource={dataSource}
+        context={{ form: { customer: 'c1' } } as any}
+      />,
+    );
+    const input = screen.getByRole('combobox');
+    fireEvent.click(input);
+    fireEvent.change(input, { target: { value: 'project' } });
+    rerender(
+      <Select name="project" dataSource={dataSource} context={{ form: { customer: '' } } as any} />,
+    );
+    expect(input).toBeDisabled();
+    expect(input).toHaveValue('');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('shows an explicit empty state when there are no options', () => {
     render(
       <Select
         name="bom_project_id"
@@ -181,10 +305,10 @@ describe('Smart Select', () => {
 
     fireEvent.click(screen.getByTestId('select-trigger-bom_project_id'));
 
-    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('无匹配结果');
   });
 
-  it('does not render a loading-only dropdown panel before async options arrive', () => {
+  it('shows loading feedback while async options arrive', () => {
     mockLoading = true;
 
     render(
@@ -192,17 +316,50 @@ describe('Smart Select', () => {
         name="bom_project_id"
         label="所属项目"
         value=""
-        dataSource={{
-          type: 'api',
-          endpoint: '/api/dynamic/req_requirement_set_pcba_bom/list',
-          method: 'get',
-          autoFetch: false,
-        } as any}
+        dataSource={
+          {
+            type: 'api',
+            endpoint: '/api/dynamic/req_requirement_set_pcba_bom/list',
+            method: 'get',
+            autoFetch: false,
+          } as any
+        }
       />,
     );
 
     fireEvent.click(screen.getByTestId('select-trigger-bom_project_id'));
 
+    expect(screen.getByRole('status')).toHaveTextContent('加载中');
+  });
+
+  it('replaces stale candidates with an error state and allows an explicit reopen', () => {
+    mockOptions = [{ label: 'Acme', value: 'acme' }];
+    mockError = 'Network unavailable';
+    render(<Select name="customer" dataSource={{ type: 'api', endpoint: '/customers' } as any} />);
+    const input = screen.getByRole('combobox');
+    fireEvent.click(input);
+    expect(screen.getByRole('status')).toHaveTextContent('加载失败');
+    expect(screen.queryByRole('option')).not.toBeInTheDocument();
+    fireEvent.keyDown(input, { key: 'Escape' });
+    fireEvent.click(input);
+    expect(mockRefetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps read-only labels visible and prevents opening or refetching', () => {
+    mockOptions = [{ label: 'Acme', value: 'acme' }];
+    render(
+      <Select
+        name="customer"
+        value="acme"
+        readOnly
+        dataSource={{ type: 'api', endpoint: '/customers' } as any}
+      />,
+    );
+    const input = screen.getByRole('combobox');
+    expect(input).toHaveValue('Acme');
+    expect(input).toBeDisabled();
+    fireEvent.click(input);
+    expect(mockRefetch).not.toHaveBeenCalled();
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 

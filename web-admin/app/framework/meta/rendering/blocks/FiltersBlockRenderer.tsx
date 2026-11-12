@@ -3,6 +3,7 @@
  */
 
 import React from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { TimeWindowFilter } from './TimeWindowFilter';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
@@ -28,6 +29,13 @@ export const FiltersBlockRenderer: React.FC<FiltersBlockRendererProps> = ({ bloc
   const fields = block.fields || [];
   const density = (block as any).density || 'default';
   const compact = density === 'compact';
+  // URL filter sync (P1-01 URL筛选): with `urlSync: true`, the declared filter
+  // fields are restored from the URL query on mount and written back to the URL
+  // (replace, no history spam) on search/reset, so filtered views are deep-linkable.
+  const urlSyncEnabled = (block as any).urlSync === true;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { hash } = useLocation();
   const visibleFields = fields.filter(
     (field) =>
       runtime.getStateManager().getFieldMeta(runtime.getScopeId(), field.field)?.hidden !== true &&
@@ -48,6 +56,10 @@ export const FiltersBlockRenderer: React.FC<FiltersBlockRendererProps> = ({ bloc
     if (block.onSearch) {
       try {
         await executeFilterHandler(block.onSearch);
+        if (urlSyncEnabled) {
+          const form = ((runtime.getContext() as any).form ?? {}) as Record<string, any>;
+          writeUrl(form);
+        }
       } catch (err) {
         console.error('Search handler failed:', err);
       }
@@ -67,11 +79,49 @@ export const FiltersBlockRenderer: React.FC<FiltersBlockRendererProps> = ({ bloc
     if (block.onReset) {
       try {
         await executeFilterHandler(block.onReset);
+        if (urlSyncEnabled) writeUrl({});
       } catch (err) {
         console.error('Reset handler failed:', err);
       }
     }
   };
+
+  const writeUrl = (values: Record<string, any>) => {
+    if (!urlSyncEnabled) return;
+    const next = new URLSearchParams();
+    for (const field of fields) {
+      const value = values[field.field];
+      if (value !== undefined && value !== null && String(value).trim() !== '') {
+        next.set(field.field, String(value));
+      }
+    }
+    setSearchParams(next, { replace: true });
+    void navigate;
+    void hash;
+  };
+
+  // On mount: seed declared fields from the URL query once and restore the
+  // filtered view through the declared search handler.
+  const seededRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!urlSyncEnabled || seededRef.current) return;
+    seededRef.current = true;
+    const seeded: Record<string, any> = {};
+    for (const field of fields) {
+      const value = searchParams.get(field.field);
+      if (value !== null && value.trim() !== '') {
+        runtime.getStateManager().updateField(runtime.getScopeId(), field.field, value);
+        seeded[field.field] = value;
+      }
+    }
+    if (Object.keys(seeded).length > 0 && block.onSearch) {
+      void executeFilterHandler(block.onSearch).catch((err) => {
+        console.error('URL filter restore failed:', err);
+      });
+    }
+    // Run once per mount; fields/searchParams are stable for the seeded restore.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div

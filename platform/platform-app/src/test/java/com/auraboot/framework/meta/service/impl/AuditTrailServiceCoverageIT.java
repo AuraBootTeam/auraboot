@@ -17,7 +17,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.support.TransactionTemplate;
-import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean;
+import com.baomidou.mybatisplus.spring.MybatisSqlSessionFactoryBean;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import org.mybatis.spring.mapper.MapperFactoryBean;
 import com.auraboot.framework.meta.mapper.AuditTrailMapper;

@@ -9,6 +9,8 @@ COPY migrator-input/payload/ /opt/aura/migrations/
 COPY migrator-input/payload.sha256 /opt/aura/payload.sha256
 RUN node /opt/aura/bin/migration-payload.mjs verify /opt/aura/migrations "$(cat /opt/aura/payload.sha256)" \
     && chmod -R a-w /opt/aura/bin /opt/aura/migrations /opt/aura/payload.sha256
+# This container runs one migration command and exits; it has no daemon endpoint.
+HEALTHCHECK NONE
 USER 65532:65532
 WORKDIR /tmp
 ENTRYPOINT ["/usr/local/bin/node", "/opt/aura/bin/migrator-entrypoint.mjs"]

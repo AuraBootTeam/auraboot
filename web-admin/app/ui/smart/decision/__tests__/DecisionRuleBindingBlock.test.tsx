@@ -1,8 +1,144 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { DecisionRuleBindingBlock } from '../DecisionRuleBindingBlock';
+import { cmp, group, lit, not, path } from '~/shared/decision/ast/conditionAst';
 
 describe('DecisionRuleBindingBlock', () => {
+  it('emits a condition binding when a combined editor has no selected decision', async () => {
+    const onChange = vi.fn();
+    const api = {
+      getDecisionImpact: vi.fn(),
+      evaluate: vi.fn(),
+      listDefinitions: vi.fn(async () => ({ records: [] })),
+    };
+    render(
+      <DecisionRuleBindingBlock
+        onChange={onChange}
+        api={api}
+        block={{
+          props: {
+            mode: 'combined',
+            consumerType: 'PERMISSION',
+            decisions: [],
+            fields: [
+              { scope: 'record', path: 'data.amountMinor', label: '金额', dataType: 'integer' },
+            ],
+          },
+        }}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('cb-add'));
+    fireEvent.change(screen.getByLabelText('value-0'), { target: { value: '500' } });
+    expect(onChange.mock.calls.at(-1)?.[0]).toMatchObject({
+      bindingKind: 'CONDITION',
+      conditionSpec: { root: { children: [{ right: { value: 500 } }] } },
+    });
+    expect(onChange.mock.calls.at(-1)?.[0].decisionBinding).toBeUndefined();
+    await waitFor(() => expect(api.listDefinitions).toHaveBeenCalled());
+  });
+
+  it('preserves an explicit decision reference and allows returning to condition-only authoring', async () => {
+    const onChange = vi.fn();
+    const api = {
+      getDecisionImpact: vi.fn(),
+      evaluate: vi.fn(),
+      listDefinitions: vi.fn(async () => ({ records: [] })),
+    };
+    render(
+      <DecisionRuleBindingBlock
+        onChange={onChange}
+        api={api}
+        block={{
+          props: {
+            mode: 'combined',
+            consumerType: 'PERMISSION',
+            decisions: [{ code: 'configured_guard', name: '已配置规则' }],
+            initialValue: {
+              bindingKind: 'DECISION_REF',
+              conditionSpec: { root: group('AND', [cmp(path('record', 'data.amountMinor', 'integer'), 'LTE', lit(500, 'integer'))]), decisionBindings: [] },
+              enabled: true,
+              decisionBinding: {
+                decisionCode: 'configured_guard',
+                versionPolicy: 'LATEST_PUBLISHED',
+                inputMappings: [],
+                outputMappings: [],
+                fallbackPolicy: { mode: 'FAIL_CLOSED' },
+                traceMode: 'SAMPLED',
+                enabled: true,
+              },
+            },
+          },
+        }}
+      />,
+    );
+    expect(screen.getByLabelText('decision-code')).toHaveValue('configured_guard');
+    expect(screen.getByTestId('condition-binding-inactive')).toHaveTextContent('不参与判定');
+    expect(screen.getByLabelText('value-0')).toBeDisabled();
+    expect(screen.getByRole('option', { name: '不引用决策（仅使用条件）' })).toHaveValue('');
+    fireEvent.change(screen.getByLabelText('decision-code'), { target: { value: '' } });
+    expect(onChange.mock.calls.at(-1)?.[0].bindingKind).toBe('CONDITION');
+    expect(onChange.mock.calls.at(-1)?.[0].decisionBinding).toBeUndefined();
+    expect(screen.queryByTestId('condition-binding-inactive')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('value-0')).toBeEnabled();
+    expect(screen.getByLabelText('value-0')).toHaveValue(500);
+    fireEvent.change(screen.getByLabelText('value-0'), { target: { value: '600' } });
+    expect(onChange.mock.calls.at(-1)?.[0]).toMatchObject({ bindingKind: 'CONDITION', conditionSpec: { root: { children: [{ right: { value: 600 } }] } } });
+    fireEvent.change(screen.getByLabelText('decision-code'), { target: { value: 'configured_guard' } });
+    expect(screen.getByTestId('condition-binding-inactive')).toHaveTextContent('不参与判定');
+    expect(screen.getByLabelText('value-0')).toBeDisabled();
+    expect(onChange.mock.calls.at(-1)?.[0]).toMatchObject({ bindingKind: 'DECISION_REF', conditionSpec: { root: { children: [{ right: { value: 600 } }] } } });
+    await waitFor(() => expect(api.listDefinitions).toHaveBeenCalled());
+  });
+
+  it('honors an explicit empty decision list without substituting example decisions', async () => {
+    const api = {
+      getDecisionImpact: vi.fn(),
+      evaluate: vi.fn(),
+      listDefinitions: vi.fn(async () => ({ records: [] })),
+    };
+    render(
+      <DecisionRuleBindingBlock
+        api={api}
+        block={{ props: { mode: 'decision', consumerType: 'PERMISSION', decisions: [] } }}
+      />,
+    );
+    await waitFor(() => expect(api.listDefinitions).toHaveBeenCalled());
+    const picker = screen.getByLabelText('decision-code') as HTMLSelectElement;
+    expect(Array.from(picker.options).filter((option) => option.value)).toEqual([]);
+    expect(picker).toBeDisabled();
+    expect(picker).toHaveTextContent('暂无可用决策');
+  });
+
+  it('offers only configured and runtime decisions when choices are explicitly declared', async () => {
+    const api = {
+      getDecisionImpact: vi.fn(),
+      evaluate: vi.fn(),
+      listDefinitions: vi.fn(async () => ({
+        records: [{ decisionCode: 'live_finance_guard', decisionName: '财务规则', enabled: true }],
+      })),
+    };
+    render(
+      <DecisionRuleBindingBlock
+        api={api}
+        block={{
+          props: {
+            mode: 'decision',
+            consumerType: 'PERMISSION',
+            decisions: [{ code: 'configured_guard', name: '已配置规则' }],
+          },
+        }}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText('decision-code')).toHaveTextContent('财务规则'),
+    );
+    const picker = screen.getByLabelText('decision-code') as HTMLSelectElement;
+    expect(Array.from(picker.options).map((option) => option.value)).toEqual([
+      'configured_guard',
+      'live_finance_guard',
+    ]);
+  });
+
   it('hosts condition and decision binding editors in one DSL custom block', () => {
     render(
       <DecisionRuleBindingBlock
@@ -715,6 +851,7 @@ describe('DecisionRuleBindingBlock', () => {
 
     await waitFor(() => expect(api.getFactCatalog).toHaveBeenCalledWith('wd_leave_request'));
     expect(api.getModelFields).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('decision-code'), { target: { value: '' } });
 
     const addConditionButton = screen.getByTestId('cb-add');
     await waitFor(() => expect(addConditionButton).toBeEnabled());
@@ -725,6 +862,7 @@ describe('DecisionRuleBindingBlock', () => {
     expect(screen.getByLabelText('value-0')).toHaveTextContent('年假');
     expect(screen.getByLabelText('value-0')).toHaveTextContent('病假');
 
+    fireEvent.change(screen.getByLabelText('decision-code'), { target: { value: 'leave_request_automation' } });
     fireEvent.click(screen.getByTestId('decision-rule-section-tab-decision'));
     fireEvent.click(screen.getByRole('button', { name: '添加映射' }));
     const fieldPicker = screen.getByLabelText('mapping-field-0') as HTMLSelectElement;
@@ -936,6 +1074,7 @@ describe('DecisionRuleBindingBlock', () => {
 
     await waitFor(() => expect(api.getFactCatalog).toHaveBeenCalledWith('wd_leave_request'));
     expect(api.getModelFields).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('decision-code'), { target: { value: '' } });
 
     fireEvent.click(screen.getByTestId('cb-add'));
     await act(async () => { releaseCatalog(); });
@@ -949,6 +1088,7 @@ describe('DecisionRuleBindingBlock', () => {
     expect(screen.getByLabelText('value-0')).toHaveTextContent('年假');
     expect(screen.getByLabelText('value-0')).toHaveTextContent('病假');
 
+    fireEvent.change(screen.getByLabelText('decision-code'), { target: { value: 'leave_request_automation' } });
     fireEvent.click(screen.getByTestId('decision-rule-section-tab-decision'));
     fireEvent.click(screen.getByRole('button', { name: '添加映射' }));
     expect(screen.getByLabelText('mapping-field-0')).toHaveTextContent('请假类型');
@@ -1113,6 +1253,49 @@ describe('DecisionRuleBindingBlock', () => {
     expect(fieldPicker).toHaveTextContent('请假申请 / 请假天数');
     expect(fieldPicker).toHaveTextContent('用户部门');
     expect(fieldPicker).not.toHaveTextContent('Agent 记忆 / 访问次数');
+  });
+
+  it('counts nested comparison leaves consistently in the tab, section and builder after edits', async () => {
+    const compare = (value: string) =>
+      cmp(path('record', 'data.currency', 'string'), 'EQ', lit(value, 'string'));
+    const root = group('AND', [
+      compare('CNY'),
+      group('OR', [compare('USD'), group('AND', [compare('CNY'), not(compare('USD'))])]),
+    ]);
+    const api = {
+      getDecisionImpact: vi.fn(),
+      evaluate: vi.fn(),
+      listDefinitions: vi.fn(async () => ({ records: [] })),
+    };
+    render(
+      <DecisionRuleBindingBlock
+        api={api}
+        value={{ bindingKind: 'CONDITION', enabled: true, conditionSpec: { root, decisionBindings: [] } }}
+        block={{
+          props: {
+            mode: 'combined',
+            decisions: [],
+            fields: [{ scope: 'record', path: 'data.currency', label: '币种', dataType: 'string' }],
+          },
+        }}
+      />,
+    );
+    await waitFor(() => expect(api.listDefinitions).toHaveBeenCalled());
+    const sectionHeading = () =>
+      screen
+        .getByTestId('decision-rule-section-condition')
+        .querySelector('.decision-rule-binding-heading');
+    expect(screen.getByTestId('decision-rule-section-tab-condition')).toHaveTextContent('4 条');
+    expect(sectionHeading()).toHaveTextContent('4 条');
+    expect(screen.getByTestId('condition-builder')).toHaveTextContent('4 条条件');
+    fireEvent.click(screen.getByRole('button', { name: 'delete-not-1-1-1', exact: true }));
+    expect(screen.getByTestId('decision-rule-section-tab-condition')).toHaveTextContent('3 条');
+    expect(sectionHeading()).toHaveTextContent('3 条');
+    expect(screen.getByTestId('condition-builder')).toHaveTextContent('3 条条件');
+    fireEvent.click(screen.getByTestId('cb-add'));
+    expect(screen.getByTestId('decision-rule-section-tab-condition')).toHaveTextContent('4 条');
+    expect(sectionHeading()).toHaveTextContent('4 条');
+    expect(screen.getByTestId('condition-builder')).toHaveTextContent('4 条条件');
   });
 
   it('writes nested AND/OR/NOT condition specs through the DSL form runtime valueField', () => {

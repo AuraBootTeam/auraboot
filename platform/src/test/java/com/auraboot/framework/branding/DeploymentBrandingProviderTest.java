@@ -8,9 +8,10 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.mock.env.MockEnvironment;
 
 import java.io.IOException;
-import java.net.URISyntaxException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -317,7 +318,7 @@ class DeploymentBrandingProviderTest {
                 .withProperty("AURABOOT_WHITE_LABEL_ORDER_REFERENCE", orderReference);
     }
 
-    private MockEnvironment signedEnvironment(Path config) throws URISyntaxException {
+    private MockEnvironment signedEnvironment(Path config) throws IOException {
         return environment("standard", config, "SO-2026-001")
                 .withProperty(
                         "AURABOOT_COMMERCIAL_LICENSE_ENFORCEMENT",
@@ -338,9 +339,14 @@ class DeploymentBrandingProviderTest {
                 .withProperty("AURABOOT_VERSION", "1.0.0");
     }
 
-    private Path fixturePath(String name) throws URISyntaxException {
-        return Path.of(Objects.requireNonNull(
-                getClass().getResource("/branding/commercial-license/" + name)).toURI());
+    /** Stream copy so the fixture resolves whether the classpath entry is a directory or a jar. */
+    private Path fixturePath(String name) throws IOException {
+        Path target = tempDirectory.resolve("fixture-" + name);
+        try (InputStream in = Objects.requireNonNull(
+                getClass().getResourceAsStream("/branding/commercial-license/" + name))) {
+            Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
+        }
+        return target;
     }
 
     private Path writeBranding(String orderReference, String websiteUrl) throws IOException {

@@ -17,7 +17,7 @@ vi.mock('~/contexts/ToastContext', () => ({
 }));
 vi.mock('~/shared/services/permissionService', () => ({
   permissionService: {
-    getPolicy: vi.fn(),
+    getPolicySnapshot: vi.fn(),
   },
 }));
 
@@ -183,7 +183,10 @@ function renderAdvanced(
 describe('AdvancedAtomicActions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(permissionService.getPolicy).mockResolvedValue({});
+    vi.mocked(permissionService.getPolicySnapshot).mockResolvedValue({
+      revision: 'grant:1',
+      values: {},
+    });
   });
 
   it('is collapsed by default and expands on click', () => {
@@ -245,12 +248,15 @@ describe('AdvancedAtomicActions', () => {
   });
 
   it('loads saved policy values before opening the policy dialog', async () => {
-    vi.mocked(permissionService.getPolicy).mockResolvedValue({
-      dynamicAbac: {
-        ruleBinding: {
-          consumerType: 'PERMISSION',
-          decisionBinding: {
-            decisionCode: 'permission_department_guard',
+    vi.mocked(permissionService.getPolicySnapshot).mockResolvedValue({
+      revision: 'grant:1',
+      values: {
+        dynamicAbac: {
+          ruleBinding: {
+            consumerType: 'PERMISSION',
+            decisionBinding: {
+              decisionCode: 'permission_department_guard',
+            },
           },
         },
       },
@@ -261,7 +267,7 @@ describe('AdvancedAtomicActions', () => {
     fireEvent.click(screen.getByTestId('atomic-policy-crm.account.read'));
 
     await waitFor(() => {
-      expect(permissionService.getPolicy).toHaveBeenCalledWith('r1', 'p1');
+      expect(permissionService.getPolicySnapshot).toHaveBeenCalledWith('r1', 'p1');
     });
     expect(await screen.findByTestId('policy-dialog')).toBeTruthy();
     expect(screen.getByTestId('policy-dialog-initial-values').textContent).toContain(
@@ -269,11 +275,11 @@ describe('AdvancedAtomicActions', () => {
     );
   });
   it('does not display an empty policy editor after a read failure', async () => {
-    vi.mocked(permissionService.getPolicy).mockRejectedValue(new Error('offline'));
+    vi.mocked(permissionService.getPolicySnapshot).mockRejectedValue(new Error('offline'));
     renderAdvanced({ matrix: matrixWithPolicy });
     fireEvent.click(screen.getByTestId('advanced-atomic-toggle'));
     fireEvent.click(screen.getByTestId('atomic-policy-crm.account.read'));
-    await waitFor(() => expect(permissionService.getPolicy).toHaveBeenCalled());
+    await waitFor(() => expect(permissionService.getPolicySnapshot).toHaveBeenCalled());
     expect(screen.queryByTestId('policy-dialog')).toBeNull();
   });
   it('blocks atomic writes while a capability draft exists', () => {

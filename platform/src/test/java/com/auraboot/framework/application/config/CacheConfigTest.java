@@ -33,6 +33,14 @@ class CacheConfigTest {
             .isInstanceOf(com.github.benmanes.caffeine.cache.Cache.class);
     }
 
+    @Test
+    void defaultCachesDoNotReintroduceAggregateResultsAcrossPermissionChanges() {
+        BroadcastableCaffeineCacheManager manager = new CacheConfig().cacheManager(noPublisher());
+        assertThat(manager.getCacheNames()).doesNotContain("aggregateQuery");
+        assertThat(manager.getCache("aggregateQuery")).isNull();
+        assertThat(manager.getCacheNames()).doesNotContain("aggregateQuery");
+    }
+
     private void assertPolicy(BroadcastableCaffeineCacheManager manager, String name, Duration ttl, long maximum) {
         Cache<?, ?> cache = (Cache<?, ?>) manager.getCache(name).getNativeCache();
         assertThat(cache.policy().expireAfterWrite().orElseThrow().getExpiresAfter()).isEqualTo(ttl);

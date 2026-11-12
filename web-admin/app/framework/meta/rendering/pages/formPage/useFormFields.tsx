@@ -54,8 +54,8 @@ export function useFormFields({
   const renderSmartField = useMemo(
     () =>
       createFieldRenderer(formData, setFormData, pageContext, fieldErrors, (fieldCode, value) => {
-        syncRuntimeFieldValue(fieldCode, value);
         const patch = applyFormFieldChange(runtime, fieldCode, value);
+        syncRuntimeFieldValue(fieldCode, value);
         for (const changedField of Object.keys(patch)) {
           dirtyFieldsRef.current.add(changedField);
           clearFieldError(changedField);

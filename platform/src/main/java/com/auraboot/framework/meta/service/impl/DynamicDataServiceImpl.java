@@ -221,9 +221,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Observed(name = "dynamic_data.list", contextualName = "dynamic-data-list")
     public PaginationResult<Map<String, Object>> list(String modelCode, DynamicQueryRequest request) {
-        requireDomainAction(modelCode, "read");
-        BusinessResourceDataScope.query(modelCode, request);
-        return dynamicDataListingSupport().list(modelCode,request);
+        try (DynamicDataQueryScope __readScope = DynamicDataQueryScope.open()) {
+            requireDomainAction(modelCode, "read");
+            BusinessResourceDataScope.query(modelCode, request);
+            return dynamicDataListingSupport().list(modelCode,request);
+        }
     }
 
     /**
@@ -775,176 +777,178 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     private Map<String, Object> getByIdInSnapshot(String modelCode, String recordId, boolean enrichDisplay) {
-        BusinessResourceDataScope.read(modelCode, recordId);
-        RequiredRecordReadGuard.beforeIndependentRecordLoad();
-        validateModelCode(modelCode);
-        if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()) {
-            com.auraboot.framework.application.security.MachineDataAccessContext.requireDecision(modelCode).requireAction("read");
-        }
-        if (recordId == null || recordId.trim().isEmpty()) {
-            throw new MetaServiceException("Record ID cannot be null or empty");
-        }
+        try (DynamicDataQueryScope __readScope = DynamicDataQueryScope.open()) {
+            BusinessResourceDataScope.read(modelCode, recordId);
+            RequiredRecordReadGuard.beforeIndependentRecordLoad();
+            validateModelCode(modelCode);
+            if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()) {
+                com.auraboot.framework.application.security.MachineDataAccessContext.requireDecision(modelCode).requireAction("read");
+            }
+            if (recordId == null || recordId.trim().isEmpty()) {
+                throw new MetaServiceException("Record ID cannot be null or empty");
+            }
 
-        logOperation("getById", modelCode, recordId);
+            logOperation("getById", modelCode, recordId);
 
-        ModelDefinition model = getModelDefinition(modelCode);
+            ModelDefinition model = getModelDefinition(modelCode);
 
-        // Phase 1 virtual-model dispatch: delegate to executor if non-physical sourceType
-        // has a registered executor; otherwise fall through to inline physical path.
-        Optional<ModelDataExecutor> executorOpt = executorRegistry.resolve(model.getSourceType());
-        if (executorOpt.isPresent()) {
-            Map<String, Object> record = executorOpt.get().get(modelCode, recordId);
-            if (record == null) {
+            // Phase 1 virtual-model dispatch: delegate to executor if non-physical sourceType
+            // has a registered executor; otherwise fall through to inline physical path.
+            Optional<ModelDataExecutor> executorOpt = executorRegistry.resolve(model.getSourceType());
+            if (executorOpt.isPresent()) {
+                Map<String, Object> record = executorOpt.get().get(modelCode, recordId);
+                if (record == null) {
+                    throw new com.auraboot.framework.meta.exception.MetaRecordNotFoundException(modelCode, recordId);
+                }
+                dataPermissionEngine.requireRecordReads(modelCode, record);
+                return record;
+            }
+
+            FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
+            Long tenantId = getCurrentTenantId();
+
+            // 构建查询条件
+            List<QueryCondition> conditions = new ArrayList<>();
+            conditions.add(QueryCondition.builder()
+                    .fieldName(primaryKey.getCode())
+                    .operator(QueryCondition.Operator.EQ)
+                    .value(recordId)
+                    .build());
+            conditions.add(QueryCondition.builder()
+                    .fieldName("tenant_id")
+                    .operator(QueryCondition.Operator.EQ)
+                    .value(tenantId)
+                    .build());
+
+            QueryBuilderService.QueryBuilder queryBuilder = queryBuilderService.buildConditionQuery(model, conditions);
+            MachineDataAccessGuards.constrain(modelCode, queryBuilder);
+
+            NativeReadFieldProjection.prepareQuery(model, queryBuilder);
+            String sql = queryBuilder.getSql();
+            Map<String, Object> paramMap = queryBuilder.getParameterMap();
+            List<Map<String, Object>> records = dynamicDataMapper.selectByQuery(sql, paramMap);
+
+            if (records.isEmpty()) {
                 throw new com.auraboot.framework.meta.exception.MetaRecordNotFoundException(modelCode, recordId);
             }
-            dataPermissionEngine.requireRecordReads(modelCode, record);
+
+            Map<String, Object> record = records.get(0);
+
+            // Read-shape contract: json/jsonb fields leave as JSON strings, never PGobject.
+            JsonbFieldHelper.normalizeJsonReadValues(model, record);
+
+            boolean commandPermitInForce = MetaContext.hasCommandPermitScopeFor(modelCode) || MachineDataAccessContext.isActive();
+            if (commandPermitInForce
+                    && !CommandPermitDataAccess.permitsRecord(modelCode, record, getCurrentUserId())) {
+                throw new AccessDeniedException("Access denied: command permit scope does not include this record");
+            }
+            if (commandPermitInForce) dataPermissionEngine.requireRecordReads(modelCode, record);
+
+            if (!commandPermitInForce) {
+                // Apply the Rule Center-backed permission pipeline before the
+                // legacy row-level gate. A Rule Center DENY is responsible for
+                // producing the permission audit/trace row; if the legacy row ACL
+                // runs first, the request can fail with no explainability trail.
+                // Field-level masking still happens afterwards so the evaluator
+                // sees the original record shape.
+                try {
+                    enforceRuleCenterRecordPermission(modelCode, recordId, record);
+                } catch (AccessDeniedException denied) {
+                    throw denied;
+                } catch (MetaServiceException e) {
+                    throw e;
+                } catch (Exception e) {
+                    log.error("Failed to evaluate Rule Center permission for model {} record {} — failing closed for security",
+                            logSafe(modelCode), logSafe(recordId), e);
+                    throw new MetaServiceException(
+                            "Rule Center permission evaluation failed for model: " + modelCode, e);
+                }
+            }
+
+            if (!commandPermitInForce) {
+                // Apply row-level access check for single record — fail-secure: any
+                // non-MetaServiceException must surface as a 5xx, not be swallowed.
+                // Mirrors the list() pattern at lines 173 and 185. This remains an
+                // additional legacy guard after the Rule Center permission pipeline
+                // has either allowed the record or produced a DENY trace.
+                try {
+                    Long userId = getCurrentUserId();
+                    if (!dataPermissionEngine.canAccessRecord(tenantId, modelCode, userId, record)) {
+                        throw new AccessDeniedException("Access denied: you do not have permission to view this record");
+                    }
+                } catch (AccessDeniedException denied) {
+                    throw denied;
+                } catch (MetaServiceException e) {
+                    throw e;
+                } catch (Exception e) {
+                    log.error("Failed to evaluate row-level access for model {} record {} — failing closed for security",
+                            logSafe(modelCode), logSafe(recordId), e);
+                    throw new MetaServiceException(
+                            "Data permission evaluation failed for model: " + modelCode, e);
+                }
+            }
+
+            if (!commandPermitInForce && !com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()) {
+                record = nativeReadFields.project(model, List.of(record)).get(0);
+            }
+
+            if (!commandPermitInForce) {
+                // Apply column-level field masking (policy-based) — fail-secure.
+                // Returning the unmasked record on internal error would leak the
+                // very fields the policy is configured to hide.
+                try {
+                    Long userId = getCurrentUserId();
+                    List<FieldMaskRule> maskRules = dataPermissionEngine.getFieldMaskRules(tenantId, modelCode, userId);
+                    if (maskRules != null && !maskRules.isEmpty()) {
+                        List<Map<String, Object>> masked = dataPermissionEngine.applyFieldMasking(List.of(record), maskRules);
+                        if (masked != null && !masked.isEmpty()) {
+                            record = masked.get(0);
+                        }
+                    }
+                } catch (Exception e) {
+                    log.error("Failed to apply field masking for model {} record {} — failing closed for security",
+                            logSafe(modelCode), logSafe(recordId), e);
+                    throw new MetaServiceException(
+                            "Field masking evaluation failed for model: " + modelCode, e);
+                }
+            }
+
+            if (!commandPermitInForce) {
+                // Apply configurable field masking for detail view (A9) — fail-secure.
+                try {
+                    Long userId = getCurrentUserId();
+                    record = fieldMaskService.applyMaskingForDetail(modelCode, record, userId);
+                } catch (Exception e) {
+                    log.error("Failed to apply configurable field masking for model {} record {} — failing closed for security",
+                            logSafe(modelCode), logSafe(recordId), e);
+                    throw new MetaServiceException(
+                            "Detail-view field masking failed for model: " + modelCode, e);
+                }
+            }
+
+            if (!commandPermitInForce || MachineDataAccessContext.isActive()) {
+                // Human and machine field policies are independent of command permit grades.
+                record = applyFieldPermissionFilterSingle(modelCode, record);
+            }
+
+            if (!enrichDisplay && !commandPermitInForce && !MachineDataAccessContext.isActive()
+                    && (model.getSourceType()==null || "physical".equals(model.getSourceType()))
+                    && !"view".equals(model.getModelType())) {
+                RequiredRecordReadGuard.completePhysicalCanonicalRead(modelCode,recordId);
+            }
+
+            if (enrichDisplay && !commandPermitInForce && !RequiredRecordReadGuard.isResolvingReference()) {
+                // Authorization dependencies retain every gate above, without presentation-only back-links.
+                // Resolve reference display names (same as list) so the detail page shows names, not pids.
+                // Internal command reads intentionally retain the canonical stored shape.
+                List<Map<String, Object>> single = new java.util.ArrayList<>(1);
+                single.add(record);
+                enrichReferenceDisplayFields(modelCode, single);
+                record = single.get(0);
+            }
+
             return record;
         }
-
-        FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
-        Long tenantId = getCurrentTenantId();
-
-        // 构建查询条件
-        List<QueryCondition> conditions = new ArrayList<>();
-        conditions.add(QueryCondition.builder()
-                .fieldName(primaryKey.getCode())
-                .operator(QueryCondition.Operator.EQ)
-                .value(recordId)
-                .build());
-        conditions.add(QueryCondition.builder()
-                .fieldName("tenant_id")
-                .operator(QueryCondition.Operator.EQ)
-                .value(tenantId)
-                .build());
-
-        QueryBuilderService.QueryBuilder queryBuilder = queryBuilderService.buildConditionQuery(model, conditions);
-        MachineDataAccessGuards.constrain(modelCode, queryBuilder);
-
-        NativeReadFieldProjection.prepareQuery(model, queryBuilder);
-        String sql = queryBuilder.getSql();
-        Map<String, Object> paramMap = queryBuilder.getParameterMap();
-        List<Map<String, Object>> records = dynamicDataMapper.selectByQuery(sql, paramMap);
-
-        if (records.isEmpty()) {
-            throw new com.auraboot.framework.meta.exception.MetaRecordNotFoundException(modelCode, recordId);
-        }
-
-        Map<String, Object> record = records.get(0);
-
-        // Read-shape contract: json/jsonb fields leave as JSON strings, never PGobject.
-        JsonbFieldHelper.normalizeJsonReadValues(model, record);
-
-        boolean commandPermitInForce = MetaContext.hasCommandPermitScopeFor(modelCode) || MachineDataAccessContext.isActive();
-        if (commandPermitInForce
-                && !CommandPermitDataAccess.permitsRecord(modelCode, record, getCurrentUserId())) {
-            throw new AccessDeniedException("Access denied: command permit scope does not include this record");
-        }
-        if (commandPermitInForce) dataPermissionEngine.requireRecordReads(modelCode, record);
-
-        if (!commandPermitInForce) {
-            // Apply the Rule Center-backed permission pipeline before the
-            // legacy row-level gate. A Rule Center DENY is responsible for
-            // producing the permission audit/trace row; if the legacy row ACL
-            // runs first, the request can fail with no explainability trail.
-            // Field-level masking still happens afterwards so the evaluator
-            // sees the original record shape.
-            try {
-                enforceRuleCenterRecordPermission(modelCode, recordId, record);
-            } catch (AccessDeniedException denied) {
-                throw denied;
-            } catch (MetaServiceException e) {
-                throw e;
-            } catch (Exception e) {
-                log.error("Failed to evaluate Rule Center permission for model {} record {} — failing closed for security",
-                        logSafe(modelCode), logSafe(recordId), e);
-                throw new MetaServiceException(
-                        "Rule Center permission evaluation failed for model: " + modelCode, e);
-            }
-        }
-
-        if (!commandPermitInForce) {
-            // Apply row-level access check for single record — fail-secure: any
-            // non-MetaServiceException must surface as a 5xx, not be swallowed.
-            // Mirrors the list() pattern at lines 173 and 185. This remains an
-            // additional legacy guard after the Rule Center permission pipeline
-            // has either allowed the record or produced a DENY trace.
-            try {
-                Long userId = getCurrentUserId();
-                if (!dataPermissionEngine.canAccessRecord(tenantId, modelCode, userId, record)) {
-                    throw new AccessDeniedException("Access denied: you do not have permission to view this record");
-                }
-            } catch (AccessDeniedException denied) {
-                throw denied;
-            } catch (MetaServiceException e) {
-                throw e;
-            } catch (Exception e) {
-                log.error("Failed to evaluate row-level access for model {} record {} — failing closed for security",
-                        logSafe(modelCode), logSafe(recordId), e);
-                throw new MetaServiceException(
-                        "Data permission evaluation failed for model: " + modelCode, e);
-            }
-        }
-
-        if (!commandPermitInForce && !com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()) {
-            record = nativeReadFields.project(model, List.of(record)).get(0);
-        }
-
-        if (!commandPermitInForce) {
-            // Apply column-level field masking (policy-based) — fail-secure.
-            // Returning the unmasked record on internal error would leak the
-            // very fields the policy is configured to hide.
-            try {
-                Long userId = getCurrentUserId();
-                List<FieldMaskRule> maskRules = dataPermissionEngine.getFieldMaskRules(tenantId, modelCode, userId);
-                if (maskRules != null && !maskRules.isEmpty()) {
-                    List<Map<String, Object>> masked = dataPermissionEngine.applyFieldMasking(List.of(record), maskRules);
-                    if (masked != null && !masked.isEmpty()) {
-                        record = masked.get(0);
-                    }
-                }
-            } catch (Exception e) {
-                log.error("Failed to apply field masking for model {} record {} — failing closed for security",
-                        logSafe(modelCode), logSafe(recordId), e);
-                throw new MetaServiceException(
-                        "Field masking evaluation failed for model: " + modelCode, e);
-            }
-        }
-
-        if (!commandPermitInForce) {
-            // Apply configurable field masking for detail view (A9) — fail-secure.
-            try {
-                Long userId = getCurrentUserId();
-                record = fieldMaskService.applyMaskingForDetail(modelCode, record, userId);
-            } catch (Exception e) {
-                log.error("Failed to apply configurable field masking for model {} record {} — failing closed for security",
-                        logSafe(modelCode), logSafe(recordId), e);
-                throw new MetaServiceException(
-                        "Detail-view field masking failed for model: " + modelCode, e);
-            }
-        }
-
-        if (!commandPermitInForce || MachineDataAccessContext.isActive()) {
-            // Human and machine field policies are independent of command permit grades.
-            record = applyFieldPermissionFilterSingle(modelCode, record);
-        }
-
-        if (!enrichDisplay && !commandPermitInForce && !MachineDataAccessContext.isActive()
-                && (model.getSourceType()==null || "physical".equals(model.getSourceType()))
-                && !"view".equals(model.getModelType())) {
-            RequiredRecordReadGuard.completePhysicalCanonicalRead(modelCode,recordId);
-        }
-
-        if (enrichDisplay && !commandPermitInForce && !RequiredRecordReadGuard.isResolvingReference()) {
-            // Authorization dependencies retain every gate above, without presentation-only back-links.
-            // Resolve reference display names (same as list) so the detail page shows names, not pids.
-            // Internal command reads intentionally retain the canonical stored shape.
-            List<Map<String, Object>> single = new java.util.ArrayList<>(1);
-            single.add(record);
-            enrichReferenceDisplayFields(modelCode, single);
-            record = single.get(0);
-        }
-
-        return record;
     }
 
     private void enforceRuleCenterRecordPermission(String modelCode, String recordId, Map<String, Object> record) {

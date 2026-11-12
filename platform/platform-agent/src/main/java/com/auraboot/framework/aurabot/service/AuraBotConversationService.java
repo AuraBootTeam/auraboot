@@ -169,6 +169,16 @@ public class AuraBotConversationService {
     // detour design §1.4 called out. The corresponding controller endpoints
     // under /{id}/messages/user and /{id}/messages/assistant are also gone.
 
+    public boolean isDirectWebConversation(Long conversationId, Long tenantId) {
+        ImConversation conversation = conversationMapper.selectOne(new QueryWrapper<ImConversation>()
+                .eq("id", conversationId).eq("tenant_id", tenantId));
+        return conversation != null && isAuraBotConversation(conversation);
+    }
+
+    public void assertMember(Long conversationId, Long tenantId, Long memberId) {
+        ensureMember(conversationId, tenantId, memberId);
+    }
+
     private void ensureMember(Long conversationId, Long tenantId, Long memberId) {
         if (!imConversationService.isMember(conversationId, ImConstants.MEMBER_TYPE_HUMAN, memberId, tenantId)) {
             throw new org.springframework.security.access.AccessDeniedException("Not a member of this conversation");

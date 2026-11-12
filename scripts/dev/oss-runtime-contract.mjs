@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { closeSync, constants, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -117,14 +117,25 @@ export async function execute(action, name, { repo, workspace, state, frontend =
     const input = baseline();
     const log = join(sd, 'import.log');
     if (!existsSync(log)) throw new Error('Successful import log missing');
+    const logBytes = readFileSync(log);
+    const logHash = sha256(logBytes);
     atomicJson(join(productDir, 'imports', `${randomUUID()}.json`), {
       runtime: name, importedAt: new Date().toISOString(), sourceCommit: show().sources.find((item) => item.key === 'auraboot')?.expected.commit,
-      args: importArgs, logHash: sha256(readFileSync(log)),
+      args: importArgs, logHash,
     });
     // Keep each receipt's original bytes; later imports may reuse import.log.
-    const archive = join(productDir, 'import-logs', `${sha256(readFileSync(log))}.log`);
+    const archive = join(productDir, 'import-logs', `${logHash}.log`);
     mkdirSync(dirname(archive), { recursive: true });
-    if (!existsSync(archive)) writeFileSync(archive, readFileSync(log), { mode: 0o600 });
+    try { writeFileSync(archive, logBytes, { flag: 'wx', mode: 0o600 }); }
+    catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      const descriptor = openSync(archive, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+      try {
+        if (!fstatSync(descriptor).isFile() || sha256(readFileSync(descriptor)) !== logHash) {
+          throw new Error('Retained import log differs from its immutable digest');
+        }
+      } finally { closeSync(descriptor); }
+    }
     return input;
   }
   if (action === 'register' || action === 'register-backend') {

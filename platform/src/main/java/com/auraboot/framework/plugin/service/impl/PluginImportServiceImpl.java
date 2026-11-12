@@ -1235,8 +1235,14 @@ public class PluginImportServiceImpl implements PluginImportService {
                 applicationEventPublisher.publishEvent(
                         new com.auraboot.framework.meta.event.ModelTablePublishedEvent(this, modelCode));
 
-                // Ensure hierarchical permissions exist (idempotent — skips if already created)
-                autoPermissionAssignmentService.registerPermissions(modelCode, pluginNamespace, tenantId);
+                // Ensure hierarchical permissions exist (idempotent — skips if already created).
+                // autoAssign (not register) so a model arriving for the FIRST time in an
+                // existing tenant gets the role-template grants (tenant_admin/developer/viewer):
+                // registerPermissions built the nodes but bound zero roles, leaving every
+                // non-admin role 403 after a fan-out import (#score-import production incident).
+                // generatePermissions only applies the template when the resource node is newly
+                // created, so re-imports never restore grants an admin explicitly revoked.
+                autoPermissionAssignmentService.autoAssignPermissions(modelCode, pluginNamespace, tenantId);
             }
         }
     }

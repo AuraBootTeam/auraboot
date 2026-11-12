@@ -67,8 +67,9 @@ public class PendingToolSnapshotFactory {
         long createdAt = System.currentTimeMillis();
         String toolVersion = firstNonBlank(snapshot.getToolVersion(), DEFAULT_TOOL_VERSION);
         String argsHash = firstNonBlank(snapshot.getArgsHash(), hash(input));
-        String idempotencyKey = firstNonBlank(snapshot.getIdempotencyKey(),
-                buildIdempotencyKey(snapshot.getToolName(), toolVersion, argsHash));
+        String idempotencyKey = scopedExecutionKey(ctx, snapshot.getToolId(), snapshot.getToolName(),
+                firstNonBlank(snapshot.getIdempotencyKey(),
+                        buildIdempotencyKey(snapshot.getToolName(), toolVersion, argsHash)));
         Long expiresAt = snapshot.getExpiresAt() != null
                 ? snapshot.getExpiresAt()
                 : createdAt + DEFAULT_PENDING_TTL_MILLIS;
@@ -518,6 +519,23 @@ public class PendingToolSnapshotFactory {
                 || name.contains("update")
                 || name.contains("delete")
                 || name.contains("execute");
+    }
+
+    /** New confirmations are separate intents; retained snapshots keep their recorded lookup keys. */
+    private String scopedExecutionKey(TurnContext ctx, String toolId, String toolName, String semanticKey) {
+        if (ctx == null || ctx.turnId() == null || ctx.turnId().isBlank()) {
+            return semanticKey;
+        }
+        String versionPrefix = "pending-tool:intent:v2:";
+        String invocationPrefix = versionPrefix + ctx.tenantId() + ":" + ctx.turnId() + ":"
+                + hashText(firstNonBlank(toolId, toolName, "tool")) + ":";
+        if (semanticKey.startsWith(versionPrefix)) {
+            if (!semanticKey.startsWith(invocationPrefix)) {
+                throw new IllegalArgumentException("Pending execution key belongs to another invocation");
+            }
+            return semanticKey;
+        }
+        return invocationPrefix + semanticKey;
     }
 
     private String buildIdempotencyKey(String toolName, String toolVersion, String argsHash) {

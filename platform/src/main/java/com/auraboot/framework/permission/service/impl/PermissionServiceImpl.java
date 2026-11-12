@@ -200,11 +200,22 @@ public class PermissionServiceImpl implements PermissionService {
         Permission permission = permissionMapper.findByCode(
             code
         );
-        
+
         if (permission == null) {
             throw new ResourceNotFoundException("Permission not found: " + code);
         }
-        
+
+        return permissionConverter.toDTO(permission);
+    }
+
+    @Override
+    public PermissionDTO findByTenantIdAndCode(Long tenantId, String code) {
+        Permission permission = tenantId == null
+                ? null
+                : permissionMapper.findByTenantIdAndCode(tenantId, code);
+        if (permission == null) {
+            throw new ResourceNotFoundException("Permission not found in tenant " + tenantId + ": " + code);
+        }
         return permissionConverter.toDTO(permission);
     }
     

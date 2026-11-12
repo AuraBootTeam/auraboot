@@ -159,10 +159,21 @@ class PageSchemaValidatorBoundaryTest {
         var page = page(Map.of("id", "form", "blockType", "form-section", "fields", List.of(Map.of("field", "name"))));
         page.setKind("form"); var manifest = manifest(page); manifest.setFields(List.of(field));
         var noModel = binding("ignored", false); noModel.setModelCode(" ");
-        manifest.setModelFieldBindings(List.of(noModel, binding("name", false)));
+        // Null inherits the model field constraint; explicit bindings override it.
+        var inherited = binding("name", false); inherited.setRequired(null);
+        manifest.setModelFieldBindings(List.of(noModel, inherited));
         assertTrue(codes(validate(manifest)).contains("S-PAGE-FORM-REQUIRED"));
+        inherited.setRequired(false);
+        assertFalse(codes(validate(manifest)).contains("S-PAGE-FORM-REQUIRED"));
+        inherited.setRequired(null);
         page.setKind("detail");
         assertFalse(codes(validate(manifest)).contains("S-PAGE-FORM-REQUIRED"));
+        manifest.setModelFieldBindings(List.of(noModel, binding("name", true)));
+        page.setKind("form");
+        assertTrue(codes(validate(manifest)).contains("S-PAGE-FORM-REQUIRED"));
+        manifest.setModelFieldBindings(List.of(noModel, binding("name", false)));
+        assertFalse(codes(validate(manifest)).contains("S-PAGE-FORM-REQUIRED"));
+        manifest.setModelFieldBindings(List.of(noModel, inherited));
         constraints.setRequired(false); page.setKind("form");
         assertFalse(codes(validate(manifest)).contains("S-PAGE-FORM-REQUIRED"));
     }

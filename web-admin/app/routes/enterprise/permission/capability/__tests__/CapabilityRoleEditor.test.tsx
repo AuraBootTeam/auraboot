@@ -1,3 +1,4 @@
+import { permissionService } from '~/shared/services/permissionService';
 import { StrictMode } from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -25,6 +26,22 @@ vi.mock('../authorizationDraftService', async (original) => ({
     fieldPolicies: vi.fn(),
     fieldPolicyRoots: vi.fn(),
   },
+}));
+vi.mock('~/shared/services/permissionService', () => ({
+  permissionService: { getPolicySnapshot: vi.fn() },
+}));
+vi.mock('../../PolicyConfigDialog', () => ({
+  default: (props: any) =>
+    props.open ? (
+      <section
+        data-testid="shared-policy-dialog"
+        data-role={props.rolePid}
+        data-permission={props.permissionPid}
+      >
+        <output data-testid="shared-policy-values">{JSON.stringify(props.initialValues)}</output>
+        <button onClick={props.onClose}>Cancel shared policy</button>
+      </section>
+    ) : null,
 }));
 function baseline(): AuthorizationSnapshot {
   const capability = (code: string, granted: boolean, includes: string[]) => ({
@@ -740,5 +757,52 @@ describe('positive grant field authoring in the original role draft', () => {
     render(<CapabilityRoleEditor rolePid="role-1" activeSection="scope" readOnly />);
     expect(await screen.findByTestId('grant-field-model.order.read-0-read-cost')).toBeDisabled();
     expect(authorizationDraftService.preview).not.toHaveBeenCalled();
+  });
+});
+
+describe('mainline business-rule policy integration', () => {
+  function policyBaseline() {
+    const value = baseline();
+    const action = value.matrix.modules?.[0]?.resources?.[0]?.actions?.[0];
+    if (!action) throw new Error('Expected the saved grant fixture');
+    action.policySchema = JSON.stringify({
+      dynamicAbac: { type: 'rule-center', label: 'Business conditions', fields: [] },
+    });
+    vi.mocked(authorizationDraftService.read).mockResolvedValue(value);
+    vi.mocked(permissionService.getPolicySnapshot).mockResolvedValue({
+      revision: 'grant:1',
+      values: { dynamicAbac: { enabled: true } },
+    });
+  }
+
+  it('opens the saved grant policy without changing the atomic draft', async () => {
+    policyBaseline();
+    await open();
+    fireEvent.click(await screen.findByTestId('capability-policy-configure-order.read'));
+    fireEvent.click(await screen.findByRole('button', { name: 'read', exact: true }));
+    const dialog = await screen.findByTestId('shared-policy-dialog');
+    expect(permissionService.getPolicySnapshot).toHaveBeenCalledWith('role-1', 'p0');
+    expect(dialog).toHaveAttribute('data-role', 'role-1');
+    expect(dialog).toHaveAttribute('data-permission', 'p0');
+    expect(screen.getByTestId('shared-policy-values')).toHaveTextContent('"enabled":true');
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel shared policy' }));
+    expect(authorizationDraftService.save).not.toHaveBeenCalled();
+  });
+
+  it('keeps the policy entry unavailable without scope edit authority', async () => {
+    policyBaseline();
+    render(<CapabilityRoleEditor rolePid="role-1" scopeReadOnly />);
+    await screen.findByTestId('capability-role-editor');
+    expect(screen.queryByTestId('capability-policy-configure-order.read')).not.toBeInTheDocument();
+    expect(permissionService.getPolicySnapshot).not.toHaveBeenCalled();
+  });
+
+  it('keeps a pending joint draft from editing the saved policy independently', async () => {
+    policyBaseline();
+    await open();
+    await toggleEdit();
+    expect(screen.queryByTestId('capability-policy-configure-order.read')).not.toBeInTheDocument();
+    expect(permissionService.getPolicySnapshot).not.toHaveBeenCalled();
+    expect(authorizationDraftService.save).not.toHaveBeenCalled();
   });
 });

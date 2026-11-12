@@ -504,8 +504,8 @@ function InspectorField({
   // text + number fields are validated; structural types (json/boolean/select/
   // model/remote-select) carry their own affordances.
   const validationError =
-    type === 'number' || type === 'text' || type === 'textarea'
-      ? validateInspectorValue(value, type, validation, locale)
+    type === 'number' || type === 'text' || type === 'textarea' || type === 'localizedText'
+      ? validateInspectorValue(type === 'localizedText' ? toInspectorInputValue(value, locale) : value, type, validation, locale)
       : '';
   const jsonValue = type === 'json' ? stringifyJsonField(value) : '';
   const [jsonDraft, setJsonDraft] = useState(jsonValue);
@@ -747,6 +747,7 @@ function InspectorField({
         onChange={(event) =>
           // Editing translated DSL must retain its locale map for backend i18n validation.
           onChange(path, type === 'number' ? Number(event.target.value)
+            : type === 'localizedText' ? { ...(isLocalizedTextObject(value) ? value : {}), [locale]: event.target.value }
             : isLocalizedTextObject(value) ? { ...value, [locale]: event.target.value }
               : event.target.value)
         }

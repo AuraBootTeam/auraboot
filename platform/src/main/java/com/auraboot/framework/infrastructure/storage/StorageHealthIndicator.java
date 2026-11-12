@@ -1,7 +1,7 @@
 package com.auraboot.framework.infrastructure.storage;
 
-import org.springframework.boot.actuate.health.AbstractHealthIndicator;
-import org.springframework.boot.actuate.health.Health;
+import org.springframework.boot.health.contributor.AbstractHealthIndicator;
+import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Component;
 

@@ -29,6 +29,7 @@ import java.util.Map;
 public class AgentCardService {
 
     private final JdbcTemplate jdbcTemplate;
+    private final AgentSkillService skillService;
 
     @Value("${app.frontend-base-url:http://localhost:5173}")
     private String baseUrl;
@@ -49,7 +50,7 @@ public class AgentCardService {
      */
     public Map<String, Object> generateAgentCard(String agentCode) {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT agent_code, name, description, agent_type, communication_style " +
+                "SELECT agent_code, name, description, agent_type, communication_style, skills " +
                 "FROM ab_agent_definition " +
                 "WHERE agent_code = ? " +
                 "  AND status = 'active' " +
@@ -64,7 +65,7 @@ public class AgentCardService {
         }
 
         Map<String, Object> agent = rows.get(0);
-        List<Map<String, Object>> skills = loadSkills(agentCode);
+        List<Map<String, Object>> skills = loadSkills(agent);
 
         return buildAgentCard(agent, skills);
     }
@@ -119,19 +120,14 @@ public class AgentCardService {
         return MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
     }
 
-    /**
-     * Load active skills for a given agent code.
-     * Skills are shared across all tenants via skill_code; we fetch ACTIVE ones only.
-     */
-    private List<Map<String, Object>> loadSkills(String agentCode) {
-        // ab_agent_skill is a global catalogue (not per-agent assignment table exists yet),
-        // so we load all active skills as agent capabilities.
-        return jdbcTemplate.queryForList(
-                "SELECT skill_code, skill_name, skill_description, skill_category " +
-                "FROM ab_agent_skill " +
-                "WHERE skill_status = 'active' " +
-                "  AND (deleted_flag = FALSE OR deleted_flag IS NULL) " +
-                "ORDER BY skill_name");
+    /** Advertise only assigned effective skills in the authenticated tenant, never a global catalogue. */
+    private List<Map<String, Object>> loadSkills(Map<String, Object> agent) {
+        Long tenantId = currentTenantId();
+        if (tenantId == null) return List.of();
+        List<String> assigned = skillService.parseToolCodes(agent.get("skills"));
+        if (assigned.isEmpty()) return List.of();
+        return skillService.listSkills(tenantId, null, null).stream()
+                .filter(skill -> assigned.contains(skill.get("skill_code"))).toList();
     }
 
     /**

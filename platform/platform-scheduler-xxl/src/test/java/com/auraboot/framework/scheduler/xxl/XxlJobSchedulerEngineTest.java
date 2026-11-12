@@ -4,6 +4,8 @@ import com.auraboot.framework.scheduler.entity.ScheduledTask;
 import com.auraboot.framework.scheduler.mapper.ScheduledTaskMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -24,6 +26,20 @@ class XxlJobSchedulerEngineTest {
     private ScheduledTaskMapper taskMapper;
     @Mock
     private XxlJobAdminClient adminClient;
+
+    @ParameterizedTest
+    @CsvSource({"1,1", "1000,1", "1001,2", "300000,300", "9223372036854775807,9223372036854776"})
+    void intervalScheduleRoundsUpWithoutOverflow(long milliseconds, String expectedSeconds) {
+        ScheduledTask task = cronTask("interval-task", "interval", 7L);
+        task.setTaskType("interval");
+        task.setIntervalMs(milliseconds);
+        when(adminClient.upsertJob(any(XxlJobAdminRequest.class))).thenReturn(successResponse("503"));
+        engine().scheduleTask(task);
+        ArgumentCaptor<XxlJobAdminRequest> request = ArgumentCaptor.forClass(XxlJobAdminRequest.class);
+        verify(adminClient).upsertJob(request.capture());
+        assertThat(request.getValue().getScheduleType()).isEqualTo("FIX_RATE");
+        assertThat(request.getValue().getScheduleConf()).isEqualTo(expectedSeconds);
+    }
 
     @Test
     void scheduleTask_cronTask_upsertsAdminJobAndPersistsExternalMetadata() {

@@ -102,7 +102,7 @@ function createLogger({
     snapshot: () => records.slice(),
     capture: (kind, error) => {
       const value = (error && error.stack) || String(error || "");
-      const frame = value.match(/(?:at\s+.*?\()?([^\s/()]+\.js:\d+:\d+)\)?/);
+      const location = value.split(/[\s/()]+/).find((part) => /^[^\s/()]+\.js:\d+:\d+$/.test(part));
       // Custom error names are arbitrary application data, not safe metadata.
       const name = error && error.name;
       const category =
@@ -117,7 +117,7 @@ function createLogger({
       return emit("error", "global:error", {
         kind,
         type,
-        location: frame ? frame[1] : "unavailable",
+        location: location || "unavailable",
         error: summarize(error),
       });
     },

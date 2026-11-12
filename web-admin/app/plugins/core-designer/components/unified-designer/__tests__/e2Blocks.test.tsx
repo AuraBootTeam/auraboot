@@ -102,8 +102,11 @@ describe('E2 batch — designer registry definitions', () => {
       expect(registry.canContain(parent, 'divider')).toBe(true);
       expect(registry.canContain(parent, 'trace-graph')).toBe(true);
     }
-    // negative: form-composition blocks are NOT offered under list/dashboard
-    expect(registry.canContain('list', 'form-buttons')).toBe(false);
+    // Native CRUD lists already use form-buttons for their toolbar. Other
+    // form-only composition and dashboard boundaries remain closed.
+    expect(registry.canContain('list', 'form-buttons')).toBe(true);
+    expect(registry.canContain('list', 'form-wizard')).toBe(false);
+    expect(registry.canContain('dashboard', 'form-buttons')).toBe(false);
     expect(registry.canContain('dashboard', 'filters')).toBe(false);
   });
 });

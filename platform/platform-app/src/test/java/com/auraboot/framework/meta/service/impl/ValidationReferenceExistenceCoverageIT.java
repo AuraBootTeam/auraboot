@@ -9,7 +9,7 @@ import com.auraboot.framework.user.mapper.UserMapper;
 import com.auraboot.framework.user.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
-import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean;
+import com.baomidou.mybatisplus.spring.MybatisSqlSessionFactoryBean;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

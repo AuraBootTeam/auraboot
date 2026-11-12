@@ -1,8 +1,9 @@
 import type { DslBlockV3 } from '../../types';
 import { DESIGNER_I18N } from '~/shared/designer';
 import React from 'react';
+import { useI18n } from '~/contexts/I18nContext';
 import { RuntimeTitle } from './RuntimePrimitives';
-import { RuntimeLocaleContext, useRuntimeText } from './runtimeContexts';
+import { RuntimeListSelectionContext, RuntimeLocaleContext, useRuntimeText } from './runtimeContexts';
 import {
   getBlockLabel,
   getBooleanProp,
@@ -28,6 +29,22 @@ import {
 // (framework/meta/rendering/blocks/*). Token-backed utility classes only — no raw
 // hex.
 // ---------------------------------------------------------------------------
+
+export function RuntimeTextPreview({ block }: { block: DslBlockV3 }) {
+  const { t } = useI18n();
+  const locale = React.useContext(RuntimeLocaleContext);
+  const selection = React.useContext(RuntimeListSelectionContext);
+  const raw = block as unknown as Record<string, unknown>;
+  const key = getStringProp(raw.contentKey ?? block.props?.contentKey);
+  const content = key
+    ? t(key, { count: selection?.selectedRows.length ?? 0 })
+    : readLocalizedLabel(raw.content ?? block.props?.content, locale);
+  return (
+    <div className="text-sm text-slate-500" style={getSpanGridStyle(block)} data-testid={`runtime-text-${block.id}`}>
+      {content}
+    </div>
+  );
+}
 
 export function RuntimeStatCardPreview({ block }: { block: DslBlockV3 }) {
   const t = useRuntimeText();

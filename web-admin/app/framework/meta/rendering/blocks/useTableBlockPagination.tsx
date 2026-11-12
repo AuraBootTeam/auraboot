@@ -1,10 +1,15 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import type { PaginationConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import type { DataSourceState } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
 import { Pagination } from '~/ui/Pagination';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { readPath, writeRuntimeState } from './workbenchBlockUtils';
+
+// Remember one parent signature per configured table for the page runtime's lifetime.
+// Conditional blocks can unmount between parent selections; component refs cannot detect
+// those transitions. Weak runtime ownership prevents cross-page leakage and retains no history.
+const parentSignatures = new WeakMap<SchemaRuntime, Map<string, string>>();
 
 /** Keep pagination state in the DSL context so reloads retain the current page. */
 export function useTableBlockPagination(
@@ -16,15 +21,20 @@ export function useTableBlockPagination(
   const context = runtime.getContext();
   const binding = config?.server;
   const signature = JSON.stringify((binding?.resetOn ?? []).map((path) => readPath(context, path)));
-  const previous = useRef(signature);
+  const signatureKey = JSON.stringify([runtime.getScopeId(), source, binding?.pageState]);
   useEffect(() => {
-    if (previous.current !== signature) {
-      previous.current = signature;
-      if (binding && Number(context.state?.[binding.pageState] ?? 1) !== 1) {
-        writeRuntimeState(runtime, binding.pageState, 1);
-      }
+    if (!binding || !binding.resetOn?.length) return;
+    let remembered = parentSignatures.get(runtime);
+    if (!remembered) {
+      remembered = new Map();
+      parentSignatures.set(runtime, remembered);
     }
-  }, [runtime, binding, signature, context.state]);
+    const previous = remembered.get(signatureKey);
+    remembered.set(signatureKey, signature);
+    if (previous !== undefined && previous !== signature && Number(context.state?.[binding.pageState] ?? 1) !== 1) {
+      writeRuntimeState(runtime, binding.pageState, 1);
+    }
+  }, [runtime, binding, signatureKey, signature, context.state]);
 
   if (!binding || !source || state?.data == null) return null;
   const t = context.t || ((key: string) => key);
@@ -73,6 +83,7 @@ export function useTableBlockPagination(
         showPageSizeSelector={config?.showSizeChanger !== false}
         showQuickJumper={config?.showQuickJumper}
         t={t}
+        locale={context.locale || 'zh-CN'}
         onChange={(current) => writeRuntimeState(runtime, binding.pageState, current)}
         onPageSizeChange={(size) => {
           runtime.getStateManager().updateState(runtime.getScopeId(), binding.pageState, 1);

@@ -14323,6 +14323,32 @@
         },
         "type": "object"
       },
+      "ApiResponsePolicySnapshot": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PolicySnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponsePromotionResponse": {
         "properties": {
           "code": {
@@ -23305,6 +23331,20 @@
         },
         "type": "object"
       },
+      "Decision": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "expectedDraftHash": {
+            "type": "string"
+          },
+          "expectedPublishedVersion": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "DecisionActionCatalogDTO": {
         "properties": {
           "actions": {
@@ -25873,6 +25913,13 @@
           },
           "path": {
             "type": "string"
+          },
+          "targetTenantIds": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
           },
           "validateReferences": {
             "type": "boolean"
@@ -43652,6 +43699,38 @@
         },
         "type": "object"
       },
+      "PolicySaveRequest": {
+        "properties": {
+          "expectedRevision": {
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": {},
+            "type": "object"
+          }
+        },
+        "required": [
+          "expectedRevision",
+          "values"
+        ],
+        "type": "object"
+      },
+      "PolicySnapshot": {
+        "properties": {
+          "revision": {
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": {},
+            "type": "object"
+          }
+        },
+        "required": [
+          "revision",
+          "values"
+        ],
+        "type": "object"
+      },
       "PreferencesDTO": {
         "properties": {
           "dateFormat": {
@@ -51212,10 +51291,7 @@
         "properties": {
           "timeout": {
             "format": "int64",
-            "type": [
-              "integer",
-              "null"
-            ]
+            "type": "integer"
           }
         },
         "type": "object"
@@ -55611,6 +55687,86 @@
         ]
       }
     },
+    "/api/admin/agent-runs/conversation-tasks": {
+      "get": {
+        "operationId": "conversationTasks",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "agent-run-ops-controller"
+        ]
+      }
+    },
+    "/api/admin/agent-runs/conversation-tasks/{taskPid}": {
+      "get": {
+        "operationId": "conversationTask",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "taskPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "agent-run-ops-controller"
+        ]
+      }
+    },
     "/api/admin/agent-runs/runtime-ops": {
       "get": {
         "operationId": "runtimeOps",
@@ -55979,7 +56135,7 @@
     },
     "/api/admin/application-releases/{applicationCode}/{releaseId}/publication": {
       "post": {
-        "operationId": "publish_12",
+        "operationId": "publish_13",
         "parameters": [
           {
             "in": "path",
@@ -56115,7 +56271,7 @@
     },
     "/api/admin/auth-appearance/publish": {
       "post": {
-        "operationId": "publish_11",
+        "operationId": "publish_12",
         "requestBody": {
           "content": {
             "application/json": {
@@ -56145,7 +56301,7 @@
     },
     "/api/admin/auth-appearance/rollback": {
       "post": {
-        "operationId": "rollback_5",
+        "operationId": "rollback_6",
         "requestBody": {
           "content": {
             "application/json": {
@@ -58449,7 +58605,7 @@
     },
     "/api/admin/memory/embeddings/{pid}": {
       "get": {
-        "operationId": "inspect",
+        "operationId": "inspect_1",
         "parameters": [
           {
             "in": "path",
@@ -61316,6 +61472,162 @@
         ]
       }
     },
+    "/api/agent/skill-definitions/{pid}/governance": {
+      "get": {
+        "operationId": "inspect",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "skill-definition-governance-controller"
+        ]
+      }
+    },
+    "/api/agent/skill-definitions/{pid}/publish": {
+      "post": {
+        "operationId": "publish_11",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Decision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "skill-definition-governance-controller"
+        ]
+      }
+    },
+    "/api/agent/skill-definitions/{pid}/versions/{versionPid}": {
+      "get": {
+        "operationId": "version_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "versionPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDesignVersionDTO"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "skill-definition-governance-controller"
+        ]
+      }
+    },
+    "/api/agent/skill-definitions/{pid}/versions/{versionPid}/activate": {
+      "post": {
+        "operationId": "rollback_5",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "versionPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Decision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "skill-definition-governance-controller"
+        ]
+      }
+    },
     "/api/agent/skills": {
       "get": {
         "operationId": "listSkills_1",
@@ -61463,6 +61775,36 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseListAgentToolDefinition"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "agent-runtime-controller"
+        ]
+      }
+    },
+    "/api/agent/skills/{skillCode}/trial-definition": {
+      "get": {
+        "operationId": "skillTrialDefinition",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "skillCode",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 }
               }
             },
@@ -61986,7 +62328,7 @@
         "responses": {
           "200": {
             "content": {
-              "text/event-stream": {
+              "text/event-stream;charset=UTF-8": {
                 "schema": {
                   "$ref": "#/components/schemas/SseEmitter"
                 }
@@ -62036,6 +62378,37 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseAuraBotConversationItem"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "aura-bot-conversation-controller"
+        ]
+      }
+    },
+    "/api/ai/aurabot/conversations/{conversationId}/execution": {
+      "get": {
+        "operationId": "execution",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversationId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 }
               }
             },
@@ -62104,7 +62477,7 @@
         "responses": {
           "200": {
             "content": {
-              "text/event-stream": {
+              "text/event-stream;charset=UTF-8": {
                 "schema": {
                   "$ref": "#/components/schemas/SseEmitter"
                 }
@@ -100795,6 +101168,39 @@
         ]
       }
     },
+    "/api/permission-cache/evict": {
+      "post": {
+        "description": "Manual trigger for permission snapshot eviction after out-of-band changes",
+        "operationId": "evict",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "reason",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseString"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Evict permission caches",
+        "tags": [
+          "Permission cache administration"
+        ]
+      }
+    },
     "/api/permission/capabilities": {
       "get": {
         "operationId": "getForRole",
@@ -101448,8 +101854,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": {},
-                "type": "object"
+                "$ref": "#/components/schemas/PolicySaveRequest"
               }
             }
           },
@@ -101468,6 +101873,45 @@
           }
         },
         "summary": "Set policy values for role+permission",
+        "tags": [
+          "Permission Matrix"
+        ]
+      }
+    },
+    "/api/permissions/matrix/{rolePid}/policy/{permissionPid}/snapshot": {
+      "get": {
+        "operationId": "getPolicySnapshot",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rolePid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "permissionPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePolicySnapshot"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Read policy values and the grant revision required for saving",
         "tags": [
           "Permission Matrix"
         ]
@@ -115491,6 +115935,10 @@
     {
       "description": "Execute multiple datasource queries in parallel",
       "name": "Batch Query"
+    },
+    {
+      "description": "Manual eviction of permission snapshot caches",
+      "name": "Permission cache administration"
     },
     {
       "description": "Record-level comments and activity history",

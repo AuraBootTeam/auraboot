@@ -89,6 +89,23 @@ class ToolLoopServiceSafetyTest {
         ReflectionTestUtils.setField(service, "observabilityService", observabilityService);
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+    void commandAuthorizationDenialRetainsItsTypedNonretryableBoundary(boolean commandBusinessRefusal) throws Exception {
+        when(commandExecutor.execute(eq("tpm:create_task"), any())).thenThrow(
+                commandBusinessRefusal
+                        ? new com.auraboot.framework.exception.BusinessException(com.auraboot.framework.common.constant.ResponseCode.FORBIDDEN,"private role and tenant details")
+                        : new org.springframework.security.access.AccessDeniedException("private role and tenant details"));
+        var definition = AgentToolDefinition.builder().name("cmd:tpm:create_task").sourceCode("tpm:create_task")
+                .toolType("dsl_command").riskLevel("L0").build();
+        String raw = service.executeToolCall(1L, "run", "task", "delivery", definition.getName(),
+                Map.of("title", "Review"), List.of(definition), null);
+        Map<String,Object> result = com.auraboot.framework.agent.runtime.ToolLoopResultNormalizer.normalize(new ObjectMapper(),raw,"cmd:tpm:create_task",Map.of("title","Review"));
+        assertThat(result).containsEntry("success",false).containsEntry("errorCode","TOOL_ACCESS_DENIED").containsEntry("retryable",false);
+        assertThat(result.toString()).doesNotContain("private role and tenant details");
+        verify(commandExecutor,times(1)).execute(eq("tpm:create_task"),any());
+    }
+
     @Test
     @DisplayName("ACL denial stays nonretryable and actionable through result normalization")
     void aclDenialStaysNonretryableAndActionable() throws Exception {

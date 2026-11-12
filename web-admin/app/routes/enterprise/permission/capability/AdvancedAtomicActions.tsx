@@ -39,6 +39,7 @@ interface PolicyDialogState {
   permissionLabel: string;
   schema: Record<string, any>;
   initialValues?: Record<string, any>;
+  initialRevision: string;
 }
 
 /**
@@ -210,7 +211,9 @@ export default function AdvancedAtomicActions({
                 <div />
                 <div>{t('admin.permission.advanced.colCode', undefined, 'Code / name')}</div>
                 <div>{t('admin.permission.scope.label', undefined, 'Data scope')}</div>
-                <div>{t('admin.permission.advanced.colCoverage', undefined, 'Capability coverage')}</div>
+                <div>
+                  {t('admin.permission.advanced.colCoverage', undefined, 'Capability coverage')}
+                </div>
               </div>
 
               {grouped.length === 0 ? (
@@ -268,7 +271,7 @@ export default function AdvancedAtomicActions({
                                 onClick={async () => {
                                   try {
                                     setLoadingPolicyPid(r.permissionPid);
-                                    const initialValues = await permissionService.getPolicy(
+                                    const snapshot = await permissionService.getPolicySnapshot(
                                       rolePid,
                                       r.permissionPid,
                                     );
@@ -276,7 +279,8 @@ export default function AdvancedAtomicActions({
                                       permissionPid: r.permissionPid,
                                       permissionLabel: r.label || r.code,
                                       schema: JSON.parse(r.policySchema!),
-                                      initialValues,
+                                      initialValues: snapshot.values,
+                                      initialRevision: snapshot.revision,
                                     });
                                   } catch {
                                     showErrorToast(
@@ -378,6 +382,7 @@ export default function AdvancedAtomicActions({
           permissionLabel={policyDialog.permissionLabel}
           schema={policyDialog.schema}
           initialValues={policyDialog.initialValues}
+          initialRevision={policyDialog.initialRevision}
           onSuccess={() => setPolicyDialog(null)}
         />
       )}

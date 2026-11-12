@@ -2,10 +2,31 @@ package com.auraboot.framework.auth.service;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import java.util.ArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ApiRateLimiterTest {
+
+    @Test
+    void concurrentRequestsShareOneAtomicBudget() throws Exception {
+        ApiRateLimiter bounded = new ApiRateLimiter();
+        CountDownLatch start = new CountDownLatch(1);
+        try (var pool = Executors.newFixedThreadPool(16)) {
+            var results = new ArrayList<Future<Boolean>>();
+            for (int i = 0; i < 100; i++) results.add(pool.submit(() -> {
+                start.await();
+                return bounded.isAllowed("verify:owned-test", 5);
+            }));
+            start.countDown();
+            long allowed = 0;
+            for (var result : results) if (result.get()) allowed++;
+            assertThat(allowed).isEqualTo(5);
+        }
+    }
 
     private ApiRateLimiter limiter;
 

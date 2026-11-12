@@ -31,7 +31,8 @@ class DataScopeServiceDomainDefaultTest {
     private final PermissionSnapshotCache definitions = mock(PermissionSnapshotCache.class);
     private final DomainCommandAuthorization grants = mock(DomainCommandAuthorization.class);
     private final DataScopeServiceImpl service = new DataScopeServiceImpl(mock(RoleAuthorizationWriteLock.class),
-            scopeRows, roles, memberships, mock(TenantMemberMapper.class));
+            scopeRows, roles, memberships, mock(TenantMemberMapper.class),
+            mock(org.springframework.context.ApplicationEventPublisher.class), mock(DataScopeCacheEvictor.class));
     private static final String MODEL = "example_record";
     private static final String CODE = "bom.cap.read";
     private Role reader;

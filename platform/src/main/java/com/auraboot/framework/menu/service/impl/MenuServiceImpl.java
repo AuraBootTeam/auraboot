@@ -12,7 +12,7 @@ import com.auraboot.framework.permission.service.SubjectPermissionService;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

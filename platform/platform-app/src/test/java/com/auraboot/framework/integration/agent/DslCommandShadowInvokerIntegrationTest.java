@@ -11,7 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.Map;
 
@@ -32,7 +32,7 @@ class DslCommandShadowInvokerIntegrationTest extends BaseIntegrationTest {
     @Autowired private DslCommandShadowInvoker invoker;
     @Autowired private DryRunSupportRegistry registry;
     @Autowired private ShadowEligibilityChecker checker;
-    @MockBean  private CommandExecutor commandExecutor;
+    @MockitoBean  private CommandExecutor commandExecutor;
 
     @Test
     @DisplayName("supports() matches cmd_* and dsl.command; rejects everything else")

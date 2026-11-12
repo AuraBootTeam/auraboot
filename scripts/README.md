@@ -112,11 +112,13 @@ the original review behavior; pause idle services through their product owner.
 | `lib/golden-new-database.sh` | 0 | 2026-10-05 | Create an absent owned golden database without replacement. |
 | `lib/golden-process-stop.mjs` | 0 | 2026-10-05 | Stop only identity-attested owned golden processes. |
 | `lib/golden-private-redis.mjs` | 1 | 2026-10-21 | Start and attest an owned private Redis endpoint and persistent storage. |
+| `lib/golden-file-storage.mjs` | 1 | 2026-11-04 | Preserve owned golden file storage across source generations and verify file identity before relinking. |
 | `lib/golden-frontend-supervisor.mjs` | 1 | 2026-10-18 | Keep a stable owned frontend parent across automatic listener restarts. |
 | `lib/golden-frontend-registration.mjs` | 1 | 2026-10-18 | Register each authenticated Web/BFF generation before its entrypoint can listen. |
 | `lib/golden-product-identity.mjs` | 0 | 2026-10-05 | Bind golden product environment and source identity. |
 | `lib/golden-resume-state.mjs` | 0 | 2026-10-05 | Validate saved golden state before resume. |
 | `lib/golden-runtime-identity.sh` | 0 | 2026-10-05 | Register declared golden source roots in workspace control. |
+| `lib/golden-file-storage.mjs` | 0 | 2026-11-04 | Retain owned golden file storage outside disposable source and validate its identity. |
 | `lib/golden-stack-state.mjs` | 0 | 2026-10-05 | Resolve owned current or legacy golden stack state. |
 | `oss-golden-lifecycle.sh` | 0 | 2026-10-05 | Workspace suspend/resume lifecycle adapter for OSS golden stacks. |
 
@@ -132,7 +134,7 @@ the original review behavior; pause idle services through their product owner.
 | `application/generate-product-extraction-inventory.mjs` | 1 | 2026-09-12 | Generate the BPM/CRM extraction owner, dependency, migration, route, and candidate-test denominator. |
 | `application/create-release-screenshot-manifest.mjs` | 1 | 2026-09-14 | Create the checksum-bound screenshot manifest consumed by product release image gates. |
 
-## entrypoint (31)
+## entrypoint (32)
 
 | script | refs | updated | purpose |
 |---|--:|---|---|
@@ -141,6 +143,10 @@ the original review behavior; pause idle services through their product owner.
 | `backlog-stats.sh` | 0 | 2026-03-26 | Backlog dashboard stats — counts GAP statuses across all backlog files |
 | `billing-it-run.sh` | 0 | 2026-07-31 | Exact-class billing integration-test runner with non-zero XML evidence checks. |
 | `ci/prepare-library-candidate.sh` | 1 | 2026-10-23 | Prepare native runtime-library candidates under a frozen Jenkins context without application assembly or remote publication. |
+| `ci/verify-oss-native-candidate.sh` | 1 | 2026-11-04 | Build, export and unpack an unpublished native package under frozen CI inputs; retain exact legal notices without publication. |
+| `ci/verify-oss-full-codeql.sh` | 1 | 2026-11-11 | Run the original full Java and JavaScript CodeQL policy on frozen source; retain findings for individual review without suppression. |
+| `command-input-source-contract.mjs` | 1 | 2026-11-11 | Validate the existing command input source contract. |
+| `ci/oss-native-install.py` | Verify cold initialization, old-to-new upgrade, backup recovery and corrupt-candidate rejection using packaged lifecycle and an attempt-owned Linux database. |
 | `deploy/prod-deploy.sh` | 0 | 2026-06-18 | Production deploy orchestrator. Runs the schema migration + release ledger |
 | `dev/ci-env-export.sh` | 0 | 2026-05-09 | ci-env-export.sh — env contract for generic CI runners. Defaults are |
 | `dev/ga-e2e-env-export.sh` | 0 | 2026-05-09 | ga-e2e-env-export.sh — env contract for the GA (GitHub Actions) E2E |
@@ -185,6 +191,10 @@ the original review behavior; pause idle services through their product owner.
 | `application/migration-ownership.mjs` | 1 | 2026-09-12 | Split legacy core migrations into deterministic core, CRM, and BPM ownership sets without Flyway version collisions. |
 | `application/schema-ownership-audit.mjs` | 0 | 2026-09-25 | Audit declared migration ownership without rewriting released SQL. |
 | `application/stage-core-only-artifacts.mjs` | 1 | 2026-09-12 | Stage a commit-bound core-only application artifact set and emit its catalog and lock. |
+| `application/web-shell-capsule.mjs` | Restore the immutable capsule override map before frozen pnpm installation; shared by build and native lifecycle. |
+| `application/web-shell-capsule.test.mjs` | Verify override hydration, lock preservation, idempotency and malformed-map rejection. |
+| `application/native-config-imports.mjs` | Project the verified lock config nodes in composition order for native initialization and upgrade. |
+| `application/native-config-imports.test.mjs` | Reject missing, duplicate, ambiguous or unsafe native config projections. |
 | `application/run-product-release-image-gate.sh` | 1 | 2026-09-12 | Linux CI Docker gate for immutable product release images and browser evidence. |
 | `application/export-product-image.mjs` | 1 | 2026-10-22 | Export the tested OCI graph before native gate cleanup; checksum-bound strict archive consumption; immutable transport only. |
 | `application/platform-artifact-package.mjs` | 1 | 2026-10-23 | Export/consume an explicitly selected native Core artifact package; original catalog/lock/source/OCI checks, no compilation or qualification. |

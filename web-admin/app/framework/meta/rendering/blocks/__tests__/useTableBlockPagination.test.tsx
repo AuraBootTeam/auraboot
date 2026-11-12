@@ -36,6 +36,23 @@ function Harness({ f }: { f: ReturnType<typeof fixture> }) {
   return <>{useTableBlockPagination(f.runtime, f.config, 'queue', f.state)}</>;
 }
 describe('data-source table server pagination', () => {
+  it('keeps missing English translations in the runtime locale', () => {
+    const f = fixture();
+    f.context.locale = 'en-US';
+    render(<Harness f={f} />);
+    expect(screen.getByTestId('pagination-prev')).toHaveTextContent('Previous');
+    expect(screen.getByTestId('pagination-next')).toHaveTextContent('Next');
+    expect(screen.getByText('Page 2 of 4', { exact: false })).toHaveTextContent('35 items');
+    expect(screen.getByText('Per page', { exact: false })).toBeInTheDocument();
+  });
+  it('keeps Chinese fallback and translated labels when translations are available', () => {
+    const f = fixture();
+    f.context.locale = 'zh-CN';
+    f.context.t = (key: string) => (key === 'common.next_page' ? '继续查看' : key);
+    render(<Harness f={f} />);
+    expect(screen.getByTestId('pagination-prev')).toHaveTextContent('上一页');
+    expect(screen.getByTestId('pagination-next')).toHaveTextContent('继续查看');
+  });
   it('uses API totals and binds the next page to reloadable DSL state', () => {
     const f = fixture();
     render(<Harness f={f} />);
@@ -77,6 +94,33 @@ describe('data-source table server pagination', () => {
     render(<Harness f={f} />);
     expect(screen.getByRole('alert')).toHaveTextContent('Invalid pagination data');
     expect(screen.queryByTestId('pagination-next')).not.toBeInTheDocument();
+  });
+  it('resets a hidden child table when its parent changes before remount', () => {
+    const f = fixture();
+    const view = render(<Harness f={f} />);
+    view.unmount();
+    f.context.state.store = 'second';
+    render(<Harness f={f} />);
+    expect(f.context.state.page).toBe(1);
+    expect(f.notifyStateChanged).toHaveBeenCalledWith('page');
+  });
+  it('retains the chosen page when a hidden table remounts for the same parent', () => {
+    const f = fixture();
+    const view = render(<Harness f={f} />);
+    view.unmount();
+    render(<Harness f={f} />);
+    expect(f.context.state.page).toBe(2);
+    expect(f.notifyStateChanged).not.toHaveBeenCalled();
+  });
+  it('does not share remembered parent identities between page runtimes', () => {
+    const first = fixture();
+    const view = render(<Harness f={first} />);
+    view.unmount();
+    const next = fixture();
+    next.context.state.store = 'different-runtime-parent';
+    render(<Harness f={next} />);
+    expect(next.context.state.page).toBe(2);
+    expect(next.notifyStateChanged).not.toHaveBeenCalled();
   });
   it('keeps a zero-result page visible and its next action disabled', () => {
     const f = fixture();

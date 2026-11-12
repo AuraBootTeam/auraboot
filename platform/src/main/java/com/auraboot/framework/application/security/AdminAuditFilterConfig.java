@@ -34,7 +34,7 @@ public class AdminAuditFilterConfig {
         @Override
         protected void doFilterInternal(HttpServletRequest req, HttpServletResponse resp,
                                         FilterChain chain) throws ServletException, IOException {
-            ContentCachingRequestWrapper wrapped = new ContentCachingRequestWrapper(req);
+            ContentCachingRequestWrapper wrapped = new ContentCachingRequestWrapper(req, 0);
             chain.doFilter(wrapped, resp);
         }
     }

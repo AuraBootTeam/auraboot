@@ -12,7 +12,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.Commit;
 import org.springframework.transaction.annotation.Propagation;
@@ -43,7 +43,7 @@ class MemoryPromotionControllerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired private MemoryPromotionController controller;
     @Autowired private JdbcTemplate jdbc;
-    @MockBean private MemoryPromotionApplier applier;
+    @MockitoBean private MemoryPromotionApplier applier;
 
     private Long tenantId;
 

@@ -4,7 +4,7 @@ import com.auraboot.framework.agent.trace.entity.GenAiUsageRecord;
 import com.auraboot.framework.agent.trace.mapper.GenAiUsageMapper;
 import com.auraboot.framework.test.util.OwnedTestDatabase;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
-import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean;
+import com.baomidou.mybatisplus.spring.MybatisSqlSessionFactoryBean;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

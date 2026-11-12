@@ -15,7 +15,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.mock.mockito.SpyBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.Commit;
@@ -64,11 +64,11 @@ class SubAgentRunnerIntegrationTest extends BaseIntegrationTest {
     @Autowired private InterruptController controller;
     @Autowired private SubAgentRunner subAgentRunner;
     @Autowired private ApplicationEventPublisher eventPublisher;
-    // SpyBean so G4 can stub the second jdbcTemplate.update(...) to throw and
+    // MockitoSpyBean so G4 can stub the second jdbcTemplate.update(...) to throw and
     // assert the surrounding @Transactional unit on SubAgentRunner.spawn rolls
-    // the first INSERT back. SpyBean delegates to the real bean unless an
+    // the first INSERT back. MockitoSpyBean delegates to the real bean unless an
     // explicit doThrow/doReturn is set, so other test cases keep working.
-    @SpyBean private JdbcTemplate jdbc;
+    @MockitoSpyBean private JdbcTemplate jdbc;
 
     private Long tenantId;
     private String sessionId;
@@ -82,7 +82,7 @@ class SubAgentRunnerIntegrationTest extends BaseIntegrationTest {
 
     @AfterEach
     void cleanup() {
-        // Reset any per-test Mockito stubs on the SpyBean before cleanup writes
+        // Reset any per-test Mockito stubs on the MockitoSpyBean before cleanup writes
         // run — otherwise a G4 stub on jdbc.update(...) would still throw here.
         Mockito.reset(jdbc);
         // children first (FK-free but logically dependent)

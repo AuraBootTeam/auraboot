@@ -3,6 +3,7 @@ import { bindingText, type BindingTextKey } from './decisionBindingText';
 import { bindingPresentation } from './decisionBindingPresentation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ConditionBuilder, type FieldOption } from '~/shared/decision/ui/ConditionBuilder';
+import { conditionLeaves } from '~/shared/decision/ui/conditionTreeEditing';
 import { group, type GroupNode } from '~/shared/decision/ast/conditionAst';
 import { getApiService } from '~/shared/services/ApiService';
 import {
@@ -183,6 +184,7 @@ interface DecisionRuleBindingBlockProps {
   block?: {
     props?: {
       mode?: 'condition' | 'decision' | 'combined';
+      authoringTarget?: 'consumer-binding' | 'condition-fragment';
       valueField?: string;
       value?: BindingValueInput;
       initialValue?: BindingValueInput;
@@ -215,13 +217,16 @@ const STALE_DECISION_NAMES = new Set(['投诉 SLA 截止时间', '审批路由',
 function mergeDecisionOptions(
   configured?: DecisionOption[],
   locale: string = 'zh-CN',
+  includeExamples = true,
 ): DecisionOption[] {
-  if (!configured || configured.length === 0) return bindingPresentation(locale).DEFAULT_DECISIONS;
-  const byCode = new Map(
+  const defaults = new Map(
     bindingPresentation(locale).DEFAULT_DECISIONS.map((decision) => [decision.code, decision]),
   );
+  const examples = includeExamples ? Array.from(defaults.values()) : [];
+  if (!configured || configured.length === 0) return examples;
+  const byCode = new Map(examples.map((decision) => [decision.code, decision]));
   configured.forEach((decision) => {
-    const fallback = byCode.get(decision.code);
+    const fallback = byCode.get(decision.code) ?? defaults.get(decision.code);
     byCode.set(decision.code, {
       ...fallback,
       ...decision,
@@ -540,18 +545,20 @@ function buildRuleConsumerBinding(
     consumerNodeId?: string;
   },
 ): RuleConsumerBindingDraft {
+  const useDecision =
+    options.showDecision && (!options.showCondition || Boolean(binding.decisionCode.trim()));
   return {
     consumerType: options.consumerType,
     consumerCode: options.consumerCode,
     consumerNodeId: options.consumerNodeId,
-    bindingKind: options.showDecision ? 'DECISION_REF' : 'CONDITION',
+    bindingKind: useDecision ? 'DECISION_REF' : 'CONDITION',
     conditionSpec: options.showCondition
       ? {
           root: condition,
           decisionBindings: [],
         }
       : undefined,
-    decisionBinding: options.showDecision
+    decisionBinding: useDecision
       ? {
           decisionCode: binding.decisionCode,
           versionPolicy: binding.versionPolicy,
@@ -1575,7 +1582,12 @@ export function DecisionRuleBindingBlock({
       : (configuredFields ??
         mergeFieldOptions(catalogFields, bindingPresentation(locale).DEFAULT_FIELDS));
   const decisions = useMemo(
-    () => mergeDecisionOptions([...(props.decisions ?? []), ...definitionDecisionOptions], locale),
+    () =>
+      mergeDecisionOptions(
+        [...(props.decisions ?? []), ...definitionDecisionOptions],
+        locale,
+        props.decisions === undefined,
+      ),
     [definitionDecisionOptions, props.decisions, locale],
   );
   const defaultApiRef = useRef<RuleBindingDecisionApi | null>(null);
@@ -1585,13 +1597,14 @@ export function DecisionRuleBindingBlock({
     (props.valueField ? runtime?.getFieldValue?.(props.valueField) : undefined) ??
     props.initialValue;
   const initialRuleBinding = parseBindingValue(incomingRawBindingValue);
+  const defaultDecisionCode = props.initialDecisionCode ?? (mode === 'combined' ? '' : undefined);
   const [condition, setCondition] = useState<GroupNode>(
     () => initialRuleBinding?.conditionSpec?.root ?? defaultCondition(),
   );
   const [binding, setBinding] = useState<DecisionBindingDraft>(() =>
     buildInitialBinding(
       decisions,
-      props.initialDecisionCode,
+      defaultDecisionCode,
       props.initialVersionPolicy,
       initialRuleBinding,
     ),
@@ -1648,14 +1661,18 @@ export function DecisionRuleBindingBlock({
   const showDecision = mode === 'decision' || mode === 'combined';
   const showImpactPreview = showDecision && props.showImpactPreview !== false;
   const showTestRunner = showDecision && props.showTestRunner !== false;
+  const conditionInactive =
+    props.authoringTarget !== 'condition-fragment' &&
+    showCondition && showDecision && Boolean(binding.decisionCode.trim());
   const showStandaloneImpactPreview = !readOnly && showImpactPreview;
   const showStandaloneTestRunner = !readOnly && showTestRunner;
+  const conditionCount = conditionLeaves(condition).length;
   const workspaceTabs: RuleBindingWorkspaceTab[] = [];
   if (showCondition) {
     workspaceTabs.push({
       key: 'condition',
       label: bindingText('condition', locale),
-      meta: bindingText('entryCount', locale, { count: condition.children.length }),
+      meta: bindingText('entryCount', locale, { count: conditionCount }),
     });
   }
   if (showDecision) {
@@ -1785,12 +1802,12 @@ export function DecisionRuleBindingBlock({
     setBinding(
       buildInitialBinding(
         decisions,
-        props.initialDecisionCode,
+        defaultDecisionCode,
         props.initialVersionPolicy,
         nextRuleBinding,
       ),
     );
-  }, [decisions, incomingRawBindingValue, props.initialDecisionCode, props.initialVersionPolicy]);
+  }, [decisions, incomingRawBindingValue, defaultDecisionCode, props.initialVersionPolicy]);
 
   const effectiveConsumerType = props.consumerType ?? initialRuleBinding?.consumerType;
   const effectiveConsumerCode = resolveConsumerCode(props, runtime, initialRuleBinding);
@@ -2004,12 +2021,17 @@ export function DecisionRuleBindingBlock({
             <div className="decision-rule-binding-heading">
               <strong>{bindingText('condition', locale)}</strong>
               <span>
-                {condition.children.length} {bindingText('entries', locale)}
+                {conditionCount} {bindingText('entries', locale)}
               </span>
             </div>
+            {conditionInactive && (
+              <p className="decision-rule-condition-notice" data-testid="condition-binding-inactive">
+                {bindingText('inactiveConditionHint', locale)}
+              </p>
+            )}
             <ConditionBuilder
               value={condition}
-              readOnly={readOnly}
+              readOnly={readOnly || conditionInactive}
               fields={ruleInputFields}
               onChange={updateCondition}
             />
@@ -2045,6 +2067,7 @@ export function DecisionRuleBindingBlock({
                   {bindingText('decision', locale)}
                   <select
                     aria-label="decision-code"
+                    disabled={decisions.length === 0}
                     value={binding.decisionCode}
                     onChange={(event) =>
                       setBinding((current) => {
@@ -2057,6 +2080,12 @@ export function DecisionRuleBindingBlock({
                       })
                     }
                   >
+                    {showCondition && decisions.length > 0 && (
+                      <option value="">{bindingText('conditionOnly', locale)}</option>
+                    )}
+                    {decisions.length === 0 && (
+                      <option value="">{bindingText('noDecisionAvailable', locale)}</option>
+                    )}
                     {decisions.map((decision) => (
                       <option key={decision.code} value={decision.code} title={decision.code}>
                         {decisionDisplayName(decision.code, decision.name, locale)}

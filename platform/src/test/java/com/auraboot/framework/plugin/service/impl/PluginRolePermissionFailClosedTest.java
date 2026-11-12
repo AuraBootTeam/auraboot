@@ -248,4 +248,13 @@ class PluginRolePermissionFailClosedTest {
         verify(menuService).createMenu(captor.capture());
         assertThat(captor.getValue().getParentId()).isEqualTo(5L);
     }
+    // FIND_TENANT_DELEGATION: production resolves permissions tenant-scoped now; keep the
+    // legacy per-code stubs authoritative by delegating the scoped lookup to them.
+    {
+        when(permissions.findByTenantIdAndCode(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyString()))
+            .thenAnswer(inv -> {
+                try { return permissions.findByCode(inv.getArgument(1)); }
+                catch (Exception absent) { throw absent; }
+            });
+    }
 }

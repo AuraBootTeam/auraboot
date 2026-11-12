@@ -24,6 +24,14 @@ const audit = readFileSync(resolve(root, 'scripts/application/audit-core-only-sc
 const oci = readFileSync(resolve(root, 'scripts/application/oci-layout.mjs'), 'utf8');
 const productImageGate = readFileSync(resolve(root, 'scripts/application/run-product-release-image-gate.sh'), 'utf8');
 
+test('native and OCI SMS budget probes reject missing, premature and non-OTP controls', () => {
+  execFileSync('python3', ['-B', join(root, 'scripts/ci/oss-security-probes.test.py')], { encoding: 'utf8' });
+  const native = readFileSync(join(root, 'scripts/ci/oss-native-install.py'), 'utf8');
+  const probes = readFileSync(join(root, 'scripts/ci/oss-security-probes.py'), 'utf8');
+  assert.match(native, /security_module\.verify_sms_mobile_window\(request, check, require, 'oci'\)/);
+  assert.match(probes, /verify_sms_mobile_window\(request, check, require, 'native'\)/);
+});
+
 test('product image reentry preserves the existing work root and refuses implicit replacement', t => {
   const directory = mkdtempSync(join(tmpdir(), 'product-work-root-'));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
@@ -127,6 +135,34 @@ test('image verification creates a private per-attempt encryption key and refuse
   assert.deepEqual(readFileSync(files[0]), original);
   assert.notEqual(create('relative').status, 0);
   assert.match(productImageGate, /--env-file "\$RUNTIME_CRYPTO_ENV_FILE"/);
+});
+
+test('native install guide creates private persistent keys once and refuses to rotate them', t => {
+  const directory = mkdtempSync(join(tmpdir(), 'native-guide-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const artifact = join(directory, 'artifact'); mkdirSync(artifact);
+  const guide = readFileSync(join(root, 'distribution/application/native-install.md'), 'utf8');
+  const code = guide.match(/python3 - <<'PY'\n([\s\S]*?)\nPY/)?.[1];
+  assert.ok(code, 'literal first-install configuration command must exist');
+  const run = () => spawnSync('python3', ['-c', code], { cwd: artifact, encoding: 'utf8' });
+  assert.equal(run().status, 0);
+  const config = join(directory, 'core-runtime.env');
+  const readPrivateConfig = () => {
+    const descriptor = openSync(config, 'r');
+    try {
+      assert.equal(fstatSync(descriptor).mode & 0o777, 0o600);
+      return readFileSync(descriptor);
+    } finally {
+      closeSync(descriptor);
+    }
+  };
+  const original = readPrivateConfig();
+  const before = createHash('sha256').update(original).digest('hex');
+  for (const key of ['JWT_SECRET', 'SESSION_SECRET', 'FIELD_ENCRYPTION_KEY', 'OPEN_PLATFORM_PROTOCOL_SIGNING_KEY']) {
+    assert.ok(original.toString('utf8').includes(key + '='), 'generated configuration must include ' + key);
+  }
+  assert.notEqual(run().status, 0);
+  assert.equal(createHash('sha256').update(readPrivateConfig()).digest('hex'), before);
 });
 
 test('core release stages a compiled Web shell and a self-contained deployment driver', () => {
@@ -257,7 +293,12 @@ test('core schema audit keeps provider-neutral automation storage in core', () =
 });
 
 test('release OCI is built on a pinned Linux JRE and requires a real image builder', () => {
-  assert.match(oci, /eclipse-temurin:21-jre@sha256:[0-9a-f]{64}/);
+  assert.match(oci, /eclipse-temurin:21-jre-noble@sha256:0eda5830ed7b669abc246a8dc520ea8a23cab06f9a8d4b6964109e2f2394e46f/);
+  assert.match(oci, /apt=2\.8\.4ubuntu0\.1 libapt-pkg6\.0t64=2\.8\.4ubuntu0\.1/);
+  assert.match(oci, /Acquire::Retries=0/);
+  assert.match(oci, /libpcre2-8-0=10\.42-4ubuntu2\.2/);
+  assert.match(oci, /update --error-on=any/);
+  assert.doesNotMatch(oci, /--allow-unauthenticated|trusted=yes/);
   assert.doesNotMatch(oci, /execFileSync\('container'/);
   assert.match(oci, /self-hosted Linux CI Docker builder \(linux\/amd64\)/);
   assert.match(oci, /AURA_OCI_BUILDER must be docker/);
@@ -461,6 +502,21 @@ function webComponentFixture(t) {
   f.write('artifact-catalog.json',catalog);f.write('application.lock',lock);f.write('release-receipt.json',f.receipt);
   return {...f,coreCommit:before.source.commit,repo,put,commit,before,catalog};
 }
+
+test('Core Web capture preserves every input in a large tracked source inventory',t=>{
+  const f=webComponentFixture(t);
+  const directory='web-admin/app/'+['a','b','c'].map(c=>c.repeat(180)).join('/');
+  const count=1800;
+  for(let index=0;index<count;index++)
+    f.put(`${directory}/${String(index).padStart(4,'0')}-${'d'.repeat(100)}.ts`,'export {};\n');
+  const current=f.commit();
+  const inventory=execFileSync('git',['ls-files','-z'],{cwd:f.repo,maxBuffer:16*1024*1024});
+  assert(inventory.length>1024*1024,'The real Git fixture must exceed Node default output capacity');
+  assert.equal(current.inputs.files.filter(entry=>entry.path.startsWith(directory+'/')).length,count);
+  assert.notEqual(current.inputDigest,f.before.inputDigest);
+  f.put('web-admin/untracked.ts','export {};\n');
+  assert.throws(()=>captureCoreWebInputs(f.repo),/Clean Core source required/);
+});
 
 function frozenWebSelection(f,exported) {
   const selection=join(f.directory,'core-web-selection.json'),inputs=join(f.directory,'dataset.json');

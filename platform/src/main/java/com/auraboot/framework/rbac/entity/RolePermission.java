@@ -36,6 +36,10 @@ public class RolePermission {
      * Public ID (UUID)
      */
     private String pid;
+
+    /** Database-maintained revision covering every grant mutation, including revocation. */
+    @TableField(insertStrategy = FieldStrategy.NEVER, updateStrategy = FieldStrategy.NEVER)
+    private Long policyRevision;
     
     // ========================================================================
     // Tenant Isolation
