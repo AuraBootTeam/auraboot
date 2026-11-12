@@ -518,6 +518,36 @@ test.describe('BOM & Quote domain levels', () => {
               createdPid,
             );
             const asyncBody = await asyncDenied.json();
+            expect(asyncDenied.status()).toBe(200);
+            expect(String(asyncBody.code)).toBe('0');
+            const submitted = asyncBody.data?.data ?? asyncBody.data;
+            expect(submitted.async).toBe(true);
+            expect(submitted.taskCode).toMatch(/^[A-Z0-9]{26}$/);
+            await expect
+              .poll(
+                async () =>
+                  (
+                    await client.query(
+                      `SELECT status FROM ab_async_task WHERE tenant_id=$1 AND task_code=$2`,
+                      [beforeAsync[0].tenant_id, submitted.taskCode],
+                    )
+                  ).rows[0]?.status,
+                {
+                  timeout: 30_000,
+                  message: 'Denied async input must reach an explicit failed task',
+                },
+              )
+              .toBe('failed');
+            const delivered = (
+              await client.query(
+                `SELECT task_code,status,error_message,retry_count,result_data FROM ab_async_task WHERE tenant_id=$1 AND task_code=$2`,
+                [beforeAsync[0].tenant_id, submitted.taskCode],
+              )
+            ).rows;
+            expect(delivered).toHaveLength(1);
+            expect(delivered[0].error_message).toContain('PERMISSION_DENIED');
+            expect(delivered[0].retry_count).toBe(0);
+            expect(delivered[0].result_data).toBeNull();
             const queuedAfter = await client.query(
               `SELECT task_code FROM ab_async_task WHERE input_params->>'recordPid'=$1 ORDER BY id`,
               [createdPid],
@@ -533,13 +563,15 @@ test.describe('BOM & Quote domain levels', () => {
                 result: asyncBody.data,
                 queuedBefore: queuedBefore.rows,
                 queuedAfter: queuedAfter.rows,
-                rowUnchangedAtResponse: JSON.stringify(beforeAsync) === JSON.stringify(afterAsync),
+                delivery: delivered[0],
+                rowUnchangedAfterDelivery:
+                  JSON.stringify(beforeAsync) === JSON.stringify(afterAsync),
               }),
               contentType: 'application/json',
             });
-            expect.soft(asyncDenied.status()).toBe(403);
-            expect.soft(queuedAfter.rows).toEqual(queuedBefore.rows);
-            expect.soft(afterAsync).toEqual(beforeAsync);
+            expect(queuedBefore.rows).toHaveLength(0);
+            expect(queuedAfter.rows).toEqual([{ task_code: submitted.taskCode }]);
+            expect(afterAsync).toEqual(beforeAsync);
           }
           await info.attach(`${domain}-finite-fields-persistence`, {
             body: JSON.stringify({
