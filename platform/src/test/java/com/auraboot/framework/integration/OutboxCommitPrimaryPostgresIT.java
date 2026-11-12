@@ -68,7 +68,9 @@ class OutboxCommitPrimaryPostgresIT {
         assertNotNull(url); assertTrue(url.startsWith("jdbc:postgresql://"));
         URI target = URI.create(url.substring(5));
         assertEquals("127.0.0.1", target.getHost()); assertTrue(target.getPort() > 0);
-        assertEquals("/enterprise_1", target.getPath()); assertNull(target.getQuery()); assertNull(target.getUserInfo());
+        assertEquals("/enterprise_1", target.getPath());
+        assertTrue(target.getQuery() == null || "charSet=UTF8".equals(target.getQuery()), "Only the owned runtime charset option is allowed");
+        assertTrue(target.getUserInfo() == null, "Credentials must be supplied separately");
         String prefix = System.getenv("OUTBOX_COMMIT_PRIMARY_SCHEMA_PREFIX");
         assertNotNull(prefix); assertTrue(prefix.matches("it_procurement_commit_[a-f0-9]{16}"));
         schema = prefix + "_" + SCHEMAS.incrementAndGet();
@@ -93,7 +95,7 @@ class OutboxCommitPrimaryPostgresIT {
             String sequence = publicJdbc.queryForObject("SELECT pg_get_serial_sequence(?, 'id')", String.class, schema + "." + table);
             assertNotNull(sequence); assertTrue(sequence.startsWith(schema + "."), "Fixture identities cannot advance public sequences");
         }
-        var source = new DriverManagerDataSource(url + "?currentSchema=" + schema, username, password);
+        var source = new DriverManagerDataSource(url + (target.getQuery() == null ? "?" : "&") + "currentSchema=" + schema, username, password);
         jdbc = new JdbcTemplate(source);
         assertEquals(schema, jdbc.queryForObject("SELECT current_schema()", String.class));
         jdbc.execute("CREATE TABLE dispatch_effect (event_id text PRIMARY KEY,tenant_id bigint NOT NULL, "
