@@ -195,6 +195,17 @@ public class RoleGrantFieldScopeService {
                 || permission.getResourceCode() == null
                 || !permission.getResourceCode().matches("[A-Za-z_][A-Za-z0-9_]{0,127}")
                 || permission.getAction() == null || permission.getAction().isBlank()) return List.of();
+        var domain = new com.auraboot.framework.permission.entity.Permission();
+        domain.setCode(permission.getCode()); domain.setResourceType(permission.getResourceType());
+        domain.setAction(permission.getAction()); domain.setExtension(permission.getExtension());
+        var declared = DomainPermissionPolicy.models(domain);
+        if (!declared.isEmpty()) {
+            // Public domain ownership already covers native reads without a child Command.
+            // Internal command effects remain execution-only and are never authoring roots.
+            return declared.entrySet().stream()
+                    .filter(entry -> entry.getValue() instanceof List<?> actions && !actions.isEmpty())
+                    .map(entry -> (String) entry.getKey()).sorted().toList();
+        }
         if (("model." + permission.getResourceCode() + "." + permission.getAction()).equals(permission.getCode()))
             return Set.of("read", "create", "update").contains(permission.getAction()) ? List.of(permission.getResourceCode()) : List.of();
         if (!("operation".equalsIgnoreCase(permission.getResourceType()) || "data".equalsIgnoreCase(permission.getResourceType()))) return List.of();

@@ -57,6 +57,62 @@ class RoleGrantFieldScopeServiceTest {
         return List.of(new RoleGrantFieldScopeService.BusinessBoundary("bom.project.manage", "bom_project", "update"));
     }
 
+    private void domainPermission(String level) {
+        multipleRoots();
+        permission.setCode("bom.cap." + level); permission.setResourceCode("bom"); permission.setAction(level);
+        permission.setExtension(Map.of("domainModels", Map.of(
+                "bom_project", List.of("read"),
+                "bom_line", "read".equals(level) ? List.of("read") : List.of("read", "update"),
+                "unowned", List.of())));
+    }
+
+    @ParameterizedTest @ValueSource(strings={"read","write","manage"})
+    void domainFieldCandidatesUseDeclaredObjectsWithoutInventingChildCommands(String level) {
+        domainPermission(level);
+        var result = service.catalog(role,List.of());
+        assertThat(result).extracting(binding -> binding.modelCode()).containsExactly("bom_line","bom_project");
+        assertThat(result).allSatisfy(binding -> {
+            assertThat(binding.permissionCode()).isEqualTo(permission.getCode());
+            assertThat(binding.bindingPid()).isEqualTo("binding");
+        });
+        when(grants.findByRole(5L)).thenReturn(List.of());
+        var pending = service.candidates(role,Set.of(permission.getCode()),Set.of(permission.getCode()),List.of());
+        assertThat(pending).hasSize(2).allSatisfy(binding -> {
+            assertThat(binding.bindingPid()).isNull();
+            assertThat(binding.metadataRevision()).matches("[a-f0-9]{64}");
+        });
+        verify(models,never()).getModelDefinition("unowned");
+        verify(grants,never()).updateDirectFieldScope(any(),any(),any(),any(),any(),any());
+    }
+
+    @ParameterizedTest @ValueSource(strings={"read","write","manage"})
+    void finiteDomainFieldsPreserveOtherDeclaredObjectAllowances(String level) {
+        domainPermission(level);
+        var changes = service.preview(role,List.of(new Change("binding",null,null,List.of("remark"),List.of(),"bom_project")),
+                Set.of(permission.getCode()),Set.of(),List.of());
+        String encoded = applied(changes,List.of());
+        assertThat(BusinessGrantFieldScope.parse(new ObjectMapper(),encoded,"bom_project").readable()).containsExactly("remark");
+        assertThat(BusinessGrantFieldScope.parse(new ObjectMapper(),encoded,"bom_project").writable()).isEmpty();
+        assertThat(BusinessGrantFieldScope.parse(new ObjectMapper(),encoded,"bom_line").unrestricted()).isTrue();
+        assertThat(BusinessGrantFieldScope.select(new ObjectMapper(),encoded,"unowned")).isEmpty();
+        assertThatThrownBy(() -> service.preview(role,List.of(new Change("binding",null,null,List.of(),List.of(),"unowned")),
+                Set.of(permission.getCode()),Set.of(),List.of())).isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test void internalCommandEffectsDoNotBecomeStandaloneFieldAuthoringObjects() {
+        domainPermission("write");
+        permission.setExtension(Map.of("domainModels",Map.of("bom_project",List.of("read")),
+                "commandEffects",Map.of("bom_line",List.of("read","update"))));
+        assertThat(service.catalog(role,List.of())).extracting(binding -> binding.modelCode()).containsExactly("bom_project");
+        verify(models,never()).getModelDefinition("bom_line");
+    }
+
+    @Test void malformedDomainOwnershipCannotAdvertiseFieldAuthoring() {
+        domainPermission("read");
+        permission.setExtension(Map.of("domainModels",Map.of("bom_project",List.of("*"))));
+        assertThatThrownBy(() -> service.catalog(role,List.of())).isInstanceOf(AccessDeniedException.class);
+    }
+
     @Test void legacyOrMismatchedBusinessBoundaryCannotAdvertiseEditableFieldProtection() {
         assertThat(service.catalog(role, List.of())).isEmpty();
         permission.setAction("approve");
