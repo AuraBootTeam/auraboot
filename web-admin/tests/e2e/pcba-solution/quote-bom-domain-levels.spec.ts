@@ -106,9 +106,10 @@ test.describe('BOM & Quote domain levels', () => {
       });
       // Retired operations must be absent after the explicit release-data upgrade.
       const upgradedSnapshot = await unwrap(await page.request.get(draftUrl));
-      const retiredCodes = domain === 'bom'
-        ? ['bom.structure.release', 'bom.project.manage']
-        : ['qo.quote.approve', 'qo.quote.manage'];
+      const retiredCodes =
+        domain === 'bom'
+          ? ['bom.structure.release', 'bom.project.manage']
+          : ['qo.quote.approve', 'qo.quote.manage'];
       const registeredCodes = upgradedSnapshot.matrix.modules
         .flatMap((m: any) => m.resources)
         .flatMap((resource: any) => resource.actions)
@@ -310,14 +311,25 @@ test.describe('BOM & Quote domain levels', () => {
             }
           }
           if (domain === 'qo') {
-            for (const query of ['qo_quote_bom_price_metrics', 'qo_quote_process_fee_metrics', 'qo_quote_output_readiness']) {
-              const queryUrl = (quoteId: string) => `/api/datasource/list?${new URLSearchParams({
-                datasourceId: `nq:${query}`, valueField: 'pid', labelField: 'name', format: 'records', quoteId,
-              })}`;
+            for (const query of [
+              'qo_quote_bom_price_metrics',
+              'qo_quote_process_fee_metrics',
+              'qo_quote_output_readiness',
+            ]) {
+              const queryUrl = (quoteId: string) =>
+                `/api/datasource/list?${new URLSearchParams({
+                  datasourceId: `nq:${query}`,
+                  valueField: 'pid',
+                  labelField: 'name',
+                  format: 'records',
+                  quoteId,
+                })}`;
               const own = await actor.request.get(queryUrl(createdPid!));
               if (level === 'none') expect(own.status()).toBe(403);
               else {
-                expect(own.status(), `${query}: own quote must remain readable at ${level}`).toBe(200);
+                expect(own.status(), `${query}: own quote must remain readable at ${level}`).toBe(
+                  200,
+                );
                 await unwrap(own);
               }
               const foreign = await actor.request.get(queryUrl(foreignQuotePid!));
@@ -340,6 +352,179 @@ test.describe('BOM & Quote domain levels', () => {
             fullPage: true,
           });
         }
+
+        // Configure finite fields and the next business grant through the same existing role draft.
+        const beforeFinite = await unwrap(await page.request.get(draftUrl));
+        expect((await actor.request.get(`/api/dynamic/${model}/${createdPid}`)).status()).toBe(403);
+        await page.getByTestId(`domain-level-${domain}.cap.write`).check();
+        await page.getByTestId('permission-right-tab-scope').click();
+        await page.getByTestId('role-field-model').selectOption(model);
+        const readFields =
+          domain === 'bom'
+            ? ['bom_project_name', 'bom_project_quality_level']
+            : ['qo_quote_code', 'qo_quote_discount_pct'];
+        const writeFields = domain === 'bom' ? readFields : ['qo_quote_discount_pct'];
+        for (const level of ['read', 'write']) {
+          const grant = page.locator(`[data-testid^="grant-fields-${domain}.cap.${level}-"]`);
+          await expect(grant).toHaveCount(1);
+          await grant
+            .getByRole('button', {
+              name: /配置此对象|设置明确字段列表|Configure this object|Set a finite field list/,
+            })
+            .click();
+          const checkedIds = await grant
+            .locator('input[type="checkbox"]:checked')
+            .evaluateAll((inputs) => inputs.map((input) => input.getAttribute('data-testid')!));
+          for (const id of checkedIds) await grant.getByTestId(id).uncheck();
+          for (const field of readFields) {
+            await grant.locator(`[data-testid$="-read-${field}"]`).check();
+          }
+          if (level === 'write') {
+            for (const field of writeFields) {
+              await grant.locator(`[data-testid$="-write-${field}"]`).check();
+            }
+          }
+        }
+        await expect(page.getByTestId('grant-fields-pending')).toBeVisible();
+        // Candidate previews and unsaved checkbox changes must not grant access.
+        expect((await unwrap(await page.request.get(draftUrl))).revision).toBe(
+          beforeFinite.revision,
+        );
+        expect((await actor.request.get(`/api/dynamic/${model}/${createdPid}`)).status()).toBe(403);
+        const finitePreview = page.waitForResponse(
+          (r) =>
+            new URL(r.url()).pathname === `${draftUrl}/preview` &&
+            r.request().method() === 'POST' &&
+            (r.request().postDataJSON().grantFieldChanges?.length ?? 0) === 2,
+        );
+        await page.getByTestId('capability-save').click();
+        const finiteResponse = await finitePreview;
+        const finiteBody = finiteResponse.request().postDataJSON();
+        const finiteReview = await unwrap(finiteResponse);
+        expect(finiteBody.defaultScopeChanged).toBe(false);
+        expect(finiteBody.scopeChanges).toHaveLength(0);
+        expect(finiteBody.fieldChanges ?? []).toHaveLength(0);
+        expect(finiteBody.grantFieldChanges).toHaveLength(2);
+        expect(finiteReview.grantFieldChanges).toHaveLength(2);
+        for (const change of finiteBody.grantFieldChanges) {
+          expect(change.modelCode).toBe(model);
+          expect(change.expectedMetadataRevision).toMatch(/^[a-f0-9]{64}$/);
+        }
+        await expect(page.getByTestId('draft-preview-grant-fields')).toBeVisible();
+        await page.screenshot({
+          path: info.outputPath(`${domain}-finite-fields-preview.png`),
+          fullPage: true,
+        });
+        const finiteSave = page.waitForResponse(
+          (r) => new URL(r.url()).pathname === draftUrl && r.request().method() === 'PUT',
+        );
+        await page.getByTestId('confirm-ok').click();
+        await unwrap(await finiteSave);
+        await expect(page.getByTestId('confirm-dialog')).toBeHidden();
+        const finiteSnapshot = await unwrap(await page.request.get(draftUrl));
+        expect(policyState(finiteSnapshot)).toEqual(baseline);
+        expect(finiteSnapshot.scopes).toEqual(expect.arrayContaining(beforeFinite.scopes));
+        for (const level of ['read', 'write']) {
+          const bindings = finiteSnapshot.grantFields.filter(
+            (binding: any) =>
+              binding.permissionCode === `${domain}.cap.${level}` && binding.modelCode === model,
+          );
+          expect(bindings).toHaveLength(1);
+          expect(bindings[0].readFields.slice().sort()).toEqual(readFields.slice().sort());
+          expect(bindings[0].writeFields.slice().sort()).toEqual(
+            level === 'write' ? writeFields.slice().sort() : [],
+          );
+        }
+        // The actor keeps the original session; the newly saved field allowance must drive real execution.
+        const allowed = await unwrap(
+          await command(normal, fixture, domain === 'qo' ? createdPid : undefined),
+        );
+        if (domain === 'bom') {
+          createdPid = (allowed.data ?? allowed).recordPid ?? (allowed.data ?? allowed).recordId;
+          expect(createdPid).toMatch(/^[A-Z0-9]{26}$/);
+          await setHiddenFixture(createdPid!);
+        }
+        const excluded = domain === 'bom' ? 'bom_pcba_code' : 'qo_quote_price_factor';
+        const { client } = await openPgClient();
+        try {
+          if (domain === 'bom') {
+            const seeded = await client.query(
+              `UPDATE mt_${model} SET ${excluded}=$1 WHERE pid=$2`,
+              ['FINITE-FIELD-SOURCE', createdPid],
+            );
+            expect(seeded.rowCount).toBe(1);
+          }
+          const beforeDenied = (
+            await client.query(`SELECT * FROM mt_${model} WHERE pid=$1`, [createdPid])
+          ).rows;
+          expect(beforeDenied).toHaveLength(1);
+          expect(beforeDenied[0][excluded]).not.toBeNull();
+          const projected = await unwrap(
+            await actor.request.get(`/api/dynamic/${model}/${createdPid}`),
+          );
+          for (const field of readFields) expect(projected).toHaveProperty(field);
+          expect(projected).not.toHaveProperty(excluded);
+          expect(projected).not.toHaveProperty(hiddenField);
+          const rejectedName = `FINITE-DENIED-${Date.now()}`;
+          const deniedPayload =
+            domain === 'bom'
+              ? { ...fixture, bom_project_name: rejectedName, [excluded]: 'DISALLOWED' }
+              : { qo_quote_discount_pct: 0.07, [excluded]: 200 };
+          expect(
+            (
+              await command(normal, deniedPayload, domain === 'qo' ? createdPid : undefined)
+            ).status(),
+          ).toBe(403);
+          expect(
+            (await client.query(`SELECT * FROM mt_${model} WHERE pid=$1`, [createdPid])).rows,
+          ).toEqual(beforeDenied);
+          if (domain === 'bom') {
+            expect(
+              (
+                await client.query(
+                  `SELECT count(*)::int AS count FROM mt_${model} WHERE bom_project_name=$1`,
+                  [rejectedName],
+                )
+              ).rows[0].count,
+            ).toBe(0);
+          }
+          if (domain === 'qo') {
+            expect(
+              (await actor.request.get(`/api/dynamic/${model}/${foreignQuotePid}`)).status(),
+            ).toBe(403);
+          }
+          await info.attach(`${domain}-finite-fields-persistence`, {
+            body: JSON.stringify({
+              grants: finiteSnapshot.grantFields.filter(
+                (binding: any) => binding.modelCode === model,
+              ),
+              defaultScopeType: finiteSnapshot.defaultScopeType,
+              scopes: finiteSnapshot.scopes,
+              projected,
+              deniedWritePreservedRow: true,
+              sameSession: true,
+            }),
+            contentType: 'application/json',
+          });
+        } finally {
+          await client.end();
+        }
+        await page.reload();
+        await page.getByTestId('role-search-input').fill(role.code);
+        await page.getByTestId(`role-item-${role.code}`).click();
+        await page.getByTestId('permission-right-tab-scope').click();
+        await page.getByTestId('role-field-model').selectOption(model);
+        for (const level of ['read', 'write']) {
+          const grant = page.locator(`[data-testid^="grant-fields-${domain}.cap.${level}-"]`);
+          for (const field of readFields)
+            await expect(grant.locator(`[data-testid$="-read-${field}"]`)).toBeChecked();
+          await expect(grant.locator(`[data-testid$="-write-${excluded}"]`)).not.toBeChecked();
+        }
+        await page.getByTestId('role-grant-fields').scrollIntoViewIfNeeded();
+        await page.screenshot({
+          path: info.outputPath(`${domain}-finite-fields-saved.png`),
+          fullPage: true,
+        });
       } finally {
         await actor.close();
       }
