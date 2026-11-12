@@ -144,5 +144,12 @@
     "dev-pipeline",
     "growth",
     "customer-pcba-solution"
+  ],
+  "bom-quote": [
+    "core-meta",
+    "platform-admin",
+    "core-aurabot",
+    "page-manager",
+    "org-management"
   ]
 }
