@@ -1020,15 +1020,18 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
         var baseline = grantFieldsBaseline();
         var binding = baseline.grantFields().stream().filter(b -> b.permissionCode().equals(readCode)).findFirst().orElseThrow();
         assertThat(binding.legacy()).isTrue(); assertThat(binding.editable()).isTrue();
-        String facts = jdbc.queryForObject("SELECT (to_jsonb(g)-'field_scope'-'updated_at'-'updated_by')::text FROM ab_role_permission g WHERE pid=? AND tenant_id=?", String.class, binding.bindingPid(), getTestTenant().getId());
+        String facts = jdbc.queryForObject("SELECT (to_jsonb(g)-'field_scope'-'updated_at'-'updated_by'-'policy_revision')::text FROM ab_role_permission g WHERE pid=? AND tenant_id=?", String.class, binding.bindingPid(), getTestTenant().getId());
+        Long revision = jdbc.queryForObject("SELECT policy_revision FROM ab_role_permission WHERE pid=? AND tenant_id=?", Long.class, binding.bindingPid(), getTestTenant().getId());
         var request = grantFieldsRequest(baseline, new com.auraboot.framework.permission.dto.RoleGrantFields.Change(binding.bindingPid(), List.of(resource+"_secret"), List.of()));
         var preview = drafts.preview(rolePid, request);
         assertThat(preview.grantFieldChanges()).hasSize(1);
         assertThat(jdbc.queryForObject("SELECT field_scope IS NULL FROM ab_role_permission WHERE pid=? AND tenant_id=?", Boolean.class, binding.bindingPid(), getTestTenant().getId())).isTrue();
+        assertThat(jdbc.queryForObject("SELECT policy_revision FROM ab_role_permission WHERE pid=? AND tenant_id=?", Long.class, binding.bindingPid(), getTestTenant().getId())).isEqualTo(revision);
         var saved = drafts.apply(rolePid, request);
         var view = saved.grantFields().stream().filter(b -> b.bindingPid().equals(binding.bindingPid())).findFirst().orElseThrow();
         assertThat(view.legacy()).isFalse(); assertThat(view.readFields()).containsExactly(resource+"_secret"); assertThat(view.writeFields()).isEmpty();
-        assertThat(jdbc.queryForObject("SELECT (to_jsonb(g)-'field_scope'-'updated_at'-'updated_by')::text FROM ab_role_permission g WHERE pid=? AND tenant_id=?", String.class, binding.bindingPid(), getTestTenant().getId())).isEqualTo(facts);
+        assertThat(jdbc.queryForObject("SELECT (to_jsonb(g)-'field_scope'-'updated_at'-'updated_by'-'policy_revision')::text FROM ab_role_permission g WHERE pid=? AND tenant_id=?", String.class, binding.bindingPid(), getTestTenant().getId())).isEqualTo(facts);
+        assertThat(jdbc.queryForObject("SELECT policy_revision FROM ab_role_permission WHERE pid=? AND tenant_id=?", Long.class, binding.bindingPid(), getTestTenant().getId())).isEqualTo(revision + 1);
         assertThat(saved.grantFields().stream().filter(b -> b.permissionCode().equals(updateCode)).findFirst().orElseThrow().legacy()).isTrue();
         assertThatThrownBy(() -> drafts.apply(rolePid, request)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
     }
