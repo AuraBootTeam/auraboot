@@ -287,3 +287,22 @@ describe('list cell renderer', () => {
     );
   });
 });
+
+describe('authored multiline list text', () => {
+  it('passes the existing multiline and width contract with the exact source text', () => {
+    const { result } = renderHook(() => useListCellRenderer(options()));
+    const value = '000123\nCapacitor\n4.7uF ±10% 50V';
+    result.current(
+      { field: 'materialSummary', valueType: 'text', multiline: true, width: 250 },
+      { materialSummary: value },
+      0,
+    );
+    expect(registry.render).toHaveBeenCalledWith(
+      'text',
+      expect.objectContaining({
+        value,
+        column: expect.objectContaining({ multiline: true, width: 250 }),
+      }),
+    );
+  });
+});

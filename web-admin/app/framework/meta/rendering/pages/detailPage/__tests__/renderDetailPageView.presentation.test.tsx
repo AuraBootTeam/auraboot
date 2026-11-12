@@ -1,5 +1,5 @@
 import { createRef } from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { renderDetailPageView } from '../renderDetailPageView';
@@ -79,5 +79,51 @@ describe('actual detail presentation body', () => {
     expect(screen.getByTestId('ab:detail:case:container')).toHaveStyle({
       minHeight: 'calc(100vh - var(--workspace-header-height, 64px))',
     });
+  });
+});
+
+describe('detail permission recovery', () => {
+  it.each([
+    ['en', 'Go to home'],
+    ['zh-CN', '返回首页'],
+  ])('returns denied deep links to an accessible home in %s', (locale, label) => {
+    render(
+      <MemoryRouter>
+        {renderDetailPageView({
+          ...args(null),
+          locale,
+          recordError: 'Forbidden',
+          recordAccessDenied: true,
+        })}
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link', { name: label })).toHaveAttribute('href', '/home');
+    expect(screen.queryByText('Actual event subject')).not.toBeInTheDocument();
+  });
+
+  it('keeps non-permission errors on the original model list', () => {
+    render(
+      <MemoryRouter>
+        {renderDetailPageView({ ...args(null), recordError: 'Not found', recordNotFound: true })}
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/p/case');
+  });
+
+  it('closes a denied modal without navigating its host', () => {
+    const onClose = vi.fn();
+    render(
+      <MemoryRouter>
+        {renderDetailPageView({
+          ...args({ mode: 'modal', footerTarget: null, onClose }),
+          closeLabel: 'Close',
+          recordError: 'Forbidden',
+          recordAccessDenied: true,
+        })}
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 });

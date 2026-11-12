@@ -61,7 +61,11 @@ export function useListCellRenderer({
       if (byRenderComponent) {
         return byRenderComponent;
       }
-      const declaredTemporalType = resolveTemporalType(undefined, modelFieldMap.get(field)?.dataType, undefined);
+      const declaredTemporalType = resolveTemporalType(
+        undefined,
+        modelFieldMap.get(field)?.dataType,
+        undefined,
+      );
       if (declaredTemporalType) return declaredTemporalType;
       // REFERENCE field: either ends with _id, or has a {field}_display sibling in the record
       if (field.endsWith('_id') || (record && record[`${field}_display`] !== undefined)) {
@@ -122,7 +126,9 @@ export function useListCellRenderer({
             // to render a leading icon instead of the semantic color dot.
             return (
               <StatusDot
-                tone={resolveStatusTone(typeof item.extension?.color === 'string' ? item.extension.color : undefined)}
+                tone={resolveStatusTone(
+                  typeof item.extension?.color === 'string' ? item.extension.color : undefined,
+                )}
                 label={item.label}
                 icon={typeof item.extension?.icon === 'string' ? item.extension.icon : undefined}
               />
@@ -149,7 +155,9 @@ export function useListCellRenderer({
       }
 
       // Use CellRendererRegistry for valueType-based rendering
-      const rendererType = column.presentation ? 'workspace' : (column as any).cellRenderer || effectiveValueType;
+      const rendererType = column.presentation
+        ? 'workspace'
+        : (column as any).cellRenderer || effectiveValueType;
       return cellRendererRegistry.render(rendererType, {
         value,
         record: recordForRenderer,
@@ -157,6 +165,8 @@ export function useListCellRenderer({
           field: column.field,
           label: typeof column.label === 'string' ? column.label : undefined,
           valueType: effectiveValueType,
+          multiline: column.multiline,
+          width: column.width,
           cellRenderer: (column as any).cellRenderer,
           format: column.format,
           dateTimeFormats,

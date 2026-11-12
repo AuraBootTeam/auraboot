@@ -215,10 +215,12 @@ export function renderDetailPageView({
               </button>
             ) : (
               <Link
-                to={`/p/${tableName}`}
+                to={recordAccessDenied ? '/home' : `/p/${tableName}`}
                 className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover mx-auto inline-flex border px-3 py-1.5 text-sm font-medium"
               >
-                {resolveTextFallback(t, 'action.back', 'Back')}
+                {recordAccessDenied
+                  ? getLocalizedText({ 'zh-CN': '返回首页', en: 'Go to home' }, locale, t)
+                  : resolveTextFallback(t, 'action.back', 'Back')}
               </Link>
             )}
           </div>
