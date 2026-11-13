@@ -272,7 +272,7 @@ test('mature project creation and editing preserve customer owner dates budget a
   await shot(page, 'PJ03-mature-project-created');
   await page.getByTestId('toolbar-btn-edit').click();
   await expect(page.locator('#tpm_pj_name')).toHaveValue(name);
-  await expect(page.getByTestId('select-trigger-tpm_pj_customer_id')).toContainText('华辰制造');
+  await expect(page.getByTestId('select-trigger-tpm_pj_customer_id')).toHaveValue('华辰制造');
   await expect(page.getByTestId('user-select-trigger-tpm_pj_owner_user')).toContainText(
     'Admin User',
   );
