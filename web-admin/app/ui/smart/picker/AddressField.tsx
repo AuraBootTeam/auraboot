@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useId, useMemo, useState } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import TEXT from './AddressField.i18n.json';
@@ -86,6 +86,7 @@ export const AddressField: React.FC<AddressFieldProps> = ({
   className = '',
 }) => {
   const { locale, t } = useI18n();
+  const controlId = useId();
   const text = (key: keyof typeof TEXT) => getLocalizedText(TEXT[key], locale, t);
   const {
     labelText,
@@ -221,74 +222,97 @@ export const AddressField: React.FC<AddressFieldProps> = ({
       {manualEntry ? (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {(['province', 'city', 'district'] as const).map((key) => (
-            <input
-              key={key}
-              type="text"
-              aria-label={text(key)}
-              placeholder={text(key)}
-              value={state[key]}
-              maxLength={100}
-              disabled={!isInteractive}
-              className={selectBase}
-              onChange={(event) => updateState({ ...state, [key]: event.target.value })}
-            />
+            <div key={key} className="min-w-0 space-y-1">
+              <label htmlFor={`${controlId}-${key}`} className="text-text-2 text-xs font-medium">
+                {text(key)}
+              </label>
+              <input
+                id={`${controlId}-${key}`}
+                type="text"
+                aria-label={text(key)}
+                placeholder={text(key)}
+                value={state[key]}
+                maxLength={100}
+                disabled={!isInteractive}
+                className={selectBase}
+                onChange={(event) => updateState({ ...state, [key]: event.target.value })}
+              />
+            </div>
           ))}
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-2">
           {/* Province */}
-          <select
-            data-testid={`address-province-${name}`}
-            aria-label={text('province')}
-            value={state.province}
-            onChange={handleProvinceChange}
-            disabled={!isInteractive}
-            className={selectBase}
-          >
-            <option value="">{text('chooseProvince')}</option>
-            {regions.map((p) => (
-              <option key={p.code} value={p.name}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          <div className="min-w-0 space-y-1">
+            <label htmlFor={`${controlId}-province`} className="text-text-2 text-xs font-medium">
+              {text('province')}
+            </label>
+            <select
+              id={`${controlId}-province`}
+              data-testid={`address-province-${name}`}
+              aria-label={text('province')}
+              value={state.province}
+              onChange={handleProvinceChange}
+              disabled={!isInteractive}
+              className={selectBase}
+            >
+              <option value="">{text('chooseProvince')}</option>
+              {regions.map((p) => (
+                <option key={p.code} value={p.name}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* City */}
-          <select
-            data-testid={`address-city-${name}`}
-            aria-label={text('city')}
-            value={state.city}
-            onChange={handleCityChange}
-            disabled={!isInteractive || !state.province}
-            className={selectBase}
-          >
-            <option value="">{text('chooseCity')}</option>
-            {cityNodes.map((c) => (
-              <option key={c.code} value={c.name}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+          <div className="min-w-0 space-y-1">
+            <label htmlFor={`${controlId}-city`} className="text-text-2 text-xs font-medium">
+              {text('city')}
+            </label>
+            <select
+              id={`${controlId}-city`}
+              data-testid={`address-city-${name}`}
+              aria-label={text('city')}
+              value={state.city}
+              onChange={handleCityChange}
+              disabled={!isInteractive || !state.province}
+              className={selectBase}
+            >
+              <option value="">{text('chooseCity')}</option>
+              {cityNodes.map((c) => (
+                <option key={c.code} value={c.name}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* District */}
-          <select
-            data-testid={`address-district-${name}`}
-            aria-label={text('district')}
-            value={state.district}
-            onChange={handleDistrictChange}
-            disabled={!isInteractive || !state.city}
-            className={selectBase}
-          >
-            <option value="">
-              {text('chooseDistrict')}
-              {requireDistrict ? ' *' : ''}
-            </option>
-            {districtNodes.map((d) => (
-              <option key={d.code} value={d.name}>
-                {d.name}
+          <div className="min-w-0 space-y-1">
+            <label htmlFor={`${controlId}-district`} className="text-text-2 text-xs font-medium">
+              {text('district')}
+            </label>
+            <select
+              id={`${controlId}-district`}
+              data-testid={`address-district-${name}`}
+              aria-label={text('district')}
+              value={state.district}
+              onChange={handleDistrictChange}
+              disabled={!isInteractive || !state.city}
+              className={selectBase}
+            >
+              <option value="">
+                {text('chooseDistrict')}
+                {requireDistrict ? ' *' : ''}
               </option>
-            ))}
-          </select>
+              {districtNodes.map((d) => (
+                <option key={d.code} value={d.name}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       )}
 
@@ -300,17 +324,23 @@ export const AddressField: React.FC<AddressFieldProps> = ({
 
       {/* Detail address textarea */}
       {showDetailAddress && (
-        <textarea
-          data-testid={`address-detail-${name}`}
-          aria-label={text('detail')}
-          rows={2}
-          value={state.detail}
-          onChange={handleDetailChange}
-          disabled={!isInteractive}
-          placeholder={detailPlaceholder ?? text('detailPlaceholder')}
-          maxLength={detailMaxLength}
-          className={textareaBase}
-        />
+        <div className="space-y-1">
+          <label htmlFor={`${controlId}-detail`} className="text-text-2 text-xs font-medium">
+            {text('detail')}
+          </label>
+          <textarea
+            id={`${controlId}-detail`}
+            data-testid={`address-detail-${name}`}
+            aria-label={text('detail')}
+            rows={2}
+            value={state.detail}
+            onChange={handleDetailChange}
+            disabled={!isInteractive}
+            placeholder={detailPlaceholder ?? text('detailPlaceholder')}
+            maxLength={detailMaxLength}
+            className={textareaBase}
+          />
+        </div>
       )}
 
       {/* Hidden input for form submission */}

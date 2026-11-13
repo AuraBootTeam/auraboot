@@ -40,6 +40,18 @@ describe('shared command address input', () => {
     expect(screen.getByRole('combobox', { name: '省份' })).toBeVisible();
     expect(screen.getByRole('combobox', { name: '城市' })).toBeDisabled();
     expect(screen.getByRole('combobox', { name: '区县' })).toBeDisabled();
+    for (const caption of ['省份', '城市', '区县', '详细地址'])
+      expect(screen.getByText(caption, { selector: 'label' })).toBeVisible();
+  });
+  it('keeps visible captions when manual region values have replaced their placeholders', () => {
+    open();
+    fireEvent.click(screen.getByRole('checkbox', { name: '手动填写地区' }));
+    for (const caption of ['省份', '城市', '区县']) {
+      fireEvent.change(screen.getByRole('textbox', { name: caption }), {
+        target: { value: '已填写' },
+      });
+      expect(screen.getByText(caption, { selector: 'label' })).toBeVisible();
+    }
   });
   it('does not treat a nonempty but incomplete address object as valid required input', () => {
     const submit = open({
