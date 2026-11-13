@@ -75,7 +75,7 @@ test.describe('PCBA quote domain gap fill golden', () => {
       }, created.rows);
       const conversion = await page.request.post('/api/meta/commands/execute/bom:start_conversion', {
         data: { payload: { bom_task_customer_id: customerId, bom_task_project_id: projectId,
-          bom_task_raw_file_id: fileId } },
+          bom_task_raw_file_id: fileId, bom_task_raw_filename: `header-only-${marker}.xlsx` } },
       });
       expect(conversion.status()).toBe(200);
       const body = await conversion.json();
@@ -87,10 +87,14 @@ test.describe('PCBA quote domain gap fill golden', () => {
         ]);
         expect(tasks.length).toBeLessThanOrEqual(1);
         task = tasks[0];
+        if (task && !created.rows.some(row => row.pid === String(task!.pid)))
+          created.rows.push({ model: 'bom_conversion_task_pcba', pid: String(task.pid) });
         return task?.bom_task_status;
-      }, { timeout: 60_000 }).toBe('failed');
+      }, { timeout: 60_000 }).toMatch(/^(completed|failed)$/);
+      expect(task!.bom_task_status, 'header-only workbook must factually fail').toBe('failed');
       created.rows.push({ model: 'bom_conversion_task_pcba', pid: String(task!.pid) });
-      expect(String(task!.bom_task_error_message), 'empty workbook failure explains its cause').toMatch(/无|没有|空|有效|数据/);
+      expect(String(task!.bom_task_error_message), 'empty workbook failure explains its cause').toMatch(/无有效|没有.*数据|未.*数据|空.*BOM|零有效|zero.effective/i);
+      expect(String(task!.bom_task_error_message)).not.toMatch(/filename is required/);
       expect(String(task!.bom_task_export_file_id ?? ''), 'failed task has no export').toBe('');
       const canonical = await queryDynamicRecords(page, 'req_requirement_line_pcba_bom', [
         { fieldName: 'bom_cl_task_id', operator: 'EQ', value: task!.pid },

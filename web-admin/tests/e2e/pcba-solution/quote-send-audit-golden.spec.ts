@@ -2,6 +2,7 @@ import { test, expect } from '../../fixtures';
 import {
   cleanupRows,
   executeCommand,
+  openPgClient,
   seedBomPriceManualReviewQuote,
   cleanupImmutableQuoteArtifacts,
   queryDynamicRecords,
@@ -29,13 +30,6 @@ test.describe('PCBA quote send audit golden', () => {
           documents.set(String(row.pid), Number(row.qo_qd_version));
           if (!created.rows.some(owned => owned.pid === String(row.pid)))
             created.rows.push({ model: 'qo_quote_document_common', pid: String(row.pid) });
-        }
-        const artifacts = await queryDynamicRecords(page, 'ab_document_artifact', [
-          { fieldName: 'ab_da_source_record_pid', operator: 'EQ', value: created.quoteId },
-        ]);
-        for (const row of artifacts) {
-          if (!created.rows.some(owned => owned.pid === String(row.pid)))
-            created.rows.push({ model: 'ab_document_artifact', pid: String(row.pid) });
         }
         // Approval is a fixture precondition; the real send handler owns every audit row.
         const approved = await page.request.put(`/api/dynamic/qo_quote_common/${created.quoteId}`, {
@@ -78,6 +72,15 @@ test.describe('PCBA quote send audit golden', () => {
         expect(Number.isFinite(Date.parse(row.createdAt))).toBe(true);
       }
     } finally {
+      // Artifact rows are an internal surface, not a business-role permission.
+      // Reuse the existing guarded fixture DB helper solely to track owned cleanup.
+      const { client } = await openPgClient();
+      try {
+        const artifacts = await client.query(`SELECT a.pid FROM mt_ab_document_artifact a
+          JOIN mt_qo_quote_common q ON q.pid=a.ab_da_source_record_pid AND q.tenant_id=a.tenant_id
+          WHERE q.pid=$1`, [created.quoteId]);
+        for (const row of artifacts.rows) created.rows.push({ model: 'ab_document_artifact', pid: String(row.pid) });
+      } finally { await client.end(); }
       await cleanupImmutableQuoteArtifacts(created);
       await cleanupRows(page, created);
     }

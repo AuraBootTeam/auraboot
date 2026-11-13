@@ -396,7 +396,7 @@ test.describe('Quote actions deep — upload/process-fee/gerber/deepseek/source-
     await once(server, 'listening');
     const address = server.address();
     expect(address && typeof address !== 'string').toBeTruthy();
-    const providerCode = `q07-controlled-${uid}`;
+    const providerCode = `q07-${uid.slice(-16)}`;
     let configPid = '';
     try {
       const beforeResponse = await page.request.get('/api/llm-config?level=tenant');

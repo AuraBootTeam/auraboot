@@ -61,7 +61,7 @@ test.describe('BOM domain gap fill golden', () => {
           bom_task_customer_id: account,
           bom_task_project_id: project,
           bom_task_raw_file_id: fileId,
-          source_filename: `b09-mixed-${marker}.xlsx`,
+          bom_task_raw_filename: `b09-mixed-${marker}.xlsx`,
         } } },
       );
       const body = await conversion.json().catch(() => ({}));
@@ -74,8 +74,11 @@ test.describe('BOM domain gap fill golden', () => {
         ], { pageSize: 5 });
         expect(tasks.length, 'one task for this project').toBeLessThanOrEqual(1);
         task = tasks[0];
+        if (task && !created.rows.some(row => row.pid === String(task!.pid)))
+          created.rows.push({ model: 'bom_conversion_task_pcba', pid: String(task.pid) });
         return task?.bom_task_status;
-      }, { timeout: 120_000 }).toBe('completed');
+      }, { timeout: 120_000 }).toMatch(/^(completed|failed)$/);
+      expect(task!.bom_task_status, `B09 conversion: ${task!.bom_task_error_message ?? ''}`).toBe('completed');
       const taskId = String(task!.pid);
       created.rows.push({ model: 'bom_conversion_task_pcba', pid: taskId });
       const [raw, standard] = await Promise.all([
