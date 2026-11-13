@@ -64,7 +64,7 @@ public interface ApplicationDefinitionMapper {
     @Select("""
             SELECT * FROM ab_plugin_resource
             WHERE tenant_id=#{tenantId} AND plugin_pid=#{pluginPid}
-              AND resource_type IN ('model','field','command','permission','menu','page')
+              AND resource_type IN ('model','field','command','permission','menu','page','dashboard')
             ORDER BY resource_type,resource_code
             """)
     @Results(id = "applicationDefinitionPluginResource", value = {
