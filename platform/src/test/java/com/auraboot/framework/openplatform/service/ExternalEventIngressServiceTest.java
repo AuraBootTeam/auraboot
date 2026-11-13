@@ -225,6 +225,45 @@ class ExternalEventIngressServiceTest {
             assertThrows(ExternalEventIngressService.InvalidExternalEventException.class,()->service.accept(principal,"erp",null,body));
         verifyNoClaim();verify(accessor,never()).enqueue(any());
     }
+    @Test void explicitKeyWithoutCallerIdRestoresCanonicalEventIdentity() throws Exception {
+        idlessReplayUsesOriginalIdentity(false);
+    }
+    @Test void explicitKeyWithoutCallerIdRestoresLegacyEventIdentity() throws Exception {
+        idlessReplayUsesOriginalIdentity(true);
+    }
+    private void idlessReplayUsesOriginalIdentity(boolean legacy) throws Exception {
+        var installed=businessProvider();String body=businessBody();
+        String digest=legacy?codec.sha256(body):new OpenApiProtocolHash(new ObjectMapper(),codec).fingerprint(new ObjectMapper().readTree(body),false);
+        when(idempotencyMapper.claim(anyLong(),anyLong(),anyString(),anyString(),anyString(),any())).thenReturn(0);
+        when(idempotencyMapper.findRequestHash(42L,9L,"external-event:erp","explicit-key-1")).thenReturn(digest);
+        when(idempotencyMapper.findResponse(42L,9L,"external-event:erp","explicit-key-1")).thenReturn(
+                new OpenApiIdempotencyMapper.StoredResponse(digest,"completed",202,"{\"eventId\":\"retained-event-1\",\"accepted\":true}",null,null,null,null));
+        when(installed.verifyAcceptedReplay(eq(principal),eq("erp"),any())).thenReturn(new InstalledIntegrationService.Acceptance("original-pid",true));
+        var result=service.accept(principal,"erp","explicit-key-1",body);
+        assertEquals(java.util.Map.of("recordPid","original-pid"),result.publicReceipt());
+        assertEquals("retained-event-1",result.eventId());assertTrue(result.duplicate());
+        var envelope=ArgumentCaptor.forClass(IntegrationEventEnvelope.class);
+        verify(installed).verifyAcceptedReplay(eq(principal),eq("erp"),envelope.capture());
+        assertEquals("ext:inst:erp:retained-event-1",envelope.getValue().eventId());
+        assertEquals("retained-event-1",envelope.getValue().headers().get("externalEventId"));
+        verify(installed,never()).accept(any(),anyString(),any());verify(accessor,never()).enqueue(any());
+        verify(idempotencyMapper,never()).complete(anyLong(),anyLong(),anyString(),anyString(),anyString(),anyString());
+        // Call identity only; actual claim/receipt persistence is verified by the installed HTTP profile.
+    }
+    @Test void explicitKeyWithoutCallerIdCannotCreateWorkFromAnUnfinishedClaim() throws Exception {
+        var installed=businessProvider();String digest=new OpenApiProtocolHash(new ObjectMapper(),codec).fingerprint(readBusiness(),false);
+        when(idempotencyMapper.claim(anyLong(),anyLong(),anyString(),anyString(),anyString(),any())).thenReturn(0);
+        when(idempotencyMapper.findRequestHash(42L,9L,"external-event:erp","explicit-key-1")).thenReturn(digest);
+        for(var stored:java.util.List.of(
+                new OpenApiIdempotencyMapper.StoredResponse(digest,"processing",null,null,null,null,null,null),
+                new OpenApiIdempotencyMapper.StoredResponse(digest,"completed",202,"{\"eventId\":\"retained-event-1\",\"accepted\":false}",null,null,null,null),
+                new OpenApiIdempotencyMapper.StoredResponse(digest,"completed",202,"{\"eventId\":\"\",\"accepted\":true}",null,null,null,null))) {
+            when(idempotencyMapper.findResponse(42L,9L,"external-event:erp","explicit-key-1")).thenReturn(stored);
+            assertThrows(ExternalEventIngressService.IdempotencyConflictException.class,()->service.accept(principal,"erp","explicit-key-1",businessBody()));
+        }
+        verify(installed,never()).accept(any(),anyString(),any());verify(installed,never()).verifyAcceptedReplay(any(),anyString(),any());
+        verify(accessor,never()).enqueue(any());
+    }
     @Test void simplifiedInputRequiresExplicitProviderSupportAndLegacyStillRequiresItsHeader() {
         var installed=businessProvider();
         when(installed.prepareBusinessRequest(eq("erp"),any())).thenReturn(java.util.Optional.empty());

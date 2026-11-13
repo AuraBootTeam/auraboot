@@ -68,12 +68,21 @@ public class ExternalEventIngressService {
         if (claimed == 0) {
             String existingHash = idempotencyMapper.findRequestHash(principal.tenantId(), installation.getId(),
                     routeCode, idempotencyKey);
+            var stored = installed && event.businessRequest()
+                    && (!event.callerIdProvided() || !requestHash.equals(existingHash))
+                    ? idempotencyMapper.findResponse(principal.tenantId(), installation.getId(), routeCode, idempotencyKey) : null;
+            if (event.businessRequest() && !event.callerIdProvided()) {
+                // A retry must use the identity committed by the first request, not a new UUID.
+                String originalId = completedEventId(stored);
+                if (originalId == null) throw new IdempotencyConflictException();
+                event = event.withId(originalId);
+                verifyStoredReplay = true;
+            }
             if (!requestHash.equals(existingHash)) {
                 // Older accepted requests used the raw JSON bytes. Only their existing,
                 // event-bound receipt can authorize a formatting-only retry.
                 if (!installed || !event.businessRequest()
-                        || !completedForEvent(idempotencyMapper.findResponse(principal.tenantId(), installation.getId(),
-                                routeCode, idempotencyKey), event.id())) throw new IdempotencyConflictException();
+                        || !event.id().equals(completedEventId(stored))) throw new IdempotencyConflictException();
                 verifyStoredReplay = true;
             }
             if (installedIntegrations == null || !installedIntegrations.registered(sourceCode))
@@ -133,14 +142,15 @@ public class ExternalEventIngressService {
         }
     }
 
-    private boolean completedForEvent(OpenApiIdempotencyMapper.StoredResponse stored, String eventId) {
+    private String completedEventId(OpenApiIdempotencyMapper.StoredResponse stored) {
         if (stored == null || !"completed".equals(stored.status())
-                || !Integer.valueOf(202).equals(stored.responseStatus()) || stored.responseBody() == null) return false;
+                || !Integer.valueOf(202).equals(stored.responseStatus()) || stored.responseBody() == null) return null;
         try {
             JsonNode response = objectMapper.readTree(stored.responseBody());
-            return response != null && response.path("eventId").isTextual()
-                    && eventId.equals(response.path("eventId").asText())
-                    && response.path("accepted").isBoolean() && response.path("accepted").booleanValue();
+            if (response == null || !response.path("eventId").isTextual()
+                    || !response.path("eventId").asText().matches("[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}")
+                    || !response.path("accepted").isBoolean() || !response.path("accepted").booleanValue()) return null;
+            return response.path("eventId").asText();
         } catch (com.fasterxml.jackson.core.JsonProcessingException invalid) {
             throw new IllegalStateException("Invalid stored external event response", invalid);
         }
@@ -248,6 +258,9 @@ public class ExternalEventIngressService {
         ExternalEvent(String id,String type,int schemaVersion,Instant occurredAt,String subjectType,String subjectPid,
                       long sequence,Map<String,Object> data) {
             this(id,type,schemaVersion,occurredAt,subjectType,subjectPid,sequence,data,false,true);
+        }
+        ExternalEvent withId(String retainedId) {
+            return new ExternalEvent(retainedId,type,schemaVersion,occurredAt,subjectType,subjectPid,sequence,data,businessRequest,callerIdProvided);
         }
     }
 
