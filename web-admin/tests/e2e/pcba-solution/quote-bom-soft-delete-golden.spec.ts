@@ -150,7 +150,12 @@ test.describe('BOM conversion-task soft delete real-browser golden @smoke', () =
     await adminPage.getByTestId('confirm-ok').click();
 
     // 4. bom:delete_task command succeeds
-    const deleteBody = await (await deleteAgainPromise).json().catch(() => ({}));
+    const deleteResponse = await deleteAgainPromise;
+    const deleteRequest = deleteResponse.request().postDataJSON();
+    expect(deleteRequest.targetRecordPid, 'delete binds the exact selected task').toBe(taskPid);
+    expect(deleteRequest.payload, 'delete submits intent without unrelated row fields').toEqual({});
+    expect(Number(deleteRequest.expectedVersion), 'delete keeps optimistic version control').toBeGreaterThan(0);
+    const deleteBody = await deleteResponse.json().catch(() => ({}));
     expect(
       String((deleteBody as { code?: unknown }).code),
       `bom:delete_task response: ${JSON.stringify(deleteBody).slice(0, 500)}`,
