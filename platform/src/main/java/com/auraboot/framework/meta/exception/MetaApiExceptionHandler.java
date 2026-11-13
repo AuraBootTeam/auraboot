@@ -18,7 +18,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  *
  * Handles only exceptions that are unique to the Meta module.
  * Common exceptions (validation, binding, access denied, generic) are
- * handled by GlobalExceptionHandler to avoid duplication and priority conflicts.
+ * handled by GlobalExceptionHandler; explicit forwarding preserves root exception
+ * classifications ahead of nested Meta causes.
  *
  * @author AuraBoot Framework
  * @since 2.1.0
@@ -36,6 +37,13 @@ public class MetaApiExceptionHandler {
     public ResponseEntity<ApiResponse<Object>> handleBusinessException(
             BusinessException exception, HttpServletRequest request) {
         return globalExceptionHandler.handleBusinessException(exception, request);
+    }
+
+    /** Preserve the authorization decision before matching nested lookup causes. */
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Object>> handleAccessDeniedException(
+            org.springframework.security.access.AccessDeniedException exception) {
+        return globalExceptionHandler.handleAccessDeniedException(exception);
     }
 
     /** Keep absent records distinct from invalid business operations. */
