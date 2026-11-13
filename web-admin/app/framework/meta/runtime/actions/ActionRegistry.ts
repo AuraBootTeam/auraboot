@@ -18,6 +18,8 @@ import { resolveCommandErrorMessage } from '~/framework/meta/utils/commandRespon
 import { ActionCancelledError } from './ActionCancelledError';
 import { completedCommandOptions } from '../data-pipeline/completed-command-array';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import { ExpressionParser } from '../expression/parser';
+import { createExpressionContext } from '../expression/context';
 /**
  * ActionRegistry - 动作注册中心
  *
@@ -723,11 +725,21 @@ actionRegistry.register('toast.error', ({ args, showToast, locale, t }) => {
 /**
  * dialog.confirm - 确认对话框
  */
-actionRegistry.register('dialog.confirm', async ({ args, confirm: ctxConfirm }) => {
-  let message: any = args?.message || args?.content || 'Are you sure you want to proceed?';
-  if (message && typeof message === 'object') {
-    message =
-      (message as any)['zh-CN'] || (message as any)['en-US'] || 'Are you sure you want to proceed?';
+actionRegistry.register('dialog.confirm', async ({ args, confirm: ctxConfirm, expressionContext, locale, t }) => {
+  const configured = getLocalizedText(args?.message || args?.content, locale, t) || 'Are you sure you want to proceed?';
+  let message: unknown = configured;
+  if (configured.includes('${')) {
+    try {
+      if (!expressionContext) throw new Error('Missing confirmation context');
+      // Resolve configured expressions once. Never parse values returned by business data.
+      message = ExpressionParser.parse(configured, createExpressionContext(expressionContext));
+      if (typeof message !== 'string' || !message.trim()) throw new Error('Invalid confirmation text');
+    } catch {
+      throw new Error(getLocalizedText({
+        'zh-CN': '无法生成确认内容，请刷新后重新核对。',
+        en: 'Unable to prepare the confirmation. Refresh and review your selections.',
+      }, locale, t));
+    }
   }
   const doConfirm = ctxConfirm ?? confirmDialog;
   const confirmed = await doConfirm({ content: message as string });

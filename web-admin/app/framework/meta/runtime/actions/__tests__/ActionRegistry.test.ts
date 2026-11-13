@@ -673,6 +673,62 @@ describe('ActionRegistry command.execute inputFields (command-form sugar)', () =
 });
 
 describe('ActionRegistry dialog.confirm', () => {
+  it('evaluates localized confirmation text once and keeps business expression text literal', async () => {
+    const confirm = vi.fn().mockResolvedValue(true);
+    await actionRegistry.execute('dialog.confirm', {
+      confirm, locale: 'en-US',
+      expressionContext: createExpressionContext({ form: { label: '${record.secret}' } }),
+      args: { message: { 'zh-CN': '错误语言', en: "${fn.CONCAT('Selected: ', form.label)}" } },
+    });
+    expect(confirm).toHaveBeenCalledWith({ content: 'Selected: ${record.secret}' });
+  });
+
+  it('refuses unresolved dynamic confirmations instead of allowing a command after blank text', async () => {
+    const confirm = vi.fn().mockResolvedValue(true);
+    await expect(actionRegistry.execute('dialog.confirm', {
+      confirm, expressionContext: createExpressionContext({ form: {} }),
+      args: { message: '${form.absent}' },
+    })).rejects.toThrow();
+    await expect(actionRegistry.execute('dialog.confirm', {
+      confirm, args: { message: '${form.absent}' },
+    })).rejects.toThrow();
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it('sends the confirmed snapshot through the real flow after editable inputs change', async () => {
+    const manager = new ScopedStateManager({ locale: 'en-US', theme: 'light' } as any);
+    manager.createScope('confirmed', { form: { quantity: '1.000001', pickup: 'old-point' } });
+    const record = { pid: 'owned', rowVersion: 7, receiver: 'Old receiving address' };
+    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: { ok: true } });
+    const content: string[] = [];
+    registerConfirmDialog(async opts => {
+      content.push(opts.content);
+      manager.updateForm('confirmed', 'quantity', '999');
+      manager.updateForm('confirmed', 'pickup', 'different-point');
+      record.rowVersion = 99; record.receiver = 'Different receiving address';
+      return true;
+    });
+    try {
+      const flow = new FlowRunner({ evaluator: new ExpressionEvaluator(), actionRegistry,
+        stateManager: manager, scopeId: 'confirmed', dataSourceManager: {} as any,
+        schema: {} as any, getAllFormFields: () => [] });
+      await flow.run([
+        { action: 'form.set', args: { confirmed: {
+          target: '${record.pid}', version: '${record.rowVersion}', quantity: '${form.quantity}',
+          pickup: '${form.pickup}', receiver: '${record.receiver}',
+        } } },
+        { action: 'dialog.confirm', args: { message: "${fn.CONCAT(form.confirmed.quantity, ' / ', form.confirmed.pickup, ' / ', form.confirmed.receiver)}" } },
+        { action: 'command.execute', args: { command: 'example:ship', operationType: 'update',
+          targetRecordPid: '${form.confirmed.target}', expectedVersion: '${form.confirmed.version}',
+          payload: { quantity: '${form.confirmed.quantity}', pickup: '${form.confirmed.pickup}' } } },
+      ], { ...manager.getContext('confirmed'), record, fetchResult } as any);
+      expect(content).toEqual(['1.000001 / old-point / Old receiving address']);
+      expect(fetchResult).toHaveBeenCalledTimes(1);
+      expect(fetchResult.mock.calls[0][1].params).toMatchObject({ targetRecordPid: 'owned', expectedVersion: 7,
+        payload: { quantity: '1.000001', pickup: 'old-point' } });
+    } finally { unregisterConfirmDialog(); }
+  });
+
   it('aborts the real flow before its command and navigation when confirmation is cancelled', async () => {
     const fetchResult = vi.fn();
     const navigate = vi.fn();

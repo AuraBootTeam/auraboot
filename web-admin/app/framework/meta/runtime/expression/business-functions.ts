@@ -14,7 +14,7 @@
  */
 
 import dayjs from 'dayjs';
-import { projectRows } from './row-projection';
+import { boundedRecordRows, projectRows, readOwnPath } from './row-projection';
 import { selectRows } from './row-selection';
 
 // Decimal strings retain precision beyond JavaScript's safe integer range.
@@ -477,6 +477,23 @@ function JOIN(arr: any[], separator = ', '): string {
   return arr.map((v) => (v === null || v === undefined ? '' : String(v))).join(separator);
 }
 
+/** Plain row text: exact values, bounded own paths, no evaluation of returned data. */
+function FORMAT_ROWS(rows: unknown, template: unknown): string[] {
+  const records = boundedRecordRows(rows);
+  if (typeof template !== 'string' || template.length > 2048)
+    throw new Error('Expected a bounded row text template');
+  const token = /\{([A-Za-z_][A-Za-z0-9_.]*)\}/g;
+  if (/[{}]/.test(template.replace(token, '')))
+    throw new Error('Invalid row text template');
+  return records.map(row => template.replace(token, (_, path: string) => {
+    const value = readOwnPath(row, path);
+    if (!['string', 'number', 'boolean'].includes(typeof value) ||
+        (typeof value === 'number' && !Number.isFinite(value)))
+      throw new Error('Expected a scalar row text value');
+    return String(value);
+  }));
+}
+
 // ==================== Export ====================
 
 /**
@@ -580,6 +597,7 @@ export const businessFunctions = {
   GROUPBY,
   SORTBY,
   JOIN,
+  FORMAT_ROWS,
 } as const;
 
 /** Names of all business functions for SAFE_FUNCTIONS whitelist */
