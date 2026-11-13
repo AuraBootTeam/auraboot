@@ -1,9 +1,9 @@
 # This is a Gradle generated file for dependency locking.
 # Manual edits can break the build and are not advised.
 # This file is expected to be part of source control.
-com.baomidou:mybatis-plus-annotation:3.5.18=compileClasspath,testCompileClasspath,testRuntimeClasspath
+com.baomidou:mybatis-plus-annotation:3.5.18.1=compileClasspath,testCompileClasspath,testRuntimeClasspath
 com.baomidou:mybatis-plus-bom:3.5.18=compileClasspath
-com.baomidou:mybatis-plus-core:3.5.18=compileClasspath,testCompileClasspath,testRuntimeClasspath
+com.baomidou:mybatis-plus-core:3.5.18.1=compileClasspath,testCompileClasspath,testRuntimeClasspath
 com.baomidou:mybatis-plus-extension:3.5.18=compileClasspath
 com.baomidou:mybatis-plus-spring:3.5.18=compileClasspath
 com.fasterxml.jackson.core:jackson-annotations:2.22=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
