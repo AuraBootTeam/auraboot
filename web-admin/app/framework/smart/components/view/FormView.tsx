@@ -92,19 +92,24 @@ export const FormView: React.FC<FormViewProps> = ({
       return;
     }
     const slug = modelCode;
-    fetchResult<any>(`/api/meta/dynamic/${slug}/meta`)
+    setLoading(true);
+    setError(null);
+    fetchResult<any>(`/api/dynamic/${slug}/field-meta`)
       .then((result) => {
-        if (ResultHelper.isSuccess(result) && result.data) {
-          const meta = result.data;
-          let fieldDefs: FieldMeta[] = (meta.fields || []).map((f: any) => ({
+        if (!ResultHelper.isSuccess(result) || !Array.isArray(result.data)) {
+          throw new Error(result.message || 'Unable to load form field metadata');
+        }
+        {
+          let fieldDefs: FieldMeta[] = result.data.map((f: any) => ({
             code: f.code,
             columnName: f.columnName || f.code,
-            displayName: f.displayName || f.code,
+            displayName: f.displayName || f.uiSchema?.label || f.extension?.displayName || f.code,
             dataType: f.dataType || 'string',
             required: f.required || false,
             dictCode: f.dictCode,
-            referenceModelCode: f.referenceModelCode,
-            referenceDisplayField: f.referenceDisplayField,
+            referenceModelCode: f.referenceModelCode || f.refTarget?.targetModel,
+            referenceDisplayField:
+              f.referenceDisplayField || f.refTarget?.displayField || f.refTarget?.targetField,
             component: f.extension?.renderComponent,
           }));
 
@@ -187,6 +192,10 @@ export const FormView: React.FC<FormViewProps> = ({
         <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
       </div>
     );
+  }
+
+  if (error && fields.length === 0) {
+    return <ViewEmptyState variant="error" error={error} className={className} />;
   }
 
   if (fields.length === 0) {

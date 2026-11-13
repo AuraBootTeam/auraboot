@@ -20,7 +20,7 @@ interface MultiSelectProps {
   label?: string;
   name: string;
   options: SelectOption[];
-  value?: string[];
+  value?: string[] | null;
   defaultValue?: string[];
   placeholder?: string;
   maxSelection?: number;
@@ -75,7 +75,8 @@ export const MultiSelect = forwardRef<HTMLDivElement, MultiSelectProps>(
 
     // 判断是否为受控组件
     const isControlled = value !== undefined;
-    const currentValue = isControlled ? value : internalValue;
+    const rawValue = isControlled ? value : internalValue;
+    const currentValue = Array.isArray(rawValue) ? rawValue : [];
 
     const safeOptions = options ?? [];
     const filteredOptions = searchable

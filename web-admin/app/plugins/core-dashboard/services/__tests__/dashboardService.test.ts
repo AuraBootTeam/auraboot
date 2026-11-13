@@ -14,6 +14,22 @@ function baseDashboard(widgets: unknown[]): Dashboard {
 }
 
 describe('dashboardService.normalizeDashboard', () => {
+  it('retains registered widget properties across repeated load/save normalization', () => {
+    const config = {
+      title: 'Delivery', content: '<h2>Actual delivery</h2>', target: 128000,
+      filterFields: [{ id: 'category', type: 'select', field: 'category', options: [] }],
+      groupField: 'category', titleField: 'name', descriptionField: 'owner',
+      dataSource: { type: 'static', data: [] },
+      extensionOptions: { mode: 'business', flags: [false, 0] },
+    };
+    const first = normalizeDashboard(baseDashboard([
+      { id: 'widget', type: 'smart-kanban', x: 0, y: 0, w: 12, h: 4, config },
+    ]));
+    const reopened = normalizeDashboard(JSON.parse(JSON.stringify(first)));
+    expect(reopened.widgets[0].config).toMatchObject(config);
+    expect(config.extensionOptions.flags).toEqual([false, 0]);
+  });
+
   it('keeps model-table shorthand without synthesizing an empty static dataSource', () => {
     const dashboard = normalizeDashboard(
       baseDashboard([
