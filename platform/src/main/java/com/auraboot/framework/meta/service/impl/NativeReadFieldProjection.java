@@ -104,7 +104,11 @@ public class NativeReadFieldProjection {
             List<Map<String,Object>> result = new ArrayList<>(records.size());
             for (var record : records) {
                 if (!(record.get("__ab_auth_pid") instanceof String pid) || pid.isBlank()
-                        || record.get("__ab_auth_tenant") == null || !record.containsKey("__ab_auth_creator")) {
+                        || record.get("__ab_auth_tenant") == null
+                        // MyBatis omits null-valued map entries. Only the fixed host SELECT marker
+                        // can distinguish a loaded SQL NULL from missing authorization facts.
+                        || (!record.containsKey("__ab_auth_creator")
+                            && !Boolean.TRUE.equals(record.get("__ab_auth_creator_loaded")))) {
                     log.warn("Native field projection has incomplete source identity facts model={}",
                             com.auraboot.framework.common.util.LogSanitizer.safe(model.getCode()));
                     throw denied();
