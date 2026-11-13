@@ -14,6 +14,7 @@ import java.util.*;
 
 /** Projects ordinary human reads from complete grants evaluated against canonical host-loaded rows. */
 @Service
+@lombok.extern.slf4j.Slf4j
 @RequiredArgsConstructor
 public class NativeReadFieldProjection {
     private final BusinessCommandRecordAuthorization authorization;
@@ -103,7 +104,11 @@ public class NativeReadFieldProjection {
             List<Map<String,Object>> result = new ArrayList<>(records.size());
             for (var record : records) {
                 if (!(record.get("__ab_auth_pid") instanceof String pid) || pid.isBlank()
-                        || record.get("__ab_auth_tenant") == null || !record.containsKey("__ab_auth_creator")) throw denied();
+                        || record.get("__ab_auth_tenant") == null || !record.containsKey("__ab_auth_creator")) {
+                    log.warn("Native field projection has incomplete source identity facts model={}",
+                            com.auraboot.framework.common.util.LogSanitizer.safe(model.getCode()));
+                    throw denied();
+                }
                 Map<String,Object> canonical = new LinkedHashMap<>(record);
                 canonical.keySet().removeIf(key -> key.startsWith("__ab_auth_"));
                 for (var field : model.getFields()) {
@@ -118,7 +123,16 @@ public class NativeReadFieldProjection {
                         || !Objects.equals(grant.userId(), MetaContext.getCurrentUserId())
                         || !Objects.equals(grant.memberId(), MetaContext.getCurrentMemberId())
                         || !model.getCode().equals(grant.modelCode())
-                        || !Objects.equals(grant.recordPid(), pid)) throw denied();
+                        || !Objects.equals(grant.recordPid(), pid)) {
+                    // Keep record contents and grant details out of logs and public error envelopes.
+                    var deniedDecision = grant == null ? null : grant.result();
+                    log.warn("Native field projection denied model={} reason={} steps={}",
+                            com.auraboot.framework.common.util.LogSanitizer.safe(model.getCode()),
+                            deniedDecision == null ? "missing decision" : com.auraboot.framework.common.util.LogSanitizer.safe(deniedDecision.reason()),
+                            deniedDecision == null ? "" : com.auraboot.framework.common.util.LogSanitizer.safe(
+                                    deniedDecision.steps().stream().map(step -> step.evaluatorName() + ":" + step.verdict() + ":" + step.reason()).toList().toString()));
+                    throw denied();
+                }
                 Map<String,Object> projected = new LinkedHashMap<>();
                 for (var entry : record.entrySet()) {
                     if (entry.getKey().startsWith("__ab_auth_")) continue;
