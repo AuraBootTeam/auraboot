@@ -18,6 +18,35 @@ function renderDialog(detail: Record<string, any>) {
 }
 
 describe('FormDialog choice fields', () => {
+  it('commits the first field error before focusing and revealing its caption', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView');
+    const scrolled: HTMLElement[] = [];
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: function (this: HTMLElement) {
+        expect(this.isConnected).toBe(true);
+        scrolled.push(this);
+      },
+    });
+    try {
+      renderDialog({
+        fields: [{ field: 'code', label: 'Code', type: 'text', required: true }],
+        onSubmit: vi.fn(),
+      });
+      fireEvent.click(screen.getByTestId('form-dialog-submit'));
+      const input = screen.getByTestId('form-dialog-field-code');
+      expect(input).toHaveFocus();
+      expect(input).toHaveAttribute('aria-invalid', 'true');
+      expect(scrolled.at(-1)).toBe(
+        document.getElementById(input.getAttribute('aria-describedby')!),
+      );
+      expect(scrolled.at(-1)?.textContent).toContain('Code');
+    } finally {
+      if (descriptor) Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', descriptor);
+      else delete (HTMLElement.prototype as any).scrollIntoView;
+    }
+  });
+
   it('keeps a patterned text draft editable until corrected, before submitting once', () => {
     const onSubmit = vi.fn();
     renderDialog({

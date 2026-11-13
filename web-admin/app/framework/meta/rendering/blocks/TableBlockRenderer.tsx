@@ -1594,7 +1594,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
                       key={column.field}
                       className={`${bodyCellClass} text-text text-sm ${
                         colIdx === 0 ? 'font-medium' : ''
-                      } ${column.ellipsis ? 'truncate' : ''} ${column.valueType === 'datetime' || column.valueType === 'date' ? 'whitespace-nowrap' : ''} text-${column.align || 'left'}`}
+                      } ${column.ellipsis ? 'truncate' : column.ellipsis === false && column.valueType !== 'datetime' && column.valueType !== 'date' ? '[overflow-wrap:anywhere] whitespace-normal' : ''} ${column.valueType === 'datetime' || column.valueType === 'date' ? 'whitespace-nowrap' : ''} text-${column.align || 'left'}`}
                       title={getCellTitle(column, row)}
                       style={{
                         maxWidth: column.ellipsis ? column.width : undefined,

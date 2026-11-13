@@ -588,14 +588,15 @@ function FormDialogHost() {
     }
 
     if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
+      flushSync(() => setErrors(newErrors));
       const firstError = Object.keys(newErrors)[0];
       const wrapper = [
         ...(containerRef.current?.querySelectorAll<HTMLElement>('[data-prompt-field]') ?? []),
       ].find((element) => element.dataset.promptField === firstError);
       const input = wrapper?.querySelector<HTMLElement>('input,select,textarea,button,[tabindex]');
       input?.focus({ preventScroll: true });
-      input?.scrollIntoView?.({ block: 'nearest' });
+      const caption = wrapper?.querySelector<HTMLElement>('[data-prompt-error]');
+      (caption ?? input)?.scrollIntoView?.({ block: 'center' });
       return;
     }
 
@@ -1467,6 +1468,8 @@ function FormDialogHost() {
                         id={`form-dialog-${field.field}-${sourceIndex}`}
                         aria-label={label}
                         aria-required={field.required || undefined}
+                        aria-invalid={Boolean(error)}
+                        aria-describedby={error ? `form-dialog-error-${sourceIndex}` : undefined}
                         ref={
                           isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined
                         }
@@ -1486,6 +1489,7 @@ function FormDialogHost() {
                     {error && (
                       <p
                         id={`form-dialog-error-${sourceIndex}`}
+                        data-prompt-error
                         className="mt-1 text-xs text-red-500"
                       >
                         {error}
