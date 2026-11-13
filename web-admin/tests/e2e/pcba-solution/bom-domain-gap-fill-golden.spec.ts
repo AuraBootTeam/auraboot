@@ -14,7 +14,7 @@ import {
 function workbookBuffer(rows: Array<Record<string, string>>): Buffer {
   const wb = XLSX.utils.book_new();
   const sheet = XLSX.utils.aoa_to_sheet([
-    ['位号', '规格描述', '封装', '数量', '品牌', '料号'],
+    ['位号', '规格描述', '封装', '数量', '品牌', 'MPN'],
     ...rows.map((r) => [r.refdes, r.description, r.pkg, r.qty, r.brand, r.mpn]),
   ]);
   XLSX.utils.book_append_sheet(wb, sheet, 'BOM');
@@ -96,18 +96,24 @@ test.describe('BOM domain gap fill golden', () => {
         expect(source, `one source row for ${mpn}`).toHaveLength(1);
         expect(String(source[0].bom_raw_qty)).toBe(qty);
       }
-      const dnp = standard.filter(row => row.bom_std_mpn === `DNP-${marker}`);
+      const dnp = standard.filter(row => row.bom_std_refdes === 'R3');
       expect(dnp).toHaveLength(1);
       const quantity = JSON.parse(String(dnp[0].bom_std_quantity_json));
       expect(quantity.semantics).toBe('DNP');
       expect(quantity.rawValue).toBe('DNP');
-      expect(String(dnp[0].bom_std_reason_code)).toBe('qty_invalid');
+      expect(String(dnp[0].bom_std_reason_code)).toBe('missing_critical_field');
       expect(String(dnp[0].bom_std_material_code ?? '')).toBe('');
       expect(String(dnp[0].bom_std_candidate_codes ?? '')).toBe('');
       const evidence = await queryDynamicRecords(page, 'bom_match_evidence', [
         { fieldName: 'bom_me_canonical_line_id', operator: 'EQ', value: dnp[0].pid },
       ]);
       expect(evidence, 'DNP must not enter candidate matching').toHaveLength(0);
+      const matches = await queryDynamicRecords(page, 'bom_match_result_pcba', [
+        { fieldName: 'bom_mr_std_item_id', operator: 'EQ', value: dnp[0].pid },
+      ]);
+      expect(matches, 'DNP retains a factual isolated match outcome').toHaveLength(1);
+      expect(matches[0].bom_mr_status_color, 'DNP cannot auto-green').toBe('red');
+      expect(String(matches[0].bom_mr_matched_material_id ?? '')).toBe('');
     } finally {
       await cleanupRows(page, created);
     }

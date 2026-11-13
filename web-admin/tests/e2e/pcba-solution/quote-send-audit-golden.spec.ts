@@ -82,6 +82,7 @@ test.describe('PCBA quote send audit golden', () => {
         for (const row of artifacts.rows) created.rows.push({ model: 'ab_document_artifact', pid: String(row.pid) });
       } finally { await client.end(); }
       await cleanupImmutableQuoteArtifacts(created);
+      created.rows = created.rows.filter(row => row.model !== 'ab_document_artifact');
       await cleanupRows(page, created);
     }
   });

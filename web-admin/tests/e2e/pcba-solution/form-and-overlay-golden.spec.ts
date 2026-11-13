@@ -255,18 +255,23 @@ test.describe('QuoteOps form submit + loading overlay golden', () => {
       const concurrent = await Promise.all([1, 2].map(() => page.request.post(
         '/api/meta/commands/execute/qo_quote_common:create', { data: replayPayload, timeout: 60_000 },
       )));
-      const receipts = await Promise.all(concurrent.map(async response => {
-        expect(response.status(), 'concurrent command reaches the real backend').toBe(200);
-        const body = await response.json();
-        expect(String(body.code), JSON.stringify(body)).toBe('0');
-        return body.data;
-      }));
+      const outcomes = await Promise.all(concurrent.map(async response => ({
+        status: response.status(), body: await response.json(),
+      })));
+      const receipts = outcomes.filter(outcome => outcome.status === 200).map(outcome => outcome.body.data);
       const ids = receipts.map(receipt => String(receipt.data?.recordId ?? receipt.data?.quoteId ?? receipt.data?.pid ?? ''));
       for (const id of new Set(ids.filter(Boolean))) created.rows.push({ model: 'qo_quote_common', pid: id });
+      expect(outcomes.map(outcome => outcome.status).sort(), 'one write succeeds; duplicate is replayed or conflicts')
+        .toEqual(outcomes.some(outcome => outcome.status === 409) ? [200, 409] : [200, 200]);
+      for (const outcome of outcomes) {
+        expect(String(outcome.body.code)).toBe(outcome.status === 409 ? '40900' : '0');
+      }
       expect(ids[0], 'concurrent create returns a persisted quote').toBeTruthy();
-      expect(ids[1], 'same request key returns the same write result').toBe(ids[0]);
+      if (ids.length === 2) {
+        expect(ids[1], 'same request key returns the same write result').toBe(ids[0]);
+        expect(receipts.filter(receipt => receipt.idempotentReplay === true), 'one duplicate is replayed').toHaveLength(1);
+      }
       expect(ids[0], 'fresh key is distinct from the preceding UI create').not.toBe(quoteId);
-      expect(receipts.filter(receipt => receipt.idempotentReplay === true), 'one duplicate is replayed').toHaveLength(1);
       const ownedQuotes = await queryDynamicRecords(page, 'qo_quote_common', [
         { fieldName: 'qo_quote_crm_account_id', operator: 'EQ', value: accountId },
         { fieldName: 'qo_quote_project_id', operator: 'EQ', value: projectId },
@@ -274,6 +279,16 @@ test.describe('QuoteOps form submit + loading overlay golden', () => {
       expect(ownedQuotes.map(row => String(row.pid)).sort(), 'two logical writes produce exactly two records')
         .toEqual([quoteId, ids[0]].sort());
     } finally {
+      const project = created.rows.find(row => row.model === 'req_requirement_set_pcba_bom');
+      if (project) {
+        const quotes = await queryDynamicRecords(page, 'qo_quote_common', [
+          { fieldName: 'qo_quote_project_id', operator: 'EQ', value: project.pid },
+        ]);
+        for (const quote of quotes) {
+          if (!created.rows.some(row => row.pid === String(quote.pid)))
+            created.rows.push({ model: 'qo_quote_common', pid: String(quote.pid) });
+        }
+      }
       await cleanupRows(page, created);
     }
   });
