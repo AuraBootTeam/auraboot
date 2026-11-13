@@ -2,6 +2,9 @@ package com.auraboot.framework.plugin.pf4j;
 
 import com.auraboot.framework.plugin.extension.BackgroundDataAccessor;
 import com.auraboot.framework.plugin.extension.TenantProjectionAccessor;
+import com.auraboot.framework.plugin.extension.DataAccessorException;
+import com.auraboot.framework.plugin.extension.DataAccessErrorCode;
+import com.auraboot.framework.meta.exception.MetaRecordNotFoundException;
 
 import java.util.Collection;
 import java.util.List;
@@ -20,7 +23,12 @@ public final class TenantProjectionAccessorImpl implements TenantProjectionAcces
 
     @Override
     public Map<String, Object> getById(String modelCode, String recordId) {
-        return delegate.getById(tenantId, modelCode, recordId);
+        try {
+            return delegate.getById(tenantId, modelCode, recordId);
+        } catch (MetaRecordNotFoundException unavailable) {
+            // CATCH: tenant-bound SPI boundary; retain diagnostics in the cause and expose a coded denial.
+            throw new DataAccessorException(DataAccessErrorCode.PERMISSION_DENIED, unavailable);
+        }
     }
 
     @Override
