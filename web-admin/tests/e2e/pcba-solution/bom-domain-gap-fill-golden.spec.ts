@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import * as XLSX from 'xlsx';
 import { test, expect, type Page } from '../../fixtures';
 import {
@@ -47,7 +48,8 @@ test.describe('BOM domain gap fill golden', () => {
           buffer: workbookBuffer([
             { refdes: 'R1,R2', description: '10kΩ 0402 电阻', pkg: '0402', qty: '2', brand: 'YAGEO', mpn: `RC0402-${marker}` },
             { refdes: 'MP1', description: '钣金机加工支架', pkg: '', qty: '1', brand: 'E2E', mpn: `BRKT-${marker}` },
-            { refdes: 'HS1', description: '铝散热片 结构件', pkg: '', qty: '2', brand: 'E2E', mpn: `HS-${marker}` },
+            { refdes: 'HS1', description: '铝散热片 结构件', pkg: '', qty: '1', brand: 'E2E', mpn: `HS-${marker}` },
+            { refdes: 'R3', description: '10kΩ 0402 电阻 DNP', pkg: '0402', qty: 'DNP', brand: 'YAGEO', mpn: `DNP-${marker}` },
           ]) },
       }});
       expect(upload.ok(), await upload.text()).toBe(true);
@@ -63,24 +65,46 @@ test.describe('BOM domain gap fill golden', () => {
         } } },
       );
       const body = await conversion.json().catch(() => ({}));
-      // 合同:任务接受(异步)或命令层给出明确拒绝;不允许静默丢弃行
-      expect([200, 400]).toContain(conversion.status());
-      if (conversion.status() === 200 && String(body.code) === '0') {
-        const receipt = body.data?.data ?? body.data ?? {};
-        const taskId = String(receipt.recordId ?? receipt.taskCode ?? '');
-        const lines = await queryDynamicRecords(page, 'qo_quote_line_common', [
-          { fieldName: 'qo_ql_quote_id', operator: 'EQ', value: account },
-        ], { pageSize: 200 });
-        void lines;
+      expect(conversion.status()).toBe(200);
+      expect(String(body.code), JSON.stringify(body)).toBe('0');
+      let task: Record<string, any> | undefined;
+      await expect.poll(async () => {
+        const tasks = await queryDynamicRecords(page, 'bom_conversion_task_pcba', [
+          { fieldName: 'bom_task_project_id', operator: 'EQ', value: project },
+        ], { pageSize: 5 });
+        expect(tasks.length, 'one task for this project').toBeLessThanOrEqual(1);
+        task = tasks[0];
+        return task?.bom_task_status;
+      }, { timeout: 120_000 }).toBe('completed');
+      const taskId = String(task!.pid);
+      created.rows.push({ model: 'bom_conversion_task_pcba', pid: taskId });
+      const [raw, standard] = await Promise.all([
+        queryDynamicRecords(page, 'bom_raw_line_pcba', [
+          { fieldName: 'bom_raw_task_id', operator: 'EQ', value: taskId },
+        ]),
+        queryDynamicRecords(page, 'bom_standard_line_pcba', [
+          { fieldName: 'bom_std_task_id', operator: 'EQ', value: taskId },
+        ]),
+      ]);
+      expect(raw, 'all mixed source rows retained').toHaveLength(4);
+      expect(standard, 'all mixed standard rows retained').toHaveLength(4);
+      for (const [mpn, qty] of [[`BRKT-${marker}`, '1'], [`HS-${marker}`, '1'], [`DNP-${marker}`, 'DNP']]) {
+        const source = raw.filter(row => row.bom_raw_mpn === mpn);
+        expect(source, `one source row for ${mpn}`).toHaveLength(1);
+        expect(String(source[0].bom_raw_qty)).toBe(qty);
       }
-      await expect
-        .poll(async () => {
-          const tasks = await queryDynamicRecords(page, 'bom_conversion_task_pcba', [
-            { fieldName: 'bom_task_project_id', operator: 'EQ', value: project },
-          ], { pageSize: 5 });
-          return tasks.map((t) => String(t.bom_task_status ?? '')).join(',');
-        }, { timeout: 60_000 })
-        .toMatch(/completed|failed|analysis_ready|matching|parsed/);
+      const dnp = standard.filter(row => row.bom_std_mpn === `DNP-${marker}`);
+      expect(dnp).toHaveLength(1);
+      const quantity = JSON.parse(String(dnp[0].bom_std_quantity_json));
+      expect(quantity.semantics).toBe('DNP');
+      expect(quantity.rawValue).toBe('DNP');
+      expect(String(dnp[0].bom_std_reason_code)).toBe('qty_invalid');
+      expect(String(dnp[0].bom_std_material_code ?? '')).toBe('');
+      expect(String(dnp[0].bom_std_candidate_codes ?? '')).toBe('');
+      const evidence = await queryDynamicRecords(page, 'bom_match_evidence', [
+        { fieldName: 'bom_me_canonical_line_id', operator: 'EQ', value: dnp[0].pid },
+      ]);
+      expect(evidence, 'DNP must not enter candidate matching').toHaveLength(0);
     } finally {
       await cleanupRows(page, created);
     }
@@ -88,16 +112,18 @@ test.describe('BOM domain gap fill golden', () => {
 
   // B02-03: 上传超大文件(100MB 级)——网关按合同拒绝或稳定接受,不崩溃。
   test('B02-03 oversized upload is handled without crashing the gateway', async ({ page }) => {
-    const marker = `BIG-${Date.now()}`;
-    const chunk = '0'.repeat(1024 * 1024); // 1MB
-    // 100MB 级:multipart 序列化后≥100MB。网关按合同拒绝(413/400)或接受(200)。
-    const big = Buffer.concat([Buffer.from(chunk), Buffer.alloc(99 * 1024 * 1024, 48)]);
+    const filename = `oversized-B02-${Date.now()}.bin`;
+    const config = readFileSync(new URL('../../../../platform/platform-app/src/main/resources/application.yml', import.meta.url), 'utf8');
+    const configured = config.match(/max-file-size:\s*(\d+)MB/);
+    expect(configured, 'reviewed upload limit is explicitly configured').not.toBeNull();
+    const limitBytes = Number(configured![1]) * 1024 * 1024;
     const resp = await page.request.post('/api/file/upload', { multipart: {
-      file: { name: `oversized-${marker}.bin`, mimeType: 'application/octet-stream', buffer: big },
+      file: { name: filename, mimeType: 'application/octet-stream', buffer: Buffer.alloc(limitBytes + 1, 48) },
     }, timeout: 120_000 });
-    // 合同:上传被处理(200)或按大小拒绝(413/400);服务端必须存活
-    expect([200, 400, 413, 422]).toContain(resp.status());
-    const health = await page.request.get('/actuator/health');
-    expect(health.status(), 'gateway must survive oversized upload').toBeLessThan(500);
+    expect([400, 413], 'a file above the configured limit must be rejected').toContain(resp.status());
+    const tasks = await queryDynamicRecords(page, 'bom_conversion_task_pcba', [
+      { fieldName: 'bom_task_raw_filename', operator: 'EQ', value: filename },
+    ]);
+    expect(tasks, 'rejected upload creates no conversion task').toHaveLength(0);
   });
 });

@@ -61,6 +61,8 @@ test.describe('BOM workbench candidate confirm/undo/exclude (BOM-05/06/07) @smok
     const page = await ctx.newPage();
     users['eng'] = makeQuoteRoleUser('bom_engineering', uid, ['bom_engineering']);
     await ensureQuoteRoleUser(page, users['eng']);
+    created = await seedBomWorkbench(page, { ownerEmail: users['eng'].email });
+    taskId = created.taskId;
     await ctx.close();
   });
 
@@ -78,16 +80,6 @@ test.describe('BOM workbench candidate confirm/undo/exclude (BOM-05/06/07) @smok
   });
 
   test('provision a deterministic completed task (standard lines ready)', async ({ browser }) => {
-    const adminContext = await browser.newContext({
-      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
-    });
-    const adminPage = await adminContext.newPage();
-    try {
-      created = await seedBomWorkbench(adminPage, { ownerEmail: users['eng'].email });
-      taskId = created.taskId;
-    } finally {
-      await adminContext.close();
-    }
     const role = await openQuoteRolePage(browser, users['eng']);
     try {
       expect(taskId, 'seed produced a completed task').toBeTruthy();
@@ -195,6 +187,16 @@ test.describe('BOM workbench candidate confirm/undo/exclude (BOM-05/06/07) @smok
     const { context, page } = await openQuoteRolePage(browser, users['eng']);
     try {
       expect(created?.directLineId, 'fixture exposes the direct-copy line to exclude').toBeTruthy();
+      const beforeEdit = (await listLines(page)).find(line => line.pid === created!.directLineId);
+      expect(beforeEdit, 'direct line exists before edit').toBeTruthy();
+      const retiredCode = String(beforeEdit.bom_std_material_code);
+      const editedCode = `B15-EDIT-${Date.now()}`;
+      const edit = await post(page, 'bom:update_standard_item', {
+        pid: created!.directLineId, bom_std_material_code: editedCode,
+      }, 'update', created!.directLineId);
+      expect(edit.status).toBe(200);
+      expect(String(edit.body.code)).toBe('0');
+
       const exclusion = await post(
         page,
         'bom:set_standard_line_exclusion',
@@ -271,6 +273,28 @@ test.describe('BOM workbench candidate confirm/undo/exclude (BOM-05/06/07) @smok
       expect(bomText, 'BOM-07: confirmed-excluded MCU is absent from the exported BOM').not.toContain(
         'STM32F103C8T6',
       );
+      const restore = await post(page, 'bom:set_standard_line_exclusion', {
+        lineId: created!.directLineId, status: 'restored', reason: 'B15 undo exclusion',
+      }, 'update', created!.directLineId);
+      expect(restore.status).toBe(200);
+      expect(String(restore.body.code)).toBe('0');
+      const restored = (await listLines(page)).find(line => line.pid === created!.directLineId);
+      expect(restored.bom_std_exclusion_status).toBe('restored');
+      expect(restored.bom_std_material_code).toBe(editedCode);
+      const regenerated = await post(page, 'bom:regenerate_export', { sourceRecordId: taskId }, 'update', taskId);
+      expect(regenerated.status).toBe(200);
+      expect(String(regenerated.body.code)).toBe('0');
+      const regeneratedData = regenerated.body.data?.data ?? regenerated.body.data;
+      const restoredFile = regeneratedData.exportFileId;
+      expect(restoredFile).toBeTruthy();
+      const restoredDownload = await page.request.get(`/api/file/download/${restoredFile}`);
+      expect(restoredDownload.status()).toBe(200);
+      const restoredBook = XLSX.read(await restoredDownload.body(), { type: 'buffer' });
+      const cells = XLSX.utils.sheet_to_json<any[]>(restoredBook.Sheets.BOM, { header: 1 }).flat().map(String);
+      expect(cells, 'restored export includes the edited code').toContain(editedCode);
+      expect(cells, 'retired material code never returns after undo exclusion').not.toContain(retiredCode);
+      expect(cells.filter(value => value === 'STM32F103C8T6'), 'restored line appears once').toHaveLength(1);
+      expect(cells.filter(value => value === 'RC0603FR-0710KL'), 'unaffected line appears once').toHaveLength(1);
     } finally {
       await context.close();
     }

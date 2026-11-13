@@ -750,6 +750,7 @@ export async function queryDynamicRecords(
     resp.ok(),
     `${model} list HTTP ${resp.status()}: ${JSON.stringify(body).slice(0, 500)}`,
   ).toBe(true);
+  expect(String(body.code), `${model} list must succeed before interpreting an empty result`).toBe('0');
   return extractRecords(body);
 }
 

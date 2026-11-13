@@ -16,7 +16,9 @@ import { requireRuntimeUrl } from '../../helpers/environments';
  */
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, createReadStream } from 'node:fs';
+import { createInterface } from 'node:readline';
+import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 
 import type { Page } from '@playwright/test';
@@ -318,14 +320,71 @@ test.describe('BOM material library navigation @smoke', () => {
 
 // B16-01/B16-02: 物料主库列表与详情可查询;原始库表可访问作为来源证据。
 test('B16 material master list/detail queryable and raw library traceable', async ({ page }) => {
-  const rows = await queryDynamicRecords(page, 'bom_material_master', [], { pageSize: 5 });
-  expect(rows.length, 'material master list returns rows').toBeGreaterThan(0);
-  const first = rows[0];
-  const detail = await page.request.get(`/api/dynamic/bom_material_master/${first.pid}`);
-  expect(detail.ok(), 'detail read succeeds').toBe(true);
-  const detailData = (await detail.json()).data ?? {};
-  expect(String(detailData.pid ?? '')).toBe(String(first.pid));
-
-  const rawInfo = await page.request.get('/api/dynamic/bom_material_raw/list?pageNum=1&pageSize=1');
-  expect(rawInfo.ok(), 'raw library list endpoint accessible').toBe(true);
+  const manifestPath = process.env.BOM_KINGDEE_MATERIAL_SNAPSHOT_MANIFEST;
+  expect(manifestPath, 'fixed offline material manifest is required').toBeTruthy();
+  const manifest = JSON.parse(readFileSync(manifestPath!, 'utf8'));
+  const projectionPath = path.resolve(path.dirname(manifestPath!), manifest.projectionArtifact.path);
+  const hash = createHash('sha256');
+  for await (const chunk of createReadStream(projectionPath)) hash.update(chunk);
+  expect(hash.digest('hex'), 'approved offline projection bytes').toBe(manifest.projectionArtifact.sha256);
+  const expected: any[] = [];
+  const stream = createInterface({ input: createReadStream(projectionPath), crlfDelay: Infinity });
+  for await (const line of stream) {
+    if (line.trim()) expected.push(JSON.parse(line));
+    if (expected.length === 5) { stream.close(); break; }
+  }
+  expect(expected).toHaveLength(5);
+  for (const projection of expected) {
+    const rows = await queryDynamicRecords(page, 'bom_material_master', [
+      { fieldName: 'bom_mm_material_code', operator: 'EQ', value: projection.materialCode },
+    ]);
+    expect(rows, `one master projection for ${projection.materialCode}`).toHaveLength(1);
+    const master = rows[0];
+    const detail = await page.request.get(`/api/dynamic/bom_material_master/${master.pid}`);
+    expect(detail.ok()).toBe(true);
+    const detailBody = await detail.json();
+    expect(String(detailBody.code)).toBe('0');
+    const record = detailBody.data?.data ?? detailBody.data;
+    for (const [field, key] of Object.entries({ bom_mm_material_code: 'materialCode',
+      bom_mm_material_name: 'materialName', bom_mm_spec_model: 'specModel', bom_mm_mpn: 'mpn',
+      bom_mm_package: 'packageCode', bom_mm_brand: 'brand', bom_mm_norm_text: 'normText' })) {
+      expect(String(master[field] ?? ''), `${field} matches the approved matching projection`).toBe(String(projection[key] ?? ''));
+      expect(String(record[field] ?? ''), `${field} list/detail agree`).toBe(String(master[field] ?? ''));
+    }
+    const sourceKey = String(master.bom_mm_source_key ?? '');
+    const rawId = String(master.bom_mm_source_raw_id ?? '');
+    expect(sourceKey, 'Kingdee source key is retained').toBeTruthy();
+    expect(rawId, 'Kingdee master links to an exact raw record').toBeTruthy();
+    const rawResponse = await page.request.get(`/api/dynamic/bom_material_raw/${rawId}`);
+    expect(rawResponse.ok()).toBe(true);
+    const rawBody = await rawResponse.json();
+    expect(String(rawBody.code)).toBe('0');
+    const raw = rawBody.data?.data ?? rawBody.data;
+    expect(String(raw.pid)).toBe(rawId);
+    expect(String(raw.bom_raw_source_key)).toBe(sourceKey);
+    expect(String(raw.bom_raw_material_code)).toBe(projection.materialCode);
+    const attrs = typeof master.bom_mm_attributes_json === 'string'
+      ? JSON.parse(master.bom_mm_attributes_json) : master.bom_mm_attributes_json;
+    expect(attrs.field_lineage, 'field-level origins remain explicit').toEqual(projection.fieldLineage);
+  }
+  const pages = await Promise.all([1, 2].map(async pageNum => {
+    const response = await page.request.get(`/api/dynamic/bom_material_master/list?pageNum=${pageNum}&pageSize=2`);
+    expect(response.ok()).toBe(true);
+    const body = await response.json();
+    expect(String(body.code)).toBe('0');
+    return body.data;
+  }));
+  expect(pages[0].records).toHaveLength(2);
+  expect(pages[1].records).toHaveLength(2);
+  expect(pages[0].total).toBe(pages[1].total);
+  expect(new Set([...pages[0].records, ...pages[1].records].map(row => row.pid)).size).toBe(4);
+  const filters = encodeURIComponent(JSON.stringify([
+    { fieldName: 'bom_mm_material_code', operator: 'EQ', value: expected[0].materialCode },
+  ]));
+  const filtered = await page.request.get(`/api/dynamic/bom_material_master/list?pageNum=1&pageSize=2&filters=${filters}`);
+  expect(filtered.ok()).toBe(true);
+  const filteredBody = await filtered.json();
+  expect(String(filteredBody.code)).toBe('0');
+  expect(filteredBody.data.total).toBe(1);
+  expect(filteredBody.data.records).toHaveLength(1);
 });

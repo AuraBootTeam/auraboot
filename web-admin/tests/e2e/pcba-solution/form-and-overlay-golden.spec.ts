@@ -4,6 +4,7 @@ import { test, expect } from '../../fixtures';
 import { waitForFormReady } from '../helpers';
 import {
   cleanupRows,
+  queryDynamicRecords,
   createCorrectedBomWorkbook,
   executeCommand,
   openQuoteCreateFormFromList,
@@ -187,13 +188,42 @@ test.describe('QuoteOps form submit + loading overlay golden', () => {
       // disabled state is observed deterministically instead of racing a fast
       // local round trip (the client-side delay runs before the request is even
       // sent, so the backend still executes for real once route.continue() fires).
+      let rejectMissingCustomer = true;
+      const missingCustomer = '00000000000000000000000000';
       await page.route(
         '**/api/meta/commands/execute/qo_quote_common:create',
         async (route) => {
           await new Promise((resolve) => setTimeout(resolve, 1_500));
-          await route.continue();
+          if (rejectMissingCustomer) {
+            rejectMissingCustomer = false;
+            const data = route.request().postDataJSON();
+            expect(data.payload.qo_quote_crm_account_id, 'UI submits its selected customer').toBe(accountId);
+            data.payload.qo_quote_crm_account_id = missingCustomer;
+            const rejected = await route.fetch({ postData: JSON.stringify(data) });
+            expect(String((await rejected.json()).code), 'real backend rejects the missing customer').not.toBe('0');
+            // Preserve the real error body while exercising HTTP-200/business-error handling.
+            await route.fulfill({ response: rejected, status: 200 });
+          } else await route.continue();
         },
       );
+      const invalidResponsePromise = page.waitForResponse(response =>
+        response.url().includes('/api/meta/commands/execute/qo_quote_common:create') && response.request().method() === 'POST');
+      await page.getByTestId('form-btn-save').click();
+      const invalidResponse = await invalidResponsePromise;
+      expect(invalidResponse.status(), 'HTTP success cannot conceal business failure').toBe(200);
+      const invalidBody = await invalidResponse.json();
+      expect(String(invalidBody.code), 'missing related record is a real business failure').not.toBe('0');
+      const error = page.locator('main [role="alert"], main .text-status-red, main .text-red-600').filter({ hasText: /客户|关联|不存在|选择|参数/ }).first();
+      await expect(error, 'invalid relation has actionable Chinese feedback').toBeVisible();
+      const message = await error.innerText();
+      expect(message).not.toMatch(/Bad parameter|qo_quote_common|crm_account_common|\$i18n:|\[object Object\]/i);
+      expect(message).not.toContain(missingCustomer);
+      const rejectedQuotes = await queryDynamicRecords(page, 'qo_quote_common', [
+        { fieldName: 'qo_quote_project_id', operator: 'EQ', value: projectId },
+      ]);
+      expect(rejectedQuotes, 'invalid relation creates no quote').toHaveLength(0);
+      await expect(page).toHaveURL(/\/p\/qo_quote_common\/new/);
+      await page.screenshot({ path: testInfo.outputPath('missing-related-customer.png'), fullPage: true });
 
       const createResponsePromise = page.waitForResponse(
         (response) =>
@@ -218,6 +248,31 @@ test.describe('QuoteOps form submit + loading overlay golden', () => {
       expect(quoteId, 'quote create should return quote id').toBeTruthy();
       created.quoteId = quoteId;
       created.rows.push({ model: 'qo_quote_common', pid: quoteId });
+
+      // A fresh idempotency key is submitted concurrently through the real command boundary.
+      const replayPayload = createResponse.request().postDataJSON();
+      replayPayload.clientRequestId = `concurrent-create-${suffix}`;
+      const concurrent = await Promise.all([1, 2].map(() => page.request.post(
+        '/api/meta/commands/execute/qo_quote_common:create', { data: replayPayload, timeout: 60_000 },
+      )));
+      const receipts = await Promise.all(concurrent.map(async response => {
+        expect(response.status(), 'concurrent command reaches the real backend').toBe(200);
+        const body = await response.json();
+        expect(String(body.code), JSON.stringify(body)).toBe('0');
+        return body.data;
+      }));
+      const ids = receipts.map(receipt => String(receipt.data?.recordId ?? receipt.data?.quoteId ?? receipt.data?.pid ?? ''));
+      for (const id of new Set(ids.filter(Boolean))) created.rows.push({ model: 'qo_quote_common', pid: id });
+      expect(ids[0], 'concurrent create returns a persisted quote').toBeTruthy();
+      expect(ids[1], 'same request key returns the same write result').toBe(ids[0]);
+      expect(ids[0], 'fresh key is distinct from the preceding UI create').not.toBe(quoteId);
+      expect(receipts.filter(receipt => receipt.idempotentReplay === true), 'one duplicate is replayed').toHaveLength(1);
+      const ownedQuotes = await queryDynamicRecords(page, 'qo_quote_common', [
+        { fieldName: 'qo_quote_crm_account_id', operator: 'EQ', value: accountId },
+        { fieldName: 'qo_quote_project_id', operator: 'EQ', value: projectId },
+      ]);
+      expect(ownedQuotes.map(row => String(row.pid)).sort(), 'two logical writes produce exactly two records')
+        .toEqual([quoteId, ids[0]].sort());
     } finally {
       await cleanupRows(page, created);
     }

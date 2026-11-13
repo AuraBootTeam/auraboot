@@ -46,6 +46,7 @@ test.describe('BOM conversion-task soft delete real-browser golden @smoke', () =
   let taskNo: string;
   const rows: { model: string; pid: string }[] = [];
   let taskPid = '';
+  let childPid = '';
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
     adminContext = await browser.newContext({ storageState: { cookies: [], origins: [] } });
@@ -72,6 +73,10 @@ test.describe('BOM conversion-task soft delete real-browser golden @smoke', () =
       },
       rows,
     );
+    childPid = await dynamicCreate(adminPage, 'req_requirement_line_pcba_bom', {
+      bom_cl_task_id: taskPid, bom_cl_line_no: 1, bom_cl_mpn: `DELETE-${suffix}`,
+      bom_cl_qty: 1, bom_cl_level: '1', bom_cl_review_status: 'pending',
+    }, rows);
     // eslint-disable-next-line no-console
     console.log(`[soft-delete-golden] seeded taskNo=${taskNo} taskPid=${taskPid}`);
   });
@@ -190,6 +195,24 @@ test.describe('BOM conversion-task soft delete real-browser golden @smoke', () =
       [404, 410].includes(direct.status()) || String(directBody?.code ?? '0') !== '0' || flaggedDeleted,
       'soft-deleted task must not read back as a live record',
     ).toBe(true);
+
+    const children = await queryDynamicRecords(adminPage, 'req_requirement_line_pcba_bom', [
+      { fieldName: 'bom_cl_task_id', operator: 'EQ', value: taskPid },
+    ]);
+    expect(children, 'deleted task has no accessible child rows').toHaveLength(0);
+    const child = await adminPage.request.get(`/api/dynamic/req_requirement_line_pcba_bom/${childPid}`);
+    const childBody = await child.json();
+    expect([404, 410].includes(child.status()) || String(childBody.code) !== '0',
+      'direct child access is refused after task deletion').toBe(true);
+    const logs = await adminPage.request.get('/api/meta/commands/audit-logs?commandCode=bom:delete_task&success=true&pageNum=1&pageSize=100');
+    expect(logs.status()).toBe(200);
+    const logBody = await logs.json();
+    expect(String(logBody.code)).toBe('0');
+    const ownAudit = logBody.data.records.filter((log: any) => String(log.requestPayload).includes(taskPid));
+    expect(ownAudit, 'successful deletion remains in the command audit').toHaveLength(1);
+    expect(ownAudit[0].success).toBe(true);
+    expect(String(ownAudit[0].userId), 'delete actor is traceable').toMatch(/^[1-9]\d*$/);
+    expect(Number.isFinite(Date.parse(ownAudit[0].createdAt)), 'delete timestamp is retained').toBe(true);
 
     // 7. hard gates: no forbidden, no 500s across the whole flow
     expect(

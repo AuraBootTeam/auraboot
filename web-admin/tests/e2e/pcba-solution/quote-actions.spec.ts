@@ -1,3 +1,5 @@
+import { createServer } from 'node:http';
+import { once } from 'node:events';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -6,6 +8,8 @@ import { test, expect } from '../../fixtures';
 import { uniqueId } from '../helpers';
 import {
   makeQuoteRoleUser,
+  seedQuoteScaffold,
+  cleanupRows,
   ensureQuoteRoleUser,
   openQuoteRolePage,
   readDynamicRecord,
@@ -365,74 +369,97 @@ test.describe('Quote actions deep — upload/process-fee/gerber/deepseek/source-
     }
   });
 
-  test('QO-08 deepseek price suggestions async terminal (provider boundary)', async ({
-    browser,
-  }) => {
-    const { context, page } = await openQuoteRolePage(browser, users['sales']);
-    try {
-      const r = await post(
-        page,
-        'qo_quote_common:deepseek_price_suggestions',
-        {},
-        'update',
-        quoteId,
-      );
-      const lines = await queryDynamicRecords(
-        page,
-        'qo_quote_line_common',
-        [{ fieldName: 'qo_ql_quote_id', operator: 'EQ', value: quoteId }],
-        { pageSize: 500 },
-      );
-      const missing = lines.filter((line) => Number(line.qo_ql_unit_cost || 0) <= 0);
-      expect(missing.length, 'fixture must exercise missing-price suggestions').toBeGreaterThan(0);
-      expect(Number(r.resultData.candidateCount)).toBe(missing.length);
-      let suggested = 0;
-      let failed = 0;
-      for (const line of missing) {
-        const evidence = await queryDynamicRecords(
-          page,
-          'qo_price_evidence_common',
-          [
-            { fieldName: 'qo_pe_quote_line_id', operator: 'EQ', value: line.pid },
-            { fieldName: 'qo_pe_source', operator: 'EQ', value: 'deepseek_llm' },
-          ],
-          { pageSize: 100 },
-        );
-        expect(evidence, `one terminal result for ${line.pid}`).toHaveLength(1);
-        const row = evidence[0];
-        expect(['suggested', 'failed']).toContain(row.qo_pe_status);
-        if (row.qo_pe_status === 'suggested') {
-          suggested++;
-          expect(Number(row.qo_pe_unit_price)).toBeGreaterThan(0);
-        } else {
-          failed++;
-          const snapshot =
-            typeof row.qo_pe_snapshot === 'string'
-              ? JSON.parse(row.qo_pe_snapshot)
-              : row.qo_pe_snapshot;
-          expect(['source_unavailable', 'llm_timeout', 'llm_request_failed']).toContain(
-            snapshot.failureCode,
-          );
-          expect(String(row.qo_pe_override_reason)).toBeTruthy();
-          expect(Number(row.qo_pe_unit_price || 0)).toBe(0);
-        }
-        expect(Number(line.qo_ql_unit_cost || 0), 'suggestion must not adopt a price').toBe(0);
+  test('QO-08 deepseek price suggestions async terminal (provider boundary)', async ({ page }) => {
+    let outcome: 'failed' | 'suggested' = 'failed';
+    let requests = 0;
+    const server = createServer(async (request, response) => {
+      const chunks: Buffer[] = [];
+      for await (const chunk of request) chunks.push(Buffer.from(chunk));
+      const payload = JSON.parse(Buffer.concat(chunks).toString());
+      requests++;
+      expect(request.url).toBe('/v1/chat/completions');
+      expect(payload.model).toBe('q07-local-controlled');
+      response.setHeader('content-type', 'application/json');
+      if (outcome === 'failed') {
+        response.writeHead(503);
+        response.end(JSON.stringify({ error: { message: 'Controlled local provider unavailable' } }));
+      } else {
+        const input = JSON.parse(payload.messages.filter((message: any) => message.role === 'user').at(-1).content);
+        response.end(JSON.stringify({ id: 'q07-controlled', object: 'chat.completion', model: payload.model,
+          choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content: JSON.stringify({
+            suggestions: input.lines.map((line: any) => ({ lineId: line.lineId, mpn: line.mpn,
+              unitPrice: 1.25, currency: 'CNY', confidence: 0.8, sourceRef: 'q07-local', reason: 'Manual review required' })),
+          }) } }], usage: { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 } }));
       }
-      expect(Number(r.resultData.suggestedCount)).toBe(suggested);
-      expect(suggested + failed).toBe(missing.length);
-      test.info().annotations.push({
-        type: 'provider-outcome',
-        description: JSON.stringify({
-          suggested,
-          failed,
-          authority:
-            suggested === 0
-              ? 'unavailable-provider boundary only'
-              : 'persisted suggestions; provider quality not assessed',
-        }),
-      });
+    });
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    const address = server.address();
+    expect(address && typeof address !== 'string').toBeTruthy();
+    const providerCode = `q07-controlled-${uid}`;
+    let configPid = '';
+    try {
+      const beforeResponse = await page.request.get('/api/llm-config?level=tenant');
+      expect(beforeResponse.ok()).toBe(true);
+      const before = await beforeResponse.json();
+      expect(String(before.code)).toBe('0');
+      const priority = -2147483648;
+      expect(before.data.every((config: any) => Number(config.priority ?? 0) > priority),
+        'the owned loopback provider must be selected ahead of existing tenant providers').toBe(true);
+      const configResponse = await page.request.post('/api/llm-config', { data: {
+        configLevel: 'tenant', serviceType: 'llm', providerCode, enabled: true, priority,
+        config: JSON.stringify({ apiFormat: 'chat_completions', baseUrl: `http://127.0.0.1:${(address as any).port}/v1`,
+          apiKey: 'q07-local-only', defaultModel: 'q07-local-controlled', maxTokens: 1000 }),
+      }});
+      expect(configResponse.ok()).toBe(true);
+      expect(String((await configResponse.json()).code)).toBe('0');
+      const selected = await (await page.request.get('/api/llm-config?level=tenant')).json();
+      const owned = selected.data.filter((config: any) => config.providerCode === providerCode);
+      expect(owned).toHaveLength(1);
+      configPid = owned[0].pid;
+      for (const phase of ['failed', 'suggested'] as const) {
+        outcome = phase;
+        const created = await seedQuoteScaffold(page, `Q07-${phase}`, [{ sourceRef: 'R1', sourceRowNo: 2,
+          description: 'Controlled missing-price resistor', refdes: 'R1', mpn: `Q07-${uid}-${phase}`,
+          packageName: '0402', qty: 10, unitCost: 0, lineCost: 0, linePrice: 0, smtPoints: 1, thtPoints: 0 }]);
+        try {
+          const beforeRequests = requests;
+          const r = await post(page, 'qo_quote_common:deepseek_price_suggestions', {}, 'update', created.quoteId);
+          expect(requests, 'the actual provider call stays on the controlled loopback server').toBeGreaterThan(beforeRequests);
+          expect(Number(r.resultData.candidateCount)).toBe(1);
+          expect(Number(r.resultData.suggestedCount)).toBe(phase === 'suggested' ? 1 : 0);
+          const lines = await queryDynamicRecords(page, 'qo_quote_line_common', [
+            { fieldName: 'qo_ql_quote_id', operator: 'EQ', value: created.quoteId },
+          ]);
+          expect(lines).toHaveLength(1);
+          const evidence = await queryDynamicRecords(page, 'qo_price_evidence_common', [
+            { fieldName: 'qo_pe_quote_line_id', operator: 'EQ', value: lines[0].pid },
+            { fieldName: 'qo_pe_source', operator: 'EQ', value: 'deepseek_llm' },
+          ]);
+          for (const row of evidence) created.rows.push({ model: 'qo_price_evidence_common', pid: String(row.pid) });
+          expect(evidence, 'one terminal fact for each missing-price line').toHaveLength(1);
+          expect(evidence[0].qo_pe_status).toBe(phase);
+          expect(Number(evidence[0].qo_pe_unit_price ?? 0)).toBe(phase === 'suggested' ? 1.25 : 0);
+          expect(Number(lines[0].qo_ql_unit_cost ?? 0), 'neither outcome auto-adopts a price').toBe(0);
+          expect(String(lines[0].qo_ql_price_decision_id ?? ''), 'suggestion still needs a human decision').toBe('');
+          if (phase === 'failed') {
+            const snapshot = typeof evidence[0].qo_pe_snapshot === 'string'
+              ? JSON.parse(evidence[0].qo_pe_snapshot) : evidence[0].qo_pe_snapshot as any;
+            expect(snapshot.failureCode).toBe('llm_request_failed');
+            expect(String(evidence[0].qo_pe_override_reason)).toMatch(/不可用|失败|稍后/);
+          }
+        } finally { await cleanupRows(page, created); }
+      }
+      const after = await (await page.request.get('/api/llm-config?level=tenant')).json();
+      expect(after.data.filter((config: any) => config.pid !== configPid), 'pre-existing configurations are unchanged').toEqual(before.data);
     } finally {
-      await context.close();
+      if (configPid) {
+        const deleted = await page.request.delete(`/api/llm-config/${configPid}`);
+        expect(deleted.ok()).toBe(true);
+        expect(String((await deleted.json()).code)).toBe('0');
+      }
+      server.close();
+      await once(server, 'close');
     }
   });
 

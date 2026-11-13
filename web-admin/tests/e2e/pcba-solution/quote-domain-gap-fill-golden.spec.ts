@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 import { test, expect, type Page } from '../../fixtures';
 import {
   cleanupRows,
+  dynamicCreate,
   openQuoteDetailFromList,
   queryDynamicRecords,
   seedBomPriceManualReviewQuote,
@@ -65,33 +66,40 @@ test.describe('PCBA quote domain gap fill golden', () => {
       const fileId = String((await upload.json()).data.fileId);
       expect(fileId).toBeTruthy();
 
-      const quoteLineBefore = await queryDynamicRecords(page, 'qo_quote_line_common', [], { pageSize: 500 });
-      const conversion = await page.request.post(
-        '/api/meta/commands/execute/bom:start_conversion',
-        { data: { payload: {
-          source_file_id: fileId,
-          source_filename: `header-only-${Date.now()}.xlsx`,
-          source_model: 'excel',
-        } } },
-      );
-      const status = conversion.status();
-      const body = await conversion.json().catch(() => ({}));
-      // 合同:要么命令层拒绝,要么任务失败;零有效行不能产生成功转换
-      if (status === 200 && String(body.code) === '0') {
-        const receipt = body.data?.data ?? body.data ?? {};
-        const taskCode = String(receipt.taskCode ?? '');
-        expect(taskCode, 'header-only conversion returns a tracked task').toBeTruthy();
-        await expect
-          .poll(async () => {
-            const t = await page.request.get(`/api/async-tasks/${taskCode}`);
-            return (await t.json().catch(() => ({})))?.data?.status;
-          }, { timeout: 60_000 })
-          .toBe('failed');
-      } else {
-        expect(String(body.code ?? 'x'), 'header-only must not be accepted as business success').not.toBe('0');
-      }
-      const lineRowsAfter = await queryDynamicRecords(page, 'qo_quote_line_common', [], { pageSize: 500 });
-      expect(lineRowsAfter.length, 'header-only import must not create BOM lines').toBe(quoteLineBefore.length);
+      const marker = `HEADER-${Date.now()}`;
+      const customerId = await dynamicCreate(page, 'crm_account_common', {
+        crm_acc_name: marker, crm_acc_code: marker, crm_acc_status: 'active', crm_acc_pool_state: 'owned',
+      }, created.rows);
+      const projectId = await dynamicCreate(page, 'req_requirement_set_pcba_bom', {
+        bom_project_name: marker, bom_pcba_code: marker, bom_project_customer_id: customerId,
+      }, created.rows);
+      const conversion = await page.request.post('/api/meta/commands/execute/bom:start_conversion', {
+        data: { payload: { bom_task_customer_id: customerId, bom_task_project_id: projectId,
+          bom_task_raw_file_id: fileId } },
+      });
+      expect(conversion.status()).toBe(200);
+      const body = await conversion.json();
+      expect(String(body.code), JSON.stringify(body)).toBe('0');
+      let task: Record<string, any> | undefined;
+      await expect.poll(async () => {
+        const tasks = await queryDynamicRecords(page, 'bom_conversion_task_pcba', [
+          { fieldName: 'bom_task_project_id', operator: 'EQ', value: projectId },
+        ]);
+        expect(tasks.length).toBeLessThanOrEqual(1);
+        task = tasks[0];
+        return task?.bom_task_status;
+      }, { timeout: 60_000 }).toBe('failed');
+      created.rows.push({ model: 'bom_conversion_task_pcba', pid: String(task!.pid) });
+      expect(String(task!.bom_task_error_message), 'empty workbook failure explains its cause').toMatch(/无|没有|空|有效|数据/);
+      expect(String(task!.bom_task_export_file_id ?? ''), 'failed task has no export').toBe('');
+      const canonical = await queryDynamicRecords(page, 'req_requirement_line_pcba_bom', [
+        { fieldName: 'bom_cl_task_id', operator: 'EQ', value: task!.pid },
+      ]);
+      expect(canonical, 'empty workbook creates no canonical lines').toHaveLength(0);
+      const quotes = await queryDynamicRecords(page, 'qo_quote_common', [
+        { fieldName: 'qo_quote_project_id', operator: 'EQ', value: projectId },
+      ]);
+      expect(quotes, 'empty workbook creates no quote').toHaveLength(0);
     } finally {
       await cleanupRows(page, created);
     }
