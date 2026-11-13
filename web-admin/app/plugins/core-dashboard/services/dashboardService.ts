@@ -160,71 +160,11 @@ function normalizeWidget(raw: Record<string, unknown>, index: number): Widget {
     props: {} as Record<string, unknown>,
   };
 
-  // Preserve fields that are not part of the legacy WidgetConfig whitelist
-  // but that platform widgets may opt in to (e.g. SmartTableChart uses
-  // `modelCode` + `table` as a model-table shorthand when no full
-  // dataSource is authored — see backlog 2026-05-08 Gap 1).
-  const passthrough: Partial<Widget['config']> = {};
-  if (rawConfig.modelCode !== undefined) {
-    passthrough.modelCode = rawConfig.modelCode as string;
-  }
-  if (rawConfig.table !== undefined) {
-    passthrough.table = rawConfig.table as Record<string, unknown>;
-  }
-  for (const key of [
-    'defaultSort',
-    'defaultFilters',
-    'filters',
-    'pageSize',
-    'showPagination',
-    'sortable',
-    'striped',
-    'emptyMessage',
-  ] as const) {
-    if (rawConfig[key] !== undefined) {
-      (passthrough as Record<string, unknown>)[key] = rawConfig[key];
-    }
-  }
-  // Presentation keys consumed directly by chart components (notably smart-number-card's
-  // `cards[].label` KPI eyebrows). These live at the top level of the authored config —
-  // not under visualization — so they must be forwarded explicitly; otherwise the card
-  // loses its labels and falls back to rendering the raw named-query field codes.
-  // See dashboardService.test.ts ("preserves smart-number-card presentation keys").
-  for (const key of [
-    'cards',
-    'metricField',
-    'format',
-    'precision',
-    'currency',
-    'prefix',
-    'suffix',
-    'color',
-    'icon',
-    'label',
-    'trend',
-    'shortcuts',
-    'personalizable',
-    'orientation',
-    'stacked',
-    'showLabel',
-    'ring',
-    'innerRadius',
-    'outerRadius',
-    'labelPosition',
-    'roseType',
-    'xField',
-    'yField',
-    'seriesConfig',
-    'metricLabels',
-    'smooth',
-    'areaStyle',
-    'showSymbol',
-    'chartOptions',
-  ] as const) {
-    if (rawConfig[key] !== undefined) {
-      (passthrough as Record<string, unknown>)[key] = rawConfig[key];
-    }
-  }
+  // Widget-specific Schema/extension properties must survive load → edit → save.
+  // A renderer-key whitelist silently discarded content, filters, targets and
+  // grouping (and made a later save overwrite the original authored config).
+  // Keep the authored configuration; only legacy shape adapters below normalize it.
+  const passthrough: Partial<Widget['config']> = { ...rawConfig, title };
 
   const isModelTableShorthand =
     type === 'smart-table-chart' &&
