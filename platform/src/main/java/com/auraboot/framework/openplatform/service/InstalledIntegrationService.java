@@ -191,6 +191,23 @@ public class InstalledIntegrationService {
         });
     }
 
+    /** Verifies an already accepted event without claiming a receipt or running a command. */
+    @Transactional
+    public Acceptance verifyAcceptedReplay(MachinePrincipal principal, String source, IntegrationEventEnvelope envelope) {
+        return inTenant(principal.tenantId(), principal.installationPid(), () -> {
+            String external = envelope.headers().get("externalEventId");
+            String durable = "ext:" + principal.installationPid() + ":" + source + ":" + external;
+            Resolved resolved = resolve(principal, source, external, durable);
+            verifyEnvelope(resolved, envelope);
+            var original = receipts.find(principal.tenantId(), principal.installationPid(), source, external);
+            if (original == null || !Set.of("accepted", "completed").contains(original.state())
+                    || !validRequestPid(original.requestPid()))
+                throw new ExternalEventIngressService.IdempotencyConflictException();
+            verifyReceipt(resolved, envelope, original, true);
+            return new Acceptance(original.requestPid(), true);
+        });
+    }
+
     @Transactional
     public void consume(IntegrationEventEnvelope envelope) {
         String installation = envelope.headers().get("installationPid");

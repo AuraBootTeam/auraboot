@@ -291,6 +291,25 @@ class InstalledIntegrationServiceTest {
         verifyNoInteractions(executor);
     }
 
+    @Test void verifyAcceptedReplayRequiresAnExistingMatchingReceiptAndCannotExecuteWork() {
+        // Authorization and call-shape only; persistence is qualified by installed HTTP/PostgreSQL.
+        service.accept(principal,source,event());var original=acceptedReceipt();
+        clearInvocations(receipts,executor);
+        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(original);
+        assertEquals(new InstalledIntegrationService.Acceptance("request-pid",true),service.verifyAcceptedReplay(principal,source,event()));
+        assertThrows(ExternalEventIngressService.IdempotencyConflictException.class,
+                ()->service.verifyAcceptedReplay(principal,source,event(Map.of("title","Changed"))));
+        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(receiptWith(original,"accepting",null,original.bindingSha256(),original.commandSha256()));
+        assertThrows(ExternalEventIngressService.IdempotencyConflictException.class,()->service.verifyAcceptedReplay(principal,source,event()));
+        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(receiptWith(original,"completed","request-pid","different-binding",original.commandSha256()));
+        assertThrows(SecurityException.class,()->service.verifyAcceptedReplay(principal,source,event()));
+        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(null);
+        assertThrows(ExternalEventIngressService.IdempotencyConflictException.class,()->service.verifyAcceptedReplay(principal,source,event()));
+        verify(receipts,never()).claim(any());
+        verify(receipts,never()).accepted(anyLong(),anyString(),anyString(),anyString(),anyString());
+        verifyNoInteractions(executor);
+    }
+
     @Test void legacyFullConfigurationReceiptSurvivesProvenUnrelatedSuffixOnly() throws Exception {
         // This is a command-authorization test, not a substitute for real stored receipt replay.
         Map<String,String> originalConfigs=new HashMap<>();

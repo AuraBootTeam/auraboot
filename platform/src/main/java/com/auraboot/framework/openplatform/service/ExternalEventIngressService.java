@@ -30,6 +30,7 @@ public class ExternalEventIngressService {
     private final ReliableIntegrationAccessor integrationAccessor;
     private final OpenPlatformSecretCodec secretCodec;
     private final ObjectMapper objectMapper;
+    private final OpenApiProtocolHash protocolHash;
 
     private InstalledIntegrationService installedIntegrations;
 
@@ -59,14 +60,21 @@ public class ExternalEventIngressService {
             idempotencyKey="business:"+event.id();
         }
         String routeCode = "external-event:" + sourceCode;
-        String requestHash = secretCodec.sha256(rawBody);
+        String requestHash = installed && event.businessRequest()
+                ? businessRequestHash(rawBody) : secretCodec.sha256(rawBody);
+        boolean verifyStoredReplay = false;
         int claimed = idempotencyMapper.claim(principal.tenantId(), installation.getId(), routeCode,
                 idempotencyKey, requestHash, Instant.now().plusSeconds(86_400));
         if (claimed == 0) {
             String existingHash = idempotencyMapper.findRequestHash(principal.tenantId(), installation.getId(),
                     routeCode, idempotencyKey);
             if (!requestHash.equals(existingHash)) {
-                throw new IdempotencyConflictException();
+                // Older accepted requests used the raw JSON bytes. Only their existing,
+                // event-bound receipt can authorize a formatting-only retry.
+                if (!installed || !event.businessRequest()
+                        || !completedForEvent(idempotencyMapper.findResponse(principal.tenantId(), installation.getId(),
+                                routeCode, idempotencyKey), event.id())) throw new IdempotencyConflictException();
+                verifyStoredReplay = true;
             }
             if (installedIntegrations == null || !installedIntegrations.registered(sourceCode))
                 return new IngressResult(event.id(), true);
@@ -96,6 +104,10 @@ public class ExternalEventIngressService {
                 null, event.subjectType() + "/" + event.subjectPid(),
                 event.sequence(), event.data(), traceHeaders);
         InstalledIntegrationService.Acceptance acceptance = null;
+        if (verifyStoredReplay) {
+            acceptance = installedIntegrations.verifyAcceptedReplay(principal, sourceCode, envelope);
+            return new IngressResult(event.id(), true, acceptance.recordPid(), true, event.callerIdProvided());
+        }
         if (installedIntegrations != null && installedIntegrations.registered(sourceCode)) {
             acceptance = installedIntegrations.accept(principal,sourceCode,envelope);
         }
@@ -112,6 +124,26 @@ public class ExternalEventIngressService {
         }
         return new IngressResult(event.id(), acceptance != null && acceptance.duplicate(),
                 acceptance == null ? null : acceptance.recordPid(),event.businessRequest(),event.callerIdProvided());
+    }
+
+    private String businessRequestHash(String rawBody) {
+        try { return protocolHash.fingerprint(objectMapper.readTree(rawBody), false); }
+        catch (com.fasterxml.jackson.core.JsonProcessingException invalid) {
+            throw new InvalidExternalEventException("invalid_business_request");
+        }
+    }
+
+    private boolean completedForEvent(OpenApiIdempotencyMapper.StoredResponse stored, String eventId) {
+        if (stored == null || !"completed".equals(stored.status())
+                || !Integer.valueOf(202).equals(stored.responseStatus()) || stored.responseBody() == null) return false;
+        try {
+            JsonNode response = objectMapper.readTree(stored.responseBody());
+            return response != null && response.path("eventId").isTextual()
+                    && eventId.equals(response.path("eventId").asText())
+                    && response.path("accepted").isBoolean() && response.path("accepted").booleanValue();
+        } catch (com.fasterxml.jackson.core.JsonProcessingException invalid) {
+            throw new IllegalStateException("Invalid stored external event response", invalid);
+        }
     }
 
     private ExternalEvent parseInstalled(String sourceCode,String rawBody) {
