@@ -40,6 +40,7 @@ export const TabsBlockRenderer: React.FC<TabsBlockRendererProps> = ({ block, run
             return (
               <button
                 key={tab.key || index}
+                type="button"
                 role="tab"
                 aria-selected={activeTab === index}
                 onClick={() => setSelectedKey(tab.key)}
