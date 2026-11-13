@@ -63,7 +63,11 @@ test.describe('PCBA quote send audit golden', () => {
       expect(auditResponse.ok()).toBe(true);
       const auditBody = await auditResponse.json();
       expect(String(auditBody.code)).toBe('0');
-      const own = auditBody.data.records.filter((row: any) => String(row.requestPayload).includes(created.quoteId));
+      const sentIds = new Set(sent.map(row => String(row.pid)));
+      const own = auditBody.data.records.filter((row: any) => {
+        const outcome = JSON.parse(row.executionResult);
+        return outcome.quoteId === created.quoteId && sentIds.has(String(outcome.auditId));
+      });
       expect(own, 'both real sends have a traceable command actor').toHaveLength(2);
       expect(new Set(own.map((row: any) => String(row.userId))).size).toBe(1);
       for (const row of own) {
