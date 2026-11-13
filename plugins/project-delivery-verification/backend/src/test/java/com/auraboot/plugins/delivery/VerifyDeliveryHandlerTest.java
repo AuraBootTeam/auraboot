@@ -31,6 +31,12 @@ class VerifyDeliveryHandlerTest {
     private List<Map<String, Object>> accepted;
     private DataAccessor db;
 
+    @Test void declaresCoherentSourceReadTransaction() {
+        assertEquals(com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ,
+                handler.commandReadIsolation());
+        assertTrue(handler.supportsDryRun());
+    }
+
     @BeforeEach void setup() {
         target = new HashMap<>(Map.of("pid", "check", "tdv_ck_acceptance", "acceptance"));
         acceptance = new HashMap<>(Map.of("pid", "acceptance", "tpm_ac_project", "project",

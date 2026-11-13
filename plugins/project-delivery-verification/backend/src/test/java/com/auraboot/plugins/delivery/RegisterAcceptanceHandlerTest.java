@@ -31,6 +31,12 @@ class RegisterAcceptanceHandlerTest {
     private List<Map<String, Object>> checks;
     private DataAccessor db;
 
+    @Test void declaresCoherentSourceReadTransaction() {
+        assertEquals(com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ,
+                handler.commandReadIsolation());
+        assertTrue(handler.supportsDryRun());
+    }
+
     @BeforeEach void fixture() {
         acceptance = new HashMap<>(Map.of("pid", "acceptance", "tpm_ac_name", "Delivery",
                 "tpm_ac_project", "project", "tpm_ac_status", "accepted", "tpm_ac_registered", false,
