@@ -23,6 +23,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+bash "$SCRIPT_DIR/check-migration-version-floor.sh"
+
 if [[ "$EDITION" == "enterprise" ]]; then
   COMMITTED="$ENTERPRISE_ROOT/platform/src/main/resources/db/snapshots/schema-enterprise-current.sql"
 else
