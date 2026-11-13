@@ -130,11 +130,11 @@ public class NativeReadFieldProjection {
                         || !Objects.equals(grant.recordPid(), pid)) {
                     // Keep record contents and grant details out of logs and public error envelopes.
                     var deniedDecision = grant == null ? null : grant.result();
-                    log.warn("Native field projection denied model={} reason={} steps={}",
+                    log.warn("Native field projection denied model={} decision={} evaluators={}",
                             com.auraboot.framework.common.util.LogSanitizer.safe(model.getCode()),
-                            deniedDecision == null ? "missing decision" : com.auraboot.framework.common.util.LogSanitizer.safe(deniedDecision.reason()),
+                            deniedDecision == null ? "missing" : deniedDecision.granted() ? "identity-mismatch" : "denied",
                             deniedDecision == null ? "" : com.auraboot.framework.common.util.LogSanitizer.safe(
-                                    deniedDecision.steps().stream().map(step -> step.evaluatorName() + ":" + step.verdict() + ":" + step.reason()).toList().toString()));
+                                    deniedDecision.steps().stream().map(step -> step.evaluatorName() + ":" + step.verdict()).toList().toString()));
                     throw denied();
                 }
                 Map<String,Object> projected = new LinkedHashMap<>();

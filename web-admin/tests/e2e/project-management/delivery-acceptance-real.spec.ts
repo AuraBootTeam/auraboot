@@ -119,8 +119,13 @@ async function submit(page: Page, pid: string, minutes: number, node: string) {
   expect((Date.parse(sla[0].deadlineTime)-Date.parse(sla[0].startTime))/60000).toBe(minutes);
   receipts.push({pid,record,sla});
   await writeFile(join(evidence!,'acceptance-runtime-receipts.json'),JSON.stringify(receipts,null,2));
-  await expect(page.getByTestId('detail-persistent-header').getByTestId('bpm-panel').filter({has:page.getByTestId('bpm-section-operations')})).toHaveAttribute('data-state','ready');
-  await expect(page.getByTestId('detail-persistent-header').getByTestId('bpm-panel')).toBeVisible();
+  const header = page.getByTestId('detail-persistent-header');
+  const operations = header.getByTestId('bpm-panel').filter({has:page.getByTestId('bpm-section-operations')});
+  await expect(operations).toHaveCount(1);
+  await expect(operations).toHaveAttribute('data-state','ready');
+  await expect(operations).toBeVisible();
+  await expect(header.getByTestId('bpm-sla-summary')).toHaveCount(1);
+  await expect(header.getByTestId('bpm-sla-summary')).toBeVisible();
   await expect(page.getByRole('tab',{name:'验收详情',exact:true})).toHaveAttribute('aria-selected','true');
   await expect(page.getByTestId('bpm-rule-trace-status')).toHaveCount(0);
   await expect(page.getByTestId('bpm-history-container')).toHaveCount(0);

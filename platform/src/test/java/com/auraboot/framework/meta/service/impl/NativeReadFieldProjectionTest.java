@@ -73,6 +73,29 @@ class NativeReadFieldProjectionTest {
                 PermissionResult.deny("revoked",List.of()),100L,1L,5L,"project","record",List.of()));
         assertThatThrownBy(()->projection.project(model,List.of(row))).isInstanceOf(AccessDeniedException.class);
     }
+    @Test void denialDiagnosticsExcludePolicyExpressionsAndGrantDetails() {
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(NativeReadFieldProjection.class);
+        var appender = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            var step = new com.auraboot.framework.permission.engine.model.EvaluationStep("Policy",
+                    com.auraboot.framework.permission.engine.model.EvaluationVerdict.DENY, "PRIVATE_CONDITION");
+            when(authorization.resolveOrdinaryRead(eq(5L), eq("project"), anyMap())).thenReturn(
+                    new BusinessGrantDecision(PermissionResult.deny("PRIVATE_DECISION grant#123", List.of(step)),
+                            100L, 1L, 5L, "project", "record", List.of()));
+            assertThatThrownBy(() -> projection.project(model, List.of(row(Map.of("pid", "record", "secret", "PRIVATE_RECORD")))))
+                    .isInstanceOf(AccessDeniedException.class);
+            String output = appender.list.stream().map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
+                    .collect(java.util.stream.Collectors.joining("\n"));
+            assertThat(output).contains("model=project", "decision=denied", "Policy:DENY")
+                    .doesNotContain("PRIVATE_CONDITION", "PRIVATE_DECISION", "grant#123", "PRIVATE_RECORD");
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+    }
+
     @Test void legacyUnrestrictedGrantPreservesTheExistingDataShape() {
         var row=row(Map.<String,Object>of("pid","record","secret","PRIVATE"));
         when(authorization.resolveOrdinaryRead(eq(5L),eq("project"),anyMap())).thenReturn(new BusinessGrantDecision(
