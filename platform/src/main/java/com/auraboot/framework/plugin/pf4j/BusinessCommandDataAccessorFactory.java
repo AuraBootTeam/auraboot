@@ -785,8 +785,11 @@ public class BusinessCommandDataAccessorFactory {
             }
             @Override public void delete(String model, String pid) {
                 operation(() -> {
-                    // Root deletion is its own business use case, never an inherited child operation.
-                    if (!"update".equals(witness.action()) || rootModel.equals(model) || !deletableModels.contains(model)) throw denied();
+                    // Only a host-authorized delete use case may remove its exact root.
+                    boolean rootDelete = "delete".equals(witness.action()) && rootModel.equals(model) && rootPid.equals(pid);
+                    boolean childDelete = Set.of("update", "delete").contains(witness.action())
+                            && !rootModel.equals(model) && deletableModels.contains(model);
+                    if (!rootDelete && !childDelete) throw denied();
                     var row = load(model, pid);
                     authorize(new BusinessResourceAuthorization.Request(BusinessResourceAuthorization.Action.READ,
                             model, pid, row, null, null));
