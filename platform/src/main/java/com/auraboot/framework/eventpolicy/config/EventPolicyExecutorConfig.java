@@ -25,6 +25,9 @@ public class EventPolicyExecutorConfig {
         // depending on init order — this bit the test ActionHandler collection)
         var transactions = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
         transactions.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        // A business command reads source rows and field grants inside this same atomic
+        // action/claim transaction; establish its MVCC snapshot before either is loaded.
+        transactions.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
         return new PolicyExecutor(() -> handlers.stream().collect(java.util.stream.Collectors.toList()), idempotencyStore, transactions);
     }
 }
