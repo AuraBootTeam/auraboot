@@ -208,11 +208,16 @@ test.describe('BOM conversion-task soft delete real-browser golden @smoke', () =
     expect(logs.status()).toBe(200);
     const logBody = await logs.json();
     expect(String(logBody.code)).toBe('0');
-    const ownAudit = logBody.data.records.filter((log: any) => String(log.requestPayload).includes(taskPid));
+    const ownAudit = logBody.data.records.filter((log: any) => {
+      try { return JSON.parse(log.executionResult).recordPid === taskPid; }
+      catch { return false; }
+    });
     expect(ownAudit, 'successful deletion remains in the command audit').toHaveLength(1);
     expect(ownAudit[0].success).toBe(true);
     expect(String(ownAudit[0].userId), 'delete actor is traceable').toMatch(/^[1-9]\d*$/);
     expect(Number.isFinite(Date.parse(ownAudit[0].createdAt)), 'delete timestamp is retained').toBe(true);
+
+    await adminPage.screenshot({ path: test.info().outputPath('deleted-task-and-details.png'), fullPage: true });
 
     // 7. hard gates: no forbidden, no 500s across the whole flow
     expect(
