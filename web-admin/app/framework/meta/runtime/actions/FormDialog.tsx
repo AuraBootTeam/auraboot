@@ -441,6 +441,28 @@ function FormDialogHost() {
     for (const field of visibleFields) {
       const value = formData[field.field];
       if (
+        (field.type ?? 'text') === 'text' &&
+        field.props?.pattern !== undefined &&
+        value !== '' &&
+        value != null
+      ) {
+        let matches = false;
+        try {
+          matches =
+            typeof field.props.pattern === 'string' &&
+            typeof value === 'string' &&
+            new RegExp(`^(?:${field.props.pattern})$`, 'u').test(value.trim());
+        } catch {
+          // Invalid authored patterns must not permit a command submission.
+        }
+        if (!matches)
+          newErrors[field.field] = getLocalizedText(
+            field.props.invalidMessage || FORM_DIALOG_TEXT.invalidTextFormat,
+            locale,
+            t,
+          );
+      }
+      if (
         field.type === 'address' &&
         !validAddressInput(value, {
           required: field.required,

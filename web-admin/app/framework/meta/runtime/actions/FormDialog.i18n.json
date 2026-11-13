@@ -1,4 +1,8 @@
 {
+  "invalidTextFormat": {
+    "zh-CN": "格式不正确，请检查输入内容。",
+    "en-US": "Check the format of this value."
+  },
   "invalidDateTime": {
     "zh-CN": "所选时间在当前时区不存在，请重新选择。",
     "en-US": "This time does not exist in the current time zone. Choose another time."
