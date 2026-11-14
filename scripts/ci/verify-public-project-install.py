@@ -152,7 +152,7 @@ def main():
     if reuse_file:
         spec = importlib.util.spec_from_file_location('public_build_reuse', Path(__file__).with_name('public-build-reuse.py'))
         module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
-        reused_build = module.load(root, reuse_file, os.environ.get('AURA_PUBLIC_REUSE_BUILD_SHA256'))
+        reused_build = module.load(root, reuse_file, os.environ.get('AURA_PUBLIC_REUSE_BUILD_SHA256'), os.environ.get('AURA_CI_NETWORK_SUBNET'))
 
     # The original generic wrapper caps BuildKit at 2GiB. Source-building the
     # documented full application needs its own bounded builder, not the shared default.
@@ -231,7 +231,10 @@ def main():
             run(compose + ['up', '--build', '-d'], 'compose-build-start', timeout=2400)
         else:
             override = private / "consume-compose.json"
-            override.write_text(json.dumps({"services": {service: {"image": image} for service, image in reused_build["images"].items()}}))
+            definition = {"services": {service: {"image": image} for service, image in reused_build["images"].items()}}
+            if reused_build.get('networkSubnet'):
+                definition['networks'] = {'default': {'ipam': {'config': [{'subnet': reused_build['networkSubnet']}]}}}
+            override.write_text(json.dumps(definition))
             compose[:] = ["docker", "compose", "-f", str(root / "docker-compose.yml"), "-f", str(override), "--project-name", project, "--profile", "full"]
             for name in ["builder.json", "gradle-cache.json"]:
                 (output / name).write_text(json.dumps(reused_build[name], indent=2))

@@ -43,4 +43,12 @@ class ReuseContract(unittest.TestCase):
             a=self.fixture();a[5]['backend'][field]=value
             with self.assertRaises(RuntimeError):m.validate(*a)
 
+class NetworkContract(unittest.TestCase):
+    def test_scoped_nonoverlapping_subnet(self):
+        self.assertEqual(m.validate_subnet('10.253.200.0/28', ['10.66.0.0/24', '172.17.0.0/16', '::/64']), '10.253.200.0/28')
+    def test_overlap_wrong_scope_size_and_host_bits_are_rejected(self):
+        for value,used in [('10.253.200.0/28',['10.253.200.3/32']), ('10.253.200.0/28',['10.0.0.0/8']),
+                           ('192.168.1.0/28',[]), ('10.253.200.0/24',[]), ('10.253.200.1/28',[])]:
+            with self.assertRaises((RuntimeError, ValueError)): m.validate_subnet(value,used)
+
 if __name__=='__main__': unittest.main()

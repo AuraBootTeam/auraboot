@@ -1,6 +1,7 @@
 """Consume an unchanged, previously source-built public image set; never reuse data."""
 import hashlib
 import json
+import ipaddress
 from pathlib import Path
 import re
 import subprocess
@@ -51,7 +52,17 @@ def validate(receipt, current_tree, producer_tree, checks, containers, images):
                 businessDataReused=False, scope='Reuse actual source-build stage only; run fresh initialization and every original browser/reopen assertion')
 
 
-def load(root, filename, expected):
+def validate_subnet(value, occupied):
+    subnet = ipaddress.ip_network(value, strict=True)
+    need(subnet.version == 4 and subnet.prefixlen == 28
+         and subnet.subnet_of(ipaddress.ip_network('10.253.0.0/16')), 'Scoped CI /28 subnet required')
+    need(not any(subnet.overlaps(ipaddress.ip_network(item, strict=False))
+                 for item in occupied if ipaddress.ip_network(item, strict=False).version == 4),
+         'CI subnet overlaps an existing network or host route')
+    return str(subnet)
+
+
+def load(root, filename, expected, subnet=None):
     path = Path(filename)
     need(not path.is_symlink() and path.is_file() and path.stat().st_uid == 0
          and path.stat().st_mode & 0o022 == 0, 'Protected root-reviewed build receipt required')
@@ -81,6 +92,14 @@ def load(root, filename, expected):
         images[service] = json.loads(subprocess.check_output(['docker', 'image', 'inspect', receipt['images'][service]], text=True))[0]
     result = validate(receipt, tree(root), tree(producer), json.loads(checks_file.read_text()), containers, images)
     result.update(consumerVerifierSource=git(root, 'rev-parse', 'HEAD'), producerEvidence=str(evidence), receiptSha256=expected)
+    if subnet:
+        ids = subprocess.check_output(['docker', 'network', 'ls', '-q'], text=True).split()
+        networks = json.loads(subprocess.check_output(['docker', 'network', 'inspect', *ids], text=True)) if ids else []
+        occupied = [r['Subnet'] for n in networks for r in (n.get('IPAM', {}).get('Config') or []) if r.get('Subnet')]
+        routes = json.loads(subprocess.check_output(['ip', '-j', '-4', 'route', 'show', 'table', 'all'], text=True))
+        occupied += [r['dst'] for r in routes if r.get('dst') not in [None, 'default']]
+        result.update(networkSubnet=validate_subnet(subnet, occupied), existingNetworksChecked=len(networks),
+                      hostRoutesChecked=len(routes), existingNetworksRemoved=0)
     # Retain the original resource/cache observation as historical provenance,
     # never as a new builder measurement in this consuming round.
     for name in ['builder.json', 'gradle-cache.json']:
