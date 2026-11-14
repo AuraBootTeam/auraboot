@@ -447,7 +447,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
     const parentFields = (group: Group, fields: FieldConfig[], summary: boolean) => {
       if (!group.parent || !parentConfig) return null;
       const row = group.parent;
-      return <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid={summary ? 'card-group-summary' : 'card-group-fields'}>
+      return <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 12rem), 1fr))', gap: '0.75rem', pointerEvents: summary ? 'none' : undefined}} data-testid={summary ? 'card-group-summary' : 'card-group-fields'}>
         {fields.map(field => {
           const ctx = { ...runtime.getContext(), row } as any;
           if (field.visibleWhen && !runtime.getEvaluator().evaluateCondition(field.visibleWhen, ctx)) return null;
