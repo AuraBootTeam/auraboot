@@ -86,7 +86,7 @@ const ORG_SYSTEM_ADMIN_CODES = [
   'permission_roles',
   'enterprise_info',
   'account_security_policy',
-  'llm_provider_settings',
+  'ai_llm_providers',
   'system_preferences',
 ];
 
@@ -107,7 +107,7 @@ const ADMIN_SWEEP_CODES = [
   'permission_roles',
   'enterprise_info',
   'account_security_policy',
-  'llm_provider_settings',
+  'ai_llm_providers',
   'system_preferences',
 ];
 

@@ -141,7 +141,9 @@ async function expectFourCharts(page: Page, path: string): Promise<void> {
     // locator.hover 先把图表滚入视口再派发悬停；数据多的租户首页图表常在
     // 折叠线以下，page.mouse.move(boundingBox) 会悬到视口外导致 tooltip 不出现。
     const last = rendered.points[11];
-    await chart.hover({ position: { x: last[0], y: last[1] } });
+    // The zero-valued last point lies on the bottom/right plot boundary.
+    // Hover just inside the same week's axis band so ECharts receives the event.
+    await chart.hover({ position: { x: last[0] - 2, y: last[1] - 2 } });
     await expect(chart).toContainText(`创建数量`);
     await expect(chart).toContainText(String(expectedSeries[index][11]));
     await page.mouse.move(0, 0);
