@@ -95,6 +95,15 @@ public class DynamicController {
     @Autowired
     private com.auraboot.framework.meta.service.impl.CommandEffectExecutor commandEffectExecutor;
 
+    @Autowired(required = false)
+    private com.auraboot.framework.meta.service.CommandExecutor synthesizedCommandExecutor;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.meta.synthesized.DynamicWriteCommandSeedService dynamicWriteCommandSeedService;
+
+    @org.springframework.beans.factory.annotation.Value("${aura.command.synthesized-dynamic-writes:false}")
+    private boolean synthesizedDynamicWrites;
+
     @Autowired
     private OrganizationService organizationService;
 
@@ -565,10 +574,12 @@ public class DynamicController {
      */
     private <T> T auditedDirectWrite(String operation, String pageKey, Object payloadSummary,
                                       java.util.function.Supplier<T> write) {
+        if (synthesizedDynamicWrites && synthesizedCommandExecutor != null && dynamicWriteCommandSeedService != null) {
+            return executeAsSynthesizedCommand(operation, pageKey, (Map<String, Object>) payloadSummary);
+        }
         long start = System.currentTimeMillis();
-        Map<String, Object> requestPayload = payloadSummary instanceof Map
-                ? (Map<String, Object>) payloadSummary
-                : Map.of("summary", String.valueOf(payloadSummary));
+        // Audited payload stays bounded: batch lists are summarized to a count.
+        Map<String, Object> requestPayload = auditViewOf(payloadSummary);
         try {
             T result = write.get();
             recordDirectWriteAudit(operation, requestPayload, true, null, start);
@@ -577,6 +588,48 @@ public class DynamicController {
             recordDirectWriteAudit(operation, requestPayload, false, String.valueOf(e.getMessage()), start);
             throw e;
         }
+    }
+
+    /**
+     * Flag-on path: route the write through the command pipeline as a
+     * synthesized {@code dynamic.*} command (seeded per tenant on first use).
+     * The pipeline then owns permissions (handler-owned invocation
+     * authorization re-derives model.{pageKey}.{op} server-side), SoD,
+     * idempotency, state guards, events and auditing. Payload must carry
+     * pageKey/modelCode plus the operation-specific inputs the handler reads.
+     */
+    @SuppressWarnings("unchecked")
+    private <T> T executeAsSynthesizedCommand(String operation, String pageKey, Map<String, Object> synthPayload) {
+        String commandCode = "dynamic." + operation.substring("dynamic.".length());
+        dynamicWriteCommandSeedService.ensureSeeded(commandCode);
+        com.auraboot.framework.meta.dto.CommandExecuteRequest request =
+                new com.auraboot.framework.meta.dto.CommandExecuteRequest();
+        request.setPayload(synthPayload);
+        Object recordPid = synthPayload.get("recordPid");
+        if (recordIdCarryingOperations().contains(operation)) {
+            request.setTargetRecordId(recordPid instanceof String rp ? rp : null);
+        }
+        Object result = synthesizedCommandExecutor.execute(commandCode, request);
+        return result instanceof Map<?, ?> map ? (T) map : (T) result;
+    }
+
+    private static java.util.Set<String> recordIdCarryingOperations() {
+        return java.util.Set.of("dynamic.update", "dynamic.delete");
+    }
+
+    private static Map<String, Object> auditViewOf(Object payloadSummary) {
+        if (!(payloadSummary instanceof Map<?, ?> raw)) {
+            return Map.of("summary", String.valueOf(payloadSummary));
+        }
+        Map<String, Object> view = new java.util.LinkedHashMap<>();
+        for (Map.Entry<?, ?> e : raw.entrySet()) {
+            if (e.getValue() instanceof List<?> list) {
+                view.put(String.valueOf(e.getKey()), Map.of("count", list.size()));
+            } else if (e.getValue() != null) {
+                view.put(String.valueOf(e.getKey()), e.getValue());
+            }
+        }
+        return view;
     }
 
     /**
@@ -611,7 +664,10 @@ public class DynamicController {
             @RequestBody Map<String, Object> data) {
         log.info("创建数据: {}", logSafe(pageKey));
         String modelCode = resolveModelCode(pageKey);
-        Map<String, Object> result = auditedDirectWrite("dynamic.create", pageKey, data,
+        Map<String, Object> synthPayload = new java.util.HashMap<>(data);
+        synthPayload.put("pageKey", pageKey);
+        synthPayload.put("modelCode", modelCode);
+        Map<String, Object> result = auditedDirectWrite("dynamic.create", pageKey, synthPayload,
                 () -> dynamicDataService.create(modelCode, data));
         return ApiResponse.success(PublicRecordSanitizer.sanitizeRecord(result));
     }
@@ -650,7 +706,11 @@ public class DynamicController {
             data.put("_expectedVersion", baseRecordVersion);
         }
         String modelCode = resolveModelCode(pageKey);
-        Map<String, Object> result = auditedDirectWrite("dynamic.update", pageKey, data,
+        Map<String, Object> synthPayload = new java.util.HashMap<>(data);
+        synthPayload.put("pageKey", pageKey);
+        synthPayload.put("modelCode", modelCode);
+        synthPayload.put("recordPid", recordPid);
+        Map<String, Object> result = auditedDirectWrite("dynamic.update", pageKey, synthPayload,
                 () -> dynamicDataService.update(modelCode, recordPid, data));
         return ApiResponse.success(PublicRecordSanitizer.sanitizeRecord(result));
     }
@@ -667,7 +727,8 @@ public class DynamicController {
             @Parameter(description = "记录 PID") @PathVariable String recordPid) {
         log.info("删除数据: pageKey={}, recordPid={}", logSafe(pageKey), logSafe(recordPid));
         String modelCode = resolveModelCode(pageKey);
-        auditedDirectWrite("dynamic.delete", pageKey, Map.of("recordPid", recordPid),
+        auditedDirectWrite("dynamic.delete", pageKey,
+                Map.of("pageKey", pageKey, "modelCode", modelCode, "recordPid", recordPid),
                 () -> {
                     dynamicDataService.delete(modelCode, recordPid);
                     return null;
@@ -690,7 +751,7 @@ public class DynamicController {
         log.info("批量创建数据: {}, 数量: {}", logSafe(pageKey), dataList.size());
         String modelCode = resolveModelCode(pageKey);
         DynamicBatchResponse result = auditedDirectWrite("dynamic.batch_create", pageKey,
-                Map.of("count", dataList.size()),
+                Map.of("pageKey", pageKey, "modelCode", modelCode, "dataList", dataList),
                 () -> dynamicDataService.batchCreate(modelCode, dataList));
         return ApiResponse.success(PublicRecordSanitizer.sanitizeBatch(result));
     }
@@ -710,7 +771,7 @@ public class DynamicController {
         log.info("批量更新数据: {}, 数量: {}", logSafe(pageKey), dataList.size());
         String modelCode = resolveModelCode(pageKey);
         DynamicBatchResponse result = auditedDirectWrite("dynamic.batch_update", pageKey,
-                Map.of("count", dataList.size()),
+                Map.of("pageKey", pageKey, "modelCode", modelCode, "dataList", dataList),
                 () -> dynamicDataService.batchUpdate(modelCode, dataList));
         return ApiResponse.success(PublicRecordSanitizer.sanitizeBatch(result));
     }
@@ -729,7 +790,8 @@ public class DynamicController {
         }
         log.info("批量删除数据: pageKey={}, count={}", logSafe(pageKey), recordPids.size());
         String modelCode = resolveModelCode(pageKey);
-        auditedDirectWrite("dynamic.batch_delete", pageKey, Map.of("count", recordPids.size()),
+        auditedDirectWrite("dynamic.batch_delete", pageKey,
+                Map.of("pageKey", pageKey, "modelCode", modelCode, "recordPids", recordPids),
                 () -> {
                     dynamicDataService.batchDelete(modelCode, recordPids);
                     return null;
