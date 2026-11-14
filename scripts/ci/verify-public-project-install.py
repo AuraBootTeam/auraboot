@@ -130,6 +130,13 @@ def main():
         require(str(response['code']) == '0', 'Project read after restart failed')
         return response['data']['records']
 
+    freeze_command = ['node', str(Path(os.environ['AURA_CI_WORKSPACE_ROOT']) /
+        'auraboot-workspace/tools/local-ci/server.mjs'), 'verify-freeze',
+        '--context', os.environ['AURA_CI_FROZEN_CONTEXT'],
+        '--expected-source-set', os.environ['AURA_CI_SOURCE_SET_DIGEST'],
+        '--workspace-root', os.environ['AURA_CI_WORKSPACE_ROOT'], '--job', job]
+    run(freeze_command, 'frozen-before')
+
     # The original generic wrapper caps BuildKit at 2GiB. Source-building the
     # documented full application needs its own bounded builder, not the shared default.
     image = os.environ['AURA_PUBLIC_BUILDKIT_IMAGE']
@@ -225,6 +232,9 @@ def main():
         normalize = lambda rows: sorted(rows, key=lambda row: json.dumps(row, sort_keys=True))
         require(normalize(before) == normalize(after), 'Business records changed after documented stop/reopen')
         check('documented-stop-reopen', projects=9, recordsUnchanged=True)
+        run(freeze_command, 'frozen-after')
+        require((private / 'frozen-before.log').read_bytes() == (private / 'frozen-after.log').read_bytes(),
+                'Frozen public source identity changed')
         (output / 'result.json').write_text(json.dumps(dict(status='passed', releaseQualification=False,
              checks=checks, recordings=False, scope='Documented public Compose + project sample; no Enterprise or AI claims'), indent=2))
     finally:
