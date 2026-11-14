@@ -71,12 +71,16 @@ COPY platform/platform-agent/gradle.lockfile platform-agent/gradle.lockfile
 
 RUN chmod +x gradlew
 
+# Bound container builds independently of developer-machine Gradle defaults.
+# Two workers and a 3GiB heap leave room for metaspace, Javadoc and BuildKit
+# within the documented 8GiB build budget; product runtime settings are unchanged.
 # Download dependencies (cached unless build files change)
 RUN --mount=type=cache,target=/root/.gradle/wrapper \
     --mount=type=cache,target=/root/.gradle/caches \
     --mount=type=cache,target=/root/.m2/repository,id=aura-m2,sharing=locked \
     AURA_GRADLE_REPOSITORY_POLICY="$AURA_GRADLE_REPOSITORY_POLICY" \
-    ./gradlew --init-script /opt/aura-ci/gradle-repositories.init.gradle dependencies --no-daemon || true
+    ./gradlew --init-script /opt/aura-ci/gradle-repositories.init.gradle dependencies --no-daemon --no-parallel --max-workers=2 \
+    "-Dorg.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8" || true
 
 # Copy source code
 COPY platform/src ./src
@@ -100,7 +104,8 @@ RUN --mount=type=cache,target=/root/.gradle/wrapper \
     --mount=type=cache,target=/root/.gradle/caches \
     --mount=type=cache,target=/root/.m2/repository,id=aura-m2,sharing=locked \
     AURA_GRADLE_REPOSITORY_POLICY="$AURA_GRADLE_REPOSITORY_POLICY" \
-    ./gradlew --init-script /opt/aura-ci/gradle-repositories.init.gradle :platform-plugin-api:publishToMavenLocal bootJar --no-daemon -x test
+    ./gradlew --init-script /opt/aura-ci/gradle-repositories.init.gradle :platform-plugin-api:publishToMavenLocal bootJar --no-daemon -x test --no-parallel --max-workers=2 \
+    "-Dorg.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8"
 
 # ── Stage 2: Runtime ────────────────────────────────────────
 FROM ${RUNTIME_JRE_IMAGE}

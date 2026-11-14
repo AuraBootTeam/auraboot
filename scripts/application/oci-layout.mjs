@@ -35,7 +35,8 @@ function createRunnableLayout({ output, rootfs, labels, entrypoint }) {
         "&& apt-get -o Acquire::Retries=0 -o Acquire::https::Timeout=30 update --error-on=any " +
         "&& apt-get -o Acquire::Retries=0 -o Acquire::https::Timeout=30 install --no-install-recommends -y " +
         "apt=2.8.4ubuntu0.1 libapt-pkg6.0t64=2.8.4ubuntu0.1 libpcre2-8-0=10.42-4ubuntu2.2 " +
-        "&& dpkg-query -W apt libapt-pkg6.0t64 libpcre2-8-0 " +
+        "libc6=2.39-0ubuntu8.12 libc-bin=2.39-0ubuntu8.12 locales=2.39-0ubuntu8.12 perl-base=5.38.2-3.2ubuntu0.7 " +
+        "&& dpkg-query -W apt libapt-pkg6.0t64 libpcre2-8-0 libc6 libc-bin locales perl-base " +
         "&& sed 's|http://|https://|g' /tmp/auraboot-ubuntu.sources > /etc/apt/sources.list.d/ubuntu.sources " +
         "&& rm /tmp/auraboot-ubuntu.sources && rm -rf /var/lib/apt/lists/*",
       'COPY rootfs/ /',

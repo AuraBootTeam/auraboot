@@ -16,7 +16,8 @@
       "tpm.acceptance.read",
       "model.tpm_acceptance.read",
       "sys.file.read"
-    ]
+    ],
+    "defaultDataScopeType": "all"
   },
   {
     "code": "tpm_delivery_manager",
@@ -52,6 +53,7 @@
       "tpm.acceptance.manage",
       "model.tpm_acceptance.create",
       "model.tpm_acceptance.update"
-    ]
+    ],
+    "defaultDataScopeType": "all"
   }
 ]

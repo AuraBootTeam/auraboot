@@ -28,6 +28,12 @@ def pid(v):
 existing=req('/api/dynamic/tpm_project/list','GET',headers=h)['data']['records']
 if existing:
  raise SystemExit('Project delivery already contains projects. Nothing was cleared or seeded. Open the existing project list; use a separate empty local evaluation instance to recreate the samples.')
+navigation_spec=importlib.util.spec_from_file_location('case_navigation',core/'scripts/application/case-role-navigation.py')
+navigation=importlib.util.module_from_spec(navigation_spec);navigation_spec.loader.exec_module(navigation)
+navigation_result=navigation.install_case_role_navigation(
+ lambda path,method='GET',body=None:m.response_data(req(path,method,body,h),'case navigation'),
+ json.loads((resources/'config/roles.json').read_text()),json.loads((resources/'config/menus.json').read_text()))
+(out/'case-navigation.json').write_text(json.dumps(navigation_result,ensure_ascii=False,indent=2))
 audit_config=json.loads((resources/'scripts/field-audit-config.json').read_text())
 audit_result=req('/api/audit/field-config/bulk','POST',audit_config,h)
 assert str(audit_result['code'])=='0',audit_result
@@ -42,11 +48,13 @@ owners=[];participants=[]
 for login,name in [('delivery-lin','林晓'),('delivery-zhou','周宁'),('delivery-chen','陈晨'),('delivery-wang','王越')]:
  v=req('/api/admin/users','POST',{'userName':login,'displayName':name,'initialPassword':os.environ['ADMIN_PASSWORD'],'roleCodes':['tpm_delivery_manager'],'sendInviteEmail':False},h)
  assert str(v['code'])=='0',v
+ assert v['data']['assignedRoles']==['tpm_delivery_manager'],'Case manager must not receive unrelated roles'
  owners.append(v['data']['userPid'])
  participants.append({'login':login,'displayName':name,'userPid':v['data']['userPid'],'memberPid':v['data']['memberPid']})
 viewer_email='delivery-viewer@example.test'
 v=req('/api/admin/users','POST',{'email':viewer_email,'displayName':'交付观察员','initialPassword':os.environ['ADMIN_PASSWORD'],'roleCodes':['tpm_delivery_viewer'],'sendInviteEmail':False},h)
 assert str(v['code'])=='0',v
+assert v['data']['assignedRoles']==['tpm_delivery_viewer'],'Case viewer must not receive write/admin roles'
 owner=owners[0]
 projects=[]
 references=json.loads((resources/'scripts/reference-projects.json').read_text())

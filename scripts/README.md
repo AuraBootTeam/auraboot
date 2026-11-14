@@ -150,6 +150,8 @@ the original review behavior; pause idle services through their product owner.
 | `ci/verify-oss-full-codeql.sh` | 1 | 2026-11-11 | Run the original full Java and JavaScript CodeQL policy on frozen source; retain findings for individual review without suppression. |
 | `command-input-source-contract.mjs` | 1 | 2026-11-11 | Validate the existing command input source contract. |
 | `ci/oss-native-install.py` | Verify cold initialization, old-to-new upgrade, backup recovery and corrupt-candidate rejection using packaged lifecycle and an attempt-owned Linux database. |
+| `ci/verify-public-project-install.py` | Run the public Compose/project initialization and existing three browser journeys in an admitted isolated Linux attempt; preserve volumes and verify stop/reopen. |
+| `ci/verify-public-project-install.test.py` | Validate Compose array/NDJSON service states and reject malformed container entries. |
 | `deploy/prod-deploy.sh` | 0 | 2026-06-18 | Production deploy orchestrator. Runs the schema migration + release ledger |
 | `dev/ci-env-export.sh` | 0 | 2026-05-09 | ci-env-export.sh — env contract for generic CI runners. Defaults are |
 | `dev/ga-e2e-env-export.sh` | 0 | 2026-05-09 | ga-e2e-env-export.sh — env contract for the GA (GitHub Actions) E2E |
@@ -302,7 +304,7 @@ the original review behavior; pause idle services through their product owner.
 | `performance/measure-home.mjs` | 0 | 2026-10-16 | Measure browser home readiness and retain the native performance evidence. |
 | `performance/seed-api.mjs` | 0 | 2026-10-16 | Seed fixtures through the explicit performance API target. |
 | `publish-repos.sh` | 1 | 2026-04-15 |  |
-| `prepare-quickstart-env.py` | 2 | 2026-10-18 | Prepare missing persistent protocol signing material without printing or rotating existing keys. |
+| `prepare-quickstart-env.py` | Prepare missing protocol material without rotation; explicit `--new-local-evaluation` refuses existing state, creates independent private configuration and restores tracked public Docker resource readability. |
 | `quickstart.sh` | 8 | 2026-07-13 | quickstart.sh — turn a freshly-started AuraBoot stack into a usable one. |
 | `release/bump-version.sh` | 1 | 2026-06-18 | Bump the release version. Single source of truth = VERSION at repo root. |
 | `reset-db.sh` | 13 | 2026-06-18 | AuraBoot Database Reset Script |
@@ -430,3 +432,5 @@ isolated bootstrap with no enabled tenant or platform LLM provider. Pin
 button against the original backend and its explicitly enabled local LLM stub;
 this is transport/assembly evidence, not live-provider or generated-DSL quality.
 The base run reports the full-only draft case as not applicable.
+
+| `sync-permission-i18n.mjs` | 1 | 2026-11-14 | Synchronize permission labels from existing registered permissions and locale resources. |

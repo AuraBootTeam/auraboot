@@ -230,6 +230,7 @@ test('plugin import profiles use explicit semantic names and deprecate default',
   const profiles = JSON.parse(read('scripts/dev/plugin-import-profiles.json'));
 
   assert.deepEqual(Object.keys(profiles).sort(), [
+    'bom-quote',
     'core',
     'default',
     'demo',
@@ -245,6 +246,7 @@ test('plugin import profiles use explicit semantic names and deprecate default',
     'page-manager',
     'org-management',
   ]);
+  assert.deepEqual(profiles['bom-quote'], ['core-meta', 'platform-admin', 'core-aurabot', 'page-manager', 'org-management']);
   assert.deepEqual(profiles.demo.slice(0, profiles.core.length), profiles.core);
   assert.ok(profiles.e2e.includes('test-fixtures'));
   for (const [profile, plugins] of Object.entries(profiles)) {

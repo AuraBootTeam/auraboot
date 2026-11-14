@@ -135,3 +135,17 @@ Even twelve protocol passes do not attest deployed source/image identity: the re
 The same self-test entry additionally runs thirteen hermetic runner safety checks, injects a false
 completion verdict that must fail, and verifies restoration. They test tooling safety and reporting,
 not the deployed business paths; those require actual target execution and final full-scope evidence.
+
+## Public project installation qualification
+
+`verify-public-project-install.py` is an admitted Linux CI entry for the documented
+Compose checkout and `scripts/project-delivery-demo.sh` path. It selects an
+attempt-specific Compose project and ports, refuses inherited state, runs the
+existing three `playwright.delivery.config.ts` journeys with recordings disabled,
+and verifies record preservation after the documented stop/reopen commands.
+It retains its stopped containers, volumes, files and failure logs. It does not
+publish images or qualify Enterprise/AI scenarios. Run only through the frozen
+Jenkins manual profile with `AURA_CI_JOB_ID`, `AURA_REGRESSION_SLOT` and
+`AURA_REGRESSION_ARTIFACTS`; do not point it at an existing evaluation instance.
+
+The public installer may consume the admitted `public-gradle-8-14-6` dataset to warm only its private BuildKit wrapper cache. The archive must match the official SHA-256; the original wrapper URL, build timeout, existing browser assertions and zero-retry policy are unchanged. No shared builder or source configuration is modified.

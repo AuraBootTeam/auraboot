@@ -10,7 +10,7 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   timeout: 90_000,
-  use: { baseURL, channel: 'chrome', locale: 'zh-CN', viewport: { width: 1440, height: 1000 }, trace: 'on', video: 'on' },
+  use: { baseURL, channel: process.env.AURA_E2E_BROWSER_CHANNEL ?? 'chrome', locale: 'zh-CN', viewport: { width: 1440, height: 1000 }, trace: 'on', video: process.env.AURA_E2E_VIDEO === 'off' ? 'off' : 'on' },
   reporter: [['list'], ['json', { outputFile: process.env.DELIVERY_EVIDENCE_ROOT + '/browser-results.json' }]],
   outputDir: process.env.DELIVERY_EVIDENCE_ROOT + '/browser-artifacts',
 });

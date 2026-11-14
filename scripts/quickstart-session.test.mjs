@@ -41,7 +41,9 @@ test('quickstart selects the exact business space before all plugin imports and 
   const result = await runQuickstart([{ tenantId: '1', spaceType: 'platform' }, business]);
   assert.equal(result.code, 0, result.output);
   const imports = result.calls.filter(call => call.path === '/api/plugins/import/import-directory-sync');
-  assert.equal(imports.length, 8);
+  assert.deepEqual(imports.map(call => call.body.path.split('/').at(-1)),
+    ['core-meta', 'platform-admin', 'core-decisionops', 'page-manager', 'org-management', 'showcase']);
+  assert.ok(!imports.some(call => /core-aurabot|agent-control-plane/.test(call.body.path)));
   assert.ok(result.output.includes(`${result.baseURL} `));
   assert.ok(imports.every(call => call.authorization === 'Bearer fixture-business-token'));
   assert.ok(result.calls.findIndex(call => call.path === '/api/tenant-selection/process') < result.calls.findIndex(call => call.path === '/api/plugins/import/import-directory-sync'));

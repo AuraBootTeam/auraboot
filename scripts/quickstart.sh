@@ -22,7 +22,8 @@
 # startup. `/api/bootstrap/setup` is the explicit, auditable entry point, and an
 # init script is the sanctioned place to call it. That is this script.
 #
-# It is idempotent: run it as many times as you like.
+# Administrator creation preserves an existing account. Plugin import uses
+# OVERWRITE: run only for an explicit evaluation, never as a general upgrade.
 #
 #   BACKEND_URL     default http://localhost:3000 — the URL you open in the
 #                   browser, NOT the backend's own port.
@@ -67,6 +68,8 @@ case "$SYSTEM_MODE" in
   *) printf '%s\n' 'SYSTEM_MODE must be single, multi or hybrid.' >&2; exit 2 ;;
 esac
 
+# The source Compose image is the Core kernel. Agent-required plugins belong
+# to the separately verified full application assembly, not this Core initializer.
 # Dependency order matters: core-meta defines the metadata the rest build on.
 # One pass is not always enough — a plugin can reference something imported
 # later in the list — so anything that fails is retried once at the end.
@@ -74,11 +77,9 @@ PLUGINS=(
   core-meta
   platform-admin
   core-decisionops
-  core-aurabot
   page-manager
   org-management
   showcase
-  agent-control-plane
 )
 if [[ "$PROJECT_DELIVERY" == 1 ]]; then
   # Keep the first-use journey scoped to its actual platform dependencies.

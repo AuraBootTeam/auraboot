@@ -33,7 +33,7 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);
     await page.locator('form button[type=submit]').click();
     await page.waitForURL(url => !url.pathname.includes('/login'));
-    await page.getByText('项目', { exact: true }).click();
+    await page.getByTestId('sidebar').getByRole('link', { name: '项目', exact: true }).click();
     const projectName = fixture.projects[0].name;
     const projectRow = () => page.getByRole('row').filter({ hasText: projectName });
     await expect(projectRow()).toContainText('华辰制造');
@@ -145,7 +145,7 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     await expect(page.getByTestId('field-history')).toContainText('72');
     await shot('P17');
 
-    await page.getByText('项目', { exact: true }).click();
+    await page.getByTestId('sidebar').getByRole('link', { name: '项目', exact: true }).click();
     await page.getByTestId('tab-acceptance').click();
     await expect(page.getByRole('row').filter({ hasText: '远航物流' })).toBeVisible();
     await expect(projectRow()).toHaveCount(0);
@@ -186,9 +186,14 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     await expect(newRow).toContainText('林晓');
     await page.reload();
     await expect(newRow).toContainText('华辰制造');
-    const liveDelivery = await page.request.get('/api/datasource/list?datasourceId=nq%3Atpm_delivery_brief&format=records&maxItems=100');
-    expect(liveDelivery.status()).toBe(200);
-    const liveDeliveryBody = await liveDelivery.json();
+    // Verify through the logged-in browser's same-origin httpOnly session.
+    // Do not extract a JWT or create a second, independently authenticated client.
+    const liveDelivery = await page.evaluate(async () => {
+      const response = await fetch('/api/datasource/list?datasourceId=nq%3Atpm_delivery_brief&format=records&maxItems=100', { credentials: 'same-origin' });
+      return { status: response.status, body: await response.json() };
+    });
+    expect(liveDelivery.status).toBe(200);
+    const liveDeliveryBody = liveDelivery.body;
     expect(String(liveDeliveryBody.code)).toBe('0');
     const liveRows = liveDeliveryBody.data.records ?? liveDeliveryBody.data;
     expect(liveRows.find((row: any) => row.project_name === newProjectName)?.customer_name).toBe('华辰制造');
@@ -208,7 +213,7 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     await page.locator('#tpm_pj_risk_summary').fill('合同模板已确认，暂无阻塞。');
     await page.locator('#tpm_pj_next_action').fill('林晓安排下周一用户培训。');
     const editResponse = page.waitForResponse(response => response.url().includes('/execute/tpm:update_project') && response.request().method() === 'POST');
-    await page.getByTestId('form-btn-submit').click();
+    await page.getByRole('button', { name: '保存项目', exact: true }).click();
     const edited = await editResponse;
     expect(edited.request().postDataJSON().payload.tpm_pj_risk_summary).toBe('合同模板已确认，暂无阻塞。');
     expect(edited.request().postDataJSON().payload.tpm_pj_next_action).toBe('林晓安排下周一用户培训。');
@@ -238,7 +243,7 @@ test('delivery viewer can inspect progress but cannot edit or complete @smoke', 
   await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);
   await page.locator('form button[type=submit]').click();
   await page.waitForURL(url => !url.pathname.includes('/login'));
-  await page.getByText('项目', { exact: true }).click();
+  await page.getByTestId('sidebar').getByRole('link', { name: '项目', exact: true }).click();
   await expect(page.getByRole('button', { name: '新建项目', exact: true })).toHaveCount(0);
   await page.getByRole('row').filter({ hasText: fixture.projects[0].name }).getByRole('button', { name: /查看|详情/ }).click();
   await expect(page.getByTestId('object-summary').getByRole('progressbar')).toHaveAttribute('aria-valuenow', '72');
@@ -263,7 +268,7 @@ test('assigned view resolves the signed-in member and preserves shared attachmen
   await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);
   await page.locator('form button[type=submit]').click();
   await page.waitForURL(url => !url.pathname.includes('/login'));
-  await page.getByText('项目', { exact: true }).click();
+  await page.getByTestId('sidebar').getByRole('link', { name: '项目', exact: true }).click();
   await expect(page.getByTestId('tab-mine')).toContainText('3');
   await page.getByTestId('tab-mine').click();
   await expect(page.getByRole('row').filter({ hasText: fixture.projects[0].name })).toBeVisible();
