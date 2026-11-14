@@ -1,7 +1,6 @@
 import { validateFormPresentation } from '~/framework/meta/rendering/pages/formPage/formPresentation';
-import { resolveDesignerText } from '~/shared/designer';
+import { resolveDesignerText, PropertyFieldRenderer, DESIGNER_I18N } from '~/shared/designer';
 import { formPresentationProperties } from '~/shared/designer/formPresentationSchema';
-import { PropertyFieldRenderer, DESIGNER_I18N } from '~/shared/designer';
 /**
  * SettingsPanel Component
  *

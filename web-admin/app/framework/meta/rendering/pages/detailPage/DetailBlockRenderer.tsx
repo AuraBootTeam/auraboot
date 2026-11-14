@@ -2,7 +2,7 @@ import { WorkspaceRecordSection } from '../detail/WorkspaceRecordSection';
 import { useCallback } from 'react';
 import { BlockRenderer } from '@auraboot/runtime-kernel';
 import { getLocalizedText, DynamicField } from '~/routes/_shared/dynamic-route-utils';
-import { ContributedSubTableViewer as SubTableViewer } from '~/framework/extensions/contributed-components';
+import { ContributedSubTableViewer as SubTableViewer, LazyContributedComponent } from '~/framework/extensions/contributed-components';
 import { EmbeddedListBlockRenderer } from '~/framework/meta/rendering/blocks/EmbeddedListBlockRenderer';
 import { MonthlyGridViewer } from '~/framework/meta/rendering/blocks/MonthlyGridViewer';
 import { FieldHistoryViewer } from '~/framework/meta/rendering/blocks/FieldHistoryViewer';
@@ -11,7 +11,6 @@ import {
   resolveBusinessActivityDataSource,
 } from '~/framework/meta/rendering/blocks/ActivityTimeline';
 import { RecordComments } from '~/framework/meta/rendering/blocks/RecordComments';
-import { LazyContributedComponent } from '~/framework/extensions/contributed-components';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import type { BlockConfig, DataSourceConfig, FieldConfig } from '~/framework/meta/schemas/types';
 import { useTimezone } from '~/contexts/TimezoneContext';

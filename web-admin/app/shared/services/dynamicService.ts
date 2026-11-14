@@ -1,19 +1,6 @@
 import { get, post, put, del } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
-import type {
-  PaginationRequest,
-  PaginationResult,
-  DynamicEntity,
-  CustomQueryRequest,
-  FieldOptionsRequest,
-  RelatedDataRequest,
-  ExportRequest,
-  ImportRequest,
-  EntityStats,
-  PageSchema,
-  FieldOption,
-} from '~/types/dynamic';
-import type { DynamicBatchResult } from '~/types/dynamic';
+import type { PaginationRequest, PaginationResult, DynamicEntity, CustomQueryRequest, FieldOptionsRequest, RelatedDataRequest, ExportRequest, ImportRequest, EntityStats, PageSchema, FieldOption, DynamicBatchResult } from '~/types/dynamic';
 
 /**
  * Helper function to handle API responses

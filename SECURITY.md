@@ -25,7 +25,7 @@ to older betas. Severity-driven aspirations (NOT contractual SLAs):
 Automation backing these processes:
 - Dependabot security updates are enabled (`.github/dependabot.yml`).
 - GitHub-native secret-scanning + push-protection are active (configured
-  per `auraboot-website/docs/github-repo-settings.md`).
+  in the project team's private repository settings, which are not part of this public repo).
 - CodeQL static analysis runs on `main` (`.github/workflows/codeql.yml`).
 - Private vulnerability reporting is enabled — file a draft advisory at
   https://github.com/AuraBootTeam/auraboot/security/advisories/new.
