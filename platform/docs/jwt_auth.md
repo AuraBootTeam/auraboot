@@ -1,5 +1,3 @@
-Q:有点忘记 jwt 认证过程中的代码关系了,结合项目代码,帮我梳理下逻辑
-
 > SOT 补充：本文只说明 JWT 身份认证流程。RBAC 权限缓存失效、撤权传播、前端停留页会话重校验的权威说明见 `platform/docs/rbac_permission_cache_session_revalidation.md`。
 
 ## JWT认证架构概览
@@ -19,27 +17,27 @@ AuthController → AuthServiceImpl → JwtUtil
 ### 🔐 登录认证流程
 
 1. **用户登录请求**
-   - 用户通过 <mcfile name="AuthController.java" path="platform/src/main/java/com/auraboot/framework/controller/AuthController.java"></mcfile> 的 `/api/auth/login` 接口提交 <mcfile name="AuthenticationRequest.java" path="platform/src/main/java/com/auraboot/framework/auth/dto/AuthenticationRequest.java"></mcfile>（包含email和password）
+   - 用户通过 `platform/src/main/java/com/auraboot/framework/controller/AuthController.java` 的 `/api/auth/login` 接口提交 `platform/src/main/java/com/auraboot/framework/auth/dto/AuthenticationRequest.java`（包含email和password）
 
 2. **认证处理**
-   - <mcfile name="AuthServiceImpl.java" path="platform/src/main/java/com/auraboot/framework/auth/service/AuthServiceImpl.java"></mcfile> 调用 `AuthenticationManager.authenticate()`
+   - `platform/src/main/java/com/auraboot/framework/auth/service/AuthServiceImpl.java` 调用 `AuthenticationManager.authenticate()`
    - 创建 `UsernamePasswordAuthenticationToken(email, password)`
-   - Spring Security的 `DaoAuthenticationProvider` 自动调用 <mcfile name="CustomUserDetailsService.java" path="platform/src/main/java/com/auraboot/framework/auth/service/CustomUserDetailsService.java"></mcfile>
+   - Spring Security的 `DaoAuthenticationProvider` 自动调用 `platform/src/main/java/com/auraboot/framework/auth/service/CustomUserDetailsService.java`
 
 3. **用户信息加载**
    - `CustomUserDetailsService.loadUserByUsername()` 通过email查找用户
-   - 返回 <mcfile name="CustomUserDetails.java" path="platform/src/main/java/com/auraboot/framework/auth/dto/CustomUserDetails.java"></mcfile> 对象（包含userId、权限等）
+   - 返回 `platform/src/main/java/com/auraboot/framework/auth/dto/CustomUserDetails.java` 对象（包含userId、权限等）
    - Spring Security自动进行密码验证（使用PasswordEncoder）
 
 4. **JWT生成**
-   - 认证成功后，<mcfile name="JwtUtil.java" path="platform/src/main/java/com/auraboot/framework/auth/util/JwtUtil.java"></mcfile> 生成JWT token
+   - 认证成功后，`platform/src/main/java/com/auraboot/framework/auth/util/JwtUtil.java` 生成JWT token
    - 将userId等信息编码到JWT的claims中
-   - 返回 <mcfile name="AuthenticationResponse.java" path="platform/src/main/java/com/auraboot/framework/auth/dto/AuthenticationResponse.java"></mcfile>（包含jwt、userId、username）
+   - 返回 `platform/src/main/java/com/auraboot/framework/auth/dto/AuthenticationResponse.java`（包含jwt、userId、username）
 
 ### 🛡️ 请求验证流程
 
 1. **请求拦截**
-   - 每个API请求都会经过 <mcfile name="JwtAuthenticationFilter.java" path="platform/src/main/java/com/auraboot/framework/controller/JwtAuthenticationFilter.java"></mcfile>
+   - 每个API请求都会经过 `platform/src/main/java/com/auraboot/framework/controller/JwtAuthenticationFilter.java`
    - 检查白名单，跳过不需要认证的路径
 
 2. **JWT解析**
@@ -52,14 +50,14 @@ AuthController → AuthServiceImpl → JwtUtil
    - 使用 `JwtUtil.validateToken()` 验证token有效性（签名、过期时间等）
 
 4. **设置安全上下文**
-   - 创建 <mcfile name="EmailPasswordAuthenticationToken.java" path="platform/src/main/java/com/auraboot/framework/auth/service/EmailPasswordAuthenticationToken.java"></mcfile>（自定义认证对象，包含userId）
+   - 创建 `platform/src/main/java/com/auraboot/framework/auth/service/EmailPasswordAuthenticationToken.java`（自定义认证对象，包含userId）
    - 将认证信息设置到 `SecurityContextHolder`
-   - 后续可通过 <mcfile name="CurrentUserUtil.java" path="platform/src/main/java/com/auraboot/framework/auth/util/CurrentUserUtil.java"></mcfile> 获取当前用户信息
+   - 后续可通过 `platform/src/main/java/com/auraboot/framework/auth/util/CurrentUserUtil.java` 获取当前用户信息
 
 ## 关键配置
 
 ### Security配置
-<mcfile name="SecurityConfig.java" path="platform/src/main/java/com/auraboot/framework/application/security/SecurityConfig.java"></mcfile> 配置了：
+`platform/src/main/java/com/auraboot/framework/application/security/SecurityConfig.java` 配置了：
 - 无状态会话（STATELESS）
 - JWT过滤器在用户名密码过滤器之前执行
 - 白名单路径免认证

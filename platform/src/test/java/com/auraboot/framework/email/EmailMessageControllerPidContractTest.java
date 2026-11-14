@@ -22,6 +22,7 @@ import java.lang.reflect.Parameter;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -76,6 +77,7 @@ class EmailMessageControllerPidContractTest {
                 emailMessageMapper,
                 emailRecordLinkMapper,
                 emailRecordLinkService,
+                mock(com.auraboot.framework.email.service.EmailMessageService.class),
                 emailSendService,
                 emailTrackingService,
                 emailAccountMapper);

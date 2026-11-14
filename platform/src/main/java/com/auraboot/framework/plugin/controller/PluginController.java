@@ -34,6 +34,7 @@ public class PluginController {
     private final PlatformProperties platformProperties;
     private final com.auraboot.framework.plugin.pf4j.AuraPluginManager auraPluginManager;
     private final com.auraboot.framework.application.tenant.ApplicationCatalogPolicy catalogPolicy;
+    private final com.auraboot.framework.plugin.service.PluginRecordStateService pluginRecordStateService;
 
     /**
      * List all installed plugins for the current tenant.
@@ -82,18 +83,12 @@ public class PluginController {
     @Operation(summary = "Enable plugin", description = "Enable an installed plugin")
     @RequirePermission(MetaPermission.PLUGIN_MANAGE)
     public ApiResponse<PluginDTO> enablePlugin(@PathVariable String pid) {
-        PluginRecord plugin = pluginRecordMapper.findByPid(pid);
-        if (plugin == null) {
+        PluginRecord plugin;
+        try {
+            plugin = pluginRecordStateService.setEnabled(pid, true);
+        } catch (IllegalArgumentException notFound) {
             return ApiResponse.error("Plugin not found");
         }
-
-        Long tenantId = MetaContext.getCurrentTenantId();
-        if (tenantId != null && !tenantId.equals(plugin.getTenantId())) {
-            return ApiResponse.error("Plugin not found");
-        }
-
-        pluginRecordMapper.markAsEnabled(pid);
-        plugin = pluginRecordMapper.findByPid(pid);
 
         log.info("Plugin enabled: {} ({})", plugin.getPluginId(), pid);
         return ApiResponse.success(toDTO(plugin));
@@ -106,19 +101,12 @@ public class PluginController {
     @Operation(summary = "Disable plugin", description = "Disable an installed plugin")
     @RequirePermission(MetaPermission.PLUGIN_MANAGE)
     public ApiResponse<PluginDTO> disablePlugin(@PathVariable String pid) {
-        PluginRecord plugin = pluginRecordMapper.findByPid(pid);
-        if (plugin == null) {
+        PluginRecord plugin;
+        try {
+            plugin = pluginRecordStateService.setEnabled(pid, false);
+        } catch (IllegalArgumentException notFound) {
             return ApiResponse.error("Plugin not found");
         }
-
-        Long tenantId = MetaContext.getCurrentTenantId();
-        if (tenantId != null && !tenantId.equals(plugin.getTenantId())) {
-            return ApiResponse.error("Plugin not found");
-        }
-
-        auraPluginManager.requireTenantLifecycleChange(plugin);
-        pluginRecordMapper.markAsDisabled(pid);
-        plugin = pluginRecordMapper.findByPid(pid);
 
         log.info("Plugin disabled: {} ({})", plugin.getPluginId(), pid);
         return ApiResponse.success(toDTO(plugin));
