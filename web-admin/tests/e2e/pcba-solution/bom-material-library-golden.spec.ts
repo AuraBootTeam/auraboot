@@ -195,6 +195,7 @@ process.exit(23);
       await search.press('Enter');
     }
     await expect(page.getByText(code, { exact: false }).first()).toBeVisible({ timeout: 30_000 });
+    await page.screenshot({ path: test.info().outputPath('material-library-loaded-row.png'), fullPage: true });
   });
 
   test('saving an edit rewrites the derived match text, not just the visible fields', async ({

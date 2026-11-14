@@ -236,6 +236,7 @@ test.describe('QuoteOps form submit + loading overlay golden', () => {
 
       // Assert disabled state *while the delayed request is still in flight*.
       await expect(saveButton).toBeDisabled({ timeout: 2_000 });
+      await testInfo.attach('quote-create-in-flight', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
 
       const createResponse = await createResponsePromise;
       const createBody = await createResponse.json().catch(() => ({}));
