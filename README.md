@@ -114,6 +114,8 @@ No public candidate download or all-platform installation guarantee is implied.
 
 ### Docker (recommended)
 
+Host prerequisites: Git, curl, Python 3.8+, Node.js20+ and Docker Compose v2. This batch verifies Node22.23.2. Initialization runs the plugin-assembly script on the host, so the frontend container does not remove the host Node requirement.
+
 ```bash
 git clone https://github.com/AuraBootTeam/auraboot.git
 cd auraboot
