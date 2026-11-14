@@ -176,6 +176,33 @@ async function createOrdinaryRole(page: Page, roleCode: string): Promise<void> {
     { data: [PLATFORM_BASE_CAPABILITY] },
   );
   expect(grantResponse.ok()).toBe(true);
+  // Fresh roles start with an explicit empty menu selection. Assign only Home;
+  // business capability grants must not implicitly grant navigation.
+  const menusResponse = await page.request.get('/api/menu/user');
+  expect(menusResponse.ok()).toBe(true);
+  const menusBody = await menusResponse.json();
+  const homeMenus: any[] = [];
+  const visit = (menus: any[]) => {
+    for (const menu of menus) {
+      if (menu.path === HOME_PATH) homeMenus.push(menu);
+      visit(menu.children ?? []);
+    }
+  };
+  visit(menusBody.data);
+  expect(homeMenus).toHaveLength(1);
+  expect(homeMenus[0].pid).toBeTruthy();
+  const navigationUrl = `/api/navigation/roles/${rolePid}`;
+  const selectionResponse = await page.request.get(navigationUrl);
+  expect(selectionResponse.ok()).toBe(true);
+  const selection = (await selectionResponse.json()).data;
+  const navigationResponse = await page.request.put(navigationUrl, { data: {
+    expectedRevision: selection.revision,
+    selectedMenuPids: [homeMenus[0].pid],
+  } });
+  expect(navigationResponse.ok()).toBe(true);
+  const saved = await navigationResponse.json();
+  expect(String(saved.code)).toBe('0');
+  expect(saved.data.selectedMenuPids).toEqual([homeMenus[0].pid]);
 }
 
 async function withUserPage(
