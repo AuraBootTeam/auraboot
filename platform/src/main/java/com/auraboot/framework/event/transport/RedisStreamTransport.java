@@ -26,11 +26,21 @@ public class RedisStreamTransport implements EventBusTransport {
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
-    private final ExecutorService listenerPool = Executors.newCachedThreadPool(r -> {
-        Thread t = new Thread(r, "redis-stream-listener");
-        t.setDaemon(true);
-        return t;
-    });
+    /**
+     * Bounded listener pool — one blocking XREADGROUP loop per subscribed
+     * topic/group. Listener count is static (subscriptions are registered at
+     * startup), so a small fixed ceiling is ample and avoids the unbounded
+     * thread growth a cached pool allowed.
+     */
+    private final ExecutorService listenerPool = new java.util.concurrent.ThreadPoolExecutor(
+            2, 16, 60L, java.util.concurrent.TimeUnit.SECONDS,
+            new java.util.concurrent.LinkedBlockingQueue<>(32),
+            r -> {
+                Thread t = new Thread(r, "redis-stream-listener");
+                t.setDaemon(true);
+                return t;
+            },
+            new java.util.concurrent.ThreadPoolExecutor.AbortPolicy());
     private final AtomicBoolean running = new AtomicBoolean(true);
 
     public RedisStreamTransport(StringRedisTemplate redisTemplate, ObjectMapper objectMapper) {
