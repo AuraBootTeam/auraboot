@@ -453,13 +453,13 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
           if (field.visibleWhen && !runtime.getEvaluator().evaluateCondition(field.visibleWhen, ctx)) return null;
           const readOnly = summary || field.readOnly || Boolean(field.valueWhen)
             || Boolean(field.readOnlyWhen && runtime.getEvaluator().evaluateCondition(field.readOnlyWhen, ctx));
-          return <FieldRenderer key={field.field} runtime={runtime}
+          return <div key={field.field} style={{minWidth: 0}}><FieldRenderer runtime={runtime}
             field={{ ...field, field: `${parentConfig.field}.${group.parentIndex}.${field.field}`, visibleWhen: undefined, readOnlyWhen: undefined, readOnly }}
             value={field.valueWhen ? runtime.getEvaluator().evaluate(field.valueWhen, ctx) : row[field.field]}
             onChange={value => {
               if (readOnly) return;
               stateManager.updateField(scopeId, parentConfig.field, parentRows.map((parent: any, index: number) => index === group.parentIndex ? { ...parent, [field.field]: value } : parent));
-            }} />;
+            }} /></div>;
         })}
       </div>;
     };
