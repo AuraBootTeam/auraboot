@@ -72,7 +72,11 @@ export default defineConfig({
     // 快速失败
     bail: 0, // 不快速失败，运行所有测试
     // 重试配置
-    retry: 0, // 不重试失败的测试，避免延长时间
+    // 失败用例重试一次：runner 级偶发（worker 调度/CI 机器差异）曾让套件
+    // 在 CI 以 2/9592 的规模随机漂移失败（本地全模式绿、plain-main probe 绿、
+    // 失败点跨跑漂移——2026-11-14 #2540 三跑取证）。重试只在失败时发生，
+    // 正常运行零额外耗时；同点二连挂仍会红（真问题不被掩盖）。
+    retry: 1,
     // 报告配置
     reporters: ['verbose', 'json'],
     outputFile: {
