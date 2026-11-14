@@ -58,6 +58,33 @@ describe('RowActionButtons — More actions dropdown', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
+  it('keeps conditional and explicit disabled inline actions inert', () => {
+    const { handleAction } = setup({
+      buttons: [
+        { code: 'up', label: 'Up', inline: true, disableWhen: '${!record.canMoveUp}' },
+        { code: 'locked', label: 'Locked', inline: true, disabled: true },
+      ] as ButtonConfig[],
+      record: { canMoveUp: false },
+      evaluateVisibleWhen: (expr, row) => expr === '${!record.canMoveUp}' ? !row.canMoveUp : true,
+    });
+    expect(screen.getByRole('button', { name: 'Up' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Locked' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Up' }));
+    expect(handleAction).not.toHaveBeenCalled();
+  });
+
+  it('disables overflow actions until their enable condition is true', () => {
+    const { handleAction } = setup({
+      buttons: [{ code: 'view', label: 'View' }, { code: 'edit', label: 'Edit', enableWhen: '${record.allowed}' }] as ButtonConfig[],
+      record: { allowed: false },
+      evaluateVisibleWhen: (expr, row) => expr === '${record.allowed}' ? row.allowed : true,
+    });
+    fireEvent.click(screen.getByTestId('row-action-more'));
+    expect(screen.getByRole('menuitem', { name: 'Edit' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    expect(handleAction).not.toHaveBeenCalled();
+  });
+
   it('renders the More actions trigger when there are >= 2 visible buttons', () => {
     setup();
     expect(screen.getByTestId('row-action-more')).toBeInTheDocument();
