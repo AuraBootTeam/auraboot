@@ -68,6 +68,8 @@ case "$SYSTEM_MODE" in
   *) printf '%s\n' 'SYSTEM_MODE must be single, multi or hybrid.' >&2; exit 2 ;;
 esac
 
+# The source Compose image is the Core kernel. Agent-required plugins belong
+# to the separately verified full application assembly, not this Core initializer.
 # Dependency order matters: core-meta defines the metadata the rest build on.
 # One pass is not always enough — a plugin can reference something imported
 # later in the list — so anything that fails is retried once at the end.
@@ -75,11 +77,9 @@ PLUGINS=(
   core-meta
   platform-admin
   core-decisionops
-  core-aurabot
   page-manager
   org-management
   showcase
-  agent-control-plane
 )
 if [[ "$PROJECT_DELIVERY" == 1 ]]; then
   # Keep the first-use journey scoped to its actual platform dependencies.

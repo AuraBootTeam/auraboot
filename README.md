@@ -125,6 +125,8 @@ docker compose --profile full up --build -d
 ./scripts/quickstart.sh                       # creates the admin, imports the plugins
 ```
 
+Source Compose runs the Core kernel. Agent-required plugins use the separately verified full application assembly; they are not imported into this Core first-use route.
+
 The `full` profile starts PostgreSQL + the Spring Boot backend + the Node BFF/SSR frontend. Wait for the backend to be healthy before initialization. Download/build time depends on your machine and network; the 120s health-check start period is not an installation-time guarantee.
 
 **`scripts/quickstart.sh` is not optional.** `docker compose up` starts the services and nothing else: it creates no admin user and imports no plugins. Without this step the login below fails with *"Invalid username or password"*, and even past it the platform has zero models and zero menus. It preserves an existing administrator password, but reimports configuration using `OVERWRITE`. Run it only on your own evaluation instance, not as a general upgrade or business-data repair command.
