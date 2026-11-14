@@ -107,6 +107,23 @@ public class PluginImportController {
     private final AsyncTaskServiceImpl asyncTaskService;
     private final AdminRoleChecker adminRoleChecker;
     private final ObjectMapper objectMapper;
+
+    /**
+     * Shared scheduler for SSE progress polling. One polling task per open
+     * connection — never one thread (let alone one whole executor) per
+     * connection, which was unbounded and never shut down.
+     */
+    private final java.util.concurrent.ScheduledExecutorService sseScheduler =
+            Executors.newScheduledThreadPool(2, r -> {
+                Thread t = new Thread(r, "sse-plugin-progress");
+                t.setDaemon(true);
+                return t;
+            });
+
+    @jakarta.annotation.PreDestroy
+    void shutdownSseScheduler() {
+        sseScheduler.shutdownNow();
+    }
     // ==================== Upload & Parse ====================
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -615,67 +632,76 @@ public class PluginImportController {
         // 10-minute timeout — matches the async task timeout
         SseEmitter emitter = new SseEmitter(600_000L);
 
-        Executors.newSingleThreadExecutor(r -> {
-            Thread t = new Thread(r, "sse-plugin-progress-" + taskCode);
-            t.setDaemon(true);
-            return t;
-        }).execute(() -> {
-            int maxPolls = 750; // 10 min at 800ms
+        final java.util.concurrent.atomic.AtomicInteger polls =
+                new java.util.concurrent.atomic.AtomicInteger(750); // 10 min at 800ms
+        final java.util.concurrent.atomic.AtomicBoolean finished =
+                new java.util.concurrent.atomic.AtomicBoolean(false);
+        final java.util.concurrent.ScheduledFuture<?>[] handle =
+                new java.util.concurrent.ScheduledFuture<?>[1];
+
+        Runnable stopPolling = () -> {
+            if (finished.compareAndSet(false, true) && handle[0] != null) {
+                handle[0].cancel(false);
+            }
+        };
+        emitter.onCompletion(stopPolling);
+        emitter.onTimeout(() -> {
+            stopPolling.run();
+            emitter.complete();
+        });
+
+        Runnable pollOnce = () -> {
             try {
-                for (int i = 0; i < maxPolls; i++) {
-                    AsyncTaskDTO task = asyncTaskService.getTask(taskCode);
-                    if (task == null) {
-                        emitter.send(SseEmitter.event()
-                                .name("error")
-                                .data("{\"error\":\"Task not found: " + taskCode + "\"}"));
-                        emitter.complete();
-                        return;
-                    }
-
-                    ObjectNode data = objectMapper.createObjectNode();
-                    data.put("taskCode", taskCode);
-                    data.put("status", task.getStatus());
-                    data.put("progress", task.getProgress() != null ? task.getProgress() : 0);
-                    data.put("progressMessage",
-                            task.getProgressMessage() != null ? task.getProgressMessage() : "");
-                    data.put("errorMessage",
-                            task.getErrorMessage() != null ? task.getErrorMessage() : "");
-
-                    boolean terminal = isTerminal(task.getStatus());
-                    data.put("done", terminal);
-
-                    // Include resource counts when done
-                    if (terminal && task.getResultData() != null
-                            && task.getResultData().has("resourceCounts")) {
-                        data.set("resourceCounts", task.getResultData().get("resourceCounts"));
-                    }
-
-                    emitter.send(SseEmitter.event()
-                            .name("progress")
-                            .data(objectMapper.writeValueAsString(data)));
-
-                    if (terminal) {
-                        emitter.complete();
-                        return;
-                    }
-
-                    Thread.sleep(800);
+                if (!finished.get() && polls.getAndDecrement() <= 0) {
+                    ObjectNode timeoutData = objectMapper.createObjectNode();
+                    timeoutData.put("taskCode", taskCode);
+                    timeoutData.put("status", "timed_out");
+                    timeoutData.put("progress", 100);
+                    timeoutData.put("progressMessage", "Timed out waiting for completion.");
+                    timeoutData.put("done", true);
+                    emitter.send(SseEmitter.event().name("progress")
+                            .data(objectMapper.writeValueAsString(timeoutData)));
+                    emitter.complete();
+                    return;
                 }
-                // Timeout reached — send final event
-                ObjectNode timeoutData = objectMapper.createObjectNode();
-                timeoutData.put("taskCode", taskCode);
-                timeoutData.put("status", "timed_out");
-                timeoutData.put("progress", 100);
-                timeoutData.put("progressMessage", "Timed out waiting for completion.");
-                timeoutData.put("done", true);
-                emitter.send(SseEmitter.event().name("progress").data(objectMapper.writeValueAsString(timeoutData)));
-                emitter.complete();
+
+                AsyncTaskDTO task = asyncTaskService.getTask(taskCode);
+                if (task == null) {
+                    emitter.send(SseEmitter.event()
+                            .name("error")
+                            .data("{\"error\":\"Task not found: " + taskCode + "\"}"));
+                    emitter.complete();
+                    return;
+                }
+
+                ObjectNode data = objectMapper.createObjectNode();
+                data.put("taskCode", taskCode);
+                data.put("status", task.getStatus());
+                data.put("progress", task.getProgress() != null ? task.getProgress() : 0);
+                data.put("progressMessage",
+                        task.getProgressMessage() != null ? task.getProgressMessage() : "");
+                data.put("errorMessage",
+                        task.getErrorMessage() != null ? task.getErrorMessage() : "");
+
+                boolean terminal = isTerminal(task.getStatus());
+                data.put("done", terminal);
+
+                // Include resource counts when done
+                if (terminal && task.getResultData() != null
+                        && task.getResultData().has("resourceCounts")) {
+                    data.set("resourceCounts", task.getResultData().get("resourceCounts"));
+                }
+
+                emitter.send(SseEmitter.event()
+                        .name("progress")
+                        .data(objectMapper.writeValueAsString(data)));
+
+                if (terminal) {
+                    emitter.complete();
+                }
             } catch (IOException e) {
                 // Client disconnected — not an error
                 log.debug("SSE client disconnected for task {}", taskCode);
-                emitter.completeWithError(e);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
                 emitter.completeWithError(e);
             } catch (Exception e) {
                 log.warn("SSE progress stream error for task {}: {}", taskCode, e.getMessage());
@@ -686,7 +712,9 @@ public class PluginImportController {
                 } catch (IOException ignored) { /* ignored */ }
                 emitter.completeWithError(e);
             }
-        });
+        };
+
+        handle[0] = sseScheduler.scheduleWithFixedDelay(pollOnce, 0, 800, java.util.concurrent.TimeUnit.MILLISECONDS);
 
         return emitter;
     }

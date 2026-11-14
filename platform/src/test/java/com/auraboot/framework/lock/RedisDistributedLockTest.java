@@ -159,4 +159,72 @@ class RedisDistributedLockTest {
             assertThat(expected.getMessage()).contains("Failed to acquire lock");
         }
     }
+
+    // ===== Lease/acquisition semantics (2026-11-14 hardening) =====
+
+    @Test
+    void tryLock_usesFixedLease_notAcquisitionTimeoutAsLease() {
+        stubAcquire(true);
+        assertThat(lock.tryLock("k", 5, TimeUnit.SECONDS)).isTrue();
+        // The lease must be the fixed default (3 min), never the 5s acquisition timeout.
+        org.mockito.ArgumentCaptor<Duration> lease = org.mockito.ArgumentCaptor.forClass(Duration.class);
+        verify(valueOps).setIfAbsent(anyString(), anyString(), lease.capture());
+        assertThat(lease.getValue()).isEqualTo(Duration.ofMinutes(3));
+    }
+
+    @Test
+    void tryLock_retriesWithinAcquisitionTimeoutUntilAvailable() {
+        // Held at first attempt, free at the second — must spin, not fail fast.
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.setIfAbsent(anyString(), anyString(), any(Duration.class)))
+                .thenReturn(false, true);
+        long start = System.nanoTime();
+        assertThat(lock.tryLock("k", 2, TimeUnit.SECONDS)).isTrue();
+        long elapsedMs = (System.nanoTime() - start) / 1_000_000;
+        verify(valueOps, times(2)).setIfAbsent(anyString(), anyString(), any(Duration.class));
+        // It waited for the backoff between attempts rather than returning immediately.
+        assertThat(elapsedMs).isGreaterThanOrEqualTo(15);
+    }
+
+    @Test
+    void renewLease_worksFromDifferentThread_thanAcquiringThread() throws Exception {
+        stubAcquire(true);
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any(), any()))
+                .thenReturn(1L);
+        assertThat(lock.tryLock("k", 1, TimeUnit.SECONDS)).isTrue();
+
+        // The watchdog thread is not the business thread that acquired the lock.
+        java.util.concurrent.atomic.AtomicBoolean renewed = new java.util.concurrent.atomic.AtomicBoolean(false);
+        Thread watchdog = new Thread(() -> renewed.set(lock.renewLease("k", 60, TimeUnit.SECONDS)));
+        watchdog.start();
+        watchdog.join(5_000);
+
+        assertThat(renewed.get()).isTrue();
+        verify(redisTemplate).execute(any(RedisScript.class), anyList(), any(), eq("60000"));
+    }
+
+    @Test
+    void isHeldByCurrentThread_falseForOtherThread() throws Exception {
+        stubAcquire(true);
+        assertThat(lock.tryLock("k", 1, TimeUnit.SECONDS)).isTrue();
+
+        java.util.concurrent.atomic.AtomicBoolean seen = new java.util.concurrent.atomic.AtomicBoolean(true);
+        Thread other = new Thread(() -> seen.set(lock.isHeldByCurrentThread("k")));
+        other.start();
+        other.join(5_000);
+
+        assertThat(seen.get()).isFalse();
+        assertThat(lock.isHeldByCurrentThread("k")).isTrue();
+    }
+
+    @Test
+    void renewLease_afterUnlock_returnsFalse() {
+        stubAcquire(true);
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), any()))
+                .thenReturn(1L);
+        assertThat(lock.tryLock("k", 1, TimeUnit.SECONDS)).isTrue();
+        lock.unlock("k");
+        assertThat(lock.renewLease("k", 60, TimeUnit.SECONDS)).isFalse();
+        verify(redisTemplate, never()).execute(any(RedisScript.class), anyList(), any(), any());
+    }
 }

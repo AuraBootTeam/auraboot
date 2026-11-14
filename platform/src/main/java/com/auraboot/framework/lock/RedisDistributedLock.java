@@ -7,14 +7,22 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import java.net.InetAddress;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
  * Redis-based distributed lock implementation.
  * <p>
- * Uses Redis SET NX EX for atomic lock acquisition and Lua script for safe release.
- * Default lease time is 3 minutes — locks are automatically released after expiry
- * even if the holder crashes without explicit unlock.
+ * Uses Redis SET NX EX for atomic lock acquisition and Lua scripts for safe
+ * release and lease renewal. The {@link #tryLock(String, long, TimeUnit)}
+ * {@code timeout} parameter is an <em>acquisition</em> timeout: the caller
+ * waits up to that long to acquire, while the Redis lease is a fixed
+ * {@link #DEFAULT_LEASE} (renewable via {@link #renewLease(String, long, TimeUnit)}).
+ * This matches the {@link DistributedLock} contract used by the local
+ * implementation; previously this class misused the acquisition timeout as the
+ * lease, so any command whose transaction outlasted it silently lost mutual
+ * exclusion.
  *
  * @author AuraBoot Framework
  * @since 3.4.0
@@ -24,6 +32,9 @@ public class RedisDistributedLock implements DistributedLock {
 
     private static final String LOCK_PREFIX = "aura:lock:";
     private static final Duration DEFAULT_LEASE = Duration.ofMinutes(3);
+    /** Backoff bounds while spinning to acquire within the caller's timeout. */
+    private static final long MIN_BACKOFF_MS = 20;
+    private static final long MAX_BACKOFF_MS = 200;
 
     /**
      * Lua script for safe unlock: only delete if the value matches the holder ID.
@@ -43,9 +54,24 @@ public class RedisDistributedLock implements DistributedLock {
                     "else return 0 end",
             Long.class);
 
+    /**
+     * Holder bookkeeping. Instance-level (not ThreadLocal) so a watchdog thread
+     * can renew a lease acquired on the business thread: the entry records both
+     * the Redis holder value and the owning thread, and {@code SET NX} remains
+     * the sole cross-process arbiter.
+     */
+    private static final class Holder {
+        final String holderId;
+        final long ownerThreadId;
+
+        Holder(String holderId, long ownerThreadId) {
+            this.holderId = holderId;
+            this.ownerThreadId = ownerThreadId;
+        }
+    }
+
     private final StringRedisTemplate redisTemplate;
-    private final ThreadLocal<java.util.Map<String, String>> heldLocks =
-            ThreadLocal.withInitial(java.util.concurrent.ConcurrentHashMap::new);
+    private final Map<String, Holder> heldLocks = new ConcurrentHashMap<>();
 
     public RedisDistributedLock(StringRedisTemplate redisTemplate) {
         this.redisTemplate = redisTemplate;
@@ -54,25 +80,41 @@ public class RedisDistributedLock implements DistributedLock {
     @Override
     public boolean tryLock(String lockKey, long timeout, TimeUnit unit) {
         String redisKey = LOCK_PREFIX + lockKey;
-        String holderId = getHolderId();
-        Duration leaseTime = timeout > 0 ? Duration.ofMillis(unit.toMillis(timeout)) : DEFAULT_LEASE;
+        long deadline = System.currentTimeMillis() + (timeout > 0 ? unit.toMillis(timeout) : 0);
+        long backoff = MIN_BACKOFF_MS;
 
-        try {
-            Boolean acquired = redisTemplate.opsForValue()
-                    .setIfAbsent(redisKey, holderId, leaseTime);
+        while (true) {
+            String holderId = getHolderId();
+            try {
+                // The lease is always the fixed default — never the acquisition
+                // timeout. Long-running holders renew via renewLease().
+                Boolean acquired = redisTemplate.opsForValue()
+                        .setIfAbsent(redisKey, holderId, DEFAULT_LEASE);
 
-            if (Boolean.TRUE.equals(acquired)) {
-                heldLocks.get().put(lockKey, holderId);
-                log.debug("Acquired lock: {} by holder: {}, lease={}s", lockKey, holderId, leaseTime.toSeconds());
-                return true;
+                if (Boolean.TRUE.equals(acquired)) {
+                    heldLocks.put(lockKey, new Holder(holderId, Thread.currentThread().threadId()));
+                    log.debug("Acquired lock: {} by holder: {}, lease={}s",
+                            lockKey, holderId, DEFAULT_LEASE.toSeconds());
+                    return true;
+                }
+            } catch (Exception e) {
+                log.error("Error acquiring Redis lock: {}", lockKey, e);
+                return false;
             }
 
-            log.debug("Failed to acquire lock: {} (held by another holder)", lockKey);
-            return false;
-
-        } catch (Exception e) {
-            log.error("Error acquiring Redis lock: {}", lockKey, e);
-            return false;
+            long now = System.currentTimeMillis();
+            if (now >= deadline) {
+                log.debug("Failed to acquire lock: {} within {}ms (held by another holder)",
+                        lockKey, timeout > 0 ? unit.toMillis(timeout) : 0);
+                return false;
+            }
+            try {
+                Thread.sleep(Math.min(backoff, Math.min(MAX_BACKOFF_MS, Math.max(1, deadline - now))));
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+            backoff = Math.min(backoff * 2, MAX_BACKOFF_MS);
         }
     }
 
@@ -95,53 +137,52 @@ public class RedisDistributedLock implements DistributedLock {
 
     @Override
     public void unlock(String lockKey) {
-        java.util.Map<String, String> locks = heldLocks.get();
-        String holderId = locks.get(lockKey);
+        Holder holder = heldLocks.get(lockKey);
 
-        if (holderId == null) {
+        if (holder == null) {
             log.warn("Attempt to unlock a lock not held by current thread: {}", lockKey);
             return;
         }
 
         try {
             String redisKey = LOCK_PREFIX + lockKey;
-            Long result = redisTemplate.execute(UNLOCK_SCRIPT, List.of(redisKey), holderId);
+            Long result = redisTemplate.execute(UNLOCK_SCRIPT, List.of(redisKey), holder.holderId);
 
             if (result != null && result > 0) {
-                locks.remove(lockKey);
-                log.debug("Released lock: {} by holder: {}", lockKey, holderId);
+                log.debug("Released lock: {} by holder: {}", lockKey, holder.holderId);
             } else {
-                locks.remove(lockKey);
                 log.warn("Lock {} was already released or held by another holder", lockKey);
             }
-
         } catch (Exception e) {
             log.error("Error releasing Redis lock: {}", lockKey, e);
+        } finally {
+            heldLocks.remove(lockKey);
         }
     }
 
     @Override
     public boolean isHeldByCurrentThread(String lockKey) {
-        return heldLocks.get().containsKey(lockKey);
+        Holder holder = heldLocks.get(lockKey);
+        return holder != null && holder.ownerThreadId == Thread.currentThread().threadId();
     }
 
     @Override
     public boolean renewLease(String lockKey, long leaseTime, TimeUnit unit) {
-        java.util.Map<String, String> locks = heldLocks.get();
-        String holderId = locks.get(lockKey);
+        Holder holder = heldLocks.get(lockKey);
 
-        if (holderId == null) {
-            log.warn("Attempt to renew a lock not held by current thread: {}", lockKey);
+        if (holder == null) {
+            log.warn("Attempt to renew a lock not held by this process: {}", lockKey);
             return false;
         }
 
         try {
             String redisKey = LOCK_PREFIX + lockKey;
             long leaseMs = unit.toMillis(leaseTime);
-            Long result = redisTemplate.execute(RENEW_SCRIPT, List.of(redisKey), holderId, String.valueOf(leaseMs));
+            Long result = redisTemplate.execute(RENEW_SCRIPT, List.of(redisKey),
+                    holder.holderId, String.valueOf(leaseMs));
 
             if (result != null && result > 0) {
-                log.debug("Renewed lock: {} by holder: {}, newLease={}ms", lockKey, holderId, leaseMs);
+                log.debug("Renewed lock: {} by holder: {}, newLease={}ms", lockKey, holder.holderId, leaseMs);
                 return true;
             }
 
