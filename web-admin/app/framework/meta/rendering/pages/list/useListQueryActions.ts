@@ -636,6 +636,10 @@ export function useListQueryActions(
       skipFirstSortFilterEffectRef.current = false;
       return;
     }
+    // Initial URL-filtered loading can still be waiting for field metadata.
+    // That load owns the requested page; a mount-time debounce must not issue
+    // page one before the first explicit query has even been scheduled.
+    if (!lastScheduledSortFilterValuesRef.current) return;
     // Explicit loads (initialization or view selection) already scheduled the
     // same query. Do not start a second request after the debounce catches up.
     if (
