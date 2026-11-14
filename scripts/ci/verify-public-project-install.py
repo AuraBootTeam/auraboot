@@ -248,7 +248,7 @@ def main():
             require(rows == [{'HostIp':'127.0.0.1', 'HostPort':str(port)}], 'Actual published interface must be loopback')
             published[service] = rows
         (output / 'published-ports.json').write_text(json.dumps(published, indent=2))
-        check('compose-public-entry', source=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip(), project=project)
+        check('compose-public-entry', source=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip(), project=project, sourceBuildExecutedThisRound=reused_build is None, producerSource=reused_build['producerSource'] if reused_build else None)
         deny = private / 'no-host-node'
         deny.mkdir(mode=0o700)
         for tool in ['node', 'npm', 'pnpm']:
@@ -285,7 +285,7 @@ def main():
         require((private / 'frozen-before.log').read_bytes() == (private / 'frozen-after.log').read_bytes(),
                 'Frozen public source identity changed')
         (output / 'result.json').write_text(json.dumps(dict(status='passed', releaseQualification=False,
-             checks=checks, recordings=False, scope='Documented public Compose + project sample; no Enterprise or AI claims'), indent=2))
+             checks=checks, recordings=False, sourceBuildExecutedThisRound=reused_build is None, scope='Documented public Compose + project sample; source-build provenance is explicit; no Enterprise or AI claims'), indent=2))
     finally:
         if started:
             run(compose + ['stop'], 'retain-stopped-project')
