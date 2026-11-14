@@ -138,13 +138,35 @@ function walk(dir, out = []) {
 }
 
 const unguarded = [];
+let totalControllers = 0;
+let annotatedControllers = 0;
 for (const file of SOURCES.flatMap(source => walk(source))) {
   const text = fs.readFileSync(file, 'utf8');
   if (TEST_PROFILE.test(text)) continue; // @Profile("test") — never wired in prod
+  totalControllers += 1;
+  if (text.includes('@RequirePermission')) annotatedControllers += 1;
   if (!hasUndecidedHandler(text)) continue;
   unguarded.push(path.relative(REPO, file));
 }
 unguarded.sort();
+
+// Documentation anchor: the exemption registry doc declares these counts;
+// recompute and fail when the registry drifts (year-reviewable record).
+const DOC = 'docs/system-reference/controller-permission-exemptions.md';
+if (fs.existsSync(DOC)) {
+  const doc = fs.readFileSync(DOC, 'utf8');
+  const m = doc.match(/(\d+) `@RestController` classes; (\d+) carry `@RequirePermission`/);
+  if (!m) {
+    console.error(`[controller-authz] ${DOC} lost its count sentence '<N> \`@RestController\` classes; <M> carry \`@RequirePermission\`' — restore it so the registry stays anchored`);
+    process.exitCode = 1;
+  } else if (Number(m[1]) !== totalControllers || Number(m[2]) !== annotatedControllers) {
+    console.error(
+      `[controller-authz] exemption registry counts drifted: doc says ${m[1]}/${m[2]}, ` +
+      `code has ${totalControllers} controllers / ${annotatedControllers} annotated. ` +
+      `Update the count sentence (and registry entries for newly un-annotated controllers) in ${DOC}.`);
+    process.exit(1);
+  }
+}
 
 /**
  * The baseline accepts two entry shapes:

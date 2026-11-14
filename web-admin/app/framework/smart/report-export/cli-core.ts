@@ -40,9 +40,9 @@ export async function loadChromium(): Promise<ChromiumLike> {
       if (mod.chromium) {
         return mod.chromium;
       }
-    } catch {
+    } catch (error) {
       // try the next candidate
-    }
+ console.warn('[cli-core] previously-silent catch', error);    }
   }
   throw new Error(
     'report-export CLI: no headless browser found — install "playwright" (production) or "@playwright/test" (dev/golden).',

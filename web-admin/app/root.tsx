@@ -653,9 +653,9 @@ export function ErrorBoundary({ error }: ErrorBoundaryProps) {
       await navigator.clipboard.writeText(errorId);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
-    } catch {
+    } catch (error) {
       // Clipboard unavailable (e.g. non-secure context) — leave the id visible.
-    }
+ console.warn('[root] previously-silent catch', error);    }
   };
 
   if (rootData?.bootstrapStatus && !rootData.bootstrapStatus.initialized) {

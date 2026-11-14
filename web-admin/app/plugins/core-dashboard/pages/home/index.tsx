@@ -95,9 +95,9 @@ export default function WorkbenchPage() {
             : raw
         ) as Record<string, unknown>;
         addSheet('stats', Object.entries(stats).map(([key, value]) => ({ key, value: String(value) })));
-      } catch {
+      } catch (error) {
         // stats are optional for the export
-      }
+ console.warn('[index] previously-silent catch', error);      }
 
       // 3) inbox items
       try {
@@ -109,9 +109,9 @@ export default function WorkbenchPage() {
           priority: item.priority,
           status: item.status,
         })));
-      } catch {
+      } catch (error) {
         // inbox is optional for the export
-      }
+ console.warn('[index] previously-silent catch', error);      }
 
       // 4) recent visits
       try {
@@ -121,9 +121,9 @@ export default function WorkbenchPage() {
           path: v.path,
           visitedAt: v.visitedAt,
         })));
-      } catch {
+      } catch (error) {
         // recent visits are optional for the export
-      }
+ console.warn('[index] previously-silent catch', error);      }
 
       if (sheetCount === 0) {
         showErrorToast(t('workbench.exportNoData', undefined, 'No data to export'));

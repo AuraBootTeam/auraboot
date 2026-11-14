@@ -143,9 +143,9 @@ export function useFormValidation({
                 );
                 break;
               }
-            } catch {
+            } catch (error) {
               // Ignore invalid regex rule configuration.
-            }
+ console.warn('[useFormValidation] previously-silent catch', error);            }
           }
           if (rule.type === 'minValue' && Number.isFinite(rule.minValue)) {
             const num = Number(value);

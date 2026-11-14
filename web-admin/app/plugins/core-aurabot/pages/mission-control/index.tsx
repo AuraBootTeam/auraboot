@@ -905,9 +905,9 @@ function ObservationRow({
     if (parsedDetail.startsWith('{') || parsedDetail.startsWith('[')) {
       parsedDetail = JSON.stringify(JSON.parse(parsedDetail), null, 2);
     }
-  } catch {
+  } catch (error) {
     /* use raw */
-  }
+ console.warn('[index] previously-silent catch', error);  }
 
   return (
     <>

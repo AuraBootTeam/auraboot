@@ -210,9 +210,9 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
             // Open the native date picker when clicking anywhere on the input
             try {
               (e.target as HTMLInputElement).showPicker?.();
-            } catch {
+            } catch (error) {
               // showPicker() may throw in some browsers; ignore
-            }
+ console.warn('[DatePicker] previously-silent catch', error);            }
           }}
           className={clsx(
             baseStyles,

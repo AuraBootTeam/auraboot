@@ -106,7 +106,7 @@ export function persistDrawerLayout(storageKey: string, layout: DrawerLayoutStat
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(storageKey, JSON.stringify(normalizeDrawerLayout(layout)));
-  } catch {
+  } catch (error) {
     // localStorage may be unavailable in private browsing or strict test environments.
-  }
+ console.warn('[reviewDrawerLayout] previously-silent catch', error);  }
 }

@@ -257,9 +257,9 @@ export function CommandPalette() {
             setRecordResults([]);
           }
         }
-      } catch {
+      } catch (error) {
         // Search was aborted or failed
-      } finally {
+ console.warn('[CommandPalette] previously-silent catch', error);      } finally {
         if (!controller.signal.aborted) {
           setSearching(false);
         }

@@ -106,9 +106,9 @@ export default function ProjectOverview({ projectId }: ProjectOverviewProps) {
       if (ResultHelper.isSuccess(payRes) && payRes.data?.records) {
         setPayments(payRes.data.records);
       }
-    } catch {
+    } catch (error) {
       // ignore
-    } finally {
+ console.warn('[ProjectOverview] previously-silent catch', error);    } finally {
       setLoading(false);
     }
   }, [projectId]);

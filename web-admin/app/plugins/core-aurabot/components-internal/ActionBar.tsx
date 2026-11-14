@@ -57,8 +57,8 @@ async function loadActions(pageContext: PageContext): Promise<Action[]> {
     if (result.code === '0' && Array.isArray(result.data)) {
       return result.data;
     }
-  } catch {
+  } catch (error) {
     // Actions are optional
-  }
+ console.warn('[ActionBar] previously-silent catch', error);  }
   return [];
 }

@@ -579,9 +579,9 @@ export function DecisionActionPlanBlock({ block, runtime, api }: DecisionActionP
     try {
       const next = writeActionFieldValue(action.target, action.payload, field, value);
       updateAction(index, { target: next.target, payload: next.payload });
-    } catch {
+    } catch (error) {
       // Keep the previous structured payload until the JSON field becomes valid again.
-    }
+ console.warn('[DecisionActionPlanBlock] previously-silent catch', error);    }
   };
 
   const removeAction = (index: number) => {

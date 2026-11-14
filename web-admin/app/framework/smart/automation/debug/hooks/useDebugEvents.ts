@@ -37,9 +37,9 @@ export function useDebugEvents() {
         const event: DebugEvent = { ...data, eventType: eventType as DebugEvent['eventType'] };
         addEvent(event);
         updateSessionFromEvent(event);
-      } catch {
+      } catch (error) {
         // Ignore parse errors
-      }
+ console.warn('[useDebugEvents] previously-silent catch', error);      }
     };
 
     // Subscribe to all event types

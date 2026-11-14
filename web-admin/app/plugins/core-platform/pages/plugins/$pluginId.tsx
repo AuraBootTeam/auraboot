@@ -130,9 +130,9 @@ export default function MarketplaceDetailPage() {
           const fData = await featRes.json();
           setFeatures(fData.data ?? []);
         }
-      } catch {
+      } catch (error) {
         /* plans/features are optional */
-      }
+ console.warn('[$pluginId] previously-silent catch', error);      }
     })();
   }, [pluginId]);
 

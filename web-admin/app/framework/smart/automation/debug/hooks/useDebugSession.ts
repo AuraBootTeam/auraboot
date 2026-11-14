@@ -115,6 +115,7 @@ export const useDebugSession = create<DebugSessionState>((set, getState) => ({
       set({ session: updated });
     } catch (e) {
       // Silently ignore refresh errors
+      console.warn('[useDebugSession] refresh failed (previously silent)', e);
     }
   },
 

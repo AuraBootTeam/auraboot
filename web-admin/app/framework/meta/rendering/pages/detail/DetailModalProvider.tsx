@@ -243,9 +243,9 @@ export function DetailModalProvider({ children }: { children: ReactNode }) {
       const width =
         entry.current?.value === value && entry.current.scope === scope ? entry.current.width : 900;
       target = resolveDetailModalTarget(value, width);
-    } catch {
+    } catch (error) {
       /* The invalid URL is rendered as an error, never navigated or fetched. */
-    }
+ console.warn('[DetailModalProvider] previously-silent catch', error);    }
   }
   return (
     <DetailModalContext.Provider value={open}>

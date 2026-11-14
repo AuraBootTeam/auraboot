@@ -158,9 +158,9 @@ export default function MemberDetailPage() {
           if (ResultHelper.isSuccess(empResult) && empResult.data?.records?.length > 0) {
             setEmployee(empResult.data.records[0]);
           }
-        } catch {
+        } catch (error) {
           // org-employee may not exist for this user
-        }
+ console.warn('[member-detail] previously-silent catch', error);        }
       }
 
       // 3. Fetch team memberships
@@ -169,9 +169,9 @@ export default function MemberDetailPage() {
         if (ResultHelper.isSuccess(teamsResult) && teamsResult.data) {
           setTeams(teamsResult.data);
         }
-      } catch {
+      } catch (error) {
         // teams may be empty
-      }
+ console.warn('[member-detail] previously-silent catch', error);      }
     } catch {
       setLoadError('error');
     } finally {

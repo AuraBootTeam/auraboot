@@ -34,9 +34,9 @@ export const FieldSelector: React.FC<FieldSelectorProps> = ({
         setFields(resp.data);
         onFieldsLoaded?.(resp.data);
       }
-    } catch {
+    } catch (error) {
       /* ignore */
-    } finally {
+ console.warn('[FieldSelector] previously-silent catch', error);    } finally {
       setLoading(false);
     }
   }, [modelCode, onFieldsLoaded]);

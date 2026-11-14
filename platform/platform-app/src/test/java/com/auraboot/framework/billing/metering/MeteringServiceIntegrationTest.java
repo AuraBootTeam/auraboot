@@ -39,9 +39,9 @@ import static org.assertj.core.api.Assertions.*;
  * <p>Runs against the real {@code aura_boot} test database.
  * All 3 billing migrations must be applied before running:
  * <pre>
- *   psql -h localhost -d aura_boot -f platform/src/main/resources/database/migrations/2026-06-10-billing-resource-catalog.sql
- *   psql -h localhost -d aura_boot -f platform/src/main/resources/database/migrations/2026-06-10-billing-quota.sql
- *   psql -h localhost -d aura_boot -f platform/src/main/resources/database/migrations/2026-06-10-billing-metering.sql
+ *   psql -h localhost -d aura_boot -f platform/src/testFixtures/resources/database/migrations/2026-06-10-billing-resource-catalog.sql
+ *   psql -h localhost -d aura_boot -f platform/src/testFixtures/resources/database/migrations/2026-06-10-billing-quota.sql
+ *   psql -h localhost -d aura_boot -f platform/src/testFixtures/resources/database/migrations/2026-06-10-billing-metering.sql
  * </pre>
  *
  * <p>Tests do NOT extend {@code @Transactional} at class level — the concurrent test

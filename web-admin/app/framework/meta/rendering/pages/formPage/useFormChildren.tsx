@@ -211,9 +211,9 @@ export function useFormChildren({
               _key: row.pid || `loaded-${i}`,
             }));
           }
-        } catch {
+        } catch (error) {
           // Silently skip failed child loads
-        }
+ console.warn('[useFormChildren] previously-silent catch', error);        }
       }
 
       setSubTableData(newData);

@@ -174,9 +174,9 @@ export const AiPagePanel: React.FC<AiPagePanelProps> = ({
         try {
           const dsl = parsePageDslResponse(data.content);
           onGenerated(dsl);
-        } catch {
+        } catch (error) {
           // Not valid DSL — leave it as a conversational reply, no canvas change.
-        }
+ console.warn('[AiPagePanel] previously-silent catch', error);        }
       } catch (err) {
         setAssistant({ content: err instanceof Error ? err.message : 'AI 生成失败', streaming: false, error: true });
         setIsStreaming(false);

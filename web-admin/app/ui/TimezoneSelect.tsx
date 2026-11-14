@@ -39,9 +39,9 @@ function buildAllOptions(): Array<{ value: string; label: string; isKnown: boole
   let systemZones: string[] = [];
   try {
     systemZones = Intl.supportedValuesOf('timeZone');
-  } catch {
+  } catch (error) {
     // Older engines — curated list only
-  }
+ console.warn('[TimezoneSelect] previously-silent catch', error);  }
 
   const fallback = systemZones
     .filter((tz) => !curatedIana.has(tz))

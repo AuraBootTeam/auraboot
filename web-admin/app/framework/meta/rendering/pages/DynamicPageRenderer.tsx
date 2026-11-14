@@ -87,8 +87,9 @@ export function DynamicPageRenderer({
   let profile;
   try {
     profile = profileRegistry.resolve(schema, profileName);
-  } catch {
+  } catch (error) {
     // Fallback to admin if profile resolution fails
+    console.warn('[DynamicPageRenderer] profile resolution failed; falling back to admin profile', error);
     profile = profileRegistry.get('admin');
   }
 

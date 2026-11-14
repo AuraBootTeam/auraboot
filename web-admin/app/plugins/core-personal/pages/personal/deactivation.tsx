@@ -71,9 +71,9 @@ export default function DeactivationPage() {
       if (ResultHelper.isSuccess(result) && result.data) {
         setExistingStatus(result.data);
       }
-    } catch {
+    } catch (error) {
       // No active deactivation — that's fine
-    } finally {
+ console.warn('[deactivation] previously-silent catch', error);    } finally {
       setLoading(false);
     }
   }, []);

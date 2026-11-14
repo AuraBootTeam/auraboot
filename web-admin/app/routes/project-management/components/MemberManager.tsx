@@ -98,9 +98,9 @@ export default function MemberManager({ projectId }: MemberManagerProps) {
             : [],
         ),
       );
-    } catch {
+    } catch (error) {
       // silent
-    }
+ console.warn('[MemberManager] previously-silent catch', error);    }
   }, []);
 
   // ------ Load roles ------
@@ -113,9 +113,9 @@ export default function MemberManager({ projectId }: MemberManagerProps) {
       if (ResultHelper.isSuccess(result) && result.data?.records) {
         setRoles(result.data.records);
       }
-    } catch {
+    } catch (error) {
       // silent
-    }
+ console.warn('[MemberManager] previously-silent catch', error);    }
   }, []);
 
   useEffect(() => {

@@ -222,9 +222,9 @@ export function resolveBaseUrl(context: RequestContext, apiConfig?: Partial<ApiC
     if (context.request) {
       try {
         return new URL(context.request.url).origin;
-      } catch {
+      } catch (error) {
         // fall through to port-based fallback
-      }
+ console.warn('[URLBuilder] previously-silent catch', error);      }
     }
 
     // Priority 4: Default BFF URL

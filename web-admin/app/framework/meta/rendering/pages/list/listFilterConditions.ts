@@ -199,9 +199,9 @@ export function resolveUserFilterCondition(
       const parsed = JSON.parse(value);
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)
         && ('start' in parsed || 'end' in parsed)) value = parsed;
-    } catch {
+    } catch (error) {
       // Keep malformed values intact so query validation can report them.
-    }
+ console.warn('[listFilterConditions] previously-silent catch', error);    }
   }
   // Date range objects { start, end }
   if (value !== null && typeof value === 'object' && ('start' in value || 'end' in value)) {

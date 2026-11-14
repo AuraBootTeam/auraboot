@@ -161,9 +161,9 @@ export const BlockPropertyPanel: React.FC<BlockPropertyPanelProps> = ({
         const list = Array.isArray(res?.data) ? res.data : [];
         const phys = list.find((f) => f.code === fieldCode);
         if (phys?.dataType) setFieldDataType(phys.dataType);
-      } catch {
+      } catch (error) {
         // Physical lookup also failed — keep the 'string' default.
-      }
+ console.warn('[BlockPropertyPanel] previously-silent catch', error);      }
     };
 
     viewModelService
