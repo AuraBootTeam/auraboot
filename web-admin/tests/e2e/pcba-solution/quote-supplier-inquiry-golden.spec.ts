@@ -64,8 +64,8 @@ test.describe('PCBA quote supplier inquiry golden', () => {
           if (request.method() === 'POST' && request.url().includes('/api/meta/commands/execute/qo_supplier_request_common:')) commands.push(request.url());
         });
         await ui.getByTestId('form-btn-create').click();
-        await expect(ui.getByTestId('form-field-qo_sr_code')).toContainText('此字段为必填项');
-        await expect(ui.getByTestId('form-field-qo_sr_category')).toContainText('此字段为必填项');
+        await expect(ui.getByTestId('form-field-qo_sr_code')).toContainText('请填写询价编号');
+        await expect(ui.getByTestId('form-field-qo_sr_category')).toContainText('请填写物料类别');
         expect(commands, 'missing required fields must not send a command').toEqual([]);
         await ui.screenshot({ path: test.info().outputPath('inquiry-required-fields.png'), fullPage: true });
         await field('qo_sr_code').fill(marker);
