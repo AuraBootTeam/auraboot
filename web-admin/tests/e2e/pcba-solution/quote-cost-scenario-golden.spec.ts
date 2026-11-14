@@ -31,12 +31,12 @@ test.describe('PCBA quote cost scenario golden', () => {
     const fixtureRows: CreatedRows = { quoteId: '', quoteCode: '', rows: [] };
     const assumptionId = await dynamicCreate(page, 'qo_cost_assumption_common', {
       qo_ca_code: 'ASSUME-FX', qo_ca_scenario_id: scenarioId,
-      qo_ca_description: '汇率假设 7.0 CNY/USD', qo_ca_impact_type: 'cost',
+      qo_ca_description: '汇率假设 7.0 CNY/USD', qo_ca_impact_type: '成本',
       qo_ca_version: 'v1',
     }, fixtureRows.rows);
     const gapId = await dynamicCreate(page, 'qo_cost_gap_common', {
       qo_cg_code: 'GAP-TEST', qo_cg_scenario_id: scenarioId,
-      qo_cg_severity: 'major', qo_cg_description: '缺少测试报告成本项',
+      qo_cg_severity: 'warning', qo_cg_description: '缺少测试报告成本项',
     }, fixtureRows.rows);
     expect(assumptionId).toBeTruthy();
     expect(gapId).toBeTruthy();
@@ -160,7 +160,7 @@ test.describe('PCBA quote cost scenario golden', () => {
     });
     await expectImmutable('qo_cost_assumption_common:create', {
       payload: { qo_ca_code: 'ASSUME-X', qo_ca_scenario_id: scenarioId,
-        qo_ca_description: 'post-freeze attempt', qo_ca_impact_type: 'cost', qo_ca_version: 'v1' },
+        qo_ca_description: 'post-freeze attempt', qo_ca_impact_type: '成本', qo_ca_version: 'v1' },
       targetRecordPid: scenarioId, targetRecordId: scenarioId, operationType: 'create',
     });
     await expectImmutable('qo_cost_scenario_common:calculate', {
@@ -214,7 +214,7 @@ test.describe('PCBA quote cost scenario golden', () => {
     // 假设经授权命令创建(默认 proposed)→ 授权命令批准
     const assumptionCreated = await executeCommand(page, 'qo_cost_assumption_common:create', {
       qo_ca_code: 'ASSUME-FX', qo_ca_scenario_id: scenarioId,
-      qo_ca_description: '汇率假设 7.0 CNY/USD', qo_ca_impact_type: 'cost', qo_ca_version: 'v1',
+      qo_ca_description: '汇率假设 7.0 CNY/USD', qo_ca_impact_type: '成本', qo_ca_version: 'v1',
     });
     const assumptionId = String(assumptionCreated.recordId);
     await executeCommand(page, 'qo_cost_assumption_common:approve', {
@@ -262,6 +262,8 @@ test.describe('PCBA quote cost scenario golden', () => {
     expect(bodyText).not.toMatch(/"tiers"\s*:/);
     await expect(page.getByText('已批准', { exact: true })).toBeVisible();
     await expect(page.getByText('已豁免', { exact: true })).toBeVisible();
+    await expect(page.getByText('严重', { exact: true })).toBeVisible();
+    await expect(page.getByText('critical', { exact: true })).toHaveCount(0);
     await expect(page.getByText('approved', { exact: true })).toHaveCount(0);
     await expect(page.getByText('waived', { exact: true })).toHaveCount(0);
     await expect(page.locator('main').getByText(assumptionId, { exact: true })).toHaveCount(0);

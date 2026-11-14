@@ -97,6 +97,11 @@ test.describe('PCBA quote supplier inquiry golden', () => {
         const saved = await queryDynamicRecords(page, 'qo_supplier_request_common', [{ fieldName: 'pid', operator: 'EQ', value: headPid }]);
         expect(saved[0].qo_sr_supplier).toBe('E2E Supplier Updated');
         await ui.screenshot({ path: test.info().outputPath('inquiry-created-edited-reloaded.png'), fullPage: true });
+        await clickRowActionByLocator(ui, row, 'edit', '编辑');
+        await expect(field('qo_sr_code')).toHaveValue(marker);
+        await expect(field('qo_sr_category')).toHaveValue('pcb');
+        await expect(field('qo_sr_supplier')).toHaveValue('E2E Supplier Updated');
+        await ui.screenshot({ path: test.info().outputPath('inquiry-edited-form-reloaded.png'), fullPage: true });
       } finally { await procurement.context.close(); }
 
       const quoteLine = (
