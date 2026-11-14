@@ -50,3 +50,13 @@ test('quickstart CI creates a private fresh key before compose and never overwri
     assert.notEqual(readEnv().contents, before.contents);
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
+
+// The entrypoint's temporary bootstrap server accepts Unix sockets before the
+// production TCP server starts. A socket probe must not release the backend.
+test('public PostgreSQL readiness waits for the real TCP server', () => {
+  for (const name of ['docker-compose.yml', 'docker-compose.pull.yml']) {
+    const probe = YAML.parse(read(name)).services.postgres.healthcheck.test;
+    assert.equal(probe[0], 'CMD-SHELL');
+    assert.match(probe[1], /pg_isready -h 127\.0\.0\.1 -p 5432 /);
+  }
+});
