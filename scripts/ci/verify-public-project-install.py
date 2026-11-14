@@ -70,6 +70,26 @@ def measured_chrome_runtime(executable):
                 scope='Observed CI-installed browser; no global install or browser download')
 
 
+def completion_receipt(checks, source_build_executed):
+    expected = {'compose-public-entry', 'public-initialization', 'public-browser', 'documented-stop-reopen'}
+    if not source_build_executed:
+        expected.add('source-build-evidence-reused')
+    require(len(checks) == len(expected) and {c['id'] for c in checks} == expected
+            and all(c.get('status') == 'passed' for c in checks), 'Complete actual stage results required')
+    rows = {c['id']: c for c in checks}
+    browser = rows['public-browser']; restored = rows['documented-stop-reopen']
+    require(browser.get('executed') == browser.get('passed') == 3
+            and browser.get('skipped') == browser.get('retries') == 0, 'Original three browser journeys required')
+    require(restored.get('projects') == 9 and restored.get('recordsUnchanged') is True,
+            'Actual nine-record stop/reopen comparison required')
+    require(rows['public-initialization'].get('projects') == 8
+            and rows['public-initialization'].get('hostNodeDeniedDuringBootstrap') is True,
+            'Actual public initialization required')
+    return dict(status='passed', stageIds=sorted(expected), browser=browser,
+                restart=restored, sourceBuildExecutedThisRound=source_build_executed,
+                recordings=False, releaseQualification=False)
+
+
 def main():
     require(os.uname().sysname == 'Linux', 'Linux CI only; no local container fallback')
     job = os.environ['AURA_CI_JOB_ID']
@@ -294,6 +314,8 @@ def main():
             run(compose + ['stop'], 'retain-stopped-project')
         if builder_created:
             run(['docker', 'buildx', 'rm', builder], 'owned-builder-remove')
+    # Emit actual completion only after every assertion and owned cleanup returns.
+    print(json.dumps(completion_receipt(checks, reused_build is None)))
 
 
 if __name__ == '__main__':

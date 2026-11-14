@@ -51,4 +51,24 @@ class NetworkContract(unittest.TestCase):
                            ('192.168.1.0/28',[]), ('10.253.200.0/24',[]), ('10.253.200.1/28',[])]:
             with self.assertRaises((RuntimeError, ValueError)): m.validate_subnet(value,used)
 
+class CompletionContract(unittest.TestCase):
+    def fixture(self):
+        spec = importlib.util.spec_from_file_location('installer', Path(__file__).with_name('verify-public-project-install.py'))
+        installer = importlib.util.module_from_spec(spec); spec.loader.exec_module(installer)
+        return installer, [dict(id='compose-public-entry',status='passed'),
+            dict(id='public-initialization',status='passed',projects=8,hostNodeDeniedDuringBootstrap=True),
+            dict(id='public-browser',status='passed',executed=3,passed=3,skipped=0,retries=0),
+            dict(id='documented-stop-reopen',status='passed',projects=9,recordsUnchanged=True)]
+    def test_actual_completion_is_structured_and_requires_restart(self):
+        installer, rows = self.fixture(); self.assertEqual(installer.completion_receipt(rows,True)['browser']['passed'],3)
+        rows[-1]['recordsUnchanged']=False
+        with self.assertRaises(RuntimeError): installer.completion_receipt(rows,True)
+    def test_empty_partial_skipped_or_unbound_consumption_cannot_emit_success(self):
+        for mode in ['empty','partial','skip','unbound']:
+            installer, rows=self.fixture()
+            if mode=='empty': rows=[]
+            if mode=='partial': rows[2]['passed']=2
+            if mode=='skip': rows[2]['skipped']=1
+            with self.assertRaises(RuntimeError): installer.completion_receipt(rows,mode!='unbound')
+
 if __name__=='__main__': unittest.main()
