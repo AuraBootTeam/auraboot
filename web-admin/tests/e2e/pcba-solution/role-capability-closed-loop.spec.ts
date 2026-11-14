@@ -283,7 +283,14 @@ test('BOM domain management authors rules and downgrades to read without Quote a
     );
     await page.getByTestId('permission-right-tab-capabilities').click();
     await page.getByTestId(`domain-level-bom.cap.${manage ? 'manage' : 'read'}`).check();
+    const preview = page.waitForResponse(
+      (r) => r.url().includes(`/api/permission/roles/${role.pid}/draft/preview`) &&
+        r.request().method() === 'POST',
+    );
     await page.getByTestId('capability-save').click();
+    const previewResponse = await preview;
+    expect(previewResponse.status()).toBe(200);
+    expect(String((await previewResponse.json()).code)).toBe('0');
     await expect(page.getByTestId('confirm-dialog')).toBeVisible();
     const saved = page.waitForResponse(
       (r) =>

@@ -303,13 +303,16 @@ test.describe('Quote actions deep — upload/process-fee/gerber/deepseek/source-
   test('QO-05 compute process fee', async ({ browser }) => {
     const { context, page } = await openQuoteRolePage(browser, users['sales']);
     try {
-      const r = await post(
+      const results = await Promise.all([0, 1].map(() => post(
         page,
         'qo_quote_common:compute_process_fee',
         { count_hole_mode: 'none' },
         'update',
         quoteId,
-      );
+      )));
+      for (const result of results) expect(result.resultData.status).toBe('completed');
+      expect(results[1].resultData.totalPoints).toBe(results[0].resultData.totalPoints);
+      const r = results[0];
       test.info().annotations.push({
         type: 'note',
         description: `QO-05 status=${r.status} body=${JSON.stringify(r.body?.data).slice(0, 160)}`,

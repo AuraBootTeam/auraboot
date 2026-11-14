@@ -57,7 +57,8 @@ test.describe('PCBA quote cost scenario golden', () => {
     for (const description of ['缺少测试报告成本项', '汇率假设 7.0 CNY/USD']) {
       await expect(page.locator('main').getByText(description, { exact: true }).first())
         .toBeVisible({ timeout: 20_000 });
-      await page.locator('main').getByText(description, { exact: true }).first().scrollIntoViewIfNeeded();
+      await page.locator('main').getByText(description, { exact: true }).first().evaluate(element => element.scrollIntoView({ block: 'center', inline: 'nearest' }));
+      await expect(page.locator('main').getByText(description, { exact: true }).first()).toBeInViewport();
       await info.attach(`q18-01-evidence-${description}`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     }
     // 档位子表人类可读:数量 100 可见;缺口/假设描述人类可读,无内部 JSON 块
@@ -246,7 +247,8 @@ test.describe('PCBA quote cost scenario golden', () => {
     ).toBeVisible({ timeout: 20_000 });
     for (const evidence of ['汇率口径经财务复核', '缺少测试报告成本项', '由历史测试报告覆盖,无需另行收费']) {
       await expect(page.locator('main').getByText(evidence, { exact: true })).toBeVisible({ timeout: 20_000 });
-      await page.locator('main').getByText(evidence, { exact: true }).scrollIntoViewIfNeeded();
+      await page.locator('main').getByText(evidence, { exact: true }).evaluate(element => element.scrollIntoView({ block: 'center', inline: 'nearest' }));
+      await expect(page.locator('main').getByText(evidence, { exact: true })).toBeInViewport();
       await info.attach(`q18-03-evidence-${evidence}`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     }
     const bodyText = await page.locator('main').innerText();
