@@ -2,7 +2,6 @@
 import importlib.util
 from pathlib import Path
 import unittest
-import tempfile
 
 spec = importlib.util.spec_from_file_location('public_install', Path(__file__).with_name('verify-public-project-install.py'))
 installer = importlib.util.module_from_spec(spec)
@@ -31,26 +30,6 @@ class ComposeStateTests(unittest.TestCase):
 
 
 class IsolatedEnvironmentTests(unittest.TestCase):
-    def test_public_schema_read_grant_preserves_bytes_and_private_keys(self):
-        with tempfile.TemporaryDirectory() as directory:
-            schema, private = Path(directory) / 'schema.sql', Path(directory) / '.env'
-            schema.write_bytes(b'CREATE TABLE example (id bigint);\n')
-            private.write_text('PRIVATE_TEST_FIXTURE=unchanged\n')
-            schema.chmod(0o600); private.chmod(0o600)
-            receipt = installer.prepare_public_schema(schema)
-            self.assertEqual(schema.stat().st_mode & 0o777, 0o644)
-            self.assertEqual(private.stat().st_mode & 0o777, 0o600)
-            self.assertEqual(schema.read_bytes(), b'CREATE TABLE example (id bigint);\n')
-            self.assertFalse(receipt['sourceBytesModified'])
-            self.assertEqual(receipt['modeBefore'], '0o600')
-
-    def test_schema_symlink_is_rejected_without_changing_target(self):
-        with tempfile.TemporaryDirectory() as directory:
-            target, link = Path(directory) / 'target', Path(directory) / 'schema.sql'
-            target.write_text('private'); target.chmod(0o600); link.symlink_to(target)
-            with self.assertRaises(RuntimeError): installer.prepare_public_schema(link)
-            self.assertEqual(target.stat().st_mode & 0o777, 0o600)
-
     def test_actual_resource_clamp_is_recorded_instead_of_requested_limit(self):
         receipt = installer.measured_builder_limits({'Memory': 4294967296, 'MemorySwap': 4294967296})
         self.assertEqual(receipt['requestedMemoryBytes'], 8589934592)

@@ -114,17 +114,13 @@ No public candidate download or all-platform installation guarantee is implied.
 
 ### Docker (recommended)
 
-Host prerequisites: Git, curl, Python 3.8+, Node.js20+ and Docker Compose v2. This batch verifies Node22.23.2. Initialization runs the plugin-assembly script on the host, so the frontend container does not remove the host Node requirement.
+Host prerequisites: Git, curl, Python 3.8+ and Docker Compose v2. The public initialization uses Python and HTTP; host Node.js is not required. Prepare a new local evaluation once; keep its private configuration and data on later starts.
 
 ```bash
 git clone https://github.com/AuraBootTeam/auraboot.git
 cd auraboot
-test -f .env || cp .env.example .env
-chmod 600 .env
-# PostgreSQL reads this public DDL as its own container user.
-chmod a+r platform/src/main/resources/db/snapshots/schema-current.sql
-# Prepare once; preserve existing installation keys across restarts.
-python3 scripts/prepare-quickstart-env.py --file .env
+# New empty local evaluation only; refuses existing configuration or data.
+python3 scripts/prepare-quickstart-env.py --file .env --new-local-evaluation
 docker compose --profile full up --build -d
 ./scripts/quickstart.sh                       # creates the admin, imports the plugins
 ```

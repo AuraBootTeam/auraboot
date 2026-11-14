@@ -44,18 +44,6 @@ def gradle_cache_path(url):
     return Path('dists/gradle-8.14.6-bin') / (digits or '0') / 'gradle-8.14.6-bin.zip'
 
 
-def prepare_public_schema(file):
-    """Only the public DDL needs to be readable by the PostgreSQL container UID."""
-    require(file.is_file() and not file.is_symlink(), 'Regular public schema required')
-    before = hashlib.sha256(file.read_bytes()).hexdigest()
-    mode = file.stat().st_mode & 0o777
-    file.chmod(mode | 0o044)
-    after = hashlib.sha256(file.read_bytes()).hexdigest()
-    require(before == after, 'Public schema content changed')
-    return dict(sha256=after, modeBefore=oct(mode), modeAfter=oct(file.stat().st_mode & 0o777),
-                sourceBytesModified=False, scope='public DDL read bits only; no private files or write grants')
-
-
 def measured_builder_limits(host):
     memory, swap = host.get('Memory'), host.get('MemorySwap')
     require(type(memory) is int and 0 < memory <= 8589934592,
@@ -81,8 +69,12 @@ def main():
                POSTGRES_PORT=str(db_port), BACKEND_URL=f'http://127.0.0.1:{web_port}',
                DELIVERY_BACKEND_URL=f'http://127.0.0.1:{web_port}',
                DELIVERY_WEB_URL=f'http://127.0.0.1:{web_port}',
+               AURABOOT_BIND_ADDRESS='127.0.0.1', POSTGRES_BIND_ADDRESS='127.0.0.1',
                DELIVERY_EVIDENCE_ROOT=str(output), ADMIN_EMAIL='admin@auraboot.com',
                ADMIN_PASSWORD='Test2026x', AURA_E2E_VIDEO='off', AURA_E2E_BROWSER_CHANNEL='chromium', COMPOSE_PARALLEL_LIMIT='1', NO_PROXY='localhost,127.0.0.1')
+    for key in ['JWT_SECRET', 'SESSION_SECRET', 'POSTGRES_PASSWORD', 'OPEN_PLATFORM_PROTOCOL_SIGNING_KEY',
+                'FIELD_ENCRYPTION_KEY', 'POSTGRES_USER', 'POSTGRES_DB']:
+        env.pop(key, None)
     for port in [web_port, db_port]:
         with socket.socket() as probe:
             probe.bind(('127.0.0.1', port))
@@ -157,11 +149,16 @@ def main():
     existing = subprocess.check_output(compose + ['ps', '-aq'], cwd=root, env=env, text=True).strip()
     require(not existing, 'Attempt already has Compose resources; no overwrite or implicit retry')
     require(not (root / '.env').exists(), 'Public checkout must not inherit another .env')
-    shutil.copyfile(root / '.env.example', root / '.env')
-    (root / '.env').chmod(0o600)
-    run(['python3', 'scripts/prepare-quickstart-env.py', '--file', '.env'], 'prepare-env')
-    (output / 'schema-permissions.json').write_text(json.dumps(prepare_public_schema(
-        root / 'platform/src/main/resources/db/snapshots/schema-current.sql'), indent=2))
+    run(['python3', 'scripts/prepare-quickstart-env.py', '--file', '.env', '--new-local-evaluation'], 'prepare-env')
+    values = dict(line.split('=', 1) for line in (root / '.env').read_text().splitlines()
+                  if line and not line.lstrip().startswith('#') and '=' in line)
+    keys = ['JWT_SECRET', 'SESSION_SECRET', 'POSTGRES_PASSWORD', 'OPEN_PLATFORM_PROTOCOL_SIGNING_KEY']
+    require(len({values[key] for key in keys}) == 4 and all(len(values[key]) >= 32 for key in keys),
+            'Independent fresh evaluation secrets required')
+    require((root / '.env').stat().st_mode & 0o777 == 0o600, 'Private environment mode required')
+    (output / 'preparation.json').write_text(json.dumps(dict(independentSecrets=True,
+         checkedKeys=keys, secretValuesExported=False, environmentMode='0600',
+         bindAddresses=[values['AURABOOT_BIND_ADDRESS'], values['POSTGRES_BIND_ADDRESS']]), indent=2))
     started = False
     builder_created = False
     try:
@@ -207,12 +204,27 @@ def main():
         started = True
         run(compose + ['up', '--build', '-d'], 'compose-build-start', timeout=2400)
         ready()
+        published = {}
+        for service, port, internal in [('frontend', web_port, '3000/tcp'), ('postgres', db_port, '5432/tcp')]:
+            bindings = json.loads(subprocess.check_output(['docker', 'inspect', '--format',
+                '{{json .HostConfig.PortBindings}}', project + '-' + service], text=True))
+            rows = bindings.get(internal, [])
+            require(rows == [{'HostIp':'127.0.0.1', 'HostPort':str(port)}], 'Actual published interface must be loopback')
+            published[service] = rows
+        (output / 'published-ports.json').write_text(json.dumps(published, indent=2))
         check('compose-public-entry', source=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip(), project=project)
-        run(['bash', 'scripts/project-delivery-demo.sh'], 'public-project-initialize')
+        deny = private / 'no-host-node'
+        deny.mkdir(mode=0o700)
+        for tool in ['node', 'npm', 'pnpm']:
+            file = deny / tool
+            file.write_text('#!/bin/sh\necho "Unexpected host JavaScript dependency during public bootstrap" >&2\nexit 97\n')
+            file.chmod(0o700)
+        run(['env', 'PATH=' + str(deny) + ':' + env['PATH'], 'bash', 'scripts/project-delivery-demo.sh'],
+            'public-project-initialize')
         fixture = json.loads((output / 'fixture.json').read_text())
         require(len(fixture['projects']) == 8, 'Public initialization must create all eight sample projects')
         shutil.copyfile(root / 'plugins/project-management/scripts/acceptance-matrix.json', output / 'acceptance-matrix.json')
-        check('public-initialization', projects=8, fixture='fixture.json')
+        check('public-initialization', projects=8, fixture='fixture.json', hostNodeDeniedDuringBootstrap=True)
         run(['pnpm', 'install', '--frozen-lockfile', '--ignore-scripts'], 'host-browser-dependencies')
         run(['pnpm', 'exec', 'playwright', 'install', 'chromium'], 'browser-install', cwd=root / 'web-admin')
         with (private / 'public-browser.log').open('xb') as log:

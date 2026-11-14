@@ -16,7 +16,7 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME:-auraboot}-postgres
     restart: unless-stopped
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_BIND_ADDRESS:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-aura_boot}
       POSTGRES_USER: ${POSTGRES_USER:-auraboot}
@@ -131,7 +131,7 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME:-auraboot}-frontend
     restart: unless-stopped
     ports:
-      - "${AURABOOT_PORT:-3000}:3000"
+      - "${AURABOOT_BIND_ADDRESS:-127.0.0.1}:${AURABOOT_PORT:-3000}:3000"
     environment:
       NODE_ENV: production
       AURA_TRACE_LOG_DIR: /app/logs/traces

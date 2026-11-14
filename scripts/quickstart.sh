@@ -22,7 +22,8 @@
 # startup. `/api/bootstrap/setup` is the explicit, auditable entry point, and an
 # init script is the sanctioned place to call it. That is this script.
 #
-# It is idempotent: run it as many times as you like.
+# Administrator creation preserves an existing account. Plugin import uses
+# OVERWRITE: run only for an explicit evaluation, never as a general upgrade.
 #
 #   BACKEND_URL     default http://localhost:3000 — the URL you open in the
 #                   browser, NOT the backend's own port.
