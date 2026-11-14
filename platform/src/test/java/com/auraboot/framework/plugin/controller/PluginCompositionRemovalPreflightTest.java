@@ -26,7 +26,8 @@ class PluginCompositionRemovalPreflightTest {
         doThrow(BusinessException.i18n("plugin.error.composition_lifecycle")).when(manager).requireTenantLifecycleChange(record);
         var controller=new PluginController(records,mock(com.auraboot.framework.plugin.service.PlatformVersionChecker.class),
                 mock(com.auraboot.framework.plugin.config.PlatformProperties.class),manager,
-                new com.auraboot.framework.application.tenant.ApplicationCatalogPolicy(mock(com.auraboot.framework.tenant.service.TenantPreferenceService.class),""));
+                new com.auraboot.framework.application.tenant.ApplicationCatalogPolicy(mock(com.auraboot.framework.tenant.service.TenantPreferenceService.class),""),
+                new com.auraboot.framework.plugin.service.impl.PluginRecordStateServiceImpl(records,manager));
         assertThatThrownBy(()->controller.disablePlugin("shared")).isInstanceOf(BusinessException.class);
         verify(records,never()).markAsDisabled(anyString());
     }
@@ -44,7 +45,8 @@ class PluginCompositionRemovalPreflightTest {
         when(records.selectList(any(com.baomidou.mybatisplus.core.conditions.query.QueryWrapper.class))).thenReturn(java.util.List.of(retained));
         var properties=new com.auraboot.framework.plugin.config.PlatformProperties();
         var controller=new PluginController(records,new com.auraboot.framework.plugin.service.PlatformVersionChecker(properties),
-                properties,mock(AuraPluginManager.class),new com.auraboot.framework.application.tenant.ApplicationCatalogPolicy(preferences,"bom-quote"));
+                properties,mock(AuraPluginManager.class),new com.auraboot.framework.application.tenant.ApplicationCatalogPolicy(preferences,"bom-quote"),
+                mock(com.auraboot.framework.plugin.service.PluginRecordStateService.class));
         assertThat(controller.listPlugins().getData()).extracting(PluginController.PluginDTO::pluginId).containsExactly("com.auraboot.core-meta");
         assertThat(controller.checkVersionCompatibility().getData().plugins()).extracting(PluginController.PluginCompatibilityDTO::pluginId).containsExactly("com.auraboot.core-meta");
         var capture=org.mockito.ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.query.QueryWrapper.class);

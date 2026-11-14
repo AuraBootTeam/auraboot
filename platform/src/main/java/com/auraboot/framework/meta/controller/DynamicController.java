@@ -93,6 +93,9 @@ public class DynamicController {
     private RecordCapabilityService recordCapabilityService;
 
     @Autowired
+    private com.auraboot.framework.meta.service.impl.CommandEffectExecutor commandEffectExecutor;
+
+    @Autowired
     private OrganizationService organizationService;
 
     @Autowired
@@ -553,6 +556,50 @@ public class DynamicController {
     }
 
     /**
+     * Records a direct (non-command-pipeline) write into ab_command_audit_log.
+     * The dynamic CRUD REST surface predates the command pipeline and still
+     * bypasses its stages (SoD, idempotency, state guards); until it is
+     * migrated to synthesized commands, this wrapper keeps the write surface
+     * auditable — who wrote what to which model, and whether it succeeded.
+     * {@code phaseReached="direct"} marks the legacy path in the audit row.
+     */
+    private <T> T auditedDirectWrite(String operation, String pageKey, Object payloadSummary,
+                                      java.util.function.Supplier<T> write) {
+        long start = System.currentTimeMillis();
+        Map<String, Object> requestPayload = payloadSummary instanceof Map
+                ? (Map<String, Object>) payloadSummary
+                : Map.of("summary", String.valueOf(payloadSummary));
+        try {
+            T result = write.get();
+            recordDirectWriteAudit(operation, requestPayload, true, null, start);
+            return result;
+        } catch (RuntimeException e) {
+            recordDirectWriteAudit(operation, requestPayload, false, String.valueOf(e.getMessage()), start);
+            throw e;
+        }
+    }
+
+    /**
+     * Best-effort: audit recording must never break the write it observes
+     * (same philosophy as {@code CommandEffectExecutor.saveAuditLog}'s own
+     * failure handling, and safe in contexts without an initialized
+     * MetaContext, e.g. unit tests).
+     */
+    private void recordDirectWriteAudit(String operation, Map<String, Object> requestPayload,
+                                        boolean success, String errorMessage, long start) {
+        try {
+            commandEffectExecutor.saveAuditLog(
+                    com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId(),
+                    operation, null,
+                    com.auraboot.framework.application.tenant.MetaContext.getCurrentUserId(),
+                    requestPayload, success ? Map.of("success", true) : null, success, errorMessage,
+                    System.currentTimeMillis() - start, "direct", null);
+        } catch (Exception auditFailure) {
+            log.warn("Direct-write audit recording failed for {}: {}", operation, auditFailure.getMessage());
+        }
+    }
+
+    /**
      * 创建数据
      */
     @com.auraboot.framework.openplatform.service.OpenApiEndpointCandidate(code = "dynamic.create", adapter = com.auraboot.framework.openplatform.service.OpenApiEndpointKind.RESOURCE_CREATE, version = "1", name = "Create record", chineseName = "创建记录")
@@ -564,7 +611,8 @@ public class DynamicController {
             @RequestBody Map<String, Object> data) {
         log.info("创建数据: {}", logSafe(pageKey));
         String modelCode = resolveModelCode(pageKey);
-        Map<String, Object> result = dynamicDataService.create(modelCode, data);
+        Map<String, Object> result = auditedDirectWrite("dynamic.create", pageKey, data,
+                () -> dynamicDataService.create(modelCode, data));
         return ApiResponse.success(PublicRecordSanitizer.sanitizeRecord(result));
     }
 
@@ -602,7 +650,8 @@ public class DynamicController {
             data.put("_expectedVersion", baseRecordVersion);
         }
         String modelCode = resolveModelCode(pageKey);
-        Map<String, Object> result = dynamicDataService.update(modelCode, recordPid, data);
+        Map<String, Object> result = auditedDirectWrite("dynamic.update", pageKey, data,
+                () -> dynamicDataService.update(modelCode, recordPid, data));
         return ApiResponse.success(PublicRecordSanitizer.sanitizeRecord(result));
     }
 
@@ -618,7 +667,11 @@ public class DynamicController {
             @Parameter(description = "记录 PID") @PathVariable String recordPid) {
         log.info("删除数据: pageKey={}, recordPid={}", logSafe(pageKey), logSafe(recordPid));
         String modelCode = resolveModelCode(pageKey);
-        dynamicDataService.delete(modelCode, recordPid);
+        auditedDirectWrite("dynamic.delete", pageKey, Map.of("recordPid", recordPid),
+                () -> {
+                    dynamicDataService.delete(modelCode, recordPid);
+                    return null;
+                });
         return ApiResponse.success(null);
     }
 
@@ -636,7 +689,9 @@ public class DynamicController {
         }
         log.info("批量创建数据: {}, 数量: {}", logSafe(pageKey), dataList.size());
         String modelCode = resolveModelCode(pageKey);
-        DynamicBatchResponse result = dynamicDataService.batchCreate(modelCode, dataList);
+        DynamicBatchResponse result = auditedDirectWrite("dynamic.batch_create", pageKey,
+                Map.of("count", dataList.size()),
+                () -> dynamicDataService.batchCreate(modelCode, dataList));
         return ApiResponse.success(PublicRecordSanitizer.sanitizeBatch(result));
     }
 
@@ -654,7 +709,9 @@ public class DynamicController {
         }
         log.info("批量更新数据: {}, 数量: {}", logSafe(pageKey), dataList.size());
         String modelCode = resolveModelCode(pageKey);
-        DynamicBatchResponse result = dynamicDataService.batchUpdate(modelCode, dataList);
+        DynamicBatchResponse result = auditedDirectWrite("dynamic.batch_update", pageKey,
+                Map.of("count", dataList.size()),
+                () -> dynamicDataService.batchUpdate(modelCode, dataList));
         return ApiResponse.success(PublicRecordSanitizer.sanitizeBatch(result));
     }
 
@@ -672,7 +729,11 @@ public class DynamicController {
         }
         log.info("批量删除数据: pageKey={}, count={}", logSafe(pageKey), recordPids.size());
         String modelCode = resolveModelCode(pageKey);
-        dynamicDataService.batchDelete(modelCode, recordPids);
+        auditedDirectWrite("dynamic.batch_delete", pageKey, Map.of("count", recordPids.size()),
+                () -> {
+                    dynamicDataService.batchDelete(modelCode, recordPids);
+                    return null;
+                });
         return ApiResponse.success(null);
     }
 

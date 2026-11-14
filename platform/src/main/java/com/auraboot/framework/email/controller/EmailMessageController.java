@@ -44,6 +44,7 @@ public class EmailMessageController {
     private final EmailMessageMapper     emailMessageMapper;
     private final EmailRecordLinkMapper  emailRecordLinkMapper;
     private final EmailRecordLinkService emailRecordLinkService;
+    private final com.auraboot.framework.email.service.EmailMessageService emailMessageService;
     private final EmailSendService       emailSendService;
     private final EmailTrackingService   emailTrackingService;
     private final EmailAccountMapper     emailAccountMapper;
@@ -194,10 +195,7 @@ public class EmailMessageController {
     @PutMapping("/{id}/read")
     @Operation(summary = "Mark a message as read")
     public ApiResponse<Void> markRead(@PathVariable Long id) {
-        EmailMessage message = new EmailMessage();
-        message.setId(id);
-        message.setIsRead(true);
-        emailMessageMapper.updateById(message);
+        emailMessageService.markRead(id);
         return ApiResponse.ok();
     }
 

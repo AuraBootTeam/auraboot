@@ -1,5 +1,7 @@
 # Runtime Platform 总览（中文）
 
+> Path update (2026-11-14): `app/meta/**` → `app/framework/meta/**`; the designer studio moved into the `core-designer` plugin (`app/plugins/core-designer/components/studio/**`). Re-verify exact file names before relying on them.
+
 本文档汇集 `README.md`、`ARCHITECTURE.md`、`CONSTRAINTS.md` 的核心内容，完整描述
 组件系统、数据源体系、架构流程以及运行期约束，帮助中文读者快速掌握 AuraBoot
 Runtime Platform 的最佳实践。
@@ -9,14 +11,14 @@ Runtime Platform 的最佳实践。
 ## 1. 平台概览
 
 1. **组件注册体系**
-   - 所有 Smart 组件在 `app/meta/registry/components/ComponentConfigs.ts` 中定义，包含
+   - 所有 Smart 组件在 `app/framework/meta/registry/components/ComponentConfigs.ts` 中定义，包含
      类型、属性面板、默认值等设计时信息。
    - `ComponentRuntimeManifest.ts` 为每个类型提供运行时元数据：模块路径、
      导出名称、别名。新增组件只需维护这两个文件即可。
 
 2. **动态加载**
    - `runtime-component-loaders.ts` 通过 `import.meta.glob` 扫描整个
-     `app/studio/workbench/components/smart-components` 目录，基于 manifest 自动生成
+     `app/plugins/core-designer/components/studio/workbench/components/smart-components` 目录，基于 manifest 自动生成
      loader。
    - `ComponentLoader.tsx` 使用上述 loader，根据组件名（或别名）懒加载真实的 Studio
      组件并缓存，确保设计器/运行期完全一致。

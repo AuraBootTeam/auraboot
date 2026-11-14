@@ -1,5 +1,7 @@
 # Runtime Platform 架构详解（中文完整版）
 
+> Path update (2026-11-14): `app/meta/**` → `app/framework/meta/**`; the designer studio moved into the `core-designer` plugin (`app/plugins/core-designer/components/studio/**`). Re-verify exact file names before relying on them.
+
 本文档深入描述 AuraBoot Runtime Platform 的整体架构、模块职责、数据流及交互序列，
 并对扩展点与未来演进方向提供建议。配合 `README.md` 和 `CONSTRAINTS.md` 阅读，可快速掌握
 设计器与运行期之间的连接方式。
@@ -31,10 +33,10 @@
 
 | 分层 | Studio 模块 | Meta 模块 | 说明 |
 | --- | --- | --- | --- |
-| **Domain** | `app/studio/domain/schema/**` | `app/meta/schemas/**` | 纯类型/转换器，不依赖 React。|
-| **Services** | `app/studio/services/**`（SchemaRuntimeAdapter 等） | `app/meta/runtime/**`（SchemaRuntime、ActionRegistry、DataSourceManager 等） | 核心业务引擎，封装状态/数据流。 |
-| **Hooks** | `app/studio/hooks/**` | `app/meta/hooks/**` | “React glue”，只包装 services。 |
-| **UI** | `app/studio/workbench/**` (Smart Components, Canvas, Panels) | `app/meta/rendering/**` (BlockRenderer, ComponentLoader) | UI 仅消费 hooks。|
+| **Domain** | `app/plugins/core-designer/components/studio/domain/schema/**` | `app/framework/meta/schemas/**` | 纯类型/转换器，不依赖 React。|
+| **Services** | `app/plugins/core-designer/components/studio/services/**`（SchemaRuntimeAdapter 等） | `app/framework/meta/runtime/**`（SchemaRuntime、ActionRegistry、DataSourceManager 等） | 核心业务引擎，封装状态/数据流。 |
+| **Hooks** | `app/plugins/core-designer/components/studio/hooks/**` | `app/framework/meta/hooks/**` | “React glue”，只包装 services。 |
+| **UI** | `app/plugins/core-designer/components/studio/workbench/**` (Smart Components, Canvas, Panels) | `app/framework/meta/rendering/**` (BlockRenderer, ComponentLoader) | UI 仅消费 hooks。|
 
 ### 1.1 分层架构与插件化（来自主架构文档）
 
@@ -89,14 +91,14 @@
 
 ### 2.2 Meta 侧
 
-1. **Domain**：`app/meta/schemas/types.ts`，统一 DSL。  
+1. **Domain**：`app/framework/meta/schemas/types.ts`，统一 DSL。  
 2. **Services**：`runtime/**`（SchemaRuntime、FlowRunner、ActionRegistry、DataSourceManager、ScopedStateManager）。  
 3. **Hooks**：`useSchemaLoader`、`useSchemaRuntime`、`useFieldDataSource`、`usePageDataSources`。  
 4. **UI**：`rendering/**`（SchemaRenderer、BlockRenderer、ComponentLoader）。
 
 ### 2.3 近期重构里程碑
 
-- **表达式系统迁移**：所有求值逻辑集中到 `app/meta/runtime/expression/*`，彻底摆脱旧 `app/core` 依赖。  
+- **表达式系统迁移**：所有求值逻辑集中到 `app/framework/meta/runtime/expression/*`，彻底摆脱旧 `app/core` 依赖。  
 - **SchemaRuntime 纯编排**：`executeAction` 只处理流程，对具体动作零感知。  
 - **DataSourceManager 强制单例**：Runtime 配置项必须传入实例，`useFieldDataSource` 对缺失 Manager 的场景直接抛错。  
 - **动态路由共享 Hook**：`useDynamicPageSetup` 将 schema 加载、数据源初始化、Runtime 创建整合为单一入口，List/New/Edit/View 统一使用。

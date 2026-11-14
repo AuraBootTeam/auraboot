@@ -1,5 +1,7 @@
 # Runtime Platform 使用指南（中文完整版）
 
+> Path update (2026-11-14): `app/meta/**` → `app/framework/meta/**`; the designer studio moved into the `core-designer` plugin (`app/plugins/core-designer/components/studio/**`). Re-verify exact file names before relying on them.
+
 本文档面向需要维护或扩展 AuraBoot Runtime Platform 的研发人员，完整描述组件体系、
 数据源生命周期、运行时钩子以及如何与 Studio 设计器协同。阅读本指南可帮助你在无需翻阅
 多份资料的情况下，快速理解平台的核心概念和最佳实践。
@@ -11,21 +13,21 @@
 AuraBoot 的运行期与设计器都遵循同一套分层：
 
 1. **Domain（领域模型）**  
-   - 位置：`app/studio/domain/**`、`app/meta/schemas/**`。  
+   - 位置：`app/plugins/core-designer/components/studio/domain/**`、`app/framework/meta/schemas/**`。  
    - 作用：描述 schema、block、component、dataSource、theme 等纯数据结构，不含 React。
 
 2. **Services（无 UI 的业务引擎）**  
-   - 位置：`app/studio/services/**`、`app/meta/runtime/**`。  
+   - 位置：`app/plugins/core-designer/components/studio/services/**`、`app/framework/meta/runtime/**`。  
    - 包含 SchemaRuntime、DataSourceManager、ActionRegistry 等。  
    - 只依赖 Domain，不依赖 React。
 
 3. **Hooks（React Glue）**  
-   - 位置：`app/studio/hooks/**`、`app/meta/hooks/**`。  
+   - 位置：`app/plugins/core-designer/components/studio/hooks/**`、`app/framework/meta/hooks/**`。  
    - 仅做“React 封装”，内部调用 services/domain。  
    - 示例：`usePageDataSources`（封装 DataSourceManager）、`useSchemaRuntime`（封装 SchemaRuntime）、`useSmartComponent`（封装表达式/验证服务）。
 
 4. **UI（Smart Components / Workbench）**  
-   - 位置：`app/studio/workbench/**` 和运行期渲染器（`app/meta/rendering/**`）。  
+   - 位置：`app/plugins/core-designer/components/studio/workbench/**` 和运行期渲染器（`app/framework/meta/rendering/**`）。  
    - 完全通过 hooks 访问 services，禁止直接依赖 services 代码，以保证可测试性和复用。
 
 > **重点**：Hooks 绝不包含业务逻辑或副作用调度，全部委托给 services；UI 只消费 hooks，使得同一 services 能在 Studio、Preview、Runtime 三个环境复用。
@@ -37,12 +39,12 @@ AuraBoot 的运行期与设计器都遵循同一套分层：
 ### 2.1 设计态与运行态的单一事实来源
 
 1. **设计态定义**  
-   - 位置：`app/meta/registry/components/ComponentConfigs.ts`  
+   - 位置：`app/framework/meta/registry/components/ComponentConfigs.ts`  
    - 作用：提供组件类型（如 `input`、`select`）、属性 schema、默认值、分类等信息。  
    - Studio 在属性面板和画布上完全依赖这些元数据进行渲染、校验和导出。
 
 2. **运行态元数据（Manifest）**  
-   - 位置：`app/meta/registry/components/ComponentRuntimeManifest.ts`  
+   - 位置：`app/framework/meta/registry/components/ComponentRuntimeManifest.ts`  
    - 作用：描述组件在运行时对应的真实模块路径、导出名称和别名；例如：
      ```ts
      input: {
@@ -56,7 +58,7 @@ AuraBoot 的运行期与设计器都遵循同一套分层：
 ### 2.2 动态加载机制
 
 1. `runtime-component-loaders.ts`
-   - 使用 `import.meta.glob` 扫描 `app/studio/workbench/components/smart-components/**`，
+   - 使用 `import.meta.glob` 扫描 `app/plugins/core-designer/components/studio/workbench/components/smart-components/**`，
      自动根据 Manifest 生成 loader。
    - 避免了手动维护 `import()` 语句或 switch-case，降低漏配风险。
 
@@ -96,7 +98,7 @@ Smart 组件渲染（共享 useSmartComponent hook）
 
 ### 3.2 Declarative dependOn
 
-- `app/meta/schemas/types.ts` 允许在 schema 的 `dataSources[id]` 中声明：
+- `app/framework/meta/schemas/types.ts` 允许在 schema 的 `dataSources[id]` 中声明：
   ```json
   {
     "dependOn": ["state.filters", "form.store.name"]
@@ -156,7 +158,7 @@ Smart 组件渲染（共享 useSmartComponent hook）
 
 ### 4.1 新增 Smart 组件
 
-1. 在 `app/studio/workbench/components/smart-components/...` 中实现组件。  
+1. 在 `app/plugins/core-designer/components/studio/workbench/components/smart-components/...` 中实现组件。  
 2. 在 `ComponentConfigs.ts` 中添加类型描述（名称、分类、属性 schema）。  
 3. 在 `ComponentRuntimeManifest.ts` 中登记模块路径、导出名和别名。  
 4. 运行 `pnpm dev` 或相关构建任务，即可通过 `ComponentLoader` 在运行期使用。
@@ -229,7 +231,7 @@ Smart 组件渲染（共享 useSmartComponent hook）
 
 | 编号 | 内容 | 效果 |
 | --- | --- | --- |
-| P0-1 | 表达式系统迁移到 `app/meta/runtime/expression`，移除 `app/core` 依赖 | Meta Framework 完全自包含，可独立发布 |
+| P0-1 | 表达式系统迁移到 `app/framework/meta/runtime/expression`，移除 `app/core` 依赖 | Meta Framework 完全自包含，可独立发布 |
 | P0-2 | SchemaRuntime 改为“纯编排”模式，所有原子操作委托给 ActionRegistry | 新增动作只需注册，无需修改 SchemaRuntime |
 | P0-3 | DataSourceManager 强制单例，`SchemaRuntimeConfig` 必须传入实例 | 彻底解决多实例数据不同步问题 |
 | P1-1 | 动态路由共享 `useDynamicPageSetup` Hook | List/New/Edit/View 页面共享初始化流程，减少重复代码 |

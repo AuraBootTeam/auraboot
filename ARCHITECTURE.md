@@ -64,6 +64,8 @@ Pages are DSL documents that compose blocks (list, form, detail, custom). There 
 ### Command
 A command is the only sanctioned write path. Every command — whether triggered by a button, an automation rule, a workflow task, or an AI agent — flows through the same multi-stage pipeline: resolve, authenticate, authorize, validate against entitlement and SoD, check preconditions, guard state transitions, execute, audit, dispatch events, and trigger side effects.
 
+> **Transition note (2026-11):** the default REST CRUD surface for models without a custom command (`/api/dynamic/...`) predates the pipeline and still bypasses its stages. It carries permission checks and, since 2026-11, records every write into the command audit log (marked `phaseReached="direct"`), but SoD, idempotency and state guards do not apply to it yet. Migrating it onto synthesized commands is tracked work; until then, treat "every write goes through the pipeline" as true for commands, not yet for this legacy surface.
+
 This contract is what makes the rest of the platform possible. Without it, audit and AI-safe execution would be aspirations, not guarantees.
 
 → [Commands](https://docs.auraboot.com)

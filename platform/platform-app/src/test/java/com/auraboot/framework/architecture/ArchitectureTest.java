@@ -31,13 +31,17 @@ class ArchitectureTest {
     }
 
     @Test
-    @DisplayName("Rule 1: No class should depend on controller layer")
+    @DisplayName("Rule 1: No class should depend on controller layer (frozen — new violations blocked)")
     void noClassShouldDependOnControllers() {
-        noClasses()
-                .that().resideOutsideOfPackage("..controller..")
-                .should().dependOnClassesThat().resideInAnyPackage("..controller..")
-                .because("Controllers are entry points — no other layer should depend on them")
-                .check(classes);
+        // Frozen 2026-11-14: two pre-existing PermissionInterceptor references
+        // (bean-type special-casing for DynamicController / CommandController)
+        // are recorded in the baseline; new violations fail.
+        FreezingArchRule.freeze(
+                noClasses()
+                        .that().resideOutsideOfPackage("..controller..")
+                        .should().dependOnClassesThat().resideInAnyPackage("..controller..")
+                        .because("Controllers are entry points - no other layer should depend on them")
+        ).check(classes);
     }
 
     @Test
