@@ -1,6 +1,7 @@
 package com.auraboot.plugins.delivery;
 
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
+import com.auraboot.framework.plugin.extension.BusinessResourceAuthorization;
 import com.auraboot.framework.plugin.extension.DataAccessor;
 import org.pf4j.Extension;
 
@@ -13,6 +14,10 @@ import java.util.Map;
 public final class RegisterAcceptanceHandler implements CommandHandlerExtension {
     @Override public String getCommandType() { return "tdv:register_acceptance"; }
     @Override public boolean supportsDryRun() { return true; }
+    // Source rows and field grants must share the command's physical MVCC snapshot.
+    @Override public BusinessResourceAuthorization.ReadIsolation commandReadIsolation() {
+        return BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ;
+    }
 
     @Override public Object execute(CommandContext context) {
         if (context == null || context.tenantId() == null || context.dataAccessor() == null

@@ -73,6 +73,29 @@ class NativeReadFieldProjectionTest {
                 PermissionResult.deny("revoked",List.of()),100L,1L,5L,"project","record",List.of()));
         assertThatThrownBy(()->projection.project(model,List.of(row))).isInstanceOf(AccessDeniedException.class);
     }
+    @Test void denialDiagnosticsExcludePolicyExpressionsAndGrantDetails() {
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(NativeReadFieldProjection.class);
+        var appender = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            var step = new com.auraboot.framework.permission.engine.model.EvaluationStep("Policy",
+                    com.auraboot.framework.permission.engine.model.EvaluationVerdict.DENY, "PRIVATE_CONDITION");
+            when(authorization.resolveOrdinaryRead(eq(5L), eq("project"), anyMap())).thenReturn(
+                    new BusinessGrantDecision(PermissionResult.deny("PRIVATE_DECISION grant#123", List.of(step)),
+                            100L, 1L, 5L, "project", "record", List.of()));
+            assertThatThrownBy(() -> projection.project(model, List.of(row(Map.of("pid", "record", "secret", "PRIVATE_RECORD")))))
+                    .isInstanceOf(AccessDeniedException.class);
+            String output = appender.list.stream().map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
+                    .collect(java.util.stream.Collectors.joining("\n"));
+            assertThat(output).contains("model=project", "decision=denied", "Policy:DENY")
+                    .doesNotContain("PRIVATE_CONDITION", "PRIVATE_DECISION", "grant#123", "PRIVATE_RECORD");
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+    }
+
     @Test void legacyUnrestrictedGrantPreservesTheExistingDataShape() {
         var row=row(Map.<String,Object>of("pid","record","secret","PRIVATE"));
         when(authorization.resolveOrdinaryRead(eq(5L),eq("project"),anyMap())).thenReturn(new BusinessGrantDecision(
@@ -88,14 +111,47 @@ class NativeReadFieldProjectionTest {
         assertThat(projection.project(model,List.of(row(raw)))).containsExactly(Map.of("pid","record"));
     }
 
+    @Test void loadedSqlNullCreatorStillRequiresAnExactCurrentGrant() {
+        var value = row(Map.of("pid", "record", "stored_name", "Board", "stored_secret", "PRIVATE"));
+        value.remove("__ab_auth_creator");
+        value.put("__ab_auth_creator_loaded", true);
+        when(authorization.resolveOrdinaryRead(eq(5L), eq("project"), anyMap()))
+                .thenReturn(allow("record", "name"));
+        assertThat(projection.project(model, List.of(value)))
+                .containsExactly(Map.of("pid", "record", "stored_name", "Board"));
+        verify(authorization).resolveOrdinaryRead(eq(5L), eq("project"), argThat(canonical ->
+                canonical.containsKey("created_by") && canonical.get("created_by") == null
+                        && canonical.keySet().stream().noneMatch(key -> key.startsWith("__ab_auth_"))));
+        when(authorization.resolveOrdinaryRead(eq(5L), eq("project"), anyMap()))
+                .thenReturn(new BusinessGrantDecision(PermissionResult.deny("scope denied", List.of()),
+                        100L, 1L, 5L, "project", "record", List.of()));
+        assertThatThrownBy(() -> projection.project(model, List.of(value)))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test void missingCreatorWithoutTheFixedLoadedMarkerIsDeniedBeforeGrantEvaluation() {
+        var value = row(Map.of("pid", "record", "name", "Board"));
+        value.remove("__ab_auth_creator");
+        for (Object marker : Arrays.asList(null, false, "true", 1)) {
+            value.put("__ab_auth_creator_loaded", marker);
+            assertThatThrownBy(() -> projection.project(model, List.of(value)))
+                    .isInstanceOf(AccessDeniedException.class);
+        }
+        value.put("__ab_auth_creator_loaded", true);
+        value.remove("__ab_auth_tenant");
+        assertThatThrownBy(() -> projection.project(model, List.of(value)))
+                .isInstanceOf(AccessDeniedException.class);
+        verify(authorization, never()).resolveOrdinaryRead(any(), anyString(), anyMap());
+    }
+
     @Test void queryAddsOnlyFixedHostFactsWithoutReplacingTheBusinessSelection() {
         var builder = new QueryBuilderServiceImpl(mock(com.auraboot.framework.meta.mapper.DynamicDataMapper.class))
                 .buildConditionQuery(model,List.of());
         var original = List.copyOf(builder.getSelectFields());
         NativeReadFieldProjection.prepareQuery(model,builder);
-        assertThat(builder.getSql()).contains("stored_name", "pid AS __ab_auth_pid", "tenant_id AS __ab_auth_tenant", "created_by AS __ab_auth_creator");
+        assertThat(builder.getSql()).contains("stored_name", "pid AS __ab_auth_pid", "tenant_id AS __ab_auth_tenant", "created_by AS __ab_auth_creator", "TRUE AS __ab_auth_creator_loaded");
         NativeReadFieldProjection.prepareQuery(model,builder);
-        assertThat(builder.getSelectFields()).containsAll(original).hasSize(original.size()+3);
+        assertThat(builder.getSelectFields()).containsAll(original).hasSize(original.size()+4);
     }
 
     @Test void envelopeKeepsOptimisticVersionWithoutGrantingAuditOrBusinessSecrets() {

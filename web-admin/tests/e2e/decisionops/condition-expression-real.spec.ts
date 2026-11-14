@@ -1,3 +1,4 @@
+import { assignRoleNavigation } from '../../helpers/role-navigation';
 import { test, expect, type Page, type Response } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -415,6 +416,8 @@ test('E10 a real reader can inspect nested conditions but cannot edit, publish o
       data: grants.map((code) => ({ permissionId: ids.get(code), granted: true })),
     }),
   );
+  // This legacy route-bearing parent is also an explicit navigation entry.
+  await assignRoleNavigation(page, role.pid, ['decisionops_console', 'decisionops_condition_fragments']);
   const email = `${key}@e2e.local`,
     password = 'Test2026x';
   await payload(

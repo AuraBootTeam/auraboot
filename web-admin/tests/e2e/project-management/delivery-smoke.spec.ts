@@ -81,7 +81,7 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     await shot('P04');
     await page.getByTestId('toolbar-btn-edit').click();
     await expect(page.locator('#tpm_pj_name')).toHaveValue(projectName);
-    await expect(page.getByTestId('select-trigger-tpm_pj_customer_id')).toContainText('华辰制造');
+    await expect(page.getByTestId('select-trigger-tpm_pj_customer_id')).toHaveValue('华辰制造');
     await expect(page.getByTestId('workspace-breadcrumb')).toContainText('编辑项目');
     await shot('P22');
     await page.getByTestId('form-btn-cancel').click();
@@ -162,7 +162,7 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     await page.locator('#tpm_pj_name').fill(newProjectName);
     await page.getByTestId('select-trigger-tpm_pj_customer_id').click();
     await page.getByRole('option', { name: '华辰制造', exact: true }).click();
-    await expect(page.getByTestId('select-trigger-tpm_pj_customer_id')).toContainText('华辰制造');
+    await expect(page.getByTestId('select-trigger-tpm_pj_customer_id')).toHaveValue('华辰制造');
     await page.locator('#tpm_pj_description').fill('统一合同审批、版本管理与交付归档。（虚构示例数据）');
     await page.locator('#tpm_pj_budget').fill('36000');
     await page.locator('#tpm_pj_risk_summary').fill('客户合同模板的版本需确认。');

@@ -537,7 +537,7 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
             if (queryType != QueryType.SELECT) throw new IllegalStateException("Authorization facts require a SELECT");
             if (selectFields.isEmpty()) selectFields.add("*");
             for (String field : List.of("pid AS __ab_auth_pid", "tenant_id AS __ab_auth_tenant",
-                    "created_by AS __ab_auth_creator")) {
+                    "created_by AS __ab_auth_creator", "TRUE AS __ab_auth_creator_loaded")) {
                 if (!selectFields.contains(field)) selectFields.add(field);
             }
             return this;

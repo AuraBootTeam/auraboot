@@ -1,6 +1,7 @@
 import { render, act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
+import { renderToString } from 'react-dom/server';
 
 // ---------------------------------------------------------------------------
 // ACP H.1 regression test.
@@ -130,6 +131,28 @@ describe('AutomationEditor — initialData stability (ACP H.1)', () => {
     vi.unstubAllGlobals();
   });
 
+  it('does not accept metadata before hydration and preserves edits through canvas updates', () => {
+    const container = document.createElement('div');
+    container.innerHTML = renderToString(<AutomationEditor />);
+    for (const id of ['name', 'description']) {
+      expect(
+        container.querySelector<HTMLInputElement>(`[data-testid="automation-editor-${id}-input"]`)
+          ?.disabled,
+      ).toBe(true);
+    }
+    render(<AutomationEditor />);
+    const name = screen.getByTestId('automation-editor-name-input');
+    const description = screen.getByTestId('automation-editor-description-input');
+    expect(name).not.toBeDisabled();
+    fireEvent.change(name, { target: { value: 'Delivery archival' } });
+    fireEvent.change(description, { target: { value: 'Only the selected delivery task' } });
+    act(() => {
+      lastOnChange?.(buildFlowData('edited'));
+    });
+    expect(name).toHaveValue('Delivery archival');
+    expect(description).toHaveValue('Only the selected delivery task');
+  });
+
   it('keeps the initialData reference stable across FlowDesigner onChange events', () => {
     const initial = {
       name: 'Auto X',
@@ -145,7 +168,9 @@ describe('AutomationEditor — initialData stability (ACP H.1)', () => {
       />,
     );
 
-    expect(receivedInitialData).toHaveLength(1);
+    // Hydration may render again; every render must retain the loaded schema reference.
+    const mountedRenderCount = receivedInitialData.length;
+    expect(mountedRenderCount).toBeGreaterThan(0);
     const firstRef = receivedInitialData[0];
     expect(firstRef).toBe(initial.flowData);
 
@@ -160,7 +185,7 @@ describe('AutomationEditor — initialData stability (ACP H.1)', () => {
     // reference passed to FlowDesigner as `initialData` MUST NOT change,
     // otherwise FlowDesigner's mount-effect re-runs importData() and resets
     // `selectedNodeId` to null.
-    expect(receivedInitialData.length).toBeGreaterThan(1);
+    expect(receivedInitialData.length).toBeGreaterThan(mountedRenderCount);
     for (const ref of receivedInitialData) {
       expect(ref).toBe(firstRef);
     }

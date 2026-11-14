@@ -209,7 +209,7 @@ async function createReviewTaskThroughUi(page: Page, title: string, projectPid: 
     fullPage: true,
   });
   await page.getByRole('option', { name: project.name, exact: true }).click();
-  await expect(page.getByTestId('select-trigger-tpm_ts_project_id')).toHaveText(project.name);
+  await expect(page.getByTestId('select-trigger-tpm_ts_project_id')).toHaveValue(project.name);
   await page.locator('#tpm_ts_description').fill(original);
   const creating = page.waitForResponse(
     (response) =>

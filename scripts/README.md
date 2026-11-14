@@ -94,9 +94,12 @@ the original review behavior; pause idle services through their product owner.
 | `application/run-product-release-archive-stage.sh` | 1 | 2026-10-25 | Run the product release archive stage and preserve its release evidence. |
 | `project-delivery-demo.sh` | 1 | 2026-10-25 | Drive the project delivery walkthrough against an explicitly selected runtime. |
 | `application/deployment-target-attestation.it.mjs` | 0 | 2026-09-25 | Verify target reservation and signed deployment observation through the protected executor. |
+| `application/case-role-navigation.mjs` | 0 | 2026-11-13 | Assign only declared case navigation through revision-checked public APIs; never grant business permissions. |
 | `application/run-migrator-image-gate.mjs` | 0 | 2026-09-25 | Run the retained-container Linux migrator lifecycle gate and emit digest-bound evidence. |
 | `db/check-db-matches-snapshot.sh` | 1 | 2026-07-23 | Answer one question about an EXISTING database: does it still match |
 | `db/check-schema-drift.sh` | 1 | 2026-06-22 | Regenerate the schema snapshot from Flyway and diff it against the committed |
+| `db/normalize-schema-dump.py` | 0 | 2026-11-13 | Normalize only volatile PostgreSQL dump metadata; preserve application DDL for schema drift. |
+| `db/check-migration-version-floor.sh` | 0 | 2026-11-13 | Reject stale released migration version/count before schema drift generation. |
 | `db/test-stage-pre1900-core-migrations.sh` | 0 | 2026-09-25 | Verify deterministic staging of immutable pre-#1900 Core migration bytes. |
 | `digital-employee-capability-eval-run.sh` | 0 | 2026-07-25 | Managed capability-eval runner; full/focused/deterministic module-owned catalogs, native receipts and retained runtime. |
 | `oss-e2e-gate-run.sh` | 0 | 2026-07-24 | oss-e2e-gate-run.sh — self-contained, one-command OSS E2E regression gate. |

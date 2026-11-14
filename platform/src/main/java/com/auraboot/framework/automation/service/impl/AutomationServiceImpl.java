@@ -80,14 +80,15 @@ public class AutomationServiceImpl implements AutomationService {
         return automation;
     }
 
-    @Transactional
+    // Template record selection and its field grants share the creation snapshot.
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     @Override
     public AutomationDTO create(AutomationCreateRequest request) {
         return createInternal(request, null, null);
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public AutomationDTO createPluginSeed(AutomationCreateRequest request, String pluginId, String seedKey) {
         requireSeedIdentity(pluginId, seedKey);
         return createInternal(request, pluginId, seedKey);

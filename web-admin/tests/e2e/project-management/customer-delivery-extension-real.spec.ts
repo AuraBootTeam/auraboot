@@ -1,3 +1,4 @@
+import { assignRoleNavigation } from '../../helpers/role-navigation';
 import { test, expect, type Page, type APIResponse, type Response } from '@playwright/test';
 import { readFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -206,6 +207,7 @@ test('customer extension keeps read-only access and rejects conflicting contribu
       }),
     }),
   );
+  await assignRoleNavigation(page, role.pid, ['tpm_projects']);
   const email = `${code}@e2e.local`;
   await data(
     await page.request.post('/api/admin/users', {
