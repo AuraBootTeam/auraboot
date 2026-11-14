@@ -35,6 +35,16 @@ export class PropertyEditorRegistry {
     };
   }
 
+  /**
+   * Test seam: clears one key unconditionally. Production code never needs
+   * this (register/dispose is the managed lifecycle); it exists so suites
+   * that assert the fail-closed/conflicting semantics can start from a
+   * known state even when a retried run left residue in this singleton.
+   */
+  clear(key: string): void {
+    this.editors.delete(key);
+  }
+
   resolve(key: string): ComponentType<RegisteredPropertyEditorProps> {
     const editor = this.editors.get(key);
     if (!editor) throw new Error(`Unregistered property editor: ${key}`);
