@@ -212,7 +212,7 @@ def main():
             cached.parent.mkdir(parents=True)
             shutil.copyfile(archive, cached)
             (context / 'Dockerfile').write_text(
-                'FROM eclipse-temurin:21-jdk\nCOPY seed /seed\n'
+                'FROM docker.io/library/busybox:1.37.0@sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec\nCOPY seed /seed\n'
                 'RUN --mount=type=cache,target=/root/.gradle/wrapper cp -a /seed/. /root/.gradle/wrapper/\n')
             run(['docker', 'buildx', 'build', '--builder', builder, '--output', 'type=cacheonly',
                  str(context)], 'verified-gradle-cache-prewarm', timeout=300)
