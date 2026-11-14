@@ -155,3 +155,61 @@ describe('Card-grid draft form fields', () => {
     expect(screen.queryByRole('group', { name: 'Supplier C' })).toBeNull();
   });
 });
+
+function setupJoinedGroups(duplicate = false) {
+  const state = new ScopedStateManager({} as any);state.createScope('joined');
+  const parents = [
+    { sourcePid: 's-a', sourceLabel: 'Same material', remainingQty: '100', quantity: '100' },
+    { sourcePid: duplicate ? 's-a' : 's-b', sourceLabel: 'Same material', remainingQty: '80', quantity: '80' },
+    { sourcePid: 's-new', sourceLabel: 'New material', remainingQty: '50', quantity: '50' },
+  ];
+  let offers = [
+    { pid: 'offer-a', sourcePid: 's-a', supplierName: 'Alpha', proposedQty: '60' },
+    { pid: 'offer-b', sourcePid: 's-a', supplierName: 'Beta', proposedQty: '40' },
+    { pid: 'offer-c', sourcePid: 's-b', supplierName: 'Alpha', proposedQty: '80' },
+  ];
+  const listeners = new Set<() => void>();
+  const manager = {
+    getData: (id: string) => id === 'parents' ? parents : offers,
+    getState: (id: string) => ({ data: id === 'parents' ? parents : offers }),
+    subscribe: (_id: string, listener: () => void) => {listeners.add(listener);return () => listeners.delete(listener);},
+  };
+  const runtime = {
+    getContext: () => ({ fn: businessFunctions, locale: 'en', t: (key: string) => key, ...state.getScope('joined') }),
+    getEvaluator: () => new ExpressionEvaluator(),getStateManager: () => state,getScopeId: () => 'joined',
+    getSchema: () => ({ id: 'joined' }),getDataSourceManager: () => manager,triggerFieldLinkage: vi.fn(),
+  } as any;
+  render(<CardGridBlockRenderer runtime={runtime} block={{
+    id: 'joined',blockType: 'card-grid',dataSource: 'offers',field: 'allocations',titleField: 'supplierName',
+    groupByField: 'sourcePid',groupTitleField: 'sourceLabel',collapsibleGroups: true,groupsDefaultOpen: true,
+    searchFields: ['supplierName'],searchPlaceholder: 'Search suppliers',
+    groupRows: { dataSource: 'parents',field: 'demands',identityField: 'sourcePid',titleField: 'sourceLabel',
+      summaryFields: [{ field: 'remainingQty',label: 'Remaining',component: 'SmartInput',readOnly: true }],
+      fields: [{ field: 'quantity',label: 'Purchase target',component: 'SmartInput' }],emptyText: 'Not dispatched',
+    },fields: [{field:'proposedQty',label:'Proposed quantity',component:'SmartInput'}],
+  } as any} />);
+  return { state,refresh: () => { offers = offers.map(row => ({...row,proposedQty:'999'}));listeners.forEach(fn => fn()); } };
+}
+
+describe('Joined card groups keep source and offer drafts independent', () => {
+  it('retains empty parent groups and does not lose or redirect edited rows through search and collapse', () => {
+    const { state,refresh } = setupJoinedGroups();
+    const groups = screen.getAllByTestId('card-grid-group');expect(groups).toHaveLength(3);
+    expect(groups[2]).toHaveTextContent('Not dispatched');
+    const first=within(groups[0]);
+    fireEvent.change(first.getByRole('textbox',{name:'Purchase target'}),{target:{value:'90.000001'}});
+    fireEvent.change(within(first.getByRole('group',{name:'Beta'})).getByRole('textbox',{name:'Proposed quantity'}),{target:{value:'30.000001'}});
+    fireEvent.change(first.getByRole('searchbox',{name:'Search suppliers'}),{target:{value:'Alpha'}});
+    expect(Array.from(groups[0].querySelectorAll('fieldset')).some(el=>(el as Element).getAttribute('aria-label')==='Beta')).toBe(false);
+    fireEvent.change(first.getByRole('searchbox',{name:'Search suppliers'}),{target:{value:''}});
+    expect(within(first.getByRole('group',{name:'Beta'})).getByRole('textbox',{name:'Proposed quantity'})).toHaveValue('30.000001');
+    fireEvent.click(groups[0].querySelector('summary')!);fireEvent.click(groups[0].querySelector('summary')!);
+    act(refresh);
+    expect(state.getFieldValue('joined','demands')[0].quantity).toBe('90.000001');
+    expect(state.getFieldValue('joined','demands')[1].quantity).toBe('80');
+    expect(state.getFieldValue('joined','allocations').map((row:any)=>row.proposedQty)).toEqual(['60','30.000001','80']);
+  });
+  it('rejects duplicate parent identities instead of joining different material rows by label', () => {
+    expect(() => setupJoinedGroups(true)).toThrow(/group identity/i);
+  });
+});

@@ -106,6 +106,16 @@ export interface BusinessActivityDetailField {
 export interface BusinessActivitySnapshotField extends BusinessActivityDetailField {}
 
 // Block 配置 (新 DSL)
+export interface CardGroupRows {
+  dataSource: string;
+  field: string;
+  identityField: string;
+  titleField: string;
+  summaryFields?: FieldConfig[];
+  fields?: FieldConfig[];
+  emptyText?: string | LocalizedText;
+}
+
 export interface BlockConfig {
   id: string;
   blockType: string; // block 类型: form-section, form-buttons, table, filters 等
@@ -139,6 +149,11 @@ export interface BlockConfig {
   groupDescriptionField?: string;
   /** Boolean row fact: highlight a group if any member requires attention. */
   groupWarningField?: string;
+  /** Join child cards to explicit parent rows, including parents without children. */
+  groupRows?: CardGroupRows;
+  /** Per-group local search never removes rows from the submitted draft array. */
+  searchFields?: string[];
+  searchPlaceholder?: string | LocalizedText;
   buttons?: ButtonConfig[];
 
   // 表格相关

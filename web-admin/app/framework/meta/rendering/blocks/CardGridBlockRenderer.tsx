@@ -25,7 +25,7 @@ import { resolveRowActionModel } from './rowActionModel';
 
 import { initializeSelectedRows, indexSelectionRows, positiveRowValue, type RowSelectionRule } from '../../runtime/expression/row-selection';
 import { readOwnPath } from '../../runtime/expression/row-projection';
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import type { BlockConfig, CardImageViewport, FieldConfig, LayoutConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
@@ -105,6 +105,10 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
     : undefined;
   // A declared form field stores draft card rows; data-source refreshes never replace edits.
   const formField = typeof cfg.field === 'string' && cfg.field.trim() ? cfg.field : undefined;
+  const parentConfig = cfg.groupRows;
+  if (parentConfig && (!cfg.groupByField || !parentConfig.dataSource || !parentConfig.field || !parentConfig.identityField || !parentConfig.titleField))
+    throw new Error('Joined card groups require an explicit parent source and group identity');
+  const [groupSearch, setGroupSearch] = useState<Record<string, string>>({});
   const rowSelection = cfg.rowSelection;
   if (rowSelection && !formField) throw new Error('Card row selection requires a form array');
   const selectionRule: RowSelectionRule | undefined = rowSelection ? {identityField:readOwnPath(rowSelection,'identityField') as string,selectedField:readOwnPath(rowSelection,'selectedField') as string,positiveField:readOwnPath(rowSelection,'positiveField') as string} : undefined;
@@ -124,8 +128,10 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
 
   // Subscribe to data-source changes so the component re-renders on updates
   useDataSourceSubscription(runtime, dataSourceId);
+  useDataSourceSubscription(runtime, parentConfig?.dataSource);
 
   const dataSourceState = readDataSourceState(runtime, dataSourceId);
+  const parentState = readDataSourceState(runtime, parentConfig?.dataSource);
 
   // Action dispatch — mirror ToolbarBlockRenderer pattern
   const navigate = useNavigate();
@@ -182,6 +188,13 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   const freshRows = normalizeRows(rawData);
   const initialRows = rowSelection ? initializeSelectedRows(freshRows,rowSelection) : freshRows;
   const rows = Array.isArray(formRows) ? formRows : initialRows;
+  const rawParents = parentConfig ? dataSourceManager.getData(parentConfig.dataSource) : undefined;
+  const storedParents = parentConfig ? stateManager?.getFieldValue(scopeId, parentConfig.field) : undefined;
+  const parentRows = Array.isArray(storedParents) ? storedParents : normalizeRows(rawParents);
+  useEffect(() => {
+    if (parentConfig && storedParents === undefined && parentState?.data !== undefined && !parentState.loading && !parentState.error)
+      stateManager.updateField(scopeId, parentConfig.field, normalizeRows(rawParents));
+  }, [parentConfig, storedParents, parentState, rawParents, scopeId, stateManager]);
   const currentSelectionRows = selectionRule ? indexSelectionRows(freshRows,selectionRule) : undefined;
   if (selectionRule) {
     for (const row of indexSelectionRows(rows,selectionRule).values()) {
@@ -196,15 +209,15 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   }, [formField, formRows, dataSourceState, rawData, scopeId, stateManager, rowSelection]);
 
   // ── Error state ────────────────────────────────────────────────────────────
-  if (dataSourceState?.error) {
-    const sourceError = dataSourceState.error as Error & {status?:unknown;statusCode?:unknown;code?:unknown};
+  if (dataSourceState?.error || parentState?.error) {
+    const sourceError = (dataSourceState?.error || parentState?.error) as Error & {status?:unknown;statusCode?:unknown;code?:unknown};
     const status = Number(sourceError.status ?? sourceError.statusCode ?? sourceError.code);
     const message =
       status === 403
         ? rootT('forbidden', resolveErrorLocale(locale))
-        : dataSourceState.error instanceof Error
-        ? dataSourceState.error.message
-        : String(dataSourceState.error);
+        : sourceError instanceof Error
+        ? sourceError.message
+        : String(sourceError);
     return (
       <div
         role="alert"
@@ -217,7 +230,8 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   }
 
   // ── Loading state ──────────────────────────────────────────────────────────
-  if (dataSourceState?.loading && !dataSourceState.data) {
+  if ((dataSourceState?.loading && !dataSourceState.data)
+      || (parentConfig && storedParents === undefined && (parentState?.data === undefined || parentState.loading && !parentState.data))) {
     return (
       <div
         data-testid="card-grid-loading"
@@ -229,7 +243,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   }
 
   // ── Empty state ────────────────────────────────────────────────────────────
-  if (rows.length === 0) {
+  if (rows.length === 0 && (!parentConfig || parentRows.length === 0)) {
     const emptyMsg = cfg.empty?.title ? getLocalizedText(cfg.empty.title, locale, t) :
       t('template.gallery.empty') !== 'template.gallery.empty'
         ? t('template.gallery.empty')
@@ -411,41 +425,85 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   // Group by stored identity while retaining original indexes for draft edits and actions.
   const groupByField = typeof cfg.groupByField === 'string' ? cfg.groupByField : undefined;
   if (groupByField) {
-    const groups = new Map<string, { title: string; entries: Array<{ row: any; index: number }> }>();
+    type Group = { title: string; parent?: any; parentIndex?: number; entries: Array<{ row: any; index: number }> };
+    const groups = new Map<string, Group>();
+    const identityKey = (identity: unknown) => (typeof identity === 'string' && identity.trim()) || typeof identity === 'number' && Number.isFinite(identity)
+      ? `${typeof identity}:${identity}` : undefined;
+    if (parentConfig) parentRows.forEach((parent: any, index: number) => {
+      const key = identityKey(readOwnPath(parent, parentConfig.identityField));
+      if (!key || groups.has(key)) throw new Error('Missing or duplicate parent group identity');
+      groups.set(key, { title: getLocalizedText(parent[parentConfig.titleField], locale, t), parent, parentIndex: index, entries: [] });
+    });
     rows.forEach((row: any, index: number) => {
       const identity = row[groupByField];
-      const key = (typeof identity === 'string' && identity.trim()) || typeof identity === 'number'
-        ? `${typeof identity}:${identity}` : `missing:${index}`;
-      const group: { title: string; entries: Array<{ row: any; index: number }> } = groups.get(key) || {
+      const key = identityKey(identity) || `missing:${index}`;
+      if (parentConfig && !groups.has(key)) throw new Error('Child card has no matching parent group identity');
+      const group: Group = groups.get(key) || {
         title: getLocalizedText(row[cfg.groupTitleField || groupByField], locale, t), entries: [],
       };
       group.entries.push({ row, index });
       groups.set(key, group);
     });
+    const parentFields = (group: Group, fields: FieldConfig[], summary: boolean) => {
+      if (!group.parent || !parentConfig) return null;
+      const row = group.parent;
+      return <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid={summary ? 'card-group-summary' : 'card-group-fields'}>
+        {fields.map(field => {
+          const ctx = { ...runtime.getContext(), row } as any;
+          if (field.visibleWhen && !runtime.getEvaluator().evaluateCondition(field.visibleWhen, ctx)) return null;
+          const readOnly = summary || field.readOnly || Boolean(field.valueWhen)
+            || Boolean(field.readOnlyWhen && runtime.getEvaluator().evaluateCondition(field.readOnlyWhen, ctx));
+          return <FieldRenderer key={field.field} runtime={runtime}
+            field={{ ...field, field: `${parentConfig.field}.${group.parentIndex}.${field.field}`, visibleWhen: undefined, readOnlyWhen: undefined, readOnly }}
+            value={field.valueWhen ? runtime.getEvaluator().evaluate(field.valueWhen, ctx) : row[field.field]}
+            onChange={value => {
+              if (readOnly) return;
+              stateManager.updateField(scopeId, parentConfig.field, parentRows.map((parent: any, index: number) => index === group.parentIndex ? { ...parent, [field.field]: value } : parent));
+            }} />;
+        })}
+      </div>;
+    };
+    const groupCards = (key: string, group: Group) => {
+      const search = groupSearch[key] || '';
+      const entries = cfg.searchFields?.length && search.trim()
+        ? group.entries.filter(({ row }) => cfg.searchFields.some((field: string) => String(readOwnPath(row, field) ?? '').toLocaleLowerCase(locale).includes(search.trim().toLocaleLowerCase(locale))))
+        : group.entries;
+      const searchLabel = getLocalizedText(cfg.searchPlaceholder || { 'zh-CN': '搜索', en: 'Search' }, locale, t);
+      return <>
+        {parentFields(group, parentConfig?.fields || [], false)}
+        {cfg.searchFields?.length && group.entries.length > 0 ? <div className="my-3 flex justify-end">
+          <input type="search" aria-label={searchLabel} placeholder={searchLabel} value={search}
+            className="rounded-control border-border bg-panel text-text max-w-full border px-3 py-2 text-sm"
+            onChange={event => setGroupSearch(current => ({ ...current, [key]: event.target.value }))} />
+        </div> : null}
+        {group.entries.length === 0 && parentConfig?.emptyText ? <p className="text-text-2 py-3 text-sm">{getLocalizedText(parentConfig.emptyText, locale, t)}</p> : null}
+        <div className={`mt-3 grid gap-3 ${columnsClass}`} style={columnsStyle}>
+          {entries.map(({ row, index: originalIndex }) => renderCard(row, originalIndex))}
+        </div>
+      </>;
+    };
     return (
       <div data-testid="card-grid-block" className="space-y-6">
         {selectionHint}
         {Array.from(groups.entries()).map(([key, group], index) => cfg.collapsibleGroups === true ? (
           <details key={key} data-testid="card-grid-group" open={cfg.groupsDefaultOpen !== false}
-            className={`rounded-lg border border-border p-3 ${cfg.groupWarningField && group.entries.some(({ row }) => row[cfg.groupWarningField] === true) ? 'bg-amber-50' : 'bg-surface'}`}>
+            className={`rounded-lg border border-border p-3 ${cfg.groupWarningField && (group.parent?.[cfg.groupWarningField] === true || group.entries.some(({ row }) => row[cfg.groupWarningField] === true)) ? 'bg-amber-50' : 'bg-surface'}`}>
             <summary className="cursor-pointer select-none text-sm font-semibold text-text">
               {group.title}
               {cfg.groupDescriptionField && <span className="ml-3 font-normal text-text-2 whitespace-pre-wrap">
-                {getLocalizedText(group.entries[0]?.row[cfg.groupDescriptionField], locale, t)}
+                {getLocalizedText((group.parent || group.entries[0]?.row)?.[cfg.groupDescriptionField], locale, t)}
               </span>}
+              {parentFields(group, parentConfig?.summaryFields || [], true)}
             </summary>
-            <div className={`mt-3 grid gap-3 ${columnsClass}`} style={columnsStyle}>
-              {group.entries.map(({ row, index: originalIndex }) => renderCard(row, originalIndex))}
-            </div>
+            <div className="mt-3">{groupCards(key, group)}</div>
           </details>
         ) : (
           <section key={key} data-testid="card-grid-group"
             aria-labelledby={group.title ? `${block.id}-group-${index}` : undefined}>
             {group.title && <h2 id={`${block.id}-group-${index}`}
               className="text-text mb-3 text-base font-semibold">{group.title}</h2>}
-            <div className={`grid gap-4 ${columnsClass}`} style={columnsStyle}>
-              {group.entries.map(({ row, index: originalIndex }) => renderCard(row, originalIndex))}
-            </div>
+            {parentFields(group, parentConfig?.summaryFields || [], true)}
+            {groupCards(key, group)}
           </section>
         ))}
       </div>
