@@ -67,6 +67,9 @@ test.describe('PCBA quote cost scenario golden', () => {
     expect(bodyText).toContain('汇率假设 7.0 CNY/USD');
     expect(bodyText).not.toMatch(/"qo_cs_status"\s*:/);
     expect(bodyText).not.toMatch(/\{"qo_cg_/);
+    expect(bodyText).not.toMatch(/"tiers"\s*:/);
+    await expect(page.getByText('待批准', { exact: true })).toBeVisible();
+    await expect(page.getByText('未关闭', { exact: true })).toBeVisible();
     await info.attach('q18-01-scenario-detail', {
       body: await page.screenshot({ fullPage: true }),
       contentType: 'image/png',
@@ -255,6 +258,12 @@ test.describe('PCBA quote cost scenario golden', () => {
     expect(bodyText).not.toMatch(/"qo_cs_status"\s*:/);
     expect(bodyText).not.toMatch(/\{"qo_ca_/);
     expect(bodyText).not.toMatch(/UNAPPROVED_ASSUMPTION|INVALID_WAIVER/);
+    expect(bodyText).not.toMatch(/"tiers"\s*:/);
+    await expect(page.getByText('已批准', { exact: true })).toBeVisible();
+    await expect(page.getByText('已豁免', { exact: true })).toBeVisible();
+    await expect(page.getByText('approved', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('waived', { exact: true })).toHaveCount(0);
+    await expect(page.locator('main').getByText(assumptionId, { exact: true })).toHaveCount(0);
     await info.attach('q18-03-scenario-evidence', {
       body: await page.screenshot({ fullPage: true }),
       contentType: 'image/png',
