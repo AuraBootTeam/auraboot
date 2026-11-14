@@ -119,6 +119,8 @@ git clone https://github.com/AuraBootTeam/auraboot.git
 cd auraboot
 test -f .env || cp .env.example .env
 chmod 600 .env
+# PostgreSQL reads this public DDL as its own container user.
+chmod a+r platform/src/main/resources/db/snapshots/schema-current.sql
 # Prepare once; preserve existing installation keys across restarts.
 python3 scripts/prepare-quickstart-env.py --file .env
 docker compose --profile full up --build -d

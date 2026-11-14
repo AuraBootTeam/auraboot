@@ -44,6 +44,28 @@ def gradle_cache_path(url):
     return Path('dists/gradle-8.14.6-bin') / (digits or '0') / 'gradle-8.14.6-bin.zip'
 
 
+def prepare_public_schema(file):
+    """Only the public DDL needs to be readable by the PostgreSQL container UID."""
+    require(file.is_file() and not file.is_symlink(), 'Regular public schema required')
+    before = hashlib.sha256(file.read_bytes()).hexdigest()
+    mode = file.stat().st_mode & 0o777
+    file.chmod(mode | 0o044)
+    after = hashlib.sha256(file.read_bytes()).hexdigest()
+    require(before == after, 'Public schema content changed')
+    return dict(sha256=after, modeBefore=oct(mode), modeAfter=oct(file.stat().st_mode & 0o777),
+                sourceBytesModified=False, scope='public DDL read bits only; no private files or write grants')
+
+
+def measured_builder_limits(host):
+    memory, swap = host.get('Memory'), host.get('MemorySwap')
+    require(type(memory) is int and 0 < memory <= 8589934592,
+            'A bounded owned builder memory limit is required')
+    require(type(swap) is int and swap == memory, 'Owned builder must not expand swap')
+    return dict(requestedMemoryBytes=8589934592, actualMemoryBytes=memory,
+                actualMemorySwapBytes=swap, composeParallelLimit=1,
+                scope='Docker HostConfig observation; Compose limit is not a measured BuildKit concurrency count')
+
+
 def main():
     require(os.uname().sysname == 'Linux', 'Linux CI only; no local container fallback')
     job = os.environ['AURA_CI_JOB_ID']
@@ -131,6 +153,8 @@ def main():
     shutil.copyfile(root / '.env.example', root / '.env')
     (root / '.env').chmod(0o600)
     run(['python3', 'scripts/prepare-quickstart-env.py', '--file', '.env'], 'prepare-env')
+    (output / 'schema-permissions.json').write_text(json.dumps(prepare_public_schema(
+        root / 'platform/src/main/resources/db/snapshots/schema-current.sql'), indent=2))
     started = False
     builder_created = False
     try:
@@ -138,8 +162,10 @@ def main():
         run(['docker', 'buildx', 'create', '--name', builder, '--driver', 'docker-container',
              '--driver-opt', 'image=' + image, '--driver-opt', 'memory=8g', '--driver-opt', 'memory-swap=8g',
              '--buildkitd-config', str(config), '--bootstrap'], 'owned-builder-bootstrap')
-        (output / 'builder.json').write_text(json.dumps(dict(name=builder, image=image, memoryBytes=8589934592,
-             swapBytes=8589934592, parallelBuilds=1, sharedDefaultModified=False,
+        host = json.loads(subprocess.check_output(['docker', 'inspect', '--format', '{{json .HostConfig}}',
+             'buildx_buildkit_' + builder + '0'], text=True))
+        (output / 'builder.json').write_text(json.dumps(dict(name=builder, image=image,
+             **measured_builder_limits(host), sharedDefaultModified=False,
              configSha256=hashlib.sha256(config.read_bytes()).hexdigest()), indent=2))
         # An optional admitted, official-checksum-verified distribution warms only
         # this owned builder. The public Dockerfile and wrapper URL remain unchanged.
@@ -180,6 +206,7 @@ def main():
         require(len(fixture['projects']) == 8, 'Public initialization must create all eight sample projects')
         shutil.copyfile(root / 'plugins/project-management/scripts/acceptance-matrix.json', output / 'acceptance-matrix.json')
         check('public-initialization', projects=8, fixture='fixture.json')
+        run(['pnpm', 'install', '--frozen-lockfile', '--ignore-scripts'], 'host-browser-dependencies')
         run(['pnpm', 'exec', 'playwright', 'install', 'chromium'], 'browser-install', cwd=root / 'web-admin')
         with (private / 'public-browser.log').open('xb') as log:
             result = subprocess.run(['pnpm', 'exec', 'playwright', 'test', '--config', 'playwright.delivery.config.ts'],
