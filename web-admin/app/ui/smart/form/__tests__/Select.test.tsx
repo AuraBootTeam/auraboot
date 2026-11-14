@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Select, decodeBooleanChoice } from '../Select';
 
@@ -31,6 +31,30 @@ describe('Smart Select', () => {
     mockLoading = false;
     mockError = null;
     mockRefetch = vi.fn();
+  });
+
+  it('revalidates a touched required selection when inline creation updates its controlled value', async () => {
+    const props = { name: 'customer', label: 'Customer', required: true,
+      options: [{ label: 'Created customer', value: 'created-customer' }] };
+    mockOptions = props.options;
+    const { rerender } = render(<Select {...props} value="" />);
+    fireEvent.blur(screen.getByRole('combobox', { name: 'Customer' }));
+    expect(await screen.findByText('此字段为必填项')).toBeInTheDocument();
+    rerender(<Select {...props} value="created-customer" />);
+    await waitFor(() => expect(screen.queryByText('此字段为必填项')).not.toBeInTheDocument());
+    expect(screen.getByRole('combobox', { name: 'Customer' })).toHaveValue('Created customer');
+    rerender(<Select {...props} value="" />);
+    expect(await screen.findByText('此字段为必填项')).toBeInTheDocument();
+  });
+
+  it('keeps untouched controlled prefills free of eager required errors', () => {
+    const props = { name: 'customer', label: 'Customer', required: true,
+      options: [{ label: 'Created customer', value: 'created-customer' }] };
+    mockOptions = props.options;
+    const { rerender } = render(<Select {...props} value="" />);
+    rerender(<Select {...props} value="created-customer" />);
+    rerender(<Select {...props} value="" />);
+    expect(screen.queryByText('此字段为必填项')).not.toBeInTheDocument();
   });
 
   it('exposes an external field label on the interactive select trigger', () => {

@@ -226,6 +226,8 @@ test.describe('PCBA quote minimal create regression', () => {
       const persistedProject = await readDynamicRecord(page, 'req_requirement_set_pcba_bom', projectId);
       expect(persistedProject.bom_project_customer_id).toBe(accountId);
       expect(persistedProject.bom_project_name).toBe(projectName);
+      await expect(page.getByTestId('form-field-qo_quote_crm_account_id').getByText('此字段为必填项', { exact: true })).toHaveCount(0);
+      await expect(page.getByTestId('form-field-qo_quote_project_id').getByText('此字段为必填项', { exact: true })).toHaveCount(0);
       await page.screenshot({ path: testInfo.outputPath('quote-inline-customer-project-selected.png'), fullPage: true });
     } finally {
       // Keep the business deadline; fixture teardown receives its own bounded allowance.
