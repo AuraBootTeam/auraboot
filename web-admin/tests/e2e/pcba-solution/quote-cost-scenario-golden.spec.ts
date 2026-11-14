@@ -68,8 +68,9 @@ test.describe('PCBA quote cost scenario golden', () => {
     expect(bodyText).not.toMatch(/"qo_cs_status"\s*:/);
     expect(bodyText).not.toMatch(/\{"qo_cg_/);
     expect(bodyText).not.toMatch(/"tiers"\s*:/);
-    await expect(page.getByText('待批准', { exact: true })).toBeVisible();
-    await expect(page.getByText('未关闭', { exact: true })).toBeVisible();
+    // This original display fixture has no lifecycle status; Q18-03 checks command-created labels.
+    await expect(page.getByText('proposed', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('open', { exact: true })).toHaveCount(0);
     await info.attach('q18-01-scenario-detail', {
       body: await page.screenshot({ fullPage: true }),
       contentType: 'image/png',
