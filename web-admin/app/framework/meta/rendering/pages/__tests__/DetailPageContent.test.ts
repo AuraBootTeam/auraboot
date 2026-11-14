@@ -442,6 +442,10 @@ describe('settings-card field presentation', () => {
 });
 
 describe('collectDetailDictCodes', () => {
+  it('preloads the explicit header dictionary for an API projection without model metadata', () => {
+    expect(collectDetailDictCodes({ blocks: [], extension: { headerStatusField: 'progress', headerStatusDictCode: 'business_status' } }, new Map())).toEqual(['business_status']);
+  });
+
   it('loads dictionary dependencies used by nested read-only sub-table columns without model metadata', () => {
     expect(
       collectDetailDictCodes(

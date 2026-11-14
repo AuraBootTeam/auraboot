@@ -265,6 +265,6 @@ export function collectDetailDictCodes(
   };
   walkBlocks(schema.blocks);
   if (schema.extension?.headerStatusField)
-    collectFromFields([{ field: schema.extension.headerStatusField }]);
+    collectFromFields([{ field: schema.extension.headerStatusField, dictCode: schema.extension.headerStatusDictCode }]);
   return [...new Set(codes)];
 }

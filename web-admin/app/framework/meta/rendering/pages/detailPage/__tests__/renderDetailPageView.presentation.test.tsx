@@ -127,3 +127,21 @@ describe('detail permission recovery', () => {
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 });
+
+describe('detail header business status', () => {
+  it.each([['business_status', 'business_status'], [undefined, 'native_status']])(
+    'uses the configured header dictionary %s while retaining the field default', (override, expected) => {
+      const base = args(null);
+      const getDictItems = vi.fn(() => [{ value: 'ready', label: 'All suppliers replied' }]);
+      render(<MemoryRouter>{renderDetailPageView({
+        ...base,
+        schema: { ...base.schema, extension: { ...base.schema.extension, headerStatusField: 'progress', headerStatusDictCode: override } },
+        recordData: { subject: 'Event', progress: 'ready' },
+        enrichField: (field: any) => ({ ...field, dictCode: 'native_status' }),
+        getDictItems,
+      } as Parameters<typeof renderDetailPageView>[0])}</MemoryRouter>);
+      expect(getDictItems).toHaveBeenCalledWith(expected);
+      expect(screen.getByText('All suppliers replied')).toBeInTheDocument();
+    },
+  );
+});

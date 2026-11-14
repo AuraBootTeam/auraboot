@@ -351,7 +351,7 @@ export function renderDetailPageView({
                         const field = enrichField({
                           field: schema.extension.headerStatusField,
                         } as FieldConfig);
-                        const item = (getDictItems(field.dictCode || '') || []).find(
+                        const item = (getDictItems(schema.extension?.headerStatusDictCode || field.dictCode || '') || []).find(
                           (item) => String(item.value) === String(recordData?.[field.field]),
                         );
                         return item ? getLocalizedText(item.label as any, locale, t) : '—';
