@@ -243,9 +243,9 @@ function AddMemberModal({
             .filter((m) => m.memberPid);
           setTenantMembers(options);
         }
-      } catch {
+      } catch (error) {
         // ignore
-      } finally {
+ console.warn('[team-detail] previously-silent catch', error);      } finally {
         setLoading(false);
       }
     };

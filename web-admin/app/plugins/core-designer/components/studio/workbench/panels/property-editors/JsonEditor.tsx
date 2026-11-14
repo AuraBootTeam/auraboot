@@ -291,9 +291,9 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({
       try {
         const parsed = JSON.parse(text);
         setText(JSON.stringify(parsed, null, tabSize));
-      } catch {
+      } catch (error) {
         // Keep as is
-      }
+ console.warn('[JsonEditor] previously-silent catch', error);      }
     }
   }, [formatOnBlur, parseError, text, tabSize]);
 

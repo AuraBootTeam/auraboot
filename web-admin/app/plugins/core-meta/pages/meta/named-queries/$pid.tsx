@@ -50,9 +50,9 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     let fields: NamedQueryFieldDTO[] = [];
     try {
       fields = await namedQueryService.getFields(query.code, request);
-    } catch {
+    } catch (error) {
       // Fields may not exist yet
-    }
+ console.warn('[$pid] previously-silent catch', error);    }
     return { query, fields };
   } catch (error) {
     console.error('Failed to load named query:', error);

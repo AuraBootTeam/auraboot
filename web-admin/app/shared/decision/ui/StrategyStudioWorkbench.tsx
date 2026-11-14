@@ -1487,9 +1487,9 @@ export function StrategyStudioWorkbench({
     try {
       const existing = await api.getDefinition(target.decisionCode)
       if (existing) return
-    } catch {
+    } catch (error) {
       // Missing definitions are created below; other API failures still surface through create.
-    }
+ console.warn('[StrategyStudioWorkbench] previously-silent catch', error);    }
     await api.createDefinition({
       decisionCode: target.decisionCode,
       decisionName,

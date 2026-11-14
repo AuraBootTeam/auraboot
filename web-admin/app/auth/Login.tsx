@@ -112,9 +112,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         channelOptions = legacyResult.data.map(legacyLoginChannelOption);
       }
     }
-  } catch {
+  } catch (error) {
     // Fall back to email/password when the backend predates channel descriptors.
-  }
+ console.warn('[Login] previously-silent catch', error);  }
 
   return { channelOptions, accessPolicy };
 };

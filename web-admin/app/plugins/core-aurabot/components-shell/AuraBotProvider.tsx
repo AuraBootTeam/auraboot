@@ -691,9 +691,9 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
           });
         }
       }
-    } catch {
+    } catch (error) {
       // Conversation history unavailable — keep in-memory state only
-    }
+ console.warn('[AuraBotProvider] previously-silent catch', error);    }
     // Restoration reads live state so callers can keep a stable action identity.
   }, []);
 
@@ -816,9 +816,9 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
             docCount: kb.docCount || 0,
           }));
         dispatch({ type: 'set_knowledge_bases', payload: kbs });
-      } catch {
+      } catch (error) {
         // KB list unavailable — no-op
-      }
+ console.warn('[AuraBotProvider] previously-silent catch', error);      }
     };
     loadKbs();
   }, [state.panelState, agent]);

@@ -61,9 +61,9 @@ export default function ProjectContracts({ projectId }: ProjectContractsProps) {
       if (ResultHelper.isSuccess(result) && result.data?.records) {
         setContracts(result.data.records);
       }
-    } catch {
+    } catch (error) {
       // ignore
-    } finally {
+ console.warn('[ProjectContracts] previously-silent catch', error);    } finally {
       setLoading(false);
     }
   }, [projectId]);

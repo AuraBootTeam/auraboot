@@ -4,7 +4,7 @@ status: active
 ---
 
 # Controller Permission-Annotation Exemption Registry
-Generated 2026-10-01 (batch4 E4). 232 `@RestController` classes; 132 carry `@RequirePermission`; the 100 below do not and rely on `SecurityConfig` (`anyRequest().authenticated()` / explicit `PermitAll`) plus service-layer scoping.
+Regenerated 2026-11-14 (CI-anchored by scripts/check-controller-authz.mjs — the counts below now fail the controller-authz gate when they drift). 263 `@RestController` classes; 145 carry `@RequirePermission`; the 100 below do not and rely on `SecurityConfig` (`anyRequest().authenticated()` / explicit `PermitAll`) plus service-layer scoping.
 Policy: this registry is the year-reviewable record of WHY each controller has no `@RequirePermission`. New controllers default to annotated; removals from annotation need an entry here.
 
 ## agent (6)

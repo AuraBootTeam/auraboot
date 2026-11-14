@@ -131,9 +131,9 @@ export default function SocialLinksPage() {
       if (ResultHelper.isSuccess(result) && Array.isArray(result.data)) {
         setLinks(result.data);
       }
-    } catch {
+    } catch (error) {
       // ignore — empty state is fine
-    } finally {
+ console.warn('[social-links] previously-silent catch', error);    } finally {
       setLoading(false);
     }
   }, []);
@@ -163,9 +163,9 @@ export default function SocialLinksPage() {
             );
           });
         setConfiguredProviders(options);
-      } catch {
+      } catch (error) {
         // Older servers do not expose descriptors; retain the legacy provider list.
-      }
+ console.warn('[social-links] previously-silent catch', error);      }
     })();
   }, []);
 

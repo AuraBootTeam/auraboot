@@ -78,9 +78,9 @@ export const DashboardExportExcel: React.FC<DashboardExportExcelProps> = ({
             XLSX.utils.book_append_sheet(wb, ws, sheetName);
             sheetCount++;
           }
-        } catch {
+        } catch (error) {
           // Skip widgets that fail to fetch
-        }
+ console.warn('[DashboardExportExcel] previously-silent catch', error);        }
       }
 
       if (sheetCount === 0) {

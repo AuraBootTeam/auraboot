@@ -129,9 +129,9 @@ function saveState(state: OnboardingState): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {
+  } catch (error) {
     // localStorage full — ignore
-  }
+ console.warn('[OnboardingProvider] previously-silent catch', error);  }
 }
 
 // ---------------------------------------------------------------------------

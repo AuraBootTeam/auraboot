@@ -62,9 +62,9 @@ const LegacyStatCardBlockRenderer: React.FC<StatCardBlockRendererProps> = ({ blo
           const v = rows[0]?.[field];
           if (v !== undefined && v !== null) return v;
         }
-      } catch {
+      } catch (error) {
         // swallow and fall through to inline value
-      }
+ console.warn('[StatCardBlockRenderer] previously-silent catch', error);      }
     }
     return cfg.value ?? cfg.number ?? '—';
   })();

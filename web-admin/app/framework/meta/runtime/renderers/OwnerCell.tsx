@@ -44,9 +44,9 @@ async function resolveUserName(pid: string): Promise<string | undefined> {
       userNameCache.set(pid, name);
       return name;
     }
-  } catch {
+  } catch (error) {
     // fall through to undefined → caller shows the raw id
-  }
+ console.warn('[OwnerCell] previously-silent catch', error);  }
   return undefined;
 }
 

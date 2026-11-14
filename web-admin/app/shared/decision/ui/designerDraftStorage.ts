@@ -63,18 +63,18 @@ export function saveDesignerDraft(policyCode: string, draft: DesignerDraftSnapsh
   if (!policyCode || typeof window === 'undefined') return;
   try {
     window.sessionStorage.setItem(designerDraftKey(policyCode), JSON.stringify(draft));
-  } catch {
+  } catch (error) {
     // Quota or serialization failures must never break editing.
-  }
+ console.warn('[designerDraftStorage] previously-silent catch', error);  }
 }
 
 export function clearDesignerDraft(policyCode: string): void {
   if (!policyCode || typeof window === 'undefined') return;
   try {
     window.sessionStorage.removeItem(designerDraftKey(policyCode));
-  } catch {
+  } catch (error) {
     // ignore
-  }
+ console.warn('[designerDraftStorage] previously-silent catch', error);  }
 }
 
 export const STUDIO_DRAFT_KEY_PREFIX = 'decisionops.studio.draft.';
@@ -123,16 +123,16 @@ export function saveStudioDraft(scope: string, draft: StudioDraftSnapshot): void
   if (!scope || typeof window === 'undefined') return;
   try {
     window.sessionStorage.setItem(studioDraftKey(scope), JSON.stringify(draft));
-  } catch {
+  } catch (error) {
     // Quota or serialization failures must never break editing.
-  }
+ console.warn('[designerDraftStorage] previously-silent catch', error);  }
 }
 
 export function clearStudioDraft(scope: string): void {
   if (!scope || typeof window === 'undefined') return;
   try {
     window.sessionStorage.removeItem(studioDraftKey(scope));
-  } catch {
+  } catch (error) {
     // ignore
-  }
+ console.warn('[designerDraftStorage] previously-silent catch', error);  }
 }

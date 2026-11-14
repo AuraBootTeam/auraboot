@@ -40,9 +40,9 @@ export default function BillingPage() {
           const json = await res.json();
           setOrders(json.data ?? []);
         }
-      } catch {
+      } catch (error) {
         // silent
-      } finally {
+ console.warn('[billing] previously-silent catch', error);      } finally {
         setLoading(false);
       }
     })();

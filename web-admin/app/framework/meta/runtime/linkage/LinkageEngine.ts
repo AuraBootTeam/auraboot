@@ -176,9 +176,9 @@ export class LinkageEngine {
             let resolvedValue: any;
             try {
               resolvedValue = expressionEvaluator.evaluate(action.value, context);
-            } catch {
+            } catch (error) {
               // expression parse error — use raw value
-            }
+ console.warn('[LinkageEngine] previously-silent catch', error);            }
             if (resolvedValue === undefined) {
               resolvedValue = action.value;
             }

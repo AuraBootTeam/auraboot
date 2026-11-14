@@ -214,9 +214,9 @@ function forEachRecoveryStorage(visit: (storage: Storage) => void): void {
   for (const storageName of ['localStorage', 'sessionStorage'] as const) {
     try {
       visit(window[storageName]);
-    } catch {
+    } catch (error) {
       // Best-effort cleanup only.
-    }
+ console.warn('[authoringLocalRecovery] previously-silent catch', error);    }
   }
 }
 
@@ -233,9 +233,9 @@ function listStorageKeys(storage: Storage, prefix: string): string[] {
 function removeRecovery(storage: Storage, key: string): void {
   try {
     storage.removeItem(key);
-  } catch {
+  } catch (error) {
     // Best-effort cleanup only.
-  }
+ console.warn('[authoringLocalRecovery] previously-silent catch', error);  }
 }
 
 function hasFreshTimestamp(value: unknown): value is Record<string, unknown> {

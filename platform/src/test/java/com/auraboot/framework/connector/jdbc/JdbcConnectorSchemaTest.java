@@ -20,7 +20,7 @@ class JdbcConnectorSchemaTest {
     @Test
     void migrationCreatesTablesAndColumns() throws Exception {
         String sql = Files.readString(Path.of(
-            "src/main/resources/database/migrations/2026-05-09-jdbc-connector.sql"));
+            "src/testFixtures/resources/database/migrations/2026-05-09-jdbc-connector.sql"));
         try (Connection c = DriverManager.getConnection(
                 pg.getJdbcUrl(), pg.getUsername(), pg.getPassword());
              Statement s = c.createStatement()) {

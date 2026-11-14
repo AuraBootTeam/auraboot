@@ -116,9 +116,9 @@ export function DslRegistryProvider({ children }: { children: React.ReactNode })
       const data = await fetchDslRegistry();
       setRegistry(data);
       setIsFallback(data.version.includes('fallback'));
-    } catch {
+    } catch (error) {
       // fetchDslRegistry already returns fallback on error
-    } finally {
+ console.warn('[DslRegistryContext] previously-silent catch', error);    } finally {
       setLoading(false);
     }
   }, [isAuthenticated]);

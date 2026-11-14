@@ -332,9 +332,9 @@ export const FormRefPropertyPanel: React.FC<FormRefPropertyPanelProps> = ({
                 try {
                   const headers = JSON.parse(e.target.value);
                   handlePropertyChange('dataSource.headers', headers);
-                } catch {
+                } catch (error) {
                   // 忽略无效的 JSON
-                }
+ console.warn('[FormRefPropertyPanel] previously-silent catch', error);                }
               }}
               placeholder='{\n  "Authorization": "Bearer token",\n  "Content-Type": "application/json"\n}'
               disabled={readonly}
@@ -354,9 +354,9 @@ export const FormRefPropertyPanel: React.FC<FormRefPropertyPanelProps> = ({
               try {
                 const data = JSON.parse(e.target.value);
                 handlePropertyChange('dataSource.data', data);
-              } catch {
+              } catch (error) {
                 // 忽略无效的 JSON
-              }
+ console.warn('[FormRefPropertyPanel] previously-silent catch', error);              }
             }}
             placeholder='{\n  "name": "张三",\n  "email": "zhangsan@example.com"\n}'
             disabled={readonly}
@@ -391,9 +391,9 @@ export const FormRefPropertyPanel: React.FC<FormRefPropertyPanelProps> = ({
             try {
               const initialValues = JSON.parse(e.target.value);
               handlePropertyChange('initialValues', initialValues);
-            } catch {
+            } catch (error) {
               // 忽略无效的 JSON
-            }
+ console.warn('[FormRefPropertyPanel] previously-silent catch', error);            }
           }}
           placeholder='{\n  "field1": "default value",\n  "field2": true\n}'
           disabled={readonly}
@@ -505,9 +505,9 @@ export const FormRefPropertyPanel: React.FC<FormRefPropertyPanelProps> = ({
             try {
               const style = JSON.parse(e.target.value);
               handlePropertyChange('style', style);
-            } catch {
+            } catch (error) {
               // 忽略无效的 JSON
-            }
+ console.warn('[FormRefPropertyPanel] previously-silent catch', error);            }
           }}
           placeholder='{\n  "padding": "20px",\n  "backgroundColor": "#f5f5f5"\n}'
           disabled={readonly}
@@ -524,9 +524,9 @@ export const FormRefPropertyPanel: React.FC<FormRefPropertyPanelProps> = ({
             try {
               const styleOverrides = JSON.parse(e.target.value);
               handlePropertyChange('styleOverrides', styleOverrides);
-            } catch {
+            } catch (error) {
               // 忽略无效的 JSON
-            }
+ console.warn('[FormRefPropertyPanel] previously-silent catch', error);            }
           }}
           placeholder='{\n  "container": {"margin": "10px"},\n  "field": {"marginBottom": "15px"}\n}'
           disabled={readonly}

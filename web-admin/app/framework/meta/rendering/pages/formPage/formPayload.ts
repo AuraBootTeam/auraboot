@@ -264,9 +264,9 @@ export function normalizePayloadValue(rawValue: any, dataType?: string) {
     ) {
       try {
         return JSON.parse(trimmed);
-      } catch {
+      } catch (error) {
         // Keep original string when not valid JSON text
-      }
+ console.warn('[formPayload] previously-silent catch', error);      }
     }
     return unwrapped;
   }

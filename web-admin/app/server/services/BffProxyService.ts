@@ -1100,9 +1100,9 @@ export class BffProxyService {
               this.setProxyResponseHeaders(res, error.response.headers || {});
               res.status(status).json(JSON.parse(text));
               return;
-            } catch {
+            } catch (error) {
               // Invalid JSON should still reach the client exactly as received.
-            }
+ console.warn('[BffProxyService] previously-silent catch', error);            }
           }
           this.setProxyResponseHeaders(
             res,

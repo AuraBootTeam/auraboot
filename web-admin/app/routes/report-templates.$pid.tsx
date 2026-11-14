@@ -435,9 +435,9 @@ export default function ReportTemplateEditorPage() {
                 onChange={(e) => {
                   try {
                     updateField('dataSourceConfig', JSON.parse(e.target.value));
-                  } catch {
+                  } catch (error) {
                     // ignore parse errors during typing
-                  }
+ console.warn('[report-templates.$pid] previously-silent catch', error);                  }
                 }}
                 rows={4}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"

@@ -207,9 +207,9 @@ export default function TaskDetailDrawer({
       if (ResultHelper.isSuccess(result) && result.data) {
         setSubtasks(result.data.records || []);
       }
-    } catch {
+    } catch (error) {
       // silent
-    } finally {
+ console.warn('[TaskDetailDrawer] previously-silent catch', error);    } finally {
       setSubtasksLoading(false);
     }
   }, [task.pid]);
@@ -234,9 +234,9 @@ export default function TaskDetailDrawer({
       if (ResultHelper.isSuccess(result) && result.data) {
         setComments(result.data.records || []);
       }
-    } catch {
+    } catch (error) {
       // silent
-    } finally {
+ console.warn('[TaskDetailDrawer] previously-silent catch', error);    } finally {
       setCommentsLoading(false);
     }
   }, [task.pid]);
@@ -257,9 +257,9 @@ export default function TaskDetailDrawer({
       if (ResultHelper.isSuccess(result) && result.data) {
         setActivities(result.data.records || []);
       }
-    } catch {
+    } catch (error) {
       // silent
-    } finally {
+ console.warn('[TaskDetailDrawer] previously-silent catch', error);    } finally {
       setActivitiesLoading(false);
     }
   }, [task.pid]);

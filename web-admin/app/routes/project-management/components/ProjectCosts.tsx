@@ -105,9 +105,9 @@ export default function ProjectCosts({ projectId }: ProjectCostsProps) {
       if (ResultHelper.isSuccess(monthlyRes) && monthlyRes.data?.records) {
         setMonthly(monthlyRes.data.records);
       }
-    } catch {
+    } catch (error) {
       // ignore
-    } finally {
+ console.warn('[ProjectCosts] previously-silent catch', error);    } finally {
       setLoading(false);
     }
   }, [projectId]);

@@ -464,9 +464,9 @@ function validateInspectorValue(
       if (!new RegExp(validation.pattern).test(value)) {
         return resolveDesignerText(DESIGNER_I18N.unified.validationPattern, locale);
       }
-    } catch {
+    } catch (error) {
       // Invalid regex in the schema — ignore rather than block the author.
-    }
+ console.warn('[SchemaInspector] previously-silent catch', error);    }
   }
   return '';
 }
