@@ -33,7 +33,7 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);
     await page.locator('form button[type=submit]').click();
     await page.waitForURL(url => !url.pathname.includes('/login'));
-    await page.getByText('项目', { exact: true }).click();
+    await page.getByTestId('sidebar').getByRole('link', { name: '项目', exact: true }).click();
     const projectName = fixture.projects[0].name;
     const projectRow = () => page.getByRole('row').filter({ hasText: projectName });
     await expect(projectRow()).toContainText('华辰制造');
@@ -145,7 +145,7 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     await expect(page.getByTestId('field-history')).toContainText('72');
     await shot('P17');
 
-    await page.getByText('项目', { exact: true }).click();
+    await page.getByTestId('sidebar').getByRole('link', { name: '项目', exact: true }).click();
     await page.getByTestId('tab-acceptance').click();
     await expect(page.getByRole('row').filter({ hasText: '远航物流' })).toBeVisible();
     await expect(projectRow()).toHaveCount(0);
@@ -238,7 +238,7 @@ test('delivery viewer can inspect progress but cannot edit or complete @smoke', 
   await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);
   await page.locator('form button[type=submit]').click();
   await page.waitForURL(url => !url.pathname.includes('/login'));
-  await page.getByText('项目', { exact: true }).click();
+  await page.getByTestId('sidebar').getByRole('link', { name: '项目', exact: true }).click();
   await expect(page.getByRole('button', { name: '新建项目', exact: true })).toHaveCount(0);
   await page.getByRole('row').filter({ hasText: fixture.projects[0].name }).getByRole('button', { name: /查看|详情/ }).click();
   await expect(page.getByTestId('object-summary').getByRole('progressbar')).toHaveAttribute('aria-valuenow', '72');
@@ -263,7 +263,7 @@ test('assigned view resolves the signed-in member and preserves shared attachmen
   await page.locator('#password').fill(process.env.ADMIN_PASSWORD!);
   await page.locator('form button[type=submit]').click();
   await page.waitForURL(url => !url.pathname.includes('/login'));
-  await page.getByText('项目', { exact: true }).click();
+  await page.getByTestId('sidebar').getByRole('link', { name: '项目', exact: true }).click();
   await expect(page.getByTestId('tab-mine')).toContainText('3');
   await page.getByTestId('tab-mine').click();
   await expect(page.getByRole('row').filter({ hasText: fixture.projects[0].name })).toBeVisible();
