@@ -147,3 +147,5 @@ It retains its stopped containers, volumes, files and failure logs. It does not
 publish images or qualify Enterprise/AI scenarios. Run only through the frozen
 Jenkins manual profile with `AURA_CI_JOB_ID`, `AURA_REGRESSION_SLOT` and
 `AURA_REGRESSION_ARTIFACTS`; do not point it at an existing evaluation instance.
+
+The public installer may consume the admitted `public-gradle-8-14-6` dataset to warm only its private BuildKit wrapper cache. The archive must match the official SHA-256; the original wrapper URL, build timeout, existing browser assertions and zero-retry policy are unchanged. No shared builder or source configuration is modified.

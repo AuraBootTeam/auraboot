@@ -151,6 +151,7 @@ the original review behavior; pause idle services through their product owner.
 | `command-input-source-contract.mjs` | 1 | 2026-11-11 | Validate the existing command input source contract. |
 | `ci/oss-native-install.py` | Verify cold initialization, old-to-new upgrade, backup recovery and corrupt-candidate rejection using packaged lifecycle and an attempt-owned Linux database. |
 | `ci/verify-public-project-install.py` | Run the public Compose/project initialization and existing three browser journeys in an admitted isolated Linux attempt; preserve volumes and verify stop/reopen. |
+| `ci/verify-public-project-install.test.py` | Validate Compose array/NDJSON service states and reject malformed container entries. |
 | `deploy/prod-deploy.sh` | 0 | 2026-06-18 | Production deploy orchestrator. Runs the schema migration + release ledger |
 | `dev/ci-env-export.sh` | 0 | 2026-05-09 | ci-env-export.sh — env contract for generic CI runners. Defaults are |
 | `dev/ga-e2e-env-export.sh` | 0 | 2026-05-09 | ga-e2e-env-export.sh — env contract for the GA (GitHub Actions) E2E |

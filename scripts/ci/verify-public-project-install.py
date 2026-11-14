@@ -15,11 +15,33 @@ import socket
 import subprocess
 import time
 import urllib.request
+import urllib.error
 
 
 def require(value, message):
     if not value:
         raise RuntimeError(message)
+
+
+def compose_rows(value):
+    """Compose versions emit either an array or one JSON object per line."""
+    if value.lstrip().startswith('['):
+        rows = json.loads(value)
+    else:
+        rows = [json.loads(line) for line in value.splitlines() if line.strip()]
+    require(isinstance(rows, list) and all(isinstance(row, dict) for row in rows),
+            'Invalid Compose service state')
+    return rows
+
+
+def gradle_cache_path(url):
+    # Gradle PathAssembler hashes the unchanged distribution URL as unsigned base36 MD5.
+    number = int.from_bytes(hashlib.md5(url.encode(), usedforsecurity=False).digest(), 'big')
+    digits = ''
+    while number:
+        number, remainder = divmod(number, 36)
+        digits = '0123456789abcdefghijklmnopqrstuvwxyz'[remainder] + digits
+    return Path('dists/gradle-8.14.6-bin') / (digits or '0') / 'gradle-8.14.6-bin.zip'
 
 
 def main():
@@ -59,12 +81,15 @@ def main():
         deadline = time.monotonic() + 240
         while time.monotonic() < deadline:
             state = subprocess.check_output(compose + ['ps', '--format', 'json'], cwd=root, env=env, text=True)
-            rows = [json.loads(line) for line in state.splitlines() if line.strip()]
+            rows = compose_rows(state)
             backend = [row for row in rows if row.get('Service') == 'backend']
             if len(backend) == 1 and backend[0].get('Health') == 'healthy':
-                with urllib.request.urlopen(env['BACKEND_URL'] + '/login', timeout=15) as response:
-                    require(response.status == 200, 'Public login page did not load')
-                return
+                try:
+                    with urllib.request.urlopen(env['BACKEND_URL'] + '/login', timeout=15) as response:
+                        require(response.status == 200, 'Public login page did not load')
+                    return
+                except (urllib.error.URLError, TimeoutError):
+                    pass  # The BFF may still be starting; retain the same overall deadline.
             time.sleep(3)
         raise RuntimeError('Public Compose backend did not become healthy')
 
@@ -116,6 +141,36 @@ def main():
         (output / 'builder.json').write_text(json.dumps(dict(name=builder, image=image, memoryBytes=8589934592,
              swapBytes=8589934592, parallelBuilds=1, sharedDefaultModified=False,
              configSha256=hashlib.sha256(config.read_bytes()).hexdigest()), indent=2))
+        # An optional admitted, official-checksum-verified distribution warms only
+        # this owned builder. The public Dockerfile and wrapper URL remain unchanged.
+        dataset_file = os.environ.get('AURA_CI_DATASET_INPUTS')
+        inputs = json.loads(Path(dataset_file).read_text())['files'] if dataset_file else []
+        distributions = [item for item in inputs if item['id'] == 'public-gradle-8-14-6']
+        if distributions:
+            require(len(distributions) == 1, 'One Gradle distribution input required')
+            item = distributions[0]
+            archive = Path(item['file'])
+            expected = '7988ed071b2a07900e2ec715fca15c6ab72bce6db433af301fa7fa7e9407bd24'
+            require(archive.is_file() and not archive.is_symlink(), 'Regular Gradle archive required')
+            with archive.open('rb') as stream:
+                actual = hashlib.file_digest(stream, 'sha256').hexdigest()
+            require(actual == item['sha256'] == expected, 'Official Gradle archive checksum mismatch')
+            properties = (root / 'platform/gradle/wrapper/gradle-wrapper.properties').read_text()
+            url = 'https://services.gradle.org/distributions/gradle-8.14.6-bin.zip'
+            require('distributionUrl=' + url.replace(':', chr(92) + ':') in properties,
+                    'Distribution prewarm must match the unchanged public wrapper URL')
+            context = private / 'gradle-seed'
+            cached = context / 'seed' / gradle_cache_path(url)
+            cached.parent.mkdir(parents=True)
+            shutil.copyfile(archive, cached)
+            (context / 'Dockerfile').write_text(
+                'FROM eclipse-temurin:21-jdk\nCOPY seed /seed\n'
+                'RUN --mount=type=cache,target=/root/.gradle/wrapper cp -a /seed/. /root/.gradle/wrapper/\n')
+            run(['docker', 'buildx', 'build', '--builder', builder, '--output', 'type=cacheonly',
+                 str(context)], 'verified-gradle-cache-prewarm', timeout=300)
+            (output / 'gradle-cache.json').write_text(json.dumps(dict(sha256=actual,
+                 officialChecksumUrl='https://services.gradle.org/distributions/gradle-8.14.6-bin.zip.sha256',
+                 wrapperUrl=url, sourcePropertiesModified=False, scope='owned builder cache only'), indent=2))
         started = True
         run(compose + ['up', '--build', '-d'], 'compose-build-start', timeout=2400)
         ready()
