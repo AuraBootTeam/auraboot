@@ -186,9 +186,14 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     await expect(newRow).toContainText('林晓');
     await page.reload();
     await expect(newRow).toContainText('华辰制造');
-    const liveDelivery = await page.request.get('/api/datasource/list?datasourceId=nq%3Atpm_delivery_brief&format=records&maxItems=100');
-    expect(liveDelivery.status()).toBe(200);
-    const liveDeliveryBody = await liveDelivery.json();
+    // Verify through the logged-in browser's same-origin httpOnly session.
+    // Do not extract a JWT or create a second, independently authenticated client.
+    const liveDelivery = await page.evaluate(async () => {
+      const response = await fetch('/api/datasource/list?datasourceId=nq%3Atpm_delivery_brief&format=records&maxItems=100', { credentials: 'same-origin' });
+      return { status: response.status, body: await response.json() };
+    });
+    expect(liveDelivery.status).toBe(200);
+    const liveDeliveryBody = liveDelivery.body;
     expect(String(liveDeliveryBody.code)).toBe('0');
     const liveRows = liveDeliveryBody.data.records ?? liveDeliveryBody.data;
     expect(liveRows.find((row: any) => row.project_name === newProjectName)?.customer_name).toBe('华辰制造');
