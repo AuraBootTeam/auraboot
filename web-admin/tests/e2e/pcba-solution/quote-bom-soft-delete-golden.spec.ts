@@ -46,6 +46,7 @@ test.describe('BOM conversion-task soft delete real-browser golden @smoke', () =
   let taskNo: string;
   const rows: { model: string; pid: string }[] = [];
   let taskPid = '';
+  let childPid = '';
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
     adminContext = await browser.newContext({ storageState: { cookies: [], origins: [] } });
@@ -72,6 +73,10 @@ test.describe('BOM conversion-task soft delete real-browser golden @smoke', () =
       },
       rows,
     );
+    childPid = await dynamicCreate(adminPage, 'req_requirement_line_pcba_bom', {
+      bom_cl_task_id: taskPid, bom_cl_line_no: 1, bom_cl_mpn: `DELETE-${suffix}`,
+      bom_cl_qty: 1, bom_cl_level: '1', bom_cl_review_status: 'pending',
+    }, rows);
     // eslint-disable-next-line no-console
     console.log(`[soft-delete-golden] seeded taskNo=${taskNo} taskPid=${taskPid}`);
   });
@@ -123,6 +128,7 @@ test.describe('BOM conversion-task soft delete real-browser golden @smoke', () =
     step = 'confirm delete';
     const confirmDialog = adminPage.getByTestId('confirm-dialog');
     await expect(confirmDialog).toBeVisible({ timeout: 10_000 });
+    await adminPage.screenshot({ path: test.info().outputPath('delete-confirmation-open.png'), fullPage: true });
     step = 'cancel delete (dismiss preserves)';
     await adminPage.getByTestId('confirm-cancel').click();
     await expect(confirmDialog).toHaveCount(0);
@@ -145,7 +151,12 @@ test.describe('BOM conversion-task soft delete real-browser golden @smoke', () =
     await adminPage.getByTestId('confirm-ok').click();
 
     // 4. bom:delete_task command succeeds
-    const deleteBody = await (await deleteAgainPromise).json().catch(() => ({}));
+    const deleteResponse = await deleteAgainPromise;
+    const deleteRequest = deleteResponse.request().postDataJSON();
+    expect(deleteRequest.targetRecordPid, 'delete binds the exact selected task').toBe(taskPid);
+    expect(deleteRequest.payload, 'delete submits intent without unrelated row fields').toEqual({});
+    expect(Number(deleteRequest.expectedVersion), 'delete keeps optimistic version control').toBeGreaterThan(0);
+    const deleteBody = await deleteResponse.json().catch(() => ({}));
     expect(
       String((deleteBody as { code?: unknown }).code),
       `bom:delete_task response: ${JSON.stringify(deleteBody).slice(0, 500)}`,
@@ -190,6 +201,29 @@ test.describe('BOM conversion-task soft delete real-browser golden @smoke', () =
       [404, 410].includes(direct.status()) || String(directBody?.code ?? '0') !== '0' || flaggedDeleted,
       'soft-deleted task must not read back as a live record',
     ).toBe(true);
+
+    const children = await queryDynamicRecords(adminPage, 'req_requirement_line_pcba_bom', [
+      { fieldName: 'bom_cl_task_id', operator: 'EQ', value: taskPid },
+    ]);
+    expect(children, 'deleted task has no accessible child rows').toHaveLength(0);
+    const child = await adminPage.request.get(`/api/dynamic/req_requirement_line_pcba_bom/${childPid}`);
+    const childBody = await child.json();
+    expect([404, 410].includes(child.status()) || String(childBody.code) !== '0',
+      'direct child access is refused after task deletion').toBe(true);
+    const logs = await adminPage.request.get('/api/meta/commands/audit-logs?commandCode=bom:delete_task&success=true&pageNum=1&pageSize=100');
+    expect(logs.status()).toBe(200);
+    const logBody = await logs.json();
+    expect(String(logBody.code)).toBe('0');
+    const ownAudit = logBody.data.records.filter((log: any) => {
+      try { return JSON.parse(log.executionResult).recordPid === taskPid; }
+      catch { return false; }
+    });
+    expect(ownAudit, 'successful deletion remains in the command audit').toHaveLength(1);
+    expect(ownAudit[0].success).toBe(true);
+    expect(String(ownAudit[0].userId), 'delete actor is traceable').toMatch(/^[1-9]\d*$/);
+    expect(Number.isFinite(Date.parse(ownAudit[0].createdAt)), 'delete timestamp is retained').toBe(true);
+
+    await adminPage.screenshot({ path: test.info().outputPath('deleted-task-and-details.png'), fullPage: true });
 
     // 7. hard gates: no forbidden, no 500s across the whole flow
     expect(

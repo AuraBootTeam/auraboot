@@ -569,6 +569,35 @@ class BusinessCommandDataAccessorFactoryTest {
         verify(data,never()).delete(anyString(),anyString());
         assertThat(holder.isRollbackOnly()).isTrue();
     }
+    private void deleteBoundary() {
+        owner.targetAction = "delete";
+        context.setBusinessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization(
+                "receipt.confirm", "receipt", "root-1", "delete", 7L, 20L, 30L));
+        context.setExecConfig(Map.of("type", "custom", "permissions", List.of("inventory.receipt.confirm"),
+                "handlerParams", Map.of("targetRecordAuthorization", "business", "targetRecordAction", "delete", "dslPersistence", false)));
+    }
+    @Test void deleteUseCaseMayRemoveOnlyItsAuthorizedRootWithOwnerApproval() {
+        deleteBoundary(); owner.allowRootDelete = true;
+        command(scope -> { scope.accessor().delete("receipt", "root-1"); return null; });
+        verify(data).delete("receipt", "root-1");
+        verify(mapper).selectTargetVersionForUpdate("mt_receipt", "pid", 7L, "root-1");
+        assertThat(holder.isRollbackOnly()).isFalse();
+    }
+    @Test void deleteUseCaseCannotRemoveAnotherRoot() {
+        deleteBoundary(); owner.allowRootDelete = true;
+        command(scope -> { denied(() -> scope.accessor().delete("receipt", "other-root")); return null; });
+        verify(data, never()).delete(anyString(), anyString());
+    }
+    @Test void deleteUseCaseStillRequiresOwnerApprovalForItsRoot() {
+        deleteBoundary();
+        command(scope -> { denied(() -> scope.accessor().delete("receipt", "root-1")); return null; });
+        verify(data, never()).delete(anyString(), anyString());
+    }
+    @Test void deleteUseCaseRetainsExplicitChildDeletionContract() {
+        deleteBoundary(); owner.allowDelete = true;
+        command(scope -> { scope.accessor().delete("line", "line-1"); return null; });
+        verify(data).delete("line", "line-1");
+    }
     @Test void deletionWithoutOwnerApprovalDoesNotReachNativeWriter() {
         command(scope -> { denied(() -> scope.accessor().delete("line","line-1")); return null; });
         verify(data,never()).delete(anyString(),anyString());
@@ -702,6 +731,8 @@ class BusinessCommandDataAccessorFactoryTest {
         String extraWrite;
         boolean inspectLockedLine, optionalReference, allowDelete;
         boolean optOutDelete;
+        boolean allowRootDelete;
+        String targetAction = "update";
         ReadIsolation readIsolation;
         Map<String,Integer> pagedLimits = Map.of();
         Map<String,Set<String>> publicFields = Map.of();
@@ -719,7 +750,7 @@ class BusinessCommandDataAccessorFactoryTest {
         public Set<String> optionalBusinessResourceModels() { return optionalReference ? Set.of("reference") : Set.of(); }
         public String getCommandType() { return "receipt.confirm"; }
         public Object execute(CommandContext context) { throw new AssertionError("Not called by unit fixture"); }
-        public Boundary businessBoundary(){return new Boundary("receipt.confirm","receipt","update",Set.of("inventory.receipt.confirm"));}
+        public Boundary businessBoundary(){return new Boundary("receipt.confirm","receipt",targetAction,Set.of("inventory.receipt.confirm"));}
         public Set<String> businessResourceModels() { return Set.of("receipt", "line", "ledger", "reference"); }
         public Set<String> businessResultFields() { return Set.of("status"); }
         public Map<String,BusinessResultField> businessResultProjection() { return resultProjection; }
@@ -731,6 +762,8 @@ class BusinessCommandDataAccessorFactoryTest {
             if (optionalReference && request.action() == Action.READ && "reference".equals(request.modelCode())
                     && "optional-1".equals(request.recordId())) return new Grant(Set.of("pid", "tenant_id", "row_version"), Set.of(), 1);
             Set<String> read = Set.of("pid", "tenant_id", "row_version", "parent", "qty", "status");
+            if (allowRootDelete && request.action() == Action.DELETE && "receipt".equals(request.modelCode())
+                    && root.recordId().equals(request.recordId())) return new Grant(read, Set.of(), 1);
             if (request.action() == Action.READ && ("receipt".equals(request.modelCode()) && root.recordId().equals(request.recordId())
                     || "line".equals(request.modelCode()) && root.recordId().equals(request.record().get("parent")))) return new Grant(read, Set.of(), 1);
             if (request.action() == Action.QUERY && "line".equals(request.modelCode())

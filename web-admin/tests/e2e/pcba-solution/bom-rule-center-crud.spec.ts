@@ -1133,7 +1133,9 @@ for (const kind of ['aml', 'avl'] as const) {
     await page.getByRole('button', { name: '保存', exact: true }).click();
     const invalidBody = await (await invalidTransition).json();
     expect(String(invalidBody.code)).not.toBe('0');
-    expect(JSON.stringify(invalidBody)).toContain('rejected -> approved');
+    expect(JSON.stringify(invalidBody)).toContain('当前关系状态不允许此变更，请检查当前状态后重新选择。');
+    await expect(page.getByText('当前关系状态不允许此变更，请检查当前状态后重新选择。', { exact: true }).first()).toBeVisible();
+    await info.attach(`${kind}-invalid-transition-localized`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     expect(await readDynamicRecord(page, model, first)).toEqual(rejectedRecord);
     await page.getByRole('button', { name: '取消', exact: true }).click();
     const approvedRow = page.getByRole('row').filter({ hasText: marker })

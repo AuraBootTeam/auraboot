@@ -259,15 +259,26 @@ export async function prepareReviewedCorrectedBomUpload(
 /** Current public upload journey: quote create form, explicit column review, real files. */
 export async function createQuoteFromReviewedBom(page: Page, created: CreatedRows, filePath: string) {
   await openQuoteCreateFormFromList(page);
-  for (const [field, model] of [
-    ['qo_quote_crm_account_id', 'crm_account_common'],
-    ['qo_quote_project_id', 'req_requirement_set_pcba_bom'],
+  for (const [field, model, labelField] of [
+    ['qo_quote_crm_account_id', 'crm_account_common', 'crm_acc_name'],
+    ['qo_quote_project_id', 'req_requirement_set_pcba_bom', 'bom_project_name'],
   ]) {
     const id = created.rows.find((row) => row.model === model)?.pid;
     expect(id, `fixture ${model}`).toBeTruthy();
     const trigger = page.getByTestId(`select-trigger-${field}`);
     await expect(trigger).toBeVisible();
     await trigger.click();
+    const record = await readDynamicRecord(page, model, id!);
+    const label = String(record[labelField]);
+    expect(record[labelField], `fixture ${model} business label`).toBeTruthy();
+    const searched = page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.pathname === `/api/dynamic/${model}/list` && url.searchParams.get('keyword') === label;
+    });
+    await trigger.fill(label);
+    const response = await searched;
+    expect(response.status(), 'reference search uses the scoped model API').toBe(200);
+    expect(String((await response.json()).code)).toBe('0');
     await page.locator(`[role="option"][data-value="${id}"]`).first().click();
   }
   const paste = '%FSLAX24Y24*%\n%MOMM*%\n%TF.FileFunction,Paste,Top*%\n%ADD10C,0.600*%\nD10*\nX000000Y000000D03*\nM02*\n';
@@ -750,6 +761,7 @@ export async function queryDynamicRecords(
     resp.ok(),
     `${model} list HTTP ${resp.status()}: ${JSON.stringify(body).slice(0, 500)}`,
   ).toBe(true);
+  expect(String(body.code), `${model} list must succeed before interpreting an empty result`).toBe('0');
   return extractRecords(body);
 }
 

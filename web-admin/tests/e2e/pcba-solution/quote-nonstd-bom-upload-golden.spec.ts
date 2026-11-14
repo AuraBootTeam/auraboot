@@ -19,15 +19,25 @@ import {
   yunhanMockControlUrl,
 } from './quote-e2e-helpers';
 
-/** Pick a reference-select option by its data-value (no text search needed for fixtures). */
+/** Search through the model source before selecting the exact fixture identity. */
 async function selectReferenceOption(
   page: import('@playwright/test').Page,
   field: string,
   value: string,
+  label: string,
 ): Promise<void> {
   const trigger = page.getByTestId(`select-trigger-${field}`);
   await expect(trigger).toBeVisible({ timeout: 15_000 });
   await trigger.click();
+  const model = field === 'qo_quote_crm_account_id' ? 'crm_account_common' : 'req_requirement_set_pcba_bom';
+  const searched = page.waitForResponse(response => {
+    const url = new URL(response.url());
+    return url.pathname === `/api/dynamic/${model}/list` && url.searchParams.get('keyword') === label;
+  });
+  await trigger.fill(label);
+  const response = await searched;
+  expect(response.status(), 'reference search uses the existing scoped model API').toBe(200);
+  expect(String((await response.json()).code)).toBe('0');
   const option = page.locator(`[role="option"][data-value="${value}"]`).first();
   await expect(option, `${field} option ${value} should be loaded`).toBeVisible({
     timeout: 15_000,
@@ -132,8 +142,10 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
 
     await openQuoteCreateFormFromList(page);
     await waitForFormReady(page, 20_000);
-    await selectReferenceOption(page, 'qo_quote_crm_account_id', accountId!);
-    await selectReferenceOption(page, 'qo_quote_project_id', projectId!);
+    const account = await readDynamicRecord(page, 'crm_account_common', accountId!);
+    const project = await readDynamicRecord(page, 'req_requirement_set_pcba_bom', projectId!);
+    await selectReferenceOption(page, 'qo_quote_crm_account_id', accountId!, String(account.crm_acc_name));
+    await selectReferenceOption(page, 'qo_quote_project_id', projectId!, String(project.bom_project_name));
 
     // Real source files are uploaded, but counting requires an explicit drill scope.
     const gerberFixture = writeMiniBoardZip(
@@ -366,9 +378,14 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     for (const lineId of lineIds) {
       const priceRow = page.getByTestId(`table-row-${lineId}`);
       await expect(priceRow).toBeVisible({ timeout: 20_000 });
-      const cells = await tableTexts(priceRow.locator('td, [role="cell"]'));
-      expect(cells[yunhanColumn] ?? '', `Yunhan cell for quote line ${lineId}`).toMatch(
+      // Backend evidence can finish between the workbench's polling ticks.
+      // Assert the live cell rather than freezing its intermediate refresh text.
+      await expect(
+        priceRow.locator('td, [role="cell"]').nth(yunhanColumn),
+        `Yunhan cell for quote line ${lineId}`,
+      ).toHaveText(
         /未命中|\d+(?:\.\d+)?/,
+        { timeout: 20_000 },
       );
     }
 

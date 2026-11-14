@@ -31,12 +31,12 @@ test.describe('PCBA quote cost scenario golden', () => {
     const fixtureRows: CreatedRows = { quoteId: '', quoteCode: '', rows: [] };
     const assumptionId = await dynamicCreate(page, 'qo_cost_assumption_common', {
       qo_ca_code: 'ASSUME-FX', qo_ca_scenario_id: scenarioId,
-      qo_ca_description: '汇率假设 7.0 CNY/USD', qo_ca_impact_type: 'cost',
+      qo_ca_description: '汇率假设 7.0 CNY/USD', qo_ca_impact_type: '成本',
       qo_ca_version: 'v1',
     }, fixtureRows.rows);
     const gapId = await dynamicCreate(page, 'qo_cost_gap_common', {
       qo_cg_code: 'GAP-TEST', qo_cg_scenario_id: scenarioId,
-      qo_cg_severity: 'major', qo_cg_description: '缺少测试报告成本项',
+      qo_cg_severity: 'warning', qo_cg_description: '缺少测试报告成本项',
     }, fixtureRows.rows);
     expect(assumptionId).toBeTruthy();
     expect(gapId).toBeTruthy();
@@ -57,6 +57,9 @@ test.describe('PCBA quote cost scenario golden', () => {
     for (const description of ['缺少测试报告成本项', '汇率假设 7.0 CNY/USD']) {
       await expect(page.locator('main').getByText(description, { exact: true }).first())
         .toBeVisible({ timeout: 20_000 });
+      await page.locator('main').getByText(description, { exact: true }).first().evaluate(element => element.scrollIntoView({ block: 'center', inline: 'nearest' }));
+      await expect(page.locator('main').getByText(description, { exact: true }).first()).toBeInViewport();
+      await info.attach(`q18-01-evidence-${description}`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     }
     // 档位子表人类可读:数量 100 可见;缺口/假设描述人类可读,无内部 JSON 块
     const bodyText = await page.locator('main').innerText();
@@ -65,6 +68,10 @@ test.describe('PCBA quote cost scenario golden', () => {
     expect(bodyText).toContain('汇率假设 7.0 CNY/USD');
     expect(bodyText).not.toMatch(/"qo_cs_status"\s*:/);
     expect(bodyText).not.toMatch(/\{"qo_cg_/);
+    expect(bodyText).not.toMatch(/"tiers"\s*:/);
+    // This original display fixture has no lifecycle status; Q18-03 checks command-created labels.
+    await expect(page.getByText('proposed', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('open', { exact: true })).toHaveCount(0);
     await info.attach('q18-01-scenario-detail', {
       body: await page.screenshot({ fullPage: true }),
       contentType: 'image/png',
@@ -154,7 +161,7 @@ test.describe('PCBA quote cost scenario golden', () => {
     });
     await expectImmutable('qo_cost_assumption_common:create', {
       payload: { qo_ca_code: 'ASSUME-X', qo_ca_scenario_id: scenarioId,
-        qo_ca_description: 'post-freeze attempt', qo_ca_impact_type: 'cost', qo_ca_version: 'v1' },
+        qo_ca_description: 'post-freeze attempt', qo_ca_impact_type: '成本', qo_ca_version: 'v1' },
       targetRecordPid: scenarioId, targetRecordId: scenarioId, operationType: 'create',
     });
     await expectImmutable('qo_cost_scenario_common:calculate', {
@@ -208,7 +215,7 @@ test.describe('PCBA quote cost scenario golden', () => {
     // 假设经授权命令创建(默认 proposed)→ 授权命令批准
     const assumptionCreated = await executeCommand(page, 'qo_cost_assumption_common:create', {
       qo_ca_code: 'ASSUME-FX', qo_ca_scenario_id: scenarioId,
-      qo_ca_description: '汇率假设 7.0 CNY/USD', qo_ca_impact_type: 'cost', qo_ca_version: 'v1',
+      qo_ca_description: '汇率假设 7.0 CNY/USD', qo_ca_impact_type: '成本', qo_ca_version: 'v1',
     });
     const assumptionId = String(assumptionCreated.recordId);
     await executeCommand(page, 'qo_cost_assumption_common:approve', {
@@ -240,6 +247,9 @@ test.describe('PCBA quote cost scenario golden', () => {
     ).toBeVisible({ timeout: 20_000 });
     for (const evidence of ['汇率口径经财务复核', '缺少测试报告成本项', '由历史测试报告覆盖,无需另行收费']) {
       await expect(page.locator('main').getByText(evidence, { exact: true })).toBeVisible({ timeout: 20_000 });
+      await page.locator('main').getByText(evidence, { exact: true }).evaluate(element => element.scrollIntoView({ block: 'center', inline: 'nearest' }));
+      await expect(page.locator('main').getByText(evidence, { exact: true })).toBeInViewport();
+      await info.attach(`q18-03-evidence-${evidence}`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     }
     const bodyText = await page.locator('main').innerText();
     // 人类可读:假设描述/批准原因、缺口描述/豁免原因全部可见
@@ -251,6 +261,14 @@ test.describe('PCBA quote cost scenario golden', () => {
     expect(bodyText).not.toMatch(/"qo_cs_status"\s*:/);
     expect(bodyText).not.toMatch(/\{"qo_ca_/);
     expect(bodyText).not.toMatch(/UNAPPROVED_ASSUMPTION|INVALID_WAIVER/);
+    expect(bodyText).not.toMatch(/"tiers"\s*:/);
+    await expect(page.getByText('已批准', { exact: true })).toBeVisible();
+    await expect(page.getByText('已豁免', { exact: true })).toBeVisible();
+    await expect(page.getByText('严重', { exact: true })).toBeVisible();
+    await expect(page.getByText('critical', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('approved', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('waived', { exact: true })).toHaveCount(0);
+    await expect(page.locator('main').getByText(assumptionId, { exact: true })).toHaveCount(0);
     await info.attach('q18-03-scenario-evidence', {
       body: await page.screenshot({ fullPage: true }),
       contentType: 'image/png',
