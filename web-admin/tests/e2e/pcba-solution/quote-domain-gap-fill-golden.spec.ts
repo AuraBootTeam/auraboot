@@ -5,6 +5,7 @@ import {
   dynamicCreate,
   openQuoteDetailFromList,
   queryDynamicRecords,
+  pollAsyncTaskResult,
   seedBomPriceManualReviewQuote,
   seedQuoteScaffold,
   type CreatedRows,
@@ -168,10 +169,17 @@ test.describe('PCBA quote domain gap fill golden', () => {
         const body = await response.json();
         expect(response.ok(), JSON.stringify(body).slice(0, 500)).toBe(true);
         expect(String(body.code)).toBe('0');
+        const commandResult = body.data?.data;
+        expect(commandResult, 'command envelope contains an actual result or async task').toBeTruthy();
+        const result = commandResult.async === true
+          ? await pollAsyncTaskResult(page, String(commandResult.taskCode)) : commandResult;
+        expect(result.status, 'recompute finishes its existing downstream steps').toBe('completed');
+        expect(Number(result.setCount)).toBe(setCount);
+        expect(result.suppliersQueried, 'local recompute uses stored evidence without external sourcing').toBe(false);
         const sqlCount = Number(response.headers()['x-sql-count']);
         expect(response.headers()['x-sql-count'], 'real backend SQL observation header is present').toBeTruthy();
         expect(Number.isInteger(sqlCount) && sqlCount >= 0).toBe(true);
-        observations.push({ phase, setCount, rowCount: lineCount, sqlCount, elapsedMs: Date.now() - started,
+        observations.push({ phase, setCount, rowCount: lineCount, submissionSqlCount: sqlCount, workerSqlCount: null, elapsedMs: Date.now() - started,
           performanceVerdict: 'observation-only-no-capacity-or-budget-claim' });
         const after = await queryDynamicRecords(page, 'qo_quote_line_common', filters, { pageSize: 500 });
         expect(after.length, 'bulk recompute keeps every line').toBe(lineCount);
