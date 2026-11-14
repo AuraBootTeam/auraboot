@@ -32,7 +32,7 @@ Yes — the official Docker images are multi-arch (`linux/amd64` and `linux/arm6
 
 ### Q. Can I use MySQL instead of PostgreSQL?
 
-Not in the community edition. AuraBoot relies on `pgvector` for the RAG knowledge base and on Postgres-specific features (JSONB GIN indexes, materialized views in Pivot queries). MySQL adapter is on the enterprise roadmap with no committed date.
+PostgreSQL 15+ is the supported and tested database — AuraBoot relies on `pgvector` for the RAG knowledge base and on Postgres-specific features (JSONB GIN indexes, materialized views in Pivot queries). The datasource is standard JDBC, so MySQL is technically reachable if you supply the GPL-licensed `mysql-connector-j` jar yourself; see DEPLOY.md → Databases. It is not tested or supported in the community edition.
 
 ---
 
@@ -40,14 +40,14 @@ Not in the community edition. AuraBoot relies on `pgvector` for the RAG knowledg
 
 ### Q. Where is my data stored?
 
-In your PostgreSQL database. The platform metadata (model definitions, page configs, command pipelines) lives in `meta_*` tables; business data lives in tables created when applications and plugins are installed (e.g. `mt_crm_lead_common` from the CRM application — a separate repository, installed through the application-composition contract rather than shipped in this repo).
+In your PostgreSQL database. The platform metadata (model definitions, page configs, command pipelines) lives in `ab_*`-prefixed tables (e.g. `ab_meta_model`, `ab_page_schema`); business data lives in tables created when applications and plugins are installed (e.g. `mt_crm_lead_common` from the CRM application — a separate repository, installed through the application-composition contract rather than shipped in this repo).
 
 Drop AuraBoot tomorrow and your tables remain queryable — there's no proprietary file format. Schema is documented on [the documentation site](https://docs.auraboot.com).
 
 ### Q. Will my schema change between minor versions?
 
 During the 0.x beta:
-- Platform tables (`meta_*`, `sys_*`) may evolve. Migrations run automatically on boot.
+- Platform tables (`ab_*`) may evolve. Migrations run automatically on boot.
 - Plugin tables follow the plugin's own version. Each plugin handles its own migrations.
 - Breaking schema changes are called out in `### Breaking changes` of [CHANGELOG.md](CHANGELOG.md) with explicit migration instructions.
 
@@ -135,7 +135,7 @@ OpenTelemetry is built in. Configure `MANAGEMENT_TRACING_*` and point at your co
 
 ### Q. The audit log is huge. Can I prune it?
 
-Yes — audit retention is enforced by scheduled pruning. Configure the retention window in the audit pruning settings (`application.yml` audit section); past that age rows are pruned by the scheduled job. Don't delete from `meta_audit` directly.
+Yes — audit retention is enforced by scheduled pruning. Configure the retention window in the audit pruning settings (`application.yml` audit section); past that age rows are pruned by the scheduled job. Don't delete from `ab_audit_trail` (command writes) or `ab_command_audit_log` directly.
 
 > Audit retention and archival must follow the implemented storage and operations policy; do not assume an undocumented retention setting or automatic partition archival.
 

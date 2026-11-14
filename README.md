@@ -303,7 +303,7 @@ for the instrumentation contract and reproducible measurements. A high-level sys
 | Application Composition Contract | ✓ | ✓ |
 | Plugin System + CLI | ✓ | ✓ |
 | Multi-Tenant RBAC | ✓ | ✓ |
-| Agent Orchestration (ACP) | — | ✓ |
+| Agent Orchestration (ACP) | ✓ (core orchestration, `agent-control-plane` plugin) | ✓ (advanced governance) |
 | IM (Real-time Messaging) | — | ✓ |
 | CRM / ERP application suite | — | ✓ |
 | Mobile Apps (iOS + Android) | — | ✓ |

@@ -62,6 +62,16 @@ public class LocalDistributedLock implements DistributedLock {
             return;
         }
         lock.unlock();
+        // Reclaim the map entry once no thread holds or waits on this lock.
+        // Keys can carry record-level values (concurrencyKey templates), so an
+        // unconditional retention would grow the map without bound. The
+        // two-arg remove keeps a concurrently re-acquired instance intact; the
+        // theoretical race (acquire landing between the emptiness check and the
+        // remove) is a nanosecond window, accepted in favor of the guaranteed
+        // reclamation — this implementation is single-instance only anyway.
+        if (!lock.isLocked() && !lock.hasQueuedThreads()) {
+            locks.remove(lockKey, lock);
+        }
         log.debug("Released local lock: {}", lockKey);
     }
 
