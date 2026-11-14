@@ -25,8 +25,6 @@ import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.ValidationService;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.auraboot.module.bitemporal.service.BiTemporalService;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.observation.annotation.Observed;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,7 +40,6 @@ import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Command Executor implementation.
@@ -63,7 +60,6 @@ public class CommandExecutorImpl implements CommandExecutor {
     private final DynamicDataMapper dynamicDataMapper;
     private final DynamicDataService dynamicDataService;
     private final ApplicationContext applicationContext;
-    private final ObjectMapper objectMapper;
     private final MetaModelService metaModelService;
     private final IdempotencyService idempotencyService;
     private final ConcurrencyGuard concurrencyGuard;
@@ -113,8 +109,6 @@ public class CommandExecutorImpl implements CommandExecutor {
     private com.auraboot.framework.governance.service.GovernanceSnapshotService governanceSnapshotService;
 
     /** Cache for column existence checks — table structure rarely changes. Bounded to prevent OOM. */
-    private static final int COLUMN_CACHE_MAX_SIZE = 1024;
-    private final ConcurrentHashMap<String, Boolean> columnExistsCache = new ConcurrentHashMap<>();
 
     @Autowired(required = false)
     private NativeBusinessCreateBoundary nativeCreation;
@@ -235,7 +229,14 @@ public class CommandExecutorImpl implements CommandExecutor {
                     || e instanceof AccessDeniedException) {
                 throw e;
             }
-            throw new BusinessException(ResponseCode.BadParam, "Command execution failed: " + e.getMessage());
+            // Unclassified failures (NPE, serialization, infra errors) are server
+            // faults, not client input errors: map to SystemError, keep the cause
+            // in server logs, and hand the client an opaque correlation reference
+            // instead of leaking internal exception messages.
+            String errorRef = java.util.UUID.randomUUID().toString().substring(0, 8);
+            log.error("Unclassified command execution failure ref={}", errorRef, e);
+            throw new BusinessException(ResponseCode.SystemError,
+                    "Command execution failed. Reference: " + errorRef);
         }
     }
 
@@ -265,95 +266,6 @@ public class CommandExecutorImpl implements CommandExecutor {
             return "boundary_denied[authorization:" + verdict.reason() + required + "]";
         }
         return null;
-    }
-
-    // ==================== ExecutionConfig Parsing ====================
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> parseExecutionConfig(CommandDefinition command) {
-        if (command.getExecutionConfig() == null || command.getExecutionConfig().isEmpty()) {
-            return Collections.emptyMap();
-        }
-        try {
-            Map<String, Object> result = objectMapper.readValue(command.getExecutionConfig(),
-                    new TypeReference<Map<String, Object>>() {});
-            return result != null ? result : Collections.emptyMap();
-        } catch (Exception e) {
-            log.error("Failed to parse executionConfig for command {}: {}", command.getCode(), e.getMessage());
-            throw new BusinessException(ResponseCode.CommonValidationFailed,
-                    "Invalid executionConfig for command " + command.getCode() + ": " + e.getMessage());
-        }
-    }
-
-    // ==================== Private Helpers ====================
-
-    /**
-     * Check if a table has a specific column using cached JDBC metadata.
-     */
-    private boolean hasColumn(String tableName, String columnName) {
-        if (tableName == null || columnName == null) {
-            return false;
-        }
-        String cacheKey = tableName + ":" + columnName;
-        if (columnExistsCache.size() >= COLUMN_CACHE_MAX_SIZE) {
-            var it = columnExistsCache.keySet().iterator();
-            if (it.hasNext()) { it.next(); it.remove(); }
-        }
-        return columnExistsCache.computeIfAbsent(cacheKey, k -> {
-            try {
-                return dynamicDataMapper.checkColumnExists(tableName, columnName) > 0;
-            } catch (Exception e) {
-                log.debug("Failed to check column existence for {}.{}, assuming absent: {}",
-                        tableName, columnName, e.getMessage());
-                return false;
-            }
-        });
-    }
-
-    /**
-     * Resolve concurrency key from pre-parsed execution config.
-     */
-    private String resolveConcurrencyKeyFromConfig(Map<String, Object> config, Map<String, Object> payload) {
-        if (config == null || config.isEmpty()) {
-            return null;
-        }
-        String keyTemplate = (String) config.get("concurrencyKey");
-        if (keyTemplate == null || keyTemplate.isEmpty()) {
-            return null;
-        }
-        String resolved = keyTemplate;
-        for (Map.Entry<String, Object> entry : payload.entrySet()) {
-            String placeholder = "${payload." + entry.getKey() + "}";
-            if (resolved.contains(placeholder) && entry.getValue() != null) {
-                resolved = resolved.replace(placeholder, entry.getValue().toString());
-            }
-        }
-        return resolved;
-    }
-
-    /**
-     * Resolve lock timeout from pre-parsed execution config.
-     */
-    private long resolveLockTimeoutFromConfig(Map<String, Object> config) {
-        if (config == null || config.isEmpty()) {
-            return 5000L;
-        }
-        Object timeout = config.get("lockTimeoutMs");
-        if (timeout instanceof Number) {
-            return ((Number) timeout).longValue();
-        }
-        return 5000L;
-    }
-
-    /**
-     * Transitions to a new pipeline phase, recording timing for the current phase.
-     */
-    private void transitionPhase(String[] phaseRef, long[] phaseStartRef,
-                                  Map<String, Long> phaseTimings, String newPhase) {
-        long now = System.currentTimeMillis();
-        phaseTimings.put(phaseRef[0], now - phaseStartRef[0]);
-        phaseStartRef[0] = now;
-        phaseRef[0] = newPhase;
     }
 
 }

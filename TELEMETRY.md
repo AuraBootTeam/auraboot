@@ -17,7 +17,7 @@ When AuraBoot is running, network egress comes from:
 |---|---|---|
 | LLM provider SDK | OpenAI / Anthropic / Zhipu / etc. | Only when an AI feature (AuraBot, ChatBI, RAG, ACP) is invoked AND the operator has configured a provider API key |
 | Webhook plugin | URLs the operator configured | Only when a configured webhook fires (e.g., on record create) |
-| Plugin marketplace | https://plugins.auraboot.com | Only when an admin browses or installs a plugin from the marketplace UI |
+| Plugin marketplace client | Operator-configured marketplace endpoint | Only in deployments explicitly wired to a marketplace distribution channel. The community edition ships no marketplace browsing client and contains no fixed marketplace destination |
 | License verifier | License-issuance domain (configurable) | Only for commercial-license deployments that opted in to remote validation |
 | OS / package manager updates | Distro-controlled | Standard system updates, not AuraBoot |
 | OpenTelemetry / Sentry exports | Operator-configured collector endpoints | Only when `MANAGEMENT_TRACING_*` / `SENTRY_DSN` are set |
@@ -35,7 +35,7 @@ traffic with:
 
 ```bash
 # In a docker-compose deployment
-docker run --rm --network container:auraboot-platform-1 nicolaka/netshoot \
+docker run --rm --network container:auraboot-backend nicolaka/netshoot \
   tcpdump -nni any -c 200 'not port 22 and not port 53 and not host postgres and not host redis'
 ```
 
