@@ -104,6 +104,14 @@ Multi-channel notifications (email, in-app, webhook), event bus for cross-module
 
 > **Mainland-China users:** Gitee and Tencent TCR distribution are deferred; no working mainland mirror is promised. The source-build path below requires access to GitHub, container registries, Gradle and Maven dependencies. Check that connectivity first. For pull-only deployment, use a release tag whose images and first-boot procedure have been verified; see [DEPLOY.md](DEPLOY.md#pull-only-deployment-no-source-checkout-no-build).
 
+For a reproducible first trial, use the exact source revision and scope in the
+[public beta candidate guide](https://auraboot.com/docs/release-notes/candidate)
+and [project-delivery tutorial](https://auraboot.com/docs/getting-started/project-delivery).
+The current candidate is unpublished: historical beta assets, floating images and
+moving `main` are not interchangeable. The commands below are the general source
+workflow; pin the selected revision before preparing `.env` when qualifying a trial.
+No public candidate download or all-platform installation guarantee is implied.
+
 ### Docker (recommended)
 
 ```bash
@@ -119,9 +127,9 @@ docker compose --profile full up --build -d
 
 The `full` profile starts PostgreSQL + the Spring Boot backend + the Node BFF/SSR frontend. Wait for the backend to be healthy before initialization. Download/build time depends on your machine and network; the 120s health-check start period is not an installation-time guarantee.
 
-**`scripts/quickstart.sh` is not optional.** `docker compose up` starts the services and nothing else: it creates no admin user and imports no plugins. Without this step the login below fails with *"Invalid username or password"*, and even past it the platform has zero models and zero menus. The script is idempotent — run it again any time.
+**`scripts/quickstart.sh` is not optional.** `docker compose up` starts the services and nothing else: it creates no admin user and imports no plugins. Without this step the login below fails with *"Invalid username or password"*, and even past it the platform has zero models and zero menus. It preserves an existing administrator password, but reimports configuration using `OVERWRITE`. Run it only on your own evaluation instance, not as a general upgrade or business-data repair command.
 
-> **Windows:** the runtime is fully supported through **Docker Desktop**, which runs the whole stack in its WSL2 backend — `docker compose --profile full up` works exactly as above. The only caveat is that `quickstart.sh` (and every other `scripts/*.sh`) is a bash script, so run it from a **WSL** shell or **Git Bash**, not PowerShell/cmd. It needs `bash`, `curl` and `python3` and talks to the published port, so `./scripts/quickstart.sh` works unchanged. Native, non-Docker Windows-host deployment is **not** supported: the reset/init/build tooling is bash-only and there is no `gradlew.bat`.
+> **Windows:** use Docker Desktop with its WSL2 backend and run the bash commands in WSL Ubuntu. Check `git`, `curl` and `python3` first; do not paste bash scripts into PowerShell/cmd. The current candidate qualification targets Linux amd64, so these Windows instructions are not an independently verified Windows installation claim. Native Windows-host deployment is not supported by the bash lifecycle tooling.
 
 Then open [http://localhost:3000](http://localhost:3000) and log in:
 

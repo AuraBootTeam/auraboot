@@ -7,6 +7,8 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
+from urllib.parse import urlsplit
 from pathlib import Path
 import shutil
 import socket
@@ -36,7 +38,7 @@ def main():
                DELIVERY_BACKEND_URL=f'http://127.0.0.1:{web_port}',
                DELIVERY_WEB_URL=f'http://127.0.0.1:{web_port}',
                DELIVERY_EVIDENCE_ROOT=str(output), ADMIN_EMAIL='admin@auraboot.com',
-               ADMIN_PASSWORD='Test2026x', AURA_E2E_VIDEO='off', AURA_E2E_BROWSER_CHANNEL='chromium', NO_PROXY='localhost,127.0.0.1')
+               ADMIN_PASSWORD='Test2026x', AURA_E2E_VIDEO='off', AURA_E2E_BROWSER_CHANNEL='chromium', COMPOSE_PARALLEL_LIMIT='1', NO_PROXY='localhost,127.0.0.1')
     for port in [web_port, db_port]:
         with socket.socket() as probe:
             probe.bind(('127.0.0.1', port))
@@ -81,6 +83,23 @@ def main():
         require(str(response['code']) == '0', 'Project read after restart failed')
         return response['data']['records']
 
+    # The original generic wrapper caps BuildKit at 2GiB. Source-building the
+    # documented full application needs its own bounded builder, not the shared default.
+    image = os.environ['AURA_PUBLIC_BUILDKIT_IMAGE']
+    require(re.fullmatch(r'docker.io/moby/buildkit@sha256:[a-f0-9]{64}', image), 'Exact official BuildKit image required')
+    builder = project + '-build'
+    buildx = private / 'buildx'
+    buildx.mkdir(mode=0o700)
+    env.update(BUILDX_CONFIG=str(buildx), BUILDX_BUILDER=builder)
+    mirrors = json.loads(subprocess.check_output(['docker', 'info', '--format', '{{json .RegistryConfig.Mirrors}}'], text=True))
+    require(isinstance(mirrors, list), 'Daemon mirror list required')
+    for mirror in mirrors:
+        parsed = urlsplit(mirror)
+        require(parsed.scheme == 'https' and parsed.hostname and not parsed.username and not parsed.password
+                and not parsed.query and not parsed.fragment, 'Only public HTTPS mirrors allowed')
+    config = private / 'buildkitd.toml'
+    config.write_text('[registry."docker.io"]\nmirrors = ' + json.dumps([m.removeprefix('https://').rstrip('/') for m in mirrors]) + '\n')
+    config.chmod(0o400)
     existing = subprocess.check_output(compose + ['ps', '-aq'], cwd=root, env=env, text=True).strip()
     require(not existing, 'Attempt already has Compose resources; no overwrite or implicit retry')
     require(not (root / '.env').exists(), 'Public checkout must not inherit another .env')
@@ -88,7 +107,15 @@ def main():
     (root / '.env').chmod(0o600)
     run(['python3', 'scripts/prepare-quickstart-env.py', '--file', '.env'], 'prepare-env')
     started = False
+    builder_created = False
     try:
+        builder_created = True
+        run(['docker', 'buildx', 'create', '--name', builder, '--driver', 'docker-container',
+             '--driver-opt', 'image=' + image, '--driver-opt', 'memory=8g', '--driver-opt', 'memory-swap=8g',
+             '--buildkitd-config', str(config), '--bootstrap'], 'owned-builder-bootstrap')
+        (output / 'builder.json').write_text(json.dumps(dict(name=builder, image=image, memoryBytes=8589934592,
+             swapBytes=8589934592, parallelBuilds=1, sharedDefaultModified=False,
+             configSha256=hashlib.sha256(config.read_bytes()).hexdigest()), indent=2))
         started = True
         run(compose + ['up', '--build', '-d'], 'compose-build-start', timeout=2400)
         ready()
@@ -121,6 +148,8 @@ def main():
     finally:
         if started:
             run(compose + ['stop'], 'retain-stopped-project')
+        if builder_created:
+            run(['docker', 'buildx', 'rm', builder], 'owned-builder-remove')
 
 
 if __name__ == '__main__':
