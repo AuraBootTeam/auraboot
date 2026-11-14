@@ -15,9 +15,14 @@ describe('built-in property editor lifecycle', () => {
     const initial = propertyEditorRegistry.resolve('designer.color');
     const disposeAgain = registerColorPropertyEditor();
     expect(propertyEditorRegistry.resolve('designer.color')).toBe(initial);
-    expect(() => propertyEditorRegistry.register('designer.color', () => null)).toThrow(
-      'Conflicting',
-    );
+    let conflict: unknown = 'no-throw';
+    try {
+      propertyEditorRegistry.register('designer.color', () => null);
+    } catch (e) {
+      conflict = e;
+    }
+    expect(conflict).toBeInstanceOf(Error);
+    expect((conflict as Error).message).toContain('Conflicting');
     disposeAgain();
     expect(() => propertyEditorRegistry.resolve('designer.color')).toThrow('Unregistered');
     dispose();

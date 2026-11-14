@@ -25,7 +25,14 @@ describe('registered property controls', () => {
     registry.register('sample', first);
     registry.register('sample', first);
     expect(registry.resolve('sample')).toBe(first);
-    expect(() => registry.register('sample', other)).toThrow('Conflicting');
+    let conflict: unknown = 'no-throw';
+    try {
+      registry.register('sample', other);
+    } catch (e) {
+      conflict = e;
+    }
+    expect(conflict).toBeInstanceOf(Error);
+    expect((conflict as Error).message).toContain('Conflicting');
     expect(registry.resolve('sample')).toBe(first);
   });
   it('supports owned extension cleanup without removing a newer registration', () => {
