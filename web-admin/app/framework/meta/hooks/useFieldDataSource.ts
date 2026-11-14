@@ -33,7 +33,7 @@ export interface UseFieldDataSourceResult {
   options: OptionItem[];
   loading: boolean;
   error: string | null;
-  refetch: () => Promise<void>;
+  refetch: (extraParams?: Record<string, any>) => Promise<void>;
 }
 
 const EMPTY_OPTIONS: OptionItem[] = [];
@@ -95,6 +95,7 @@ export function useFieldDataSource({
   const [options, setOptions] = useState<OptionItem[]>(staticOptions);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestVersion = useRef(0);
 
   // 内部 DataSourceManager (如果没有传入外部实例)
   const internalManagerRef = useRef<DataSourceManager | null>(null);
@@ -140,6 +141,7 @@ export function useFieldDataSource({
 
   // 注册数据源
   useEffect(() => {
+    requestVersion.current += 1;
     if (!dataSource || !manager) {
       // 没有数据源,使用静态选项
       setOptions(staticOptions);
@@ -169,6 +171,7 @@ export function useFieldDataSource({
       setError(state?.error?.message || null);
 
       return () => {
+        requestVersion.current += 1;
         unsubscribe();
       };
     }
@@ -211,6 +214,7 @@ export function useFieldDataSource({
     }
 
     return () => {
+      requestVersion.current += 1;
       unsubscribe();
       // 清理临时数据源
       manager.unregister(dsId);
@@ -218,26 +222,30 @@ export function useFieldDataSource({
   }, [dataSourceKey, manager, staticOptionsKey]);
 
   // 重新加载数据
-  const refetch = useCallback(async () => {
+  const refetch = useCallback(async (extraParams?: Record<string, any>) => {
     if (!dataSource || !manager) {
       return;
     }
 
     const dsId = typeof dataSource === 'string' ? dataSource : dataSourceIdRef.current;
 
+    const version = ++requestVersion.current;
     try {
       setLoading(true);
       setError(null);
-      const data = await manager.fetch(dsId);
+      const data = extraParams === undefined
+        ? await manager.fetch(dsId) : await manager.fetch(dsId, extraParams);
+      if (version !== requestVersion.current) return;
       if (data) {
         setOptions(Array.isArray(data) ? data : []);
       }
     } catch (err) {
+      if (version !== requestVersion.current) return;
       const errorMsg = err instanceof Error ? err.message : '数据加载失败';
       setError(errorMsg);
       console.error('useFieldDataSource refetch error:', err);
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
   }, [dataSourceKey, manager]);
 

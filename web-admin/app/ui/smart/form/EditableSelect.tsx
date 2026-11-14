@@ -21,6 +21,7 @@ interface Props {
   clearLabel: string;
   className?: string;
   onOpen: () => void;
+  onSearch?: (query: string) => void;
   onChange: (value: string) => void;
   onBlur: () => void;
   onClear: () => void;
@@ -37,11 +38,25 @@ export function EditableSelect(props: Props) {
   const anchor = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [searchPending, setSearchPending] = useState(false);
+  const busy = props.loading || searchPending;
   const [active, setActive] = useState(-1);
   const expanded = open && !props.disabled;
-  const selected = props.options.find((option) => String(option.value) === props.value);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const selectedCache = useRef<{ value: string; label: any; source: Props['onSearch'] } | null>(null);
+  const loadedSelection = props.options.find((option) => String(option.value) === props.value);
+  const selected = loadedSelection || (props.onSearch && !props.error && !props.disabled
+    && selectedCache.current?.value === props.value && selectedCache.current.source === props.onSearch ? selectedCache.current : undefined);
+  useEffect(() => {
+    if (loadedSelection) selectedCache.current = { value: String(loadedSelection.value), label: loadedSelection.label, source: props.onSearch };
+    else if (!props.value || props.error || props.disabled) selectedCache.current = null;
+  }, [loadedSelection, props.value, props.error, props.disabled, props.onSearch]);
+  useEffect(() => {
+    setSearchPending(false);
+    return () => clearTimeout(searchTimer.current);
+  }, [props.onSearch]);
   const needle = query.trim().toLocaleLowerCase();
-  const options = props.options.filter(
+  const options = props.onSearch ? props.options : props.options.filter(
     (option) =>
       !needle ||
       String(option.label ?? '')
@@ -66,6 +81,8 @@ export function EditableSelect(props: Props) {
 
   useEffect(() => {
     if (props.disabled) {
+      clearTimeout(searchTimer.current);
+      setSearchPending(false);
       setOpen(false);
       setQuery('');
       setActive(-1);
@@ -83,13 +100,15 @@ export function EditableSelect(props: Props) {
   function changeOpen(next: boolean) {
     if (props.disabled) return;
     if (next && !open) props.onOpen();
+    clearTimeout(searchTimer.current);
+    setSearchPending(false);
     setOpen(next);
     setQuery('');
     setActive(-1);
   }
   function choose(index: number) {
     const option = choices[index];
-    if (!option || option.disabled || props.loading || props.error) return;
+    if (!option || option.disabled || busy || props.error) return;
     changeOpen(false);
     if (option.create) props.onCreateNew?.();
     else props.onChange(option.value);
@@ -121,13 +140,13 @@ export function EditableSelect(props: Props) {
             aria-expanded={expanded}
             aria-controls={expanded ? `${id}-list` : undefined}
             aria-activedescendant={
-              expanded && activeChoice && !props.loading && !props.error
+              expanded && activeChoice && !busy && !props.error
                 ? `${id}-option-${active}`
                 : undefined
             }
             aria-required={props.required}
             aria-invalid={props.invalid || undefined}
-            aria-busy={props.loading}
+            aria-busy={busy}
             data-testid={`select-trigger-${props.name}`}
             disabled={props.disabled}
             value={expanded ? query : String(selected?.label ?? '')}
@@ -144,8 +163,17 @@ export function EditableSelect(props: Props) {
             }}
             onChange={(event) => {
               if (!expanded) changeOpen(true);
-              setQuery(event.target.value);
+              const query = event.target.value;
+              setQuery(query);
               setActive(-1);
+              clearTimeout(searchTimer.current);
+              if (props.onSearch) {
+                setSearchPending(true);
+                searchTimer.current = setTimeout(() => {
+                  props.onSearch?.(query.trim());
+                  setSearchPending(false);
+                }, 200);
+              }
             }}
             onBlur={() => {
               changeOpen(false);
@@ -215,9 +243,9 @@ export function EditableSelect(props: Props) {
           aria-label={props.label}
           className="max-h-60 overflow-y-auto"
         >
-          {props.loading || props.error ? (
+          {busy || props.error ? (
             <div role="status" className="text-text-3 px-3 py-2 text-sm">
-              {props.error
+              {props.error && !busy
                 ? st({
                     'zh-CN': '加载失败，请关闭后重新打开',
                     en: 'Unable to load. Close and reopen to retry.',

@@ -33,6 +33,39 @@ describe('Smart Select', () => {
     mockRefetch = vi.fn();
   });
 
+  it('searches the dynamic reference source instead of restricting selection to its first page', async () => {
+    const onChange = vi.fn();
+    const props = { name: 'customer', label: 'Customer', onChange,
+      dataSource: { type: 'api', endpoint: '/api/dynamic/crm_account_common/list',
+        modelCode: 'crm_account_common', params: { pageNum: 1, pageSize: 200,
+          filters: JSON.stringify([{ fieldName: 'crm_acc_status', operator: 'EQ', value: 'active' }]) } } as any };
+    mockOptions = [{ value: 'FIRST', label: 'First-page customer' }];
+    const { rerender } = render(<Select {...props} value="" />);
+    const input = screen.getByRole('combobox', { name: 'Customer' });
+    fireEvent.click(input);
+    fireEvent.change(input, { target: { value: 'ACC-BEYOND-200' } });
+    expect(input).toHaveAttribute('aria-busy', 'true');
+    expect(screen.queryByRole('option', { name: 'First-page customer' })).not.toBeInTheDocument();
+    await waitFor(() => expect(mockRefetch).toHaveBeenCalledWith({ keyword: 'ACC-BEYOND-200', pageNum: 1 }));
+    expect(onChange).not.toHaveBeenCalled();
+    mockOptions = [{ value: 'FOUND', label: 'Customer outside first page' }];
+    rerender(<Select {...props} value="" />);
+    fireEvent.click(await screen.findByRole('option', { name: 'Customer outside first page' }));
+    expect(onChange).toHaveBeenCalledWith('FOUND');
+    rerender(<Select {...props} value="FOUND" />);
+    expect(input).toHaveValue('Customer outside first page');
+    // Reopening/clearing a query must not erase the selected label or submit typed text.
+    fireEvent.click(input);
+    await waitFor(() => expect(mockRefetch).toHaveBeenCalledWith({ keyword: '', pageNum: 1 }));
+    mockOptions = [{ value: 'FIRST', label: 'First-page customer' }];
+    rerender(<Select {...props} value="FOUND" />);
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(input).toHaveValue('Customer outside first page');
+    mockError = 'Access denied';
+    rerender(<Select {...props} value="FOUND" />);
+    expect(input).not.toHaveValue('Customer outside first page');
+  });
+
   it('revalidates a touched required selection when inline creation updates its controlled value', async () => {
     const props = { name: 'customer', label: 'Customer', required: true,
       options: [{ label: 'Created customer', value: 'created-customer' }] };
@@ -204,7 +237,7 @@ describe('Smart Select', () => {
     expect(mockRefetch).toHaveBeenCalledTimes(1);
   });
 
-  it('filters options by typing in the select itself while keeping create available', () => {
+  it('filters static options by typing in the select itself while keeping create available', () => {
     mockOptions = [
       { label: 'Alpha Project', value: 'alpha' },
       { label: 'Beta Project', value: 'beta' },
@@ -213,13 +246,7 @@ describe('Smart Select', () => {
     render(
       <Select
         name="bom_project_id"
-        dataSource={
-          {
-            type: 'api',
-            endpoint: '/api/dynamic/bom_project/list',
-            method: 'get',
-          } as any
-        }
+        options={mockOptions}
         canCreateNew
       />,
     );

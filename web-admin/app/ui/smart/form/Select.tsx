@@ -169,6 +169,11 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       dataSource: dataSource as any,
       context,
     });
+    const remoteReferenceSearch = typeof dataSource === 'object' && dataSource?.type === 'api'
+      && /^\/api\/dynamic\/[A-Za-z_][A-Za-z0-9_]*\/list$/.test(dataSource.endpoint || '');
+    const searchReference = useCallback((keyword: string) => {
+      void refetch({ keyword, pageNum: 1 });
+    }, [refetch]);
     const [radixOpen, setRadixOpen] = useState(false);
 
     // 批量翻译 options 的 label 字段
@@ -304,8 +309,10 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
               clearLabel={clearLabel}
               className={clsx(fieldSizeStyles[size], fieldInputHeightStyles[size], className)}
               onOpen={() => {
-                if (dataSource) void refetch();
+                if (remoteReferenceSearch) searchReference('');
+                else if (dataSource) void refetch();
               }}
+              onSearch={remoteReferenceSearch ? searchReference : undefined}
               onChange={handleRadixValueChange}
               onBlur={field.onBlur}
               onClear={handleClearClick}
