@@ -8,6 +8,13 @@ import {
 } from '../PropertyEditorRegistry';
 import { SchemaBlockConfigPanel } from '../SchemaBlockConfigPanel';
 
+// A retried run in the same worker may leave residue in the singleton
+// registry; start every case from a known state (clear() is the test seam).
+beforeEach(() => {
+  propertyEditorRegistry.clear('designer.color');
+});
+
+
 afterEach(cleanup);
 describe('registered property controls', () => {
   it('fails closed for unknown controls and conflicting registrations', () => {
