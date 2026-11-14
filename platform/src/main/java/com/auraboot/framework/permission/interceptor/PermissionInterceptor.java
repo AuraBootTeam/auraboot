@@ -196,16 +196,16 @@ public class PermissionInterceptor implements HandlerInterceptor {
             }
         }
 
+        // Domain-delegated endpoints are marked with @DomainAuthorizationDelegated instead of
+        // the interceptor referencing controller classes (no layer may depend on controllers).
         if (MetaPermission.COMMAND_EXECUTE.equals(permissionCode) && handler instanceof HandlerMethod endpoint
-                && endpoint.getBeanType() == com.auraboot.framework.meta.controller.config.CommandController.class
-                && "execute".equals(endpoint.getMethod().getName()) && publishedDomainCommand(request)) return true;
+                && endpoint.hasMethodAnnotation(com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated.class)
+                && publishedDomainCommand(request)) return true;
 
         // Native domain CRUD authorizes in the shared application service for HTTP and non-HTTP callers.
         // Metadata-only endpoints and other products retain their original interceptor contract.
-        if (domainPolicies != null && handler instanceof HandlerMethod endpoint && endpoint.getBeanType() == com.auraboot.framework.meta.controller.DynamicController.class
-                && Set.of("getById", "create", "createCompat", "update", "delete", "batchCreate", "batchUpdate",
-                    "batchDelete", "validate", "getFieldOptions", "executeCustomQuery", "executeCustomAction", "exportData",
-                    "downloadExport", "importData", "getStats", "getRelationData", "saveWithRelations").contains(endpoint.getMethod().getName())
+        if (domainPolicies != null && handler instanceof HandlerMethod endpoint
+                && endpoint.hasMethodAnnotation(com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated.class)
                 && permissionCode.startsWith("model.") && permissionCode.lastIndexOf('.') > 6
                 && domainPolicies.hasDomainModel(MetaContext.getCurrentTenantId(),
                     permissionCode.substring(6, permissionCode.lastIndexOf('.')))) return true;

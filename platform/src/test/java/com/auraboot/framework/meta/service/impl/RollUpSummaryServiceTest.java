@@ -50,7 +50,9 @@ class RollUpSummaryServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new RollUpSummaryService(dynamicDataMapper, metaModelService);
+        service = new RollUpSummaryService(dynamicDataMapper, metaModelService,
+                mock(com.auraboot.framework.meta.mapper.MetaFieldMapper.class),
+                mock(com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper.class));
 
         // Default table and column name resolution
         lenient().when(metaModelService.getTableName(CHILD_MODEL)).thenReturn("mt_order_line");

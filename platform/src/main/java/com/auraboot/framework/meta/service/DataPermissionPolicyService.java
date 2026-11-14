@@ -39,6 +39,13 @@ public interface DataPermissionPolicyService {
     List<DataPermissionRoleBinding> listRoleBindings(String policyPid);
 
     /**
+     * Resolves a role referenced by a policy binding for display enrichment:
+     * same-tenant, not deleted. Returns null when the role pid is unknown or
+     * unavailable in the current tenant (the caller treats that as denied).
+     */
+    com.auraboot.framework.rbac.entity.Role resolveBindableRole(String rolePid);
+
+    /**
      * Get all enabled policies for a user (via their roles) on a model.
      */
     List<DataPermissionPolicy> getEffectivePolicies(Long tenantId, String modelCode, Long userId);

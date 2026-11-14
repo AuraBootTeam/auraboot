@@ -44,4 +44,7 @@ public interface AdjudicatorService {
      * Check if all required evidence has been collected.
      */
     boolean isEvidenceComplete(Long tenantId, String subjectType, String subjectId, String stage);
+
+    /** All decision records for a subject (moved from DecisionController for ArchUnit rule 2). */
+    java.util.List<com.auraboot.framework.meta.entity.DecisionRecord> findDecisionsBySubject(Long tenantId, String subjectType, String subjectId);
 }

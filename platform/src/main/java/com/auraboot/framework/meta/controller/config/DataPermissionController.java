@@ -38,7 +38,6 @@ import java.util.Map;
 public class DataPermissionController {
 
     private final DataPermissionPolicyService policyService;
-    private final RoleMapper roleMapper;
 
     // ==================== Policy CRUD ====================
 
@@ -145,12 +144,11 @@ public class DataPermissionController {
         List<Map<String, Object>> enriched = bindings.stream().map(b -> {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("rolePid", b.getRolePid());
-            Role role = roleMapper.findByPid(b.getRolePid());
-            if(role==null || !java.util.Objects.equals(role.getTenantId(),MetaContext.getCurrentTenantId())
-                    || Boolean.TRUE.equals(role.getDeletedFlag()))
+            Role role = policyService.resolveBindableRole(b.getRolePid());
+            if (role == null)
                 throw new org.springframework.security.access.AccessDeniedException("Policy role binding is unavailable in this tenant");
-            row.put("roleName", role != null ? role.getName() : b.getRolePid());
-            row.put("roleCode", role != null ? role.getCode() : "");
+            row.put("roleName", role.getName());
+            row.put("roleCode", role.getCode());
             return row;
         }).toList();
         return ApiResponse.success(PaginationResult.of(enriched, (long) enriched.size(), 1, Math.max(enriched.size(), 1)));

@@ -22,6 +22,7 @@ public class PluginRecordStateServiceImpl implements PluginRecordStateService {
 
     private final PluginRecordMapper pluginRecordMapper;
     private final AuraPluginManager auraPluginManager;
+    private final com.auraboot.framework.application.tenant.ApplicationCatalogPolicy catalogPolicy;
 
     @Override
     public PluginRecord setEnabled(String pid, boolean enabled) {
@@ -42,5 +43,26 @@ public class PluginRecordStateServiceImpl implements PluginRecordStateService {
             pluginRecordMapper.markAsDisabled(pid);
         }
         return pluginRecordMapper.findByPid(pid);
+    }
+
+    @Override
+    public PluginRecord findByPid(String pid) {
+        return pluginRecordMapper.findByPid(pid);
+    }
+
+    @Override
+    public java.util.List<PluginRecord> listCatalog(Long tenantId) {
+        var catalog = catalogPolicy.read(tenantId);
+        if (!catalog.active()) {
+            return pluginRecordMapper.findByTenant();
+        }
+        if (catalog.pluginIds().isEmpty()) {
+            return java.util.List.of();
+        }
+        return pluginRecordMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<PluginRecord>()
+                        .eq("tenant_id", tenantId).eq("deleted_flag", false)
+                        .in("plugin_id", catalog.pluginIds())
+                        .orderByDesc("created_at"));
     }
 }

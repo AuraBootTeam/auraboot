@@ -6,7 +6,6 @@ import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.plugin.config.PlatformProperties;
 import com.auraboot.framework.plugin.entity.PluginRecord;
-import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
 import com.auraboot.framework.plugin.service.PlatformVersionChecker;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,11 +28,9 @@ import java.util.stream.Collectors;
 @Tag(name = "Plugin Management", description = "Manage installed configuration plugins")
 public class PluginController {
 
-    private final PluginRecordMapper pluginRecordMapper;
     private final PlatformVersionChecker platformVersionChecker;
     private final PlatformProperties platformProperties;
     private final com.auraboot.framework.plugin.pf4j.AuraPluginManager auraPluginManager;
-    private final com.auraboot.framework.application.tenant.ApplicationCatalogPolicy catalogPolicy;
     private final com.auraboot.framework.plugin.service.PluginRecordStateService pluginRecordStateService;
 
     /**
@@ -63,7 +60,7 @@ public class PluginController {
     @Operation(summary = "Get plugin details", description = "Get plugin details by PID")
     @RequirePermission(MetaPermission.PLUGIN_READ)
     public ApiResponse<PluginDTO> getPlugin(@PathVariable String pid) {
-        PluginRecord plugin = pluginRecordMapper.findByPid(pid);
+        PluginRecord plugin = pluginRecordStateService.findByPid(pid);
         if (plugin == null) {
             return ApiResponse.error("Plugin not found");
         }
@@ -147,12 +144,7 @@ public class PluginController {
     }
 
     private List<PluginRecord> catalogPlugins(Long tenant) {
-        var catalog = catalogPolicy.read(tenant);
-        if (!catalog.active()) return pluginRecordMapper.findByTenant();
-        if (catalog.pluginIds().isEmpty()) return List.of();
-        return pluginRecordMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<PluginRecord>()
-                .eq("tenant_id", tenant).eq("deleted_flag", false).in("plugin_id", catalog.pluginIds())
-                .orderByDesc("created_at"));
+        return pluginRecordStateService.listCatalog(tenant);
     }
 
     private PluginDTO toDTO(PluginRecord plugin) {

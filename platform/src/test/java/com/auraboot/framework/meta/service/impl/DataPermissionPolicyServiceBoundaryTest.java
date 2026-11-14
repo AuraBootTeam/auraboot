@@ -34,7 +34,8 @@ class DataPermissionPolicyServiceBoundaryTest {
     private final DataPermissionPolicyMapper policies=mock(DataPermissionPolicyMapper.class);
     private final DataPermissionRoleBindingMapper bindings=mock(DataPermissionRoleBindingMapper.class);
     private final DataPermissionEngine engine=mock(DataPermissionEngine.class);
-    private final DataPermissionPolicyServiceImpl service=new DataPermissionPolicyServiceImpl(writes,access,policies,bindings,engine);
+    private final com.auraboot.framework.rbac.mapper.RoleMapper roleMapper=mock(com.auraboot.framework.rbac.mapper.RoleMapper.class);
+    private final DataPermissionPolicyServiceImpl service=new DataPermissionPolicyServiceImpl(writes,access,policies,bindings,engine,roleMapper);
     private MetaContext.Snapshot target;
 
     @BeforeEach void identity() {
