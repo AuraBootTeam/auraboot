@@ -2,6 +2,8 @@
 import importlib.util
 from pathlib import Path
 import unittest
+import tempfile
+import hashlib
 
 spec = importlib.util.spec_from_file_location('public_install', Path(__file__).with_name('verify-public-project-install.py'))
 installer = importlib.util.module_from_spec(spec)
@@ -36,6 +38,27 @@ class IsolatedEnvironmentTests(unittest.TestCase):
         self.assertEqual(receipt['actualMemoryBytes'], 4294967296)
         for host in [{'Memory': 0, 'MemorySwap': 0}, {'Memory': 4294967296, 'MemorySwap': -1}, {'Memory': '4g', 'MemorySwap': 4294967296}]:
             with self.subTest(host=host), self.assertRaises(RuntimeError): installer.measured_builder_limits(host)
+
+
+
+class ChromeRuntimeTests(unittest.TestCase):
+    def test_existing_chrome_is_measured_and_unsafe_inputs_fail_before_build(self):
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / 'chrome'
+            binary.write_text('#!/bin/sh\necho "Google Chrome 151.0.7922.173"\n')
+            binary.chmod(0o700)
+            record = installer.measured_chrome_runtime(binary)
+            self.assertEqual(record['channel'], 'chrome')
+            self.assertEqual(record['version'], 'Google Chrome 151.0.7922.173')
+            self.assertEqual(record['sha256'], hashlib.sha256(binary.read_bytes()).hexdigest())
+            binary.chmod(0o600)
+            with self.assertRaises(RuntimeError): installer.measured_chrome_runtime(binary)
+            binary.chmod(0o722)
+            with self.assertRaises(RuntimeError): installer.measured_chrome_runtime(binary)
+            binary.chmod(0o700)
+            binary.write_text('#!/bin/sh\necho "unrecognized tool"\n')
+            with self.assertRaises(RuntimeError): installer.measured_chrome_runtime(binary)
+            with self.assertRaises(FileNotFoundError): installer.measured_chrome_runtime(binary.with_name('missing'))
 
 
 if __name__ == '__main__':

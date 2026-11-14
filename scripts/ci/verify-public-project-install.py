@@ -54,6 +54,22 @@ def measured_builder_limits(host):
                 scope='Docker HostConfig observation; Compose limit is not a measured BuildKit concurrency count')
 
 
+
+def measured_chrome_runtime(executable):
+    """Use the CI-installed Chrome channel without an unsupported OS download."""
+    binary = Path(executable).resolve(strict=True)
+    require(binary.is_file() and os.access(binary, os.X_OK), 'Executable CI Chrome required')
+    require(binary.stat().st_mode & 0o022 == 0, 'CI Chrome must not be group/world writable')
+    version = subprocess.check_output([str(binary), '--version'], text=True,
+                                     stderr=subprocess.DEVNULL, timeout=15).strip()
+    require(re.fullmatch(r'Google Chrome [0-9]+(?:\.[0-9]+){3}(?: unknown)?', version),
+            'Recognized CI Chrome version required')
+    with binary.open('rb') as stream:
+        sha = hashlib.file_digest(stream, 'sha256').hexdigest()
+    return dict(channel='chrome', version=version, binary=str(binary), sha256=sha,
+                scope='Observed CI-installed browser; no global install or browser download')
+
+
 def main():
     require(os.uname().sysname == 'Linux', 'Linux CI only; no local container fallback')
     job = os.environ['AURA_CI_JOB_ID']
@@ -71,10 +87,12 @@ def main():
                DELIVERY_WEB_URL=f'http://127.0.0.1:{web_port}',
                AURABOOT_BIND_ADDRESS='127.0.0.1', POSTGRES_BIND_ADDRESS='127.0.0.1',
                DELIVERY_EVIDENCE_ROOT=str(output), ADMIN_EMAIL='admin@auraboot.com',
-               ADMIN_PASSWORD='Test2026x', AURA_E2E_VIDEO='off', AURA_E2E_BROWSER_CHANNEL='chromium', COMPOSE_PARALLEL_LIMIT='1', NO_PROXY='localhost,127.0.0.1')
+               ADMIN_PASSWORD='Test2026x', AURA_E2E_VIDEO='off', AURA_E2E_BROWSER_CHANNEL='chrome', COMPOSE_PARALLEL_LIMIT='1', NO_PROXY='localhost,127.0.0.1')
     for key in ['JWT_SECRET', 'SESSION_SECRET', 'POSTGRES_PASSWORD', 'OPEN_PLATFORM_PROTOCOL_SIGNING_KEY',
                 'FIELD_ENCRYPTION_KEY', 'POSTGRES_USER', 'POSTGRES_DB']:
         env.pop(key, None)
+    browser_runtime = measured_chrome_runtime('/opt/google/chrome/chrome')
+    (output / 'browser-runtime.json').write_text(json.dumps(browser_runtime, indent=2))
     for port in [web_port, db_port]:
         with socket.socket() as probe:
             probe.bind(('127.0.0.1', port))
@@ -226,7 +244,8 @@ def main():
         shutil.copyfile(root / 'plugins/project-management/scripts/acceptance-matrix.json', output / 'acceptance-matrix.json')
         check('public-initialization', projects=8, fixture='fixture.json', hostNodeDeniedDuringBootstrap=True)
         run(['pnpm', 'install', '--frozen-lockfile', '--ignore-scripts'], 'host-browser-dependencies')
-        run(['pnpm', 'exec', 'playwright', 'install', 'chromium'], 'browser-install', cwd=root / 'web-admin')
+        require(measured_chrome_runtime(browser_runtime['binary']) == browser_runtime,
+                'CI browser identity changed during installation')
         with (private / 'public-browser.log').open('xb') as log:
             result = subprocess.run(['pnpm', 'exec', 'playwright', 'test', '--config', 'playwright.delivery.config.ts'],
                                     cwd=root / 'web-admin', env=env, stdout=log, stderr=subprocess.STDOUT, timeout=900)
