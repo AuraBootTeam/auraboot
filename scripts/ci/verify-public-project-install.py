@@ -102,7 +102,7 @@ def main():
                     with urllib.request.urlopen(env['BACKEND_URL'] + '/login', timeout=15) as response:
                         require(response.status == 200, 'Public login page did not load')
                     return
-                except (urllib.error.URLError, TimeoutError):
+                except (urllib.error.URLError, TimeoutError, ConnectionError):
                     pass  # The BFF may still be starting; retain the same overall deadline.
             time.sleep(3)
         raise RuntimeError('Public Compose backend did not become healthy')
