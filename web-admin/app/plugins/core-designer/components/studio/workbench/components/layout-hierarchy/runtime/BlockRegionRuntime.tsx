@@ -1,5 +1,5 @@
 import React from 'react';
-import type { BlockConfig } from '~/plugins/core-designer/components/studio/domain/schema/layout-hierarchy';
+import type { BlockConfig } from '~/framework/smart/schema/layout-hierarchy';
 import { FieldCellRuntime } from './FieldCellRuntime';
 
 interface BlockRegionRuntimeProps {

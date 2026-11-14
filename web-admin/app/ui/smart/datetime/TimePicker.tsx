@@ -7,7 +7,7 @@
  */
 
 import React, { useRef, useState } from 'react';
-import type { TimePickerProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+import type { TimePickerProps } from '~/framework/smart/schema/smart-components';
 import { useSmartField } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
 import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
 import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';

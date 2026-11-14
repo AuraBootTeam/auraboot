@@ -62,9 +62,9 @@ vi.mock('~/shared/services/ApiService', () => ({
 
 import { PropertyFieldRenderer } from '~/shared/designer';
 import { automationNodes } from '../index';
-import { FlowPropertyPanel } from '~/plugins/core-designer/components/flow-designer-sdk/core/FlowPropertyPanel';
-import { useFlowStore } from '~/plugins/core-designer/components/flow-designer-sdk/store/useFlowStore';
-import { nodeRegistry } from '~/plugins/core-designer/components/flow-designer-sdk/nodes/NodeRegistry';
+import { FlowPropertyPanel } from '~/framework/smart/flows/sdk/core/FlowPropertyPanel';
+import { useFlowStore } from '~/framework/smart/flows/sdk/store/useFlowStore';
+import { nodeRegistry } from '~/framework/smart/flows/sdk/nodes/NodeRegistry';
 
 // The field types the automation palette nodes use (kept in sync with the configSchemas).
 const EXPECTED_AUTOMATION_FIELD_TYPES = [

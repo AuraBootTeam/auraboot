@@ -1,5 +1,5 @@
 // web-admin/app/smart/automation/nodes/controls.ts
-import type { FlowNodeDefinition } from '~/plugins/core-designer/components/flow-designer-sdk';
+import type { FlowNodeDefinition } from '~/framework/smart/flows/sdk';
 
 /**
  * Automation Control Node Definitions

@@ -4,7 +4,7 @@ import {
   createLinkageAction,
   type LinkageAction,
   type LinkageActionType,
-} from './types';
+} from '~/framework/meta/schemas/linkage-types';
 import { FieldMultiSelect } from './FieldMultiSelect';
 
 interface LinkageActionConfigProps {

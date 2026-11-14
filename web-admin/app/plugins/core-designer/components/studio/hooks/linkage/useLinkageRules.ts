@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
-import type { LinkageRule, LinkageAction } from '~/plugins/core-designer/components/studio/workbench/panels/linkage/types';
-import { createLinkageRule } from '~/plugins/core-designer/components/studio/workbench/panels/linkage/types';
+import type { LinkageRule, LinkageAction } from '~/framework/meta/schemas/linkage-types';
+import { createLinkageRule } from '~/framework/meta/schemas/linkage-types';
 import { useCanvasEditorState } from '~/plugins/core-designer/components/studio/hooks/store/useCanvasEditorState';
 import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
 

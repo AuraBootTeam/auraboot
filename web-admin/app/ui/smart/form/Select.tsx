@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import type {
   SelectProps,
   OptionItem,
-} from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+} from '~/framework/smart/schema/smart-components';
 import { useSmartField } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
 import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
 import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';

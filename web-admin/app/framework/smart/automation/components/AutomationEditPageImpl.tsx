@@ -10,7 +10,7 @@ import { usePermissions } from '~/contexts/AuthContext';
 import { useParams, useNavigate, useSearchParams, useLoaderData } from 'react-router';
 import { AutomationEditor } from './AutomationEditor';
 import type { Automation, AutomationLog } from '../services/automationService';
-import type { FlowData } from '~/plugins/core-designer/components/flow-designer-sdk';
+import type { FlowData } from '~/framework/smart/flows/sdk';
 
 interface LoaderData {
   automation: Automation | null;

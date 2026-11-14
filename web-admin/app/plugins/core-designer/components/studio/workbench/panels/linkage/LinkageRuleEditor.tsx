@@ -1,5 +1,5 @@
 import React from 'react';
-import type { LinkageRule, LinkageAction } from './types';
+import type { LinkageRule, LinkageAction } from '~/framework/meta/schemas/linkage-types';
 import { TriggerConfig } from './TriggerConfig';
 import { LinkageActionConfig } from './LinkageActionConfig';
 

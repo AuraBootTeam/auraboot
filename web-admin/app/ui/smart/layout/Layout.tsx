@@ -10,7 +10,7 @@ import type {
   FlexLayoutConfig,
   StackLayoutConfig,
   AbsoluteLayoutConfig,
-} from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+} from '~/framework/smart/schema/smart-components';
 
 export const Layout: React.FC<LayoutProps> = ({
   name,

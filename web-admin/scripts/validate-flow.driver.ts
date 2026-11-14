@@ -7,11 +7,11 @@ import { resolve } from 'node:path';
 import {
   validateGraphDocument,
   type GraphDocumentValidationError,
-} from '../app/plugins/core-designer/components/flow-designer-sdk/validation/validateGraphDocument';
+} from '../app/framework/smart/flows/sdk/validation/validateGraphDocument';
 import {
   diffGraphDocuments,
   type GrammarDivergence,
-} from '../app/plugins/core-designer/components/flow-designer-sdk/validation/diffGraphDocuments';
+} from '../app/framework/smart/flows/sdk/validation/diffGraphDocuments';
 
 interface CliArgs {
   mode: 'validate' | 'diff' | 'help';

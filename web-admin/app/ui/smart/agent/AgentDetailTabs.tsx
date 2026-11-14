@@ -702,8 +702,8 @@ function ToolsSkillsTab({
         if (ResultHelper.isSuccess(res) && res.data?.records) {
           setAllModels(res.data.records);
         }
-      } catch {
-        // silent
+      } catch (error) {
+        console.warn('[AgentDetailTabs] load models failed', error);
       } finally {
         setLoadingModels(false);
       }
@@ -721,8 +721,8 @@ function ToolsSkillsTab({
         if (ResultHelper.isSuccess(res) && res.data?.records) {
           setTools(res.data.records);
         }
-      } catch {
-        // silent
+      } catch (error) {
+        console.warn('[AgentDetailTabs] load tools failed', error);
       } finally {
         setLoadingTools(false);
       }
@@ -737,8 +737,8 @@ function ToolsSkillsTab({
         if (ResultHelper.isSuccess(res) && res.data?.records) {
           setSkills(res.data.records);
         }
-      } catch {
-        // silent
+      } catch (error) {
+        console.warn('[AgentDetailTabs] load skills failed', error);
       } finally {
         setLoadingSkills(false);
       }
@@ -1166,8 +1166,8 @@ function RunHistoryTab({ agentCode }: { agentCode: string }) {
         if (ResultHelper.isSuccess(res) && res.data?.records) {
           setRuns(res.data.records);
         }
-      } catch {
-        // silent
+      } catch (error) {
+        console.warn('[AgentDetailTabs] request failed', error);
       } finally {
         setLoading(false);
       }
@@ -1886,8 +1886,9 @@ function MemoryTab({ agentPid }: { agentPid: string }) {
         if (ResultHelper.isSuccess(res) && res.data?.records) {
           setMemories(res.data.records);
         }
-      } catch {
+      } catch (error) {
         // silent — memory may not be available
+        console.debug('[AgentDetailTabs] memory snapshot unavailable', error);
       } finally {
         setLoading(false);
       }

@@ -25,7 +25,7 @@ const statusMapSpy = vi.fn()
 /** Nodes seeded into the shared designer store — the canvas mock renders them clickable. */
 let seededNodes: Array<{ id: string; data: { label: string } }> = []
 
-vi.mock('~/plugins/core-designer/components/flow-designer-sdk', () => ({
+vi.mock('~/framework/smart/flows/sdk', () => ({
   FlowCanvas: ({ className }: { className?: string }) => (
     <div data-testid="flow-canvas" className={className}>
       {seededNodes.map((n) => (

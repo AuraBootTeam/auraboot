@@ -1,5 +1,5 @@
 import React from 'react';
-import type { FieldCellConfig } from '~/plugins/core-designer/components/studio/domain/schema/layout-hierarchy';
+import type { FieldCellConfig } from '~/framework/smart/schema/layout-hierarchy';
 
 interface FieldCellDesignerProps {
   field: FieldCellConfig;

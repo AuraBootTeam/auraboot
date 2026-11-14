@@ -26,7 +26,7 @@ import { ContextualAuthoringSurface } from '~/framework/meta/authoring/Contextua
 
 // Ensure profiles are registered
 import '~/framework/meta/profiles/admin';
-import '~/framework/meta/profiles/report';
+// report RenderProfile is registered by the core-designer plugin at boot
 
 export interface DynamicPageRendererProps {
   /** Model table name (e.g., "device", "pe-order") */

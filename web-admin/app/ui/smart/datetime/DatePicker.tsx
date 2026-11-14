@@ -1,7 +1,7 @@
 import React, { forwardRef } from 'react';
 import { useActionData } from 'react-router';
 import clsx from 'clsx';
-import type { DatePickerProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+import type { DatePickerProps } from '~/framework/smart/schema/smart-components';
 import {
   useExpressionValue,
   useSmartField,

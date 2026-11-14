@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { TabContainerConfig } from '~/plugins/core-designer/components/studio/domain/schema/layout-hierarchy';
+import type { TabContainerConfig } from '~/framework/smart/schema/layout-hierarchy';
 import { FloorSectionRuntime } from './FloorSectionRuntime';
 
 interface TabContainerRuntimeProps {

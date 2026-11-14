@@ -14,6 +14,9 @@ vi.mock('../../services/auraBotApi', () => ({ auraBotApi: {
   getConversationExecution: vi.fn().mockResolvedValue({ state: 'idle' }),
 } }));
 
+import { setDslFormFillBackend } from '~/framework/meta/rendering/dslFormFillBackend';
+import { dslFormFillBackend } from '../../formFillBackend';
+
 const instruction = '请根据纪要填写当前表单：名称：材料复核；说明：检查清单；日期未确定。';
 function Form() {
   const [values, setValues] = useState<Record<string, unknown>>({ name: '', description: '', project: 'selected-project' });
@@ -68,6 +71,10 @@ describe('Bot and real controlled form draft boundary', () => {
     vi.mocked(auraBotApi.listConversations).mockResolvedValue([]);
     vi.mocked(auraBotApi.chatStream).mockImplementation((_request, c) => { callbacks = c; return new Promise<void>(resolve => { complete = resolve; }); });
   });
+  beforeEach(() => {
+    setDslFormFillBackend(dslFormFillBackend);
+  });
+
   it('sends only editable fields and applies atomically after stream success', async () => {
     await begin();
     expect(vi.mocked(auraBotApi.chatStream).mock.calls[0][0]).toMatchObject({ agentCode: 'aurabot', formFill: { modelCode: 'task' } });

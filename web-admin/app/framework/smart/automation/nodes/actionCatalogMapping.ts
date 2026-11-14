@@ -1,4 +1,4 @@
-import type { FlowNodeDefinition } from '~/plugins/core-designer/components/flow-designer-sdk';
+import type { FlowNodeDefinition } from '~/framework/smart/flows/sdk';
 import type { DecisionAction } from '~/shared/decision/api/decisionApi';
 import { resolveDecisionActionAvailability } from '~/shared/decision/ui/actionAvailability';
 

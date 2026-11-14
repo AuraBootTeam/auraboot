@@ -23,7 +23,7 @@ vi.mock('~/ui/ui/dialog', () => ({
   DialogDescription: ({ children }: any) => <p>{children}</p>,
 }));
 
-vi.mock('~/plugins/core-designer/components/flow-designer-sdk/utils', () => ({
+vi.mock('~/framework/smart/flows/sdk/utils', () => ({
   humanizeType: (type: string) =>
     type
       .replace(/[-_]+/g, ' ')

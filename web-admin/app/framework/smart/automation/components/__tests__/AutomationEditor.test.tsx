@@ -29,7 +29,7 @@ const apiMocks = vi.hoisted(() => ({
   delete: vi.fn(),
 }));
 
-vi.mock('~/plugins/core-designer/components/flow-designer-sdk', () => ({
+vi.mock('~/framework/smart/flows/sdk', () => ({
   FlowDesigner: (props: any) => {
     receivedFlowDesignerProps.push(props);
     receivedInitialData.push(props.initialData);
@@ -102,7 +102,7 @@ vi.mock('../../nodes', () => ({
 
 // Import AFTER the mocks are wired up.
 import { AutomationEditor } from '../AutomationEditor';
-import type { FlowData } from '~/plugins/core-designer/components/flow-designer-sdk';
+import type { FlowData } from '~/framework/smart/flows/sdk';
 
 const buildFlowData = (suffix: string): FlowData => ({
   nodes: [
