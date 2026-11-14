@@ -22,7 +22,12 @@ export class PropertyEditorRegistry {
     // of failing every page behind the dev error overlay.
     const existing = this.editors.get(key);
     if (existing && existing !== editor) {
-      throw new Error(`Conflicting property editor registration: ${key}`);
+      // The dev-server module runner can evaluate the same editor module twice under
+      // different identities (SSR runner + HMR re-import chains); failing closed here
+      // takes the whole app down behind the error overlay for what is the same editor.
+      // Last registration wins; genuine conflicting registrations surface immediately
+      // in the designer as a missing/wrong editor instead of a dead app.
+      console.warn(`Property editor re-registered with a new identity: ${key}; last one wins`);
     }
     this.editors.set(key, editor);
     return () => {
