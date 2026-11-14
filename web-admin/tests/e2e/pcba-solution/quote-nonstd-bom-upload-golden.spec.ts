@@ -378,9 +378,14 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     for (const lineId of lineIds) {
       const priceRow = page.getByTestId(`table-row-${lineId}`);
       await expect(priceRow).toBeVisible({ timeout: 20_000 });
-      const cells = await tableTexts(priceRow.locator('td, [role="cell"]'));
-      expect(cells[yunhanColumn] ?? '', `Yunhan cell for quote line ${lineId}`).toMatch(
+      // Backend evidence can finish between the workbench's polling ticks.
+      // Assert the live cell rather than freezing its intermediate refresh text.
+      await expect(
+        priceRow.locator('td, [role="cell"]').nth(yunhanColumn),
+        `Yunhan cell for quote line ${lineId}`,
+      ).toHaveText(
         /未命中|\d+(?:\.\d+)?/,
+        { timeout: 20_000 },
       );
     }
 
