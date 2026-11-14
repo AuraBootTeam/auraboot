@@ -60,6 +60,7 @@ test.describe('PCBA quote BOM price ladder + MOQ warning', () => {
       ).toHaveText(/1000–2999\s*0\.009(?:0)?\s*(?:当前)?/);
       // 起订提醒: none — demand qty (1000) is at/above MOQ (100).
       await expect(ladderCandidate).not.toContainText('补齐 MOQ');
+      await page.screenshot({ path: test.info().outputPath('price-ladder-current-tier.png'), fullPage: true });
 
       // Close the drawer before switching rows (it overlays the table).
       await page.getByRole('button', { name: /关闭复核浮层|Close review drawer/ }).click();
@@ -90,6 +91,7 @@ test.describe('PCBA quote BOM price ladder + MOQ warning', () => {
       expect(moqLadderRows).toEqual(
         expect.arrayContaining(['100–999 0.0051 当前', '5000+ 0.0039']),
       );
+      await page.screenshot({ path: test.info().outputPath('price-ladder-moq-warning.png'), fullPage: true });
     } finally {
       await cleanupRows(page, created);
     }

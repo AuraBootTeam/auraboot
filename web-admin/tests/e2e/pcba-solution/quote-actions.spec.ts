@@ -291,6 +291,11 @@ test.describe('Quote actions deep — upload/process-fee/gerber/deepseek/source-
         if (r.status === 200) ok++;
       }
       expect(ok, 'QO-03: every attachment type recorded').toBe(3);
+      await page.goto(`/p/qo_quote_common/view/${quoteId}`);
+      await page.getByRole('tab', { name: '资料上传', exact: true }).click();
+      const materials = page.getByRole('table').filter({ hasText: '资料类型' }).first();
+      for (const [, , name] of types) await expect(materials).toContainText(name);
+      await page.screenshot({ path: test.info().outputPath('three-source-attachments.png'), fullPage: true });
     } finally {
       await context.close();
     }
@@ -364,6 +369,10 @@ test.describe('Quote actions deep — upload/process-fee/gerber/deepseek/source-
       );
       expect(saved.qo_rsa_type).toBe('gerber_package');
       expect(saved.qo_rsa_file_id).toBe(fid);
+      await page.goto(`/p/qo_quote_common/view/${quoteId}`);
+      await page.getByRole('tab', { name: '资料上传', exact: true }).click();
+      await expect(page.getByRole('table').filter({ hasText: '资料类型' }).first()).toContainText(path.basename(S.gerber!));
+      await page.screenshot({ path: test.info().outputPath('gerber-source-attachment.png'), fullPage: true });
     } finally {
       await context.close();
     }

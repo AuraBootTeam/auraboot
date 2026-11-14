@@ -186,12 +186,12 @@ test.describe('Team data scope runtime (X03-04)', () => {
       await openDynamicList(memberPage, resolvedBaseURL);
       await expectRowVisible(memberPage, recordOne);
       await expectRowAbsent(memberPage, recordTwo);
-      await memberPage.screenshot({ path: 'test-results/x03-member-sees-own-team.png', fullPage: true });
+      await memberPage.screenshot({ path: test.info().outputPath('x03-member-sees-own-team.png'), fullPage: true });
 
       await openDynamicList(outsiderPage, resolvedBaseURL);
       await expectRowAbsent(outsiderPage, recordOne);
       await expectRowAbsent(outsiderPage, recordTwo);
-      await outsiderPage.screenshot({ path: 'test-results/x03-outsider-sees-none.png', fullPage: true });
+      await outsiderPage.screenshot({ path: test.info().outputPath('x03-outsider-sees-none.png'), fullPage: true });
 
       // Removing the member from the team must hide the rows immediately —
       // the team-member service evicts the dataScopeCondition cache (#2102).
@@ -205,7 +205,7 @@ test.describe('Team data scope runtime (X03-04)', () => {
 
       await openDynamicList(memberPage, resolvedBaseURL);
       await expectRowAbsent(memberPage, recordOne);
-      await memberPage.screenshot({ path: 'test-results/x03-removed-member-sees-none.png', fullPage: true });
+      await memberPage.screenshot({ path: test.info().outputPath('x03-removed-member-sees-none.png'), fullPage: true });
     } finally {
       await memberContext.close();
       await outsiderContext.close();

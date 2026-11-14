@@ -110,6 +110,9 @@ test.describe('PCBA quote customer view golden', () => {
       ]);
       expect(records, 'attachment record keeps the original filename').toHaveLength(1);
       expect(String(records[0].qo_qca_file_id)).toBe(fileId);
+      await page.goto('/p/qo_quote_customer_attachment_common');
+      await expect(page.locator('main').getByText(originalName, { exact: true })).toBeVisible();
+      await page.screenshot({ path: test.info().outputPath('customer-attachment-original-filename.png'), fullPage: true });
     } finally {
       await cleanupRows(page, created);
     }

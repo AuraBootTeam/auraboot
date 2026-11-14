@@ -128,6 +128,7 @@ test.describe('BOM conversion-task soft delete real-browser golden @smoke', () =
     step = 'confirm delete';
     const confirmDialog = adminPage.getByTestId('confirm-dialog');
     await expect(confirmDialog).toBeVisible({ timeout: 10_000 });
+    await adminPage.screenshot({ path: test.info().outputPath('delete-confirmation-open.png'), fullPage: true });
     step = 'cancel delete (dismiss preserves)';
     await adminPage.getByTestId('confirm-cancel').click();
     await expect(confirmDialog).toHaveCount(0);
