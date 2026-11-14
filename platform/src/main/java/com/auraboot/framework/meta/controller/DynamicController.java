@@ -530,6 +530,7 @@ public class DynamicController {
     @GetMapping("/{pageKey}/{recordPid}")
     @Operation(summary = "获取单条数据", description = "根据记录 PID 获取单条数据")
     @RequirePermission("model.{pageKey}.read")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<Map<String, Object>> getById(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "记录 PID") @PathVariable String recordPid) {
@@ -659,6 +660,7 @@ public class DynamicController {
     @PostMapping("/{pageKey}/create")
     @Operation(summary = "创建数据", description = "根据页面定义创建新数据")
     @RequirePermission("model.{pageKey}.create")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<Object> create(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody Map<String, Object> data) {
@@ -679,6 +681,7 @@ public class DynamicController {
     @PostMapping("/{pageKey}")
     @Operation(summary = "创建数据（兼容）", description = "根据页面定义创建新数据（兼容旧DSL格式）")
     @RequirePermission("model.{pageKey}.create")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<Object> createCompat(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody Map<String, Object> data) {
@@ -692,6 +695,7 @@ public class DynamicController {
     @PutMapping("/{pageKey}/{recordPid}")
     @Operation(summary = "更新数据", description = "根据页面定义更新数据")
     @RequirePermission("model.{pageKey}.update")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<Map<String, Object>> update(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "记录 PID") @PathVariable String recordPid,
@@ -722,6 +726,7 @@ public class DynamicController {
     @DeleteMapping("/{pageKey}/{recordPid}")
     @Operation(summary = "删除数据", description = "根据页面定义删除数据")
     @RequirePermission("model.{pageKey}.delete")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<Void> delete(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "记录 PID") @PathVariable String recordPid) {
@@ -742,6 +747,7 @@ public class DynamicController {
     @PostMapping("/{pageKey}/batch")
     @Operation(summary = "批量创建数据", description = "根据页面定义批量创建数据")
     @RequirePermission("model.{pageKey}.create")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<DynamicBatchResponse> batchCreate(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody List<Map<String, Object>> dataList) {
@@ -762,6 +768,7 @@ public class DynamicController {
     @PutMapping("/{pageKey}/batch")
     @Operation(summary = "批量更新数据", description = "根据页面定义批量更新数据")
     @RequirePermission("model.{pageKey}.update")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<DynamicBatchResponse> batchUpdate(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody List<Map<String, Object>> dataList) {
@@ -782,6 +789,7 @@ public class DynamicController {
     @DeleteMapping("/{pageKey}/batch")
     @Operation(summary = "批量删除数据", description = "根据页面定义批量删除数据")
     @RequirePermission("model.{pageKey}.delete")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<Void> batchDelete(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody List<String> recordPids) {
@@ -805,6 +813,7 @@ public class DynamicController {
     @PostMapping("/{pageKey}/validate")
     @Operation(summary = "验证数据", description = "根据页面定义验证数据")
     @RequirePermission("model.{pageKey}.read")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<Map<String, Object>> validate(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody Map<String, Object> data) {
@@ -831,6 +840,7 @@ public class DynamicController {
     @GetMapping("/{pageKey}/field-options/{fieldName}")
     @Operation(summary = "获取字段选项", description = "获取指定字段的选项列表")
     @RequirePermission("model.{pageKey}.read")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<List<Map<String, Object>>> getFieldOptions(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "字段名称") @PathVariable String fieldName,
@@ -864,6 +874,7 @@ public class DynamicController {
     @PostMapping("/{pageKey}/query/{queryName}")
     @Operation(summary = "执行自定义查询", description = "执行页面定义的自定义查询")
     @RequirePermission("model.{pageKey}.read")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<List<Map<String, Object>>> executeCustomQuery(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "查询名称") @PathVariable String queryName,
@@ -880,6 +891,7 @@ public class DynamicController {
     @PostMapping("/{pageKey}/action/{actionName}")
     @Operation(summary = "执行自定义操作", description = "执行页面定义的自定义操作")
     @RequirePermission("model.{pageKey}.update")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<Map<String, Object>> executeCustomAction(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "操作名称") @PathVariable String actionName,
@@ -912,6 +924,7 @@ public class DynamicController {
     // it here 403s for every real model while the UI shows the export button — an
     // endpoint-vs-metadata inconsistency. Align to read.
     @RequirePermission("model.{pageKey}.read")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<Map<String, Object>> exportData(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Valid @RequestBody DynamicDataExportRequest exportParams) {
@@ -1040,6 +1053,7 @@ public class DynamicController {
     @Operation(summary = "下载导出文件", description = "下载当前用户仍有权限领取的导出产物")
     // Gated by read — see exportData above (export = packaging readable data).
     @RequirePermission("model.{pageKey}.read")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public void downloadExport(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "任务PID") @PathVariable String taskPid,
@@ -1089,6 +1103,7 @@ public class DynamicController {
     @PostMapping("/{pageKey}/import")
     @Operation(summary = "导入数据", description = "根据页面定义导入数据")
     @RequirePermission("model.{pageKey}.import")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<Map<String, Object>> importData(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody(required = false) Map<String, Object> importParams) {
@@ -1102,6 +1117,7 @@ public class DynamicController {
     @PostMapping("/{pageKey}/stats")
     @Operation(summary = "获取统计信息", description = "获取页面数据的统计信息")
     @RequirePermission("model.{pageKey}.read")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<Map<String, Object>> getStats(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody(required = false) Map<String, Object> statsParams) {
@@ -1119,6 +1135,7 @@ public class DynamicController {
     @GetMapping("/{pageKey}/{recordPid}/relations/{relationName}")
     @Operation(summary = "获取关联数据", description = "获取指定记录的关联数据")
     @RequirePermission("model.{pageKey}.read")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<List<Map<String, Object>>> getRelationData(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "记录 PID") @PathVariable String recordPid,
@@ -1550,6 +1567,7 @@ public class DynamicController {
     @PostMapping("/{pageKey}/joint-save")
     @Operation(summary = "联合保存主表和子表", description = "在单个事务中保存主表及其关联的子表数据")
     @RequirePermission("model.{pageKey}.update")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<JointSubTableSaveResponse> saveWithRelations(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody JointSubTableSaveRequest request) {

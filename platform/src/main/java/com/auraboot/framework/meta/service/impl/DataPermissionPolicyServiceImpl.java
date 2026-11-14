@@ -32,6 +32,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyService {
+
     private final com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
 
 
@@ -39,6 +40,7 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
     private final DataPermissionPolicyMapper policyMapper;
     private final DataPermissionRoleBindingMapper bindingMapper;
     private final DataPermissionEngine dataPermissionEngine;
+    private final com.auraboot.framework.rbac.mapper.RoleMapper roleMapper;
 
     @Override
     @Transactional
@@ -259,5 +261,19 @@ public class DataPermissionPolicyServiceImpl implements DataPermissionPolicyServ
 
     private static BusinessException missing(String pid) {
         return new BusinessException(ResponseCode.NOT_FOUND,"Data permission policy not found: "+pid);
+    }
+
+
+    @Override
+    public com.auraboot.framework.rbac.entity.Role resolveBindableRole(String rolePid) {
+        com.auraboot.framework.rbac.entity.Role role = roleMapper.findByPid(rolePid);
+        if (role == null || Boolean.TRUE.equals(role.getDeletedFlag())) {
+            return null;
+        }
+        if (!java.util.Objects.equals(role.getTenantId(),
+                com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId())) {
+            return null;
+        }
+        return role;
     }
 }

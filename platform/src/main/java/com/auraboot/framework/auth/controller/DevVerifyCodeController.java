@@ -1,7 +1,6 @@
 package com.auraboot.framework.auth.controller;
 
 import com.auraboot.framework.auth.entity.VerificationCode;
-import com.auraboot.framework.auth.mapper.VerificationCodeMapper;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import org.slf4j.Logger;
@@ -31,10 +30,10 @@ public class DevVerifyCodeController {
 
     private static final Logger log = LoggerFactory.getLogger(DevVerifyCodeController.class);
 
-    private final VerificationCodeMapper verificationCodeMapper;
+    private final com.auraboot.framework.auth.service.VerificationCodeQueryService verificationCodeQueryService;
 
-    public DevVerifyCodeController(VerificationCodeMapper verificationCodeMapper) {
-        this.verificationCodeMapper = verificationCodeMapper;
+    public DevVerifyCodeController(com.auraboot.framework.auth.service.VerificationCodeQueryService verificationCodeQueryService) {
+        this.verificationCodeQueryService = verificationCodeQueryService;
     }
 
     /**
@@ -49,7 +48,7 @@ public class DevVerifyCodeController {
     public ApiResponse<Map<String, Object>> getLatestCode(@RequestParam String target) {
         log.info("[DEV] Querying latest verification code for target: {}", target);
 
-        VerificationCode code = verificationCodeMapper.findLatestByTarget(target);
+        VerificationCode code = verificationCodeQueryService.findLatestByTarget(target);
         if (code == null) {
             log.info("[DEV] No unused verification code found for target: {}", target);
             return ApiResponse.success(Map.of("code", "", "found", false));

@@ -54,8 +54,8 @@ public class EventPolicyController {
     private final EventPolicyDefinitionService definitionService;
     private final EventPolicyVersionService versionService;
     private final EventPolicyRuntimeService runtimeService;
-    private final DrtPolicyExecLogMapper execLogMapper;
     private final EventPolicyActionRetryService actionRetryService;
+    private final com.auraboot.framework.eventpolicy.service.EventPolicyActionLogService actionLogService;
 
     // ==================== Definition CRUD ====================
 
@@ -232,20 +232,8 @@ public class EventPolicyController {
         }
         Long tenantId = MetaContext.getCurrentTenantId();
         int limit = Math.max(1, Math.min(size != null ? size : 50, 200));
-        List<DrtPolicyExecLogEntity> rows = hasPolicyFilter
-                ? execLogMapper.findByPolicyCodeFilter(
-                        tenantId,
-                        normalize(policyCode),
-                        normalize(policyCodePrefix),
-                        limit)
-                : execLogMapper.findByTraceLink(
-                        tenantId,
-                        normalize(decisionTraceId),
-                        normalize(correlationId));
-        List<EventPolicyActionLogDTO> result = rows
-                .stream()
-                .map(this::toActionLogDTO)
-                .toList();
+        List<EventPolicyActionLogDTO> result = actionLogService.findActionLogs(
+                tenantId, policyCode, policyCodePrefix, decisionTraceId, correlationId, limit);
         return ApiResponse.success(result);
     }
 
@@ -257,7 +245,7 @@ public class EventPolicyController {
         log.info("Replaying event policy action log: pid={}", pid);
         try {
             DrtPolicyExecLogEntity result = actionRetryService.replayAction(pid);
-            return ApiResponse.success("Event policy action replayed", toActionLogDTO(result));
+            return ApiResponse.success("Event policy action replayed", actionLogService.toDto(result));
         } catch (IllegalArgumentException e) {
             return ApiResponse.error(404, e.getMessage());
         } catch (IllegalStateException e) {
@@ -265,32 +253,4 @@ public class EventPolicyController {
         }
     }
 
-    private static String normalize(String value) {
-        return StringUtils.hasText(value) ? value.trim() : null;
-    }
-
-    private EventPolicyActionLogDTO toActionLogDTO(DrtPolicyExecLogEntity entity) {
-        EventPolicyActionLogDTO dto = new EventPolicyActionLogDTO();
-        dto.setPid(entity.getPid());
-        dto.setTenantId(entity.getTenantId());
-        dto.setIdempotencyKey(entity.getIdempotencyKey());
-        dto.setPolicyCode(entity.getPolicyCode());
-        dto.setDecisionTraceId(entity.getDecisionTraceId());
-        dto.setCorrelationId(entity.getCorrelationId());
-        dto.setRuleCode(entity.getRuleCode());
-        dto.setActionType(entity.getActionType());
-        dto.setStatus(entity.getStatus());
-        dto.setFailureStrategy(entity.getFailureStrategy());
-        dto.setErrorMessage(entity.getErrorMessage());
-        dto.setResultPayload(entity.getResultPayload());
-        dto.setActionPayload(entity.getActionPayload());
-        dto.setContextPayload(entity.getContextPayload());
-        dto.setAttemptCount(entity.getAttemptCount());
-        dto.setMaxAttempts(entity.getMaxAttempts());
-        dto.setNextRetryAt(entity.getNextRetryAt());
-        dto.setLastRetryAt(entity.getLastRetryAt());
-        dto.setDeadLetteredAt(entity.getDeadLetteredAt());
-        dto.setExecutedAt(entity.getExecutedAt());
-        return dto;
-    }
 }

@@ -8,8 +8,6 @@ import com.auraboot.framework.meta.entity.DecisionAlarm;
 import com.auraboot.framework.meta.entity.DecisionDefinition;
 import com.auraboot.framework.meta.entity.DecisionRecord;
 import com.auraboot.framework.meta.entity.EvidenceRecord;
-import com.auraboot.framework.meta.mapper.DecisionAlarmMapper;
-import com.auraboot.framework.meta.mapper.DecisionRecordMapper;
 import com.auraboot.framework.meta.service.AdjudicatorService;
 import com.auraboot.framework.meta.service.DecisionDefinitionService;
 import com.auraboot.framework.permission.annotation.RequirePermission;
@@ -37,8 +35,7 @@ public class DecisionController {
 
     private final DecisionDefinitionService definitionService;
     private final AdjudicatorService adjudicatorService;
-    private final DecisionRecordMapper decisionRecordMapper;
-    private final DecisionAlarmMapper alarmMapper;
+    private final com.auraboot.framework.meta.service.DecisionAlarmService alarmService;
 
     // ==================== Definition CRUD ====================
 
@@ -133,7 +130,7 @@ public class DecisionController {
     public ApiResponse<List<DecisionRecord>> getDecisions(@PathVariable String subjectType,
                                                            @PathVariable String subjectId) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        List<DecisionRecord> decisions = decisionRecordMapper.findBySubjectId(tenantId, subjectType, subjectId);
+        List<DecisionRecord> decisions = adjudicatorService.findDecisionsBySubject(tenantId, subjectType, subjectId);
         return ApiResponse.success(decisions);
     }
 
@@ -153,21 +150,21 @@ public class DecisionController {
     @RequirePermission(MetaPermission.DECISION_READ)
     public ApiResponse<List<DecisionAlarm>> getAlarms(@RequestParam(defaultValue = "50") int limit) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        List<DecisionAlarm> alarms = alarmMapper.findOpenAlarms(tenantId, limit);
+        List<DecisionAlarm> alarms = alarmService.findOpenAlarms(tenantId, limit);
         return ApiResponse.success(alarms);
     }
 
     @PostMapping("/alarms/{id}/acknowledge")
     @RequirePermission(MetaPermission.DECISION_MANAGE)
     public ApiResponse<Void> acknowledgeAlarm(@PathVariable Long id) {
-        alarmMapper.acknowledgeAlarm(id);
+        alarmService.acknowledgeAlarm(id);
         return ApiResponse.success(null);
     }
 
     @PostMapping("/alarms/{id}/resolve")
     @RequirePermission(MetaPermission.DECISION_MANAGE)
     public ApiResponse<Void> resolveAlarm(@PathVariable Long id) {
-        alarmMapper.resolveAlarm(id);
+        alarmService.resolveAlarm(id);
         return ApiResponse.success(null);
     }
 }

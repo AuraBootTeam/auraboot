@@ -1,5 +1,2 @@
 #
 #Thu Jul 23 03:52:53 UTC 2026
-no\ classes\ that\ reside\ in\ any\ package\ ['..controller..']\ should\ depend\ on\ classes\ that\ reside\ in\ any\ package\ ['..mapper..'],\ because\ Controllers\ must\ go\ through\ service\ layer,\ not\ directly\ access\ mapper\ layer=501c67a3-e67c-4074-8fba-309dca82d651
-no\ classes\ that\ reside\ in\ any\ package\ ['com.auraboot.framework.application..',\ 'com.auraboot.framework.meta..']\ should\ depend\ on\ classes\ that\ reside\ in\ any\ package\ ['com.auraboot.framework.crm..',\ 'com.auraboot.framework.bpm..',\ 'com.auraboot.framework.finance..',\ 'com.auraboot.framework.aps..',\ 'com.auraboot.framework.mrp..'],\ because\ Framework\ core\ must\ remain\ module-agnostic=869d1af5-bd30-44bf-9fa0-1562fae51882
-no\ classes\ that\ reside\ outside\ of\ package\ '..controller..'\ should\ depend\ on\ classes\ that\ reside\ in\ any\ package\ ['..controller..'],\ because\ Controllers\ are\ entry\ points\ -\ no\ other\ layer\ should\ depend\ on\ them=1d9966df-b83a-44a2-b2eb-6a8681e5d6e9

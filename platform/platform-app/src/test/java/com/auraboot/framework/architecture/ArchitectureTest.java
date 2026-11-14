@@ -3,7 +3,6 @@ package com.auraboot.framework.architecture;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
-import com.tngtech.archunit.library.freeze.FreezingArchRule;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,10 +13,9 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
  * Architecture constraints enforced via ArchUnit.
  * These tests prevent architectural drift by codifying layer dependency rules.
  *
- * Uses FreezingArchRule for rules with existing violations:
- * - Versioned baselines live in src/testFixtures/resources/archunit_store/
- * - Managed Gradle tasks copy the baseline to a writable task-specific build directory
- * - New violations fail; resolved violations update only the runtime copy
+ * All rules were unfrozen on 2026-11-14 after their baselines reached zero:
+ * every violation in the previous frozen store has been fixed, so the rules
+ * now fail on any single violation.
  */
 class ArchitectureTest {
 
@@ -31,28 +29,23 @@ class ArchitectureTest {
     }
 
     @Test
-    @DisplayName("Rule 1: No class should depend on controller layer (frozen — new violations blocked)")
+    @DisplayName("Rule 1: No class should depend on controller layer")
     void noClassShouldDependOnControllers() {
-        // Frozen 2026-11-14: two pre-existing PermissionInterceptor references
-        // (bean-type special-casing for DynamicController / CommandController)
-        // are recorded in the baseline; new violations fail.
-        FreezingArchRule.freeze(
-                noClasses()
-                        .that().resideOutsideOfPackage("..controller..")
-                        .should().dependOnClassesThat().resideInAnyPackage("..controller..")
-                        .because("Controllers are entry points - no other layer should depend on them")
-        ).check(classes);
+        noClasses()
+                .that().resideOutsideOfPackage("..controller..")
+                .should().dependOnClassesThat().resideInAnyPackage("..controller..")
+                .because("Controllers are entry points - no other layer should depend on them")
+                .check(classes);
     }
 
     @Test
-    @DisplayName("Rule 2: Controllers must not directly access mapper layer (frozen — new violations blocked)")
+    @DisplayName("Rule 2: Controllers must not directly access mapper layer")
     void controllersShouldNotAccessMappers() {
-        FreezingArchRule.freeze(
-                noClasses()
-                        .that().resideInAnyPackage("..controller..")
-                        .should().dependOnClassesThat().resideInAnyPackage("..mapper..")
-                        .because("Controllers must go through service layer, not directly access mapper layer")
-        ).check(classes);
+        noClasses()
+                .that().resideInAnyPackage("..controller..")
+                .should().dependOnClassesThat().resideInAnyPackage("..mapper..")
+                .because("Controllers must go through service layer, not directly access mapper layer")
+                .check(classes);
     }
 
     @Test
@@ -86,22 +79,21 @@ class ArchitectureTest {
     }
 
     @Test
-    @DisplayName("Rule 5: Framework core must not depend on module-specific packages (frozen — new violations blocked)")
+    @DisplayName("Rule 5: Framework core must not depend on module-specific packages")
     void frameworkCoreShouldNotDependOnModules() {
-        FreezingArchRule.freeze(
-                noClasses()
-                        .that().resideInAnyPackage(
-                                "com.auraboot.framework.application..",
-                                "com.auraboot.framework.meta.."
-                        )
-                        .should().dependOnClassesThat().resideInAnyPackage(
-                                "com.auraboot.framework.crm..",
-                                "com.auraboot.framework.bpm..",
-                                "com.auraboot.framework.finance..",
-                                "com.auraboot.framework.aps..",
-                                "com.auraboot.framework.mrp.."
-                        )
-                        .because("Framework core must remain module-agnostic")
-        ).check(classes);
+        noClasses()
+                .that().resideInAnyPackage(
+                        "com.auraboot.framework.application..",
+                        "com.auraboot.framework.meta.."
+                )
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "com.auraboot.framework.crm..",
+                        "com.auraboot.framework.bpm..",
+                        "com.auraboot.framework.finance..",
+                        "com.auraboot.framework.aps..",
+                        "com.auraboot.framework.mrp.."
+                )
+                .because("Framework core must remain module-agnostic")
+                .check(classes);
     }
 }

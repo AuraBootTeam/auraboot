@@ -30,6 +30,18 @@ public class RollUpSummaryService {
 
     private final DynamicDataMapper dynamicDataMapper;
     private final MetaModelService metaModelService;
+    private final com.auraboot.framework.meta.mapper.MetaFieldMapper metaFieldMapper;
+    private final com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper modelFieldBindingMapper;
+
+    /** Field (with feature config) by exact code, for rollUp recalculation lookups. */
+    public com.auraboot.framework.meta.entity.Field findFieldByCode(String fieldCode) {
+        return metaFieldMapper.findCurrentByCode(fieldCode);
+    }
+
+    /** Parent model code owning the given field, or null. */
+    public String findParentModelCode(Long fieldId) {
+        return modelFieldBindingMapper.findModelCodeByFieldId(fieldId);
+    }
 
     /**
      * Recalculate a single roll-up field for a specific parent record.

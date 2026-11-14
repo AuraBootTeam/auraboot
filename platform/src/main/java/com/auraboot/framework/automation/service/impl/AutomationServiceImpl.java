@@ -640,4 +640,14 @@ public class AutomationServiceImpl implements AutomationService {
                 .createdAt(entity.getCreatedAt())
                 .build();
     }
+
+
+    @Override
+    public com.auraboot.framework.automation.entity.Automation findEntityByPidWithoutTenantFilter(String pid) {
+        // External webhooks arrive before a tenant context exists; suppression
+        // is scoped to this exact-PID lookup (moved verbatim from the webhook
+        // controller so controllers stop touching the mapper layer).
+        return com.auraboot.framework.application.tenant.MetaContext.runWithoutTenantFilter(
+                () -> automationMapper.findByPid(pid));
+    }
 }

@@ -3,9 +3,6 @@ package com.auraboot.framework.email.controller;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.util.PaginationSafetyUtils;
-import com.auraboot.framework.email.mapper.EmailAccountMapper;
-import com.auraboot.framework.email.mapper.EmailMessageMapper;
-import com.auraboot.framework.email.mapper.EmailRecordLinkMapper;
 import com.auraboot.framework.email.model.EmailAccount;
 import com.auraboot.framework.email.model.EmailMessage;
 import com.auraboot.framework.email.model.EmailRecordLink;
@@ -41,13 +38,11 @@ import java.util.Map;
 @AuthenticatedAccess("inbox/send/CRM-link endpoints operate on the caller's tenant email data and connected accounts via MetaContext")
 public class EmailMessageController {
 
-    private final EmailMessageMapper     emailMessageMapper;
-    private final EmailRecordLinkMapper  emailRecordLinkMapper;
     private final EmailRecordLinkService emailRecordLinkService;
     private final com.auraboot.framework.email.service.EmailMessageService emailMessageService;
+    private final com.auraboot.framework.email.service.EmailAccountService emailAccountService;
     private final EmailSendService       emailSendService;
     private final EmailTrackingService   emailTrackingService;
-    private final EmailAccountMapper     emailAccountMapper;
 
     // ──────────────────────────────────────────────────────────────────────────
     // List / thread / detail
@@ -104,7 +99,7 @@ public class EmailMessageController {
 
         wrapper.orderByDesc(EmailMessage::getGmailDate);
 
-        IPage<EmailMessage> page = emailMessageMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
+        IPage<EmailMessage> page = emailMessageService.selectPage(new Page<>(pageNum, pageSize), wrapper);
         return ApiResponse.ok(page);
     }
 
@@ -117,7 +112,7 @@ public class EmailMessageController {
     @Operation(summary = "Get all messages in a Gmail thread")
     public ApiResponse<List<EmailMessage>> getThread(@PathVariable String threadId) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        List<EmailMessage> messages = emailMessageMapper.findByThread(tenantId, threadId);
+        List<EmailMessage> messages = emailMessageService.findThread(tenantId, threadId);
         return ApiResponse.ok(messages);
     }
 
@@ -129,7 +124,7 @@ public class EmailMessageController {
     @GetMapping("/{id}")
     @Operation(summary = "Get a single email message with tracking stats")
     public ApiResponse<Map<String, Object>> getMessage(@PathVariable Long id) {
-        EmailMessage message = emailMessageMapper.selectById(id);
+        EmailMessage message = emailMessageService.findById(id);
         if (message == null) {
             return ApiResponse.error("Message not found");
         }
@@ -153,7 +148,7 @@ public class EmailMessageController {
     public ApiResponse<EmailMessage> sendMessage(@RequestBody Map<String, Object> body) {
         try {
             Long accountId = toLong(body.get("accountId"));
-            EmailAccount account = emailAccountMapper.selectById(accountId);
+            EmailAccount account = emailAccountService.getAccount(accountId);
             if (account == null) {
                 return ApiResponse.error("Email account not found");
             }
@@ -219,7 +214,7 @@ public class EmailMessageController {
         String recordPid = body.get("recordPid");
         String threadId  = body.get("threadId");
 
-        EmailMessage message = emailMessageMapper.selectById(id);
+        EmailMessage message = emailMessageService.findById(id);
         if (message == null) {
             return ApiResponse.error("Message not found");
         }
@@ -264,7 +259,7 @@ public class EmailMessageController {
         pageSize = PaginationSafetyUtils.pageSize(pageSize, 100);
 
         int offset = PaginationSafetyUtils.offset(pageNum, pageSize, 100);
-        List<EmailMessage> messages = emailRecordLinkMapper.findMessagesByRecord(
+        List<EmailMessage> messages = emailRecordLinkService.findMessagesByRecord(
                 tenantId, modelCode, recordPid, pageSize, offset);
 
         return ApiResponse.ok(Map.of(

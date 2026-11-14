@@ -23,4 +23,21 @@ public class EmailMessageServiceImpl implements EmailMessageService {
         message.setIsRead(true);
         emailMessageMapper.updateById(message);
     }
+
+    @Override
+    public com.baomidou.mybatisplus.core.metadata.IPage<com.auraboot.framework.email.model.EmailMessage> selectPage(
+            com.baomidou.mybatisplus.core.metadata.IPage<com.auraboot.framework.email.model.EmailMessage> page,
+            com.baomidou.mybatisplus.core.conditions.Wrapper<com.auraboot.framework.email.model.EmailMessage> wrapper) {
+        return emailMessageMapper.selectPage(page, wrapper);
+    }
+
+    @Override
+    public java.util.List<com.auraboot.framework.email.model.EmailMessage> findThread(Long tenantId, String threadId) {
+        return emailMessageMapper.findByThread(tenantId, threadId);
+    }
+
+    @Override
+    public com.auraboot.framework.email.model.EmailMessage findById(Long id) {
+        return emailMessageMapper.selectById(id);
+    }
 }

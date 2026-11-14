@@ -352,4 +352,10 @@ public class AdjudicatorServiceImpl implements AdjudicatorService {
             return Collections.emptyList();
         }
     }
+
+    @Override
+    public java.util.List<com.auraboot.framework.meta.entity.DecisionRecord> findDecisionsBySubject(
+            Long tenantId, String subjectType, String subjectId) {
+        return decisionRecordMapper.findBySubjectId(tenantId, subjectType, subjectId);
+    }
 }

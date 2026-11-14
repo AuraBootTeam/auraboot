@@ -3,7 +3,7 @@ package com.auraboot.framework.automation.controller;
 import com.auraboot.framework.automation.entity.Automation;
 import com.auraboot.framework.automation.entity.AutomationLog;
 import com.auraboot.framework.automation.entity.TriggerConfig;
-import com.auraboot.framework.automation.mapper.AutomationMapper;
+import com.auraboot.framework.automation.service.AutomationService;
 import com.auraboot.framework.automation.trigger.AutomationTriggerService;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
@@ -39,7 +39,7 @@ import java.util.Map;
 @AuthenticatedAccess("external webhook endpoint, JWT-exempt by design; HMAC signature or secret token is validated in-controller (fail-closed) before any automation executes")
 public class AutomationWebhookController {
 
-    private final AutomationMapper automationMapper;
+    private final AutomationService automationService;
     private final AutomationTriggerService automationTriggerService;
     private final ObjectMapper objectMapper;
 
@@ -53,11 +53,11 @@ public class AutomationWebhookController {
 
         log.info("Received webhook for automation: pid={}", automationPid);
 
-        // External webhooks arrive before a tenant context exists. Suppress the tenant
-        // filter only for this exact-PID lookup; validation must still succeed before
-        // executeAutomation establishes the stored rule's tenant/actor context.
-        Automation automation = MetaContext.runWithoutTenantFilter(
-                () -> automationMapper.findByPid(automationPid));
+        // External webhooks arrive before a tenant context exists; the service
+        // scopes tenant-filter suppression to this exact-PID lookup, and
+        // validation must still succeed before executeAutomation establishes
+        // the stored rule's tenant/actor context.
+        Automation automation = automationService.findEntityByPidWithoutTenantFilter(automationPid);
         if (automation == null) {
             return ApiResponse.error("Automation not found: " + automationPid);
         }

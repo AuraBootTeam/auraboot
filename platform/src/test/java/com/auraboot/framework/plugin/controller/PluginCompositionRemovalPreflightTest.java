@@ -24,10 +24,10 @@ class PluginCompositionRemovalPreflightTest {
         var record=new PluginRecord();record.setPid("shared");record.setTenantId(1L);
         when(records.findByPid("shared")).thenReturn(record);
         doThrow(BusinessException.i18n("plugin.error.composition_lifecycle")).when(manager).requireTenantLifecycleChange(record);
-        var controller=new PluginController(records,mock(com.auraboot.framework.plugin.service.PlatformVersionChecker.class),
+        var catalogPolicy=new com.auraboot.framework.application.tenant.ApplicationCatalogPolicy(mock(com.auraboot.framework.tenant.service.TenantPreferenceService.class),"");
+        var controller=new PluginController(mock(com.auraboot.framework.plugin.service.PlatformVersionChecker.class),
                 mock(com.auraboot.framework.plugin.config.PlatformProperties.class),manager,
-                new com.auraboot.framework.application.tenant.ApplicationCatalogPolicy(mock(com.auraboot.framework.tenant.service.TenantPreferenceService.class),""),
-                new com.auraboot.framework.plugin.service.impl.PluginRecordStateServiceImpl(records,manager));
+                new com.auraboot.framework.plugin.service.impl.PluginRecordStateServiceImpl(records,manager,catalogPolicy));
         assertThatThrownBy(()->controller.disablePlugin("shared")).isInstanceOf(BusinessException.class);
         verify(records,never()).markAsDisabled(anyString());
     }
@@ -44,9 +44,10 @@ class PluginCompositionRemovalPreflightTest {
         var historical=new PluginRecord();historical.setPluginId("com.example.other-product");historical.setStatus("enabled");
         when(records.selectList(any(com.baomidou.mybatisplus.core.conditions.query.QueryWrapper.class))).thenReturn(java.util.List.of(retained));
         var properties=new com.auraboot.framework.plugin.config.PlatformProperties();
-        var controller=new PluginController(records,new com.auraboot.framework.plugin.service.PlatformVersionChecker(properties),
-                properties,mock(AuraPluginManager.class),new com.auraboot.framework.application.tenant.ApplicationCatalogPolicy(preferences,"bom-quote"),
-                mock(com.auraboot.framework.plugin.service.PluginRecordStateService.class));
+        var controller=new PluginController(new com.auraboot.framework.plugin.service.PlatformVersionChecker(properties),
+                properties,mock(AuraPluginManager.class),
+                new com.auraboot.framework.plugin.service.impl.PluginRecordStateServiceImpl(records,mock(AuraPluginManager.class),
+                        new com.auraboot.framework.application.tenant.ApplicationCatalogPolicy(preferences,"bom-quote")));
         assertThat(controller.listPlugins().getData()).extracting(PluginController.PluginDTO::pluginId).containsExactly("com.auraboot.core-meta");
         assertThat(controller.checkVersionCompatibility().getData().plugins()).extracting(PluginController.PluginCompatibilityDTO::pluginId).containsExactly("com.auraboot.core-meta");
         var capture=org.mockito.ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.query.QueryWrapper.class);

@@ -4,8 +4,6 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.email.controller.EmailMessageController;
 import com.auraboot.framework.email.mapper.EmailAccountMapper;
-import com.auraboot.framework.email.mapper.EmailMessageMapper;
-import com.auraboot.framework.email.mapper.EmailRecordLinkMapper;
 import com.auraboot.framework.email.model.EmailMessage;
 import com.auraboot.framework.email.model.EmailRecordLink;
 import com.auraboot.framework.email.service.EmailRecordLinkService;
@@ -29,8 +27,6 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class EmailMessageControllerPidContractTest {
 
-    @Mock private EmailMessageMapper emailMessageMapper;
-    @Mock private EmailRecordLinkMapper emailRecordLinkMapper;
     @Mock private EmailRecordLinkService emailRecordLinkService;
     @Mock private EmailSendService emailSendService;
     @Mock private EmailTrackingService emailTrackingService;
@@ -47,7 +43,7 @@ class EmailMessageControllerPidContractTest {
         EmailMessage message = new EmailMessage();
         message.setId(100L);
         message.setGmailThreadId("thread-db");
-        when(emailMessageMapper.selectById(100L)).thenReturn(message);
+        when(emailMessageService.findById(100L)).thenReturn(message);
 
         EmailRecordLink link = new EmailRecordLink();
         link.setRecordPid("01KEMAILPID");
@@ -72,14 +68,15 @@ class EmailMessageControllerPidContractTest {
         assertThat(recordParam.getName()).isEqualTo("recordPid");
     }
 
+    private final com.auraboot.framework.email.service.EmailMessageService emailMessageService =
+            mock(com.auraboot.framework.email.service.EmailMessageService.class);
+
     private EmailMessageController newController() {
         return new EmailMessageController(
-                emailMessageMapper,
-                emailRecordLinkMapper,
                 emailRecordLinkService,
-                mock(com.auraboot.framework.email.service.EmailMessageService.class),
+                emailMessageService,
+                mock(com.auraboot.framework.email.service.EmailAccountService.class),
                 emailSendService,
-                emailTrackingService,
-                emailAccountMapper);
+                emailTrackingService);
     }
 }

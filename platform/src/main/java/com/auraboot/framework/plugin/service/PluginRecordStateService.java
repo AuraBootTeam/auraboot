@@ -20,4 +20,13 @@ public interface PluginRecordStateService {
      *                                  another tenant ("Plugin not found")
      */
     PluginRecord setEnabled(String pid, boolean enabled);
+
+    /** Record by exact pid (or null) — same-tenant enforcement left to the caller. */
+    PluginRecord findByPid(String pid);
+
+    /**
+     * Catalog-visible plugin records for the tenant under the current
+     * ApplicationCatalogPolicy (moved from PluginController).
+     */
+    java.util.List<PluginRecord> listCatalog(Long tenantId);
 }

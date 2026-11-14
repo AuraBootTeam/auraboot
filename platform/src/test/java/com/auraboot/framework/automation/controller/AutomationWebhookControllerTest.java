@@ -3,7 +3,6 @@ package com.auraboot.framework.automation.controller;
 import com.auraboot.framework.automation.entity.Automation;
 import com.auraboot.framework.automation.entity.AutomationLog;
 import com.auraboot.framework.automation.entity.TriggerConfig;
-import com.auraboot.framework.automation.mapper.AutomationMapper;
 import com.auraboot.framework.automation.trigger.AutomationTriggerService;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
@@ -43,20 +42,23 @@ class AutomationWebhookControllerTest {
     private static final String SECRET = "test-secret-key-for-hmac";
     private static final String AUTOMATION_PID = "AUTO-PID-001";
 
-    private AutomationMapper automationMapper;
+    private com.auraboot.framework.automation.service.AutomationService automationServiceStub;
     private AutomationTriggerService automationTriggerService;
     private AutomationWebhookController controller;
 
     @BeforeEach
     void setUp() {
-        automationMapper = mock(AutomationMapper.class);
+        automationServiceStub = mock(com.auraboot.framework.automation.service.AutomationService.class);
         automationTriggerService = mock(AutomationTriggerService.class);
-        controller = new AutomationWebhookController(automationMapper, automationTriggerService,
+        // Default: happy automation resolved via the service (tenant-filter-free lookup)
+        when(automationServiceStub.findEntityByPidWithoutTenantFilter(AUTOMATION_PID))
+                .thenReturn(webhookAutomation("signature"));
+        controller = new AutomationWebhookController(automationServiceStub, automationTriggerService,
                 new ObjectMapper());
 
         // Default: happy automation returned by mapper
         Automation automation = webhookAutomation("signature");
-        when(automationMapper.findByPid(AUTOMATION_PID)).thenReturn(automation);
+        when(automationServiceStub.findEntityByPidWithoutTenantFilter(AUTOMATION_PID)).thenReturn(automation);
 
         // Trigger service always returns a minimal log
         AutomationLog log = new AutomationLog();
@@ -184,7 +186,7 @@ class AutomationWebhookControllerTest {
     @Test
     void correctTokenIsAccepted() throws Exception {
         Automation automation = webhookAutomation("token");
-        when(automationMapper.findByPid(AUTOMATION_PID)).thenReturn(automation);
+        when(automationServiceStub.findEntityByPidWithoutTenantFilter(AUTOMATION_PID)).thenReturn(automation);
 
         String rawBody = "{\"event\":\"ping\"}";
 
@@ -199,7 +201,7 @@ class AutomationWebhookControllerTest {
     @Test
     void wrongTokenIsRejected() throws Exception {
         Automation automation = webhookAutomation("token");
-        when(automationMapper.findByPid(AUTOMATION_PID)).thenReturn(automation);
+        when(automationServiceStub.findEntityByPidWithoutTenantFilter(AUTOMATION_PID)).thenReturn(automation);
 
         String rawBody = "{\"event\":\"ping\"}";
 
@@ -221,7 +223,7 @@ class AutomationWebhookControllerTest {
     void nullTriggerConfigIsRejected_andAutomationNotExecuted() {
         Automation automation = webhookAutomation("token");
         automation.setTriggerConfig(null);
-        when(automationMapper.findByPid(AUTOMATION_PID)).thenReturn(automation);
+        when(automationServiceStub.findEntityByPidWithoutTenantFilter(AUTOMATION_PID)).thenReturn(automation);
 
         ApiResponse<Map<String, Object>> response =
                 controller.receiveWebhook(AUTOMATION_PID, "{\"event\":\"ping\"}", null, null);
@@ -234,7 +236,7 @@ class AutomationWebhookControllerTest {
     @Test
     void nullValidationModeIsRejected_andAutomationNotExecuted() {
         Automation automation = webhookAutomation(null);
-        when(automationMapper.findByPid(AUTOMATION_PID)).thenReturn(automation);
+        when(automationServiceStub.findEntityByPidWithoutTenantFilter(AUTOMATION_PID)).thenReturn(automation);
 
         ApiResponse<Map<String, Object>> response =
                 controller.receiveWebhook(AUTOMATION_PID, "{\"event\":\"ping\"}", null, null);
@@ -247,7 +249,7 @@ class AutomationWebhookControllerTest {
     @Test
     void unknownValidationModeIsRejected_andAutomationNotExecuted() {
         Automation automation = webhookAutomation("none");
-        when(automationMapper.findByPid(AUTOMATION_PID)).thenReturn(automation);
+        when(automationServiceStub.findEntityByPidWithoutTenantFilter(AUTOMATION_PID)).thenReturn(automation);
 
         ApiResponse<Map<String, Object>> response =
                 controller.receiveWebhook(AUTOMATION_PID, "{\"event\":\"ping\"}", null, null);
@@ -261,7 +263,7 @@ class AutomationWebhookControllerTest {
     void tokenModeWithNullSecretIsRejected_andAutomationNotExecuted() {
         Automation automation = webhookAutomation("token");
         automation.getTriggerConfig().setSecret(null);
-        when(automationMapper.findByPid(AUTOMATION_PID)).thenReturn(automation);
+        when(automationServiceStub.findEntityByPidWithoutTenantFilter(AUTOMATION_PID)).thenReturn(automation);
 
         ApiResponse<Map<String, Object>> response =
                 controller.receiveWebhook(AUTOMATION_PID, "{\"event\":\"ping\"}", null, "anything");
@@ -275,7 +277,7 @@ class AutomationWebhookControllerTest {
     void signatureModeWithBlankSecretIsRejected_andAutomationNotExecuted() {
         Automation automation = webhookAutomation("signature");
         automation.getTriggerConfig().setSecret("   ");
-        when(automationMapper.findByPid(AUTOMATION_PID)).thenReturn(automation);
+        when(automationServiceStub.findEntityByPidWithoutTenantFilter(AUTOMATION_PID)).thenReturn(automation);
 
         ApiResponse<Map<String, Object>> response =
                 controller.receiveWebhook(AUTOMATION_PID, "{\"event\":\"ping\"}", "deadbeef", null);
@@ -288,7 +290,7 @@ class AutomationWebhookControllerTest {
     @Test
     void wrongTokenDoesNotExecuteAutomation() {
         Automation automation = webhookAutomation("token");
-        when(automationMapper.findByPid(AUTOMATION_PID)).thenReturn(automation);
+        when(automationServiceStub.findEntityByPidWithoutTenantFilter(AUTOMATION_PID)).thenReturn(automation);
 
         ApiResponse<Map<String, Object>> response =
                 controller.receiveWebhook(AUTOMATION_PID, "{\"event\":\"ping\"}", null, "wrong-token");
@@ -324,10 +326,12 @@ class AutomationWebhookControllerTest {
     @Test
     void preAuthLookupIsScopedAndExecutionDoesNotInheritTenantBypass() {
         MetaContext.clear();
-        when(automationMapper.findByPid(AUTOMATION_PID)).thenAnswer(invocation -> {
-            assertThat(MetaContext.isTenantFilterBypassed()).isTrue();
-            return webhookAutomation("token");
-        });
+        // The tenant-filter-free lookup scope now lives inside
+        // AutomationServiceImpl.findEntityByPidWithoutTenantFilter (method
+        // contract); here we assert what the controller must guarantee:
+        // execution does NOT inherit any bypass and leaves a clean context.
+        when(automationServiceStub.findEntityByPidWithoutTenantFilter(AUTOMATION_PID))
+                .thenReturn(webhookAutomation("token"));
         when(automationTriggerService.executeAutomation(any(), isNull(), any())).thenAnswer(invocation -> {
             assertThat(MetaContext.isTenantFilterBypassed()).isFalse();
             assertThat(MetaContext.exists()).isFalse();
@@ -345,10 +349,8 @@ class AutomationWebhookControllerTest {
     @Test
     void preAuthLookupFailureRestoresTenantFiltering() {
         MetaContext.clear();
-        when(automationMapper.findByPid(AUTOMATION_PID)).thenAnswer(invocation -> {
-            assertThat(MetaContext.isTenantFilterBypassed()).isTrue();
-            throw new IllegalStateException("lookup failed");
-        });
+        when(automationServiceStub.findEntityByPidWithoutTenantFilter(AUTOMATION_PID))
+                .thenThrow(new IllegalStateException("lookup failed"));
 
         assertThatThrownBy(() -> controller.receiveWebhook(AUTOMATION_PID, "{}", null, SECRET))
                 .isInstanceOf(IllegalStateException.class).hasMessage("lookup failed");
