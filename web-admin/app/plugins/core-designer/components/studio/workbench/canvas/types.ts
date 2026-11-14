@@ -8,8 +8,8 @@
  * @since 3.2.0
  */
 
-import type { TabContainerConfig } from '~/plugins/core-designer/components/studio/domain/schema/layout-hierarchy';
-import type { LinkageRule } from '~/plugins/core-designer/components/studio/workbench/panels/linkage/types';
+import type { TabContainerConfig } from '~/framework/smart/schema/layout-hierarchy';
+import type { LinkageRule } from '~/framework/meta/schemas/linkage-types';
 
 export interface Position {
   row: number;

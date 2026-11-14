@@ -6,7 +6,7 @@ import {
   useFlowValidation,
   type FlowData,
   type NodeStatusMap,
-} from '~/plugins/core-designer/components/flow-designer-sdk';
+} from '~/framework/smart/flows/sdk';
 import { automationNodes, automationCategoryOrder } from '../nodes';
 import { applyActionCatalogAvailabilityToAutomationNodes } from '../nodes/actionCatalogMapping';
 import { useSmartText } from '~/utils/i18n';
@@ -16,7 +16,7 @@ import { AutomationDebugger, useDebugSession } from '../debug';
 import { DesignerToolbar } from '~/shared/designer/DesignerToolbar';
 import type { ActionResult, AutomationLog } from '../services/automationService';
 import { ACTION_TYPE_I18N_KEYS } from './automationTypeLabels';
-import { humanizeType } from '~/plugins/core-designer/components/flow-designer-sdk/utils';
+import { humanizeType } from '~/framework/smart/flows/sdk/utils';
 import { useAutomationNodeStatuses } from './useAutomationNodeStatuses';
 import { getApiService } from '~/shared/services/ApiService';
 import {

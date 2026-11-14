@@ -1,5 +1,5 @@
 // web-admin/app/smart/automation/templates/automationTemplates.ts
-import type { FlowData } from '~/plugins/core-designer/components/flow-designer-sdk';
+import type { FlowData } from '~/framework/smart/flows/sdk';
 import type { LocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 
 /**

@@ -28,7 +28,7 @@ import type { UseDslFormReturn } from '~/framework/meta/hooks/useDslForm';
 
 // Ensure built-in profiles are registered before resolution
 import '~/framework/meta/profiles/admin';
-import '~/framework/meta/profiles/report';
+// report RenderProfile is registered by the core-designer plugin at boot
 
 // ---------------------------------------------------------------------------
 // Types

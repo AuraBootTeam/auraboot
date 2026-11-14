@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { FloorConfig } from '~/plugins/core-designer/components/studio/domain/schema/layout-hierarchy';
+import type { FloorConfig } from '~/framework/smart/schema/layout-hierarchy';
 import { BlockRegionRuntime } from './BlockRegionRuntime';
 
 interface FloorSectionRuntimeProps {

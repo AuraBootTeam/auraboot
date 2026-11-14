@@ -16,12 +16,14 @@ import React, {
   useReducer,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
 } from 'react';
 import { useLocation, useParams } from 'react-router';
 import { useI18n } from '~/contexts/I18nContext';
 import type { FormFillTarget, FormFillField, FormFillResult, FormFillReview } from '~/framework/meta/rendering/formFill';
 import { isExplicitFormFillRequest } from '~/framework/meta/rendering/formFillIntent';
+import { bindFormFillRegister } from '../formFillBackend';
 import type { PageContext } from '../hooks/usePageContext';
 import {
   auraBotApi,
@@ -1412,6 +1414,13 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
       setFormFillNotice('');
     };
   }, []);
+
+  // Bind the live form-fill register into the module-level backend adapter.
+  // Bound during render (idempotent) so child DslFormFillProvider effects —
+  // which run before this component's effects — already see the register;
+  // before the provider mounts the adapter's registerTarget stays undefined,
+  // mirroring the previous useAuraBotSafe-null behavior.
+  useMemo(() => bindFormFillRegister(registerFormFillTarget), [registerFormFillTarget]);
 
   const value: AuraBotContextValue = {
     hasActiveForm: Boolean(activeFormTarget),

@@ -10,7 +10,7 @@ import type {
   LinkageRule,
   LinkageAction,
   TriggerEvent,
-} from '~/plugins/core-designer/components/studio/workbench/panels/linkage/types';
+} from '~/framework/meta/schemas/linkage-types';
 import type { ScopedStateManager, FieldMeta } from '~/framework/meta/runtime/state/scoped-state';
 import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { expressionEvaluator } from '~/framework/meta/runtime/expression/evaluator';

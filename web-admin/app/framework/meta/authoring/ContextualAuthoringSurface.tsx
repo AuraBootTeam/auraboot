@@ -1228,6 +1228,7 @@ export function ContextualAuthoringSurface({
         setSession(latest);
       } catch {
         // Preserve the actionable transition error when a follow-up refresh also fails.
+              console.debug('[ContextualAuthoringSurface] intentional fallback — see comment');
       }
     } finally {
       setSubmitting(false);
@@ -1305,7 +1306,8 @@ export function ContextualAuthoringSurface({
           }
         } catch {
           // Keep the current read-only snapshot when the authoritative reload also fails.
-        }
+                  console.debug('[ContextualAuthoringSurface] intentional fallback — see comment');
+      }
         if (reconciliation === 'COMMITTED_HERE') {
           setLeaseTakeoverFeedback({
             tone: 'success',
@@ -2586,7 +2588,8 @@ function readAuthoringReturnRequest(): { sessionPid: string; focusBlockId: strin
       window.sessionStorage.setItem(AUTHORING_RETURN_REQUEST_STORAGE_KEY, JSON.stringify(request));
     } catch {
       // URL transport remains sufficient when per-tab storage is unavailable.
-    }
+          console.debug('[ContextualAuthoringSurface] intentional fallback — see comment');
+      }
     return request;
   }
   try {
@@ -2629,7 +2632,8 @@ function clearCachedAuthoringReturnRequest(): void {
     window.sessionStorage.removeItem(AUTHORING_RETURN_REQUEST_STORAGE_KEY);
   } catch {
     // Best effort only; route matching prevents a stale request leaking to a different page.
-  }
+      console.debug('[ContextualAuthoringSurface] intentional fallback — see comment');
+      }
 }
 
 function contextSelectionId(context: Record<string, unknown>): string | null {

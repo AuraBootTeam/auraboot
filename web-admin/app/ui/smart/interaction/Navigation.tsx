@@ -23,7 +23,7 @@ import type {
   MenuConfig,
   BreadcrumbConfig,
   TabConfig,
-} from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+} from '~/framework/smart/schema/smart-components';
 
 export const Navigation: React.FC<NavigationProps> = ({
   name,

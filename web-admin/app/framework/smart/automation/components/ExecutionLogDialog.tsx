@@ -10,7 +10,7 @@ import {
 import { cn } from '~/utils/cn';
 import { useSmartText } from '~/utils/i18n';
 import { ACTION_TYPE_I18N_KEYS, TRIGGER_TYPE_I18N_KEYS } from './automationTypeLabels';
-import { humanizeType } from '~/plugins/core-designer/components/flow-designer-sdk/utils';
+import { humanizeType } from '~/framework/smart/flows/sdk/utils';
 import type { AutomationLog, ActionResult } from '../services/automationService';
 
 const BASE_URL = '/api/automations';

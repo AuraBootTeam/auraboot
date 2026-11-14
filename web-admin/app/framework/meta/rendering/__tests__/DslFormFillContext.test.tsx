@@ -5,12 +5,15 @@ import { DslFormFillProvider, useDslFormFill } from '../DslFormFillContext';
 import { useFormFill } from '../useFormFill';
 import type { FormFillTarget } from '../formFill';
 
-const mocks = vi.hoisted(() => ({ register: vi.fn(), chat: vi.fn(), conversation: vi.fn() }));
-vi.mock('~/plugins/core-aurabot/hooks/useAuraBotSafe', () => ({
-  useAuraBotSafe: () => ({ registerFormFillTarget: mocks.register }),
-}));
-vi.mock('~/plugins/core-aurabot/services/auraBotApi', () => ({
-  auraBotApi: { chatStream: mocks.chat, ensureConversation: mocks.conversation },
+const mocks = vi.hoisted(() => ({ register: vi.fn(), chat: vi.fn() }));
+// The agent backend is injected (framework never imports plugin internals);
+// conversation management lives in the AI plugin's adapter, covered by
+// AuraBotProvider.formFill.test.tsx.
+vi.mock('~/framework/meta/rendering/dslFormFillBackend', () => ({
+  getDslFormFillBackend: () => ({
+    registerTarget: mocks.register,
+    extract: async (request: unknown, handlers: unknown) => mocks.chat(request, handlers),
+  }),
 }));
 let pending: Promise<void>;
 function Entry() {
@@ -55,7 +58,6 @@ describe('real form state fill boundary', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.register.mockReturnValue(vi.fn());
-    mocks.conversation.mockResolvedValue({ conversationId: 42 });
   });
   it('registered chat target updates controlled inputs and preserves later human edits', () => {
     render(<Form />);
@@ -88,8 +90,6 @@ describe('real form state fill boundary', () => {
     });
     expect(screen.getByLabelText('Name')).toHaveValue('Acme');
     expect(mocks.chat.mock.calls[0][0]).toMatchObject({
-      conversationId: 42,
-      agentCode: 'aurabot',
       formFill: { fields: [{ code: 'name' }] },
     });
     fireEvent.click(screen.getByText('Undo'));

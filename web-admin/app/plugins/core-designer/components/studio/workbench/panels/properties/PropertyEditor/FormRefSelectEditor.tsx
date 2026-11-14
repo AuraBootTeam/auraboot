@@ -8,7 +8,7 @@ import { DocumentTextIcon } from '@heroicons/react/24/outline';
 import Button from '~/ui/smart/interaction/Button';
 import { Modal, Spin, Tag } from '~/ui/smart/ui';
 import { useFormRefManager } from '~/plugins/core-designer/components/studio/hooks/forms/useFormRefManager';
-import type { FormRef } from '~/plugins/core-designer/components/studio/domain/schema/formref';
+import type { FormRef } from '~/framework/smart/schema/formref';
 
 export interface FormRefSelectEditorProps {
   value?: string;

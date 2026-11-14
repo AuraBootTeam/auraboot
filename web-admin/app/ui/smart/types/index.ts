@@ -1,1 +1,1 @@
-export * from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+export * from '~/framework/smart/schema/smart-components';

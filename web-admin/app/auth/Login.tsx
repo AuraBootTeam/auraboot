@@ -1061,8 +1061,8 @@ async function startWechatQrLogin() {
       window.sessionStorage.setItem(loginOAuthStateKey('wechat_web'), result.data.state);
       window.location.href = result.data.url;
     }
-  } catch {
-    /* ignore */
+  } catch (error) {
+    console.warn('[Login] start wechat QR login failed', error);
   }
 }
 
@@ -1078,8 +1078,8 @@ async function startSocialLogin(provider: string) {
       window.sessionStorage.setItem(loginOAuthStateKey(provider), result.data.state);
       window.location.href = result.data.authorizeUrl;
     }
-  } catch {
-    /* ignore */
+  } catch (error) {
+    console.warn(`[Login] start ${provider} login failed`, error);
   }
 }
 
@@ -1386,8 +1386,8 @@ function SmsLoginForm({
       if (ResultHelper.isSuccess(result)) {
         setCountdown(60);
       }
-    } catch {
-      /* ignore */
+    } catch (error) {
+      console.warn('[Login] send SMS code failed', error);
     }
     setSending(false);
   }, [mobile]);
@@ -1521,8 +1521,8 @@ function EmailCodeLoginForm({
       if (ResultHelper.isSuccess(result)) {
         setCountdown(60);
       }
-    } catch {
-      /* ignore */
+    } catch (error) {
+      console.warn('[Login] send email code failed', error);
     }
     setSending(false);
   }, [email]);

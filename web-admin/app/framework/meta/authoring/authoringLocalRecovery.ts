@@ -1,4 +1,4 @@
-import type { PageSchemaV3 } from '~/plugins/core-designer/components/unified-designer/types';
+import type { PageSchemaV3 } from '~/framework/meta/schemas/page-schema-v3';
 import type { PendingAuthoringEdit } from './types';
 
 const STORAGE_PREFIX = 'auraboot:authoring-recovery:v2';

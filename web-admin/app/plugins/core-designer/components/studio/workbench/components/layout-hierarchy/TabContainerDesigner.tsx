@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import type { TabContainerConfig, FieldCellConfig } from '~/plugins/core-designer/components/studio/domain/schema/layout-hierarchy';
-import type { HierarchySelection } from '~/plugins/core-designer/components/studio/domain/schema/layout-hierarchy';
+import type { TabContainerConfig, FieldCellConfig } from '~/framework/smart/schema/layout-hierarchy';
+import type { HierarchySelection } from '~/framework/smart/schema/layout-hierarchy';
 import { FloorSectionDesigner } from './FloorSectionDesigner';
 
 interface TabContainerDesignerProps {

@@ -8,7 +8,7 @@ import {
   NodeRuntimeStatusProvider,
   useFlowStore,
   type NodeStatusMap,
-} from '~/plugins/core-designer/components/flow-designer-sdk'
+} from '~/framework/smart/flows/sdk'
 
 export interface DagCanvasBlockRendererProps {
   block: BlockConfig

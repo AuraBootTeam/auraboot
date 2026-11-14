@@ -8,7 +8,7 @@ import type {
   FormRefComponentProps,
   FormRefState,
   FormRefEvent,
-} from '~/plugins/core-designer/components/studio/domain/schema/formref';
+} from '~/framework/smart/schema/formref';
 import { useFormRefManager } from '~/plugins/core-designer/components/studio/hooks/forms/useFormRefManager';
 import { Form } from '~/ui/smart/layout/Form';
 

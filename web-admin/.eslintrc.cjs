@@ -74,6 +74,29 @@ module.exports = {
       },
     },
 
+    // Framework core must not import plugin internals — the dependency
+    // direction is plugins → framework only. The boot assembly file is the
+    // single sanctioned place that wires plugins in. (2026-11-14 boundary
+    // cleanup: the last reverse imports were removed; this keeps it that way.)
+    {
+      files: ["app/framework/**/*.{ts,tsx}"],
+      excludedFiles: ["app/framework/**/__tests__/**", "app/framework/boot-plugins.ts"],
+      rules: {
+        "no-restricted-imports": [
+          "error",
+          {
+            patterns: [
+              {
+                group: ["~/plugins/*", "~/plugins/*/**"],
+                message:
+                  "Framework code must not import plugin internals. Invert the dependency: define a contract/registry in the framework and let the plugin register an implementation.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+
     // Core must not import enterprise overlay code. This catches the
     // accidental case where a developer references a path that only
     // exists in the enterprise build (which would break OSS).

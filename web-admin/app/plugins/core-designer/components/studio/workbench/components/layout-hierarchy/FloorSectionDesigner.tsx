@@ -3,7 +3,7 @@ import type {
   FloorConfig,
   BlockConfig,
   FieldCellConfig,
-} from '~/plugins/core-designer/components/studio/domain/schema/layout-hierarchy';
+} from '~/framework/smart/schema/layout-hierarchy';
 import { BlockRegionDesigner } from './BlockRegionDesigner';
 
 interface FloorSectionDesignerProps {
