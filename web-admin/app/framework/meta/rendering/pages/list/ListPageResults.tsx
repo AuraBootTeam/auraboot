@@ -9,6 +9,7 @@ import { ListPagination } from './ListPagination';
 import { resolveListReferenceFilterLabel } from './listReferenceDisplay';
 import { ListTable } from './ListTable';
 import { ListToolbar } from './ListToolbar';
+import { renderInlineListFilters } from './ListPageFilters';
 import { SelectAllMatchingBanner } from './SelectAllMatchingBanner';
 import { ViewAnalysisDrawer } from './ViewAnalysisDrawer';
 
@@ -36,6 +37,9 @@ export function renderListPageResults(
     | 'filterFormVisible'
     | 'setFilterFormVisible'
     | 'filterBlock'
+    | 'renderSmartField'
+    | 'handleSearch'
+    | 'handleReset'
     | 'quickFilterChips'
     | 'activeQuickFilter'
     | 'currentView'
@@ -276,6 +280,7 @@ export function renderListPageResults(
           {!schemaExtension.hideListToolbar && (
             <ListToolbar
               workspace={workspace}
+              inlineFilters={renderInlineListFilters(model)}
               keyword={keyword}
               searchPlaceholder={tableSearchPlaceholder}
               onKeywordChange={setKeyword}
@@ -302,7 +307,7 @@ export function renderListPageResults(
               filterFormVisible={filterFormVisible}
               onFilterFormToggle={() => setFilterFormVisible((prev) => !prev)}
               hasFilterBlock={
-                !!(filterBlock && filterBlock.fields && filterBlock.fields.length > 0)
+                schemaExtension.filterLayout !== 'inline' && !!(filterBlock && filterBlock.fields && filterBlock.fields.length > 0)
               }
               chips={quickFilterChips}
               activeQuickFilter={activeQuickFilter}

@@ -320,3 +320,14 @@ export function filterListTabDisplayData<T extends Record<string, any>>(
     }
   });
 }
+
+/** Serialize submitted API filters using the same wire contract as the list read. */
+export function applyApiUserFilters(query: Record<string, unknown>, filters: Record<string, any>): void {
+  for (const [key, value] of Object.entries(filters)) {
+    if (value == null || value === '') continue;
+    if (typeof value === 'object' && ('start' in value || 'end' in value)) {
+      if (value.start) query[`${key}_start`] = String(value.start);
+      if (value.end) query[`${key}_end`] = String(value.end);
+    } else query[key] = String(value);
+  }
+}

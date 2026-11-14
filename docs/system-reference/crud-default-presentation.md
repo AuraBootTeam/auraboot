@@ -26,6 +26,8 @@ The standard model page workbench generates usable list, form and detail pages w
 
 A list can set `extension.filterFormInitiallyVisible: true` to show its ordinary filter form on entry. Changing pages resets this initial choice; the user can still toggle filters within the current page. The default remains collapsed.
 
+A list can opt into `extension.filterLayout: "inline"` to place its existing filter fields and query/reset actions beside keyword search. This reuses submitted-filter serialization and field renderers; other pages retain the expanded filter panel. Tabs with counts use the configured API list source and submitted query, including date ranges and keywords; native lists retain their native count endpoint.
+
 A detail can pair `extension.headerStatusField` with `extension.headerStatusDictCode` when an API projection has a business status that differs from the model dictionary. The explicit dictionary is preloaded and used by the existing header badge. Without an override, the field metadata dictionary is used. These properties affect presentation only.
 
 ## User journey
