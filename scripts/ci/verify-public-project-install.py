@@ -147,6 +147,13 @@ def main():
         '--workspace-root', os.environ['AURA_CI_WORKSPACE_ROOT'], '--job', job]
     run(freeze_command, 'frozen-before')
 
+    reused_build = None
+    reuse_file = os.environ.get('AURA_PUBLIC_REUSE_BUILD_RECEIPT')
+    if reuse_file:
+        spec = importlib.util.spec_from_file_location('public_build_reuse', Path(__file__).with_name('public-build-reuse.py'))
+        module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+        reused_build = module.load(root, reuse_file, os.environ.get('AURA_PUBLIC_REUSE_BUILD_SHA256'))
+
     # The original generic wrapper caps BuildKit at 2GiB. Source-building the
     # documented full application needs its own bounded builder, not the shared default.
     image = os.environ['AURA_PUBLIC_BUILDKIT_IMAGE']
@@ -180,47 +187,58 @@ def main():
     started = False
     builder_created = False
     try:
-        builder_created = True
-        run(['docker', 'buildx', 'create', '--name', builder, '--driver', 'docker-container',
-             '--driver-opt', 'image=' + image, '--driver-opt', 'memory=8g', '--driver-opt', 'memory-swap=8g',
-             '--buildkitd-config', str(config), '--bootstrap'], 'owned-builder-bootstrap')
-        host = json.loads(subprocess.check_output(['docker', 'inspect', '--format', '{{json .HostConfig}}',
-             'buildx_buildkit_' + builder + '0'], text=True))
-        (output / 'builder.json').write_text(json.dumps(dict(name=builder, image=image,
-             **measured_builder_limits(host), sharedDefaultModified=False,
-             configSha256=hashlib.sha256(config.read_bytes()).hexdigest()), indent=2))
-        # An optional admitted, official-checksum-verified distribution warms only
-        # this owned builder. The public Dockerfile and wrapper URL remain unchanged.
-        dataset_file = os.environ.get('AURA_CI_DATASET_INPUTS')
-        inputs = json.loads(Path(dataset_file).read_text())['files'] if dataset_file else []
-        distributions = [item for item in inputs if item['id'] == 'public-gradle-8-14-6']
-        if distributions:
-            require(len(distributions) == 1, 'One Gradle distribution input required')
-            item = distributions[0]
-            archive = Path(item['file'])
-            expected = '7988ed071b2a07900e2ec715fca15c6ab72bce6db433af301fa7fa7e9407bd24'
-            require(archive.is_file() and not archive.is_symlink(), 'Regular Gradle archive required')
-            with archive.open('rb') as stream:
-                actual = hashlib.file_digest(stream, 'sha256').hexdigest()
-            require(actual == item['sha256'] == expected, 'Official Gradle archive checksum mismatch')
-            properties = (root / 'platform/gradle/wrapper/gradle-wrapper.properties').read_text()
-            url = 'https://services.gradle.org/distributions/gradle-8.14.6-bin.zip'
-            require('distributionUrl=' + url.replace(':', chr(92) + ':') in properties,
-                    'Distribution prewarm must match the unchanged public wrapper URL')
-            context = private / 'gradle-seed'
-            cached = context / 'seed' / gradle_cache_path(url)
-            cached.parent.mkdir(parents=True)
-            shutil.copyfile(archive, cached)
-            (context / 'Dockerfile').write_text(
-                'FROM docker.io/library/busybox:1.37.0@sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec\nCOPY seed /seed\n'
-                'RUN --mount=type=cache,target=/root/.gradle/wrapper cp -a /seed/. /root/.gradle/wrapper/\n')
-            run(['docker', 'buildx', 'build', '--builder', builder, '--output', 'type=cacheonly',
-                 str(context)], 'verified-gradle-cache-prewarm', timeout=300)
-            (output / 'gradle-cache.json').write_text(json.dumps(dict(sha256=actual,
-                 officialChecksumUrl='https://services.gradle.org/distributions/gradle-8.14.6-bin.zip.sha256',
-                 wrapperUrl=url, sourcePropertiesModified=False, scope='owned builder cache only'), indent=2))
-        started = True
-        run(compose + ['up', '--build', '-d'], 'compose-build-start', timeout=2400)
+        if reused_build is None:
+            builder_created = True
+            run(['docker', 'buildx', 'create', '--name', builder, '--driver', 'docker-container',
+                 '--driver-opt', 'image=' + image, '--driver-opt', 'memory=8g', '--driver-opt', 'memory-swap=8g',
+                 '--buildkitd-config', str(config), '--bootstrap'], 'owned-builder-bootstrap')
+            host = json.loads(subprocess.check_output(['docker', 'inspect', '--format', '{{json .HostConfig}}',
+                 'buildx_buildkit_' + builder + '0'], text=True))
+            (output / 'builder.json').write_text(json.dumps(dict(name=builder, image=image,
+                 **measured_builder_limits(host), sharedDefaultModified=False,
+                 configSha256=hashlib.sha256(config.read_bytes()).hexdigest()), indent=2))
+            # An optional admitted, official-checksum-verified distribution warms only
+            # this owned builder. The public Dockerfile and wrapper URL remain unchanged.
+            dataset_file = os.environ.get('AURA_CI_DATASET_INPUTS')
+            inputs = json.loads(Path(dataset_file).read_text())['files'] if dataset_file else []
+            distributions = [item for item in inputs if item['id'] == 'public-gradle-8-14-6']
+            if distributions:
+                require(len(distributions) == 1, 'One Gradle distribution input required')
+                item = distributions[0]
+                archive = Path(item['file'])
+                expected = '7988ed071b2a07900e2ec715fca15c6ab72bce6db433af301fa7fa7e9407bd24'
+                require(archive.is_file() and not archive.is_symlink(), 'Regular Gradle archive required')
+                with archive.open('rb') as stream:
+                    actual = hashlib.file_digest(stream, 'sha256').hexdigest()
+                require(actual == item['sha256'] == expected, 'Official Gradle archive checksum mismatch')
+                properties = (root / 'platform/gradle/wrapper/gradle-wrapper.properties').read_text()
+                url = 'https://services.gradle.org/distributions/gradle-8.14.6-bin.zip'
+                require('distributionUrl=' + url.replace(':', chr(92) + ':') in properties,
+                        'Distribution prewarm must match the unchanged public wrapper URL')
+                context = private / 'gradle-seed'
+                cached = context / 'seed' / gradle_cache_path(url)
+                cached.parent.mkdir(parents=True)
+                shutil.copyfile(archive, cached)
+                (context / 'Dockerfile').write_text(
+                    'FROM docker.io/library/busybox:1.37.0@sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec\nCOPY seed /seed\n'
+                    'RUN --mount=type=cache,target=/root/.gradle/wrapper cp -a /seed/. /root/.gradle/wrapper/\n')
+                run(['docker', 'buildx', 'build', '--builder', builder, '--output', 'type=cacheonly',
+                     str(context)], 'verified-gradle-cache-prewarm', timeout=300)
+                (output / 'gradle-cache.json').write_text(json.dumps(dict(sha256=actual,
+                     officialChecksumUrl='https://services.gradle.org/distributions/gradle-8.14.6-bin.zip.sha256',
+                     wrapperUrl=url, sourcePropertiesModified=False, scope='owned builder cache only'), indent=2))
+            started = True
+            run(compose + ['up', '--build', '-d'], 'compose-build-start', timeout=2400)
+        else:
+            override = private / "consume-compose.json"
+            override.write_text(json.dumps({"services": {service: {"image": image} for service, image in reused_build["images"].items()}}))
+            compose[:] = ["docker", "compose", "-f", str(root / "docker-compose.yml"), "-f", str(override), "--project-name", project, "--profile", "full"]
+            for name in ["builder.json", "gradle-cache.json"]:
+                (output / name).write_text(json.dumps(reused_build[name], indent=2))
+            (output / "build-reuse.json").write_text(json.dumps(reused_build, indent=2))
+            check("source-build-evidence-reused", sourceBuildExecutedThisRound=False, producerSource=reused_build["producerSource"])
+            started = True
+            run(compose + ["up", "--no-build", "--pull", "never", "-d"], "compose-consume-build-start", timeout=2400)
         ready()
         published = {}
         for service, port, internal in [('frontend', web_port, '3000/tcp'), ('postgres', db_port, '5432/tcp')]:
