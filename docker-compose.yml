@@ -13,7 +13,7 @@ services:
   # ─── PostgreSQL 16 ────────────────────────────────────────────────────────
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: auraboot-postgres
+    container_name: ${COMPOSE_PROJECT_NAME:-auraboot}-postgres
     restart: unless-stopped
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
@@ -35,7 +35,7 @@ services:
   redis:
     profiles: [cache]
     image: redis:7-alpine
-    container_name: auraboot-redis
+    container_name: ${COMPOSE_PROJECT_NAME:-auraboot}-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
@@ -52,7 +52,7 @@ services:
   minio:
     profiles: [storage]
     image: minio/minio:latest
-    container_name: auraboot-minio
+    container_name: ${COMPOSE_PROJECT_NAME:-auraboot}-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
@@ -82,7 +82,7 @@ services:
       args:
         AURA_GRADLE_REPOSITORY_POLICY: ${AURA_GRADLE_REPOSITORY_POLICY:-project}
         MAVEN_CENTRAL_FIRST: ${MAVEN_CENTRAL_FIRST:-false}
-    container_name: auraboot-backend
+    container_name: ${COMPOSE_PROJECT_NAME:-auraboot}-backend
     restart: unless-stopped
     environment:
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-aura_boot}?charSet=UTF8
@@ -128,7 +128,7 @@ services:
       # pnpm-lock.yaml lives at the repo root.
       context: .
       dockerfile: web-admin/Dockerfile
-    container_name: auraboot-frontend
+    container_name: ${COMPOSE_PROJECT_NAME:-auraboot}-frontend
     restart: unless-stopped
     ports:
       - "${AURABOOT_PORT:-3000}:3000"
@@ -156,7 +156,7 @@ services:
   # ─── Prometheus (metrics collection) ─────────────────── profile: monitoring
   prometheus:
     image: prom/prometheus:v2.51.0
-    container_name: auraboot-prometheus
+    container_name: ${COMPOSE_PROJECT_NAME:-auraboot}-prometheus
     profiles: [monitoring]
     restart: unless-stopped
     command:
@@ -175,7 +175,7 @@ services:
   # ─── Grafana (dashboards & visualization) ───────────── profile: monitoring
   grafana:
     image: grafana/grafana:11.0.0
-    container_name: auraboot-grafana
+    container_name: ${COMPOSE_PROJECT_NAME:-auraboot}-grafana
     profiles: [monitoring]
     restart: unless-stopped
     environment:
