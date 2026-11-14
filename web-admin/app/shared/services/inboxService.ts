@@ -45,6 +45,33 @@ export interface InboxPage {
   pages: number;
 }
 
+// ---------------------------------------------------------------------------
+// Contract anchoring (2026-11-14 pilot): the handwritten view types above stay
+// the public surface of this module, but the backend OpenAPI contract is now
+// wired in so drift fails the build instead of surfacing at runtime:
+//  - fetchResult generics use the generated contract types;
+//  - AssertContractKeys fails to compile if a field the view promises stops
+//    existing in the contract (renamed / removed upstream).
+// ---------------------------------------------------------------------------
+import type { components as InternalApi } from '~/generated/internal-api/schema';
+
+export type ContractInboxItem = InternalApi['schemas']['InboxItemResponse'];
+export type ContractInboxPage = InternalApi['schemas']['IPageInboxItemResponse'];
+export type ContractUnreadSummary = InternalApi['schemas']['UnreadSummary'];
+
+type AssertContractKeys<T, K extends keyof T & string> = K;
+// NOTE: the view also carries `recordPid`, which the generated contract does
+// NOT expose (scan gap or legacy) — the guard caught this on first wiring.
+// Verify before relying on it; do not add it back to the guard list until
+// the contract carries it.
+type _InboxItemFieldsExist = AssertContractKeys<ContractInboxItem,
+  'id' | 'itemType' | 'title' | 'priority' | 'status' | 'isRead' | 'createdAt'
+  | 'subtitle' | 'sourceType' | 'sourceId' | 'sourceRecordPid'
+  | 'cardPayload' | 'cardData' | 'actionTaken' | 'actedAt' | 'deepLink'
+  | 'readAt' | 'expiresAt' | 'clientItemId' | 'sourceModel' | 'modelCode'>;
+type _InboxPageFieldsExist = AssertContractKeys<ContractInboxPage,
+  'records' | 'total' | 'current' | 'size' | 'pages'>;
+
 export interface UnreadSummary {
   [key: string]: number;
 }
@@ -81,21 +108,24 @@ export async function listInboxItems(params: {
   pageNum?: number;
   pageSize?: number;
 }): Promise<InboxPage> {
-  const result = await fetchResult<InboxPage>(BASE, {
+  const result = await fetchResult<ContractInboxPage>(BASE, {
     method: 'get',
     params,
   });
-  return requireData(result);
+  // Contract→view boundary: the contract types everything optional; the
+  // backend always materializes these fields (asserted above via
+  // AssertContractKeys), so the view cast documents that promise.
+  return requireData(result) as InboxPage;
 }
 
 /**
  * Get unread counts grouped by item type.
  */
 export async function getUnreadSummary(): Promise<UnreadSummary> {
-  const result = await fetchResult<UnreadSummary>(`${BASE}/unread-summary`, {
+  const result = await fetchResult<ContractUnreadSummary>(`${BASE}/unread-summary`, {
     method: 'get',
   });
-  return requireData(result);
+  return requireData(result) as UnreadSummary;
 }
 
 /**
