@@ -199,6 +199,9 @@ export function DetailBlockRenderer({
         </section>
       );
     }
+    const sectionColumns = typeof (block as any).columns === 'number' ? (block as any).columns : 2;
+    if (!Number.isInteger(sectionColumns) || sectionColumns < 1 || sectionColumns > 4) throw new Error('Detail section columns must be between one and four');
+    const sectionGrid = ['md:grid-cols-1', 'md:grid-cols-2', 'md:grid-cols-3', 'md:grid-cols-4'][sectionColumns - 1];
     return (
       <section className="form-section border-border bg-panel rounded-card border p-5 shadow-sm">
         {block.title && (
@@ -207,7 +210,7 @@ export function DetailBlockRenderer({
           </h3>
         )}
         {block.fields && block.fields.length > 0 && (
-          <div className="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2">
+          <div className={`grid grid-cols-1 gap-x-8 gap-y-4 ${sectionGrid}`}>
             {block.fields.map((field: FieldConfig) => {
               const colSpan = field.layout?.colSpan || field.colSpan || (field.span === 2 ? 12 : 6);
               const isFullWidth = colSpan >= 12 || field.span === 2;
@@ -220,7 +223,7 @@ export function DetailBlockRenderer({
                 <div
                   key={field.field}
                   data-testid={`form-field-${field.field}`}
-                  className={`${isFullWidth ? 'md:col-span-2' : ''} min-w-0`}
+                  className={`${isFullWidth ? 'md:col-span-full' : ''} min-w-0`}
                 >
                   <DynamicField
                     field={enrichedField}

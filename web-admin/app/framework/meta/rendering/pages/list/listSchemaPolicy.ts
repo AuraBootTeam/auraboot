@@ -124,3 +124,13 @@ export function collectListMiscBlocks(
     return !specialized.has(block.blockType);
   });
 }
+
+/** Custom lists have independently fetched blocks rather than a native model read. */
+export function isCustomListDataReady(schema: any, manager: { getState: (id: string) => any } | null | undefined): boolean {
+  if (!manager) return false;
+  return Object.entries(schema?.dataSources || {}).every(([id, source]: [string, any]) => {
+    if (source.autoFetch === false) return true;
+    const state = manager.getState(id);
+    return Boolean(state && !state.loading && (state.lastFetch != null || state.error != null));
+  });
+}
