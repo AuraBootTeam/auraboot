@@ -213,7 +213,7 @@ test('customer delivery from menu through milestone completion @smoke', async ({
     await page.locator('#tpm_pj_risk_summary').fill('合同模板已确认，暂无阻塞。');
     await page.locator('#tpm_pj_next_action').fill('林晓安排下周一用户培训。');
     const editResponse = page.waitForResponse(response => response.url().includes('/execute/tpm:update_project') && response.request().method() === 'POST');
-    await page.getByTestId('form-btn-save').click();
+    await page.getByRole('button', { name: '保存项目', exact: true }).click();
     const edited = await editResponse;
     expect(edited.request().postDataJSON().payload.tpm_pj_risk_summary).toBe('合同模板已确认，暂无阻塞。');
     expect(edited.request().postDataJSON().payload.tpm_pj_next_action).toBe('林晓安排下周一用户培训。');
