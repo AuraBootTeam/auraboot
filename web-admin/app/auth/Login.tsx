@@ -34,7 +34,9 @@ import { migrateLegacyBrowserSession } from './legacy-session-migration';
 
 const REMEMBER_KEY = 'auth.remember';
 const REMEMBER_EMAIL_KEY = 'auth.rememberedEmail';
-const REMEMBER_PWD_KEY = 'auth.rememberedPwd';
+// Legacy key of the removed "remember password" feature (base64 is encoding,
+// not encryption). Kept only to clear values already stored in browsers.
+const LEGACY_REMEMBER_PWD_KEY = 'auth.rememberedPwd';
 const CHANNEL_I18N_KEYS: Record<string, string> = {
   EMAIL_PASSWORD: 'auth.channel.emailPassword',
   email_password: 'auth.channel.emailPassword',
@@ -512,16 +514,11 @@ export default function LoginPage() {
     if (savedRemember === 'true') {
       setRemember(true);
       const savedEmail = window.localStorage.getItem(REMEMBER_EMAIL_KEY);
-      const savedPwd = window.localStorage.getItem(REMEMBER_PWD_KEY);
       if (savedEmail) setEmail(savedEmail);
-      if (savedPwd) {
-        try {
-          setPassword(atob(savedPwd));
-        } catch {
-          /* ignore corrupt data */
-        }
-      }
     }
+    // The remembered-password feature was removed; proactively clear the
+    // legacy value so the fix also lands on browsers that still hold it.
+    window.localStorage.removeItem(LEGACY_REMEMBER_PWD_KEY);
   }, []);
 
   useEffect(() => {
@@ -1147,18 +1144,16 @@ function EmailPasswordForm({
         if (typeof window === 'undefined') return;
         const formData = new FormData(e.currentTarget);
         const trimmedEmail = (formData.get('identifier') as string)?.trim() || '';
-        const pwd = (formData.get('password') as string) || '';
         const isRemember = (e.currentTarget.elements.namedItem('remember') as HTMLInputElement)
           ?.checked;
         if (isRemember && trimmedEmail) {
           window.localStorage.setItem(REMEMBER_KEY, 'true');
           window.localStorage.setItem(REMEMBER_EMAIL_KEY, trimmedEmail);
-          window.localStorage.setItem(REMEMBER_PWD_KEY, btoa(pwd));
         } else {
           window.localStorage.removeItem(REMEMBER_KEY);
           window.localStorage.removeItem(REMEMBER_EMAIL_KEY);
-          window.localStorage.removeItem(REMEMBER_PWD_KEY);
         }
+        window.localStorage.removeItem(LEGACY_REMEMBER_PWD_KEY);
       }}
       className="space-y-5"
     >

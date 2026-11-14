@@ -393,7 +393,8 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                         .build();
             }
 
-            String ddl = "DROP TABLE IF EXISTS " + tableName;
+            String ddl = "DROP TABLE IF EXISTS "
+                    + SqlSafetyUtils.requireIdentifier(tableName, "drop table");
             dynamicDataMapper.alterTable(ddl);
 
             return SchemaOperationResult.builder()
