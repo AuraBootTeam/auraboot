@@ -45,6 +45,7 @@ public class CapabilitySyncService {
      * Runs async when triggered by event, sync when called from API.
      */
     @Async("taskExecutor")
+    @org.springframework.transaction.annotation.Transactional
     public CompletableFuture<Integer> syncCapabilities(Long tenantId) {
         try {
             // 1. Advisory lock to prevent concurrent syncs for the same tenant
@@ -128,7 +129,7 @@ public class CapabilitySyncService {
             return CompletableFuture.completedFuture(count);
         } catch (Exception e) {
             log.error("Failed to sync capabilities for tenant {}: {}", tenantId, e.getMessage(), e);
-            return CompletableFuture.completedFuture(0);
+            return CompletableFuture.failedFuture(e);
         }
     }
 

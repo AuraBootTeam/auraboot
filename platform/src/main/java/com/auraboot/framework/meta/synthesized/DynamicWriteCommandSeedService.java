@@ -41,7 +41,7 @@ public class DynamicWriteCommandSeedService {
         String code = operation + "." + modelCode;
         Map<String, Object> expectedConfig = Map.of("handler", operation,
                 "type", DynamicWriteCommandHandler.permissionSuffix(operation),
-                "handlerParams", Map.of("invocationAuthorization", "handler"));
+                "handlerParams", Map.of("invocationAuthorization", "handler", "transactionIsolation", "serializable"));
         String config;
         String targets;
         try {

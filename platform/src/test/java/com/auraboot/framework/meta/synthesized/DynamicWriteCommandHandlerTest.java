@@ -175,6 +175,8 @@ class DynamicWriteCommandHandlerTest {
             assertThat(config.get("handler").asText()).isEqualTo(DynamicWriteCommandHandler.UPDATE);
             assertThat(handler.supports(config.get("handler").asText())).isTrue();
             assertThat(config.get("type").asText()).isEqualTo("update");
+            assertThat(com.auraboot.framework.meta.transaction.CommandTransactionIsolationPolicy
+                    .requiresSerializable(json.readValue(command.getExecutionConfig(), Map.class))).isTrue();
         }
     }
 
@@ -185,7 +187,7 @@ class DynamicWriteCommandHandlerTest {
         var existing = new com.auraboot.framework.meta.entity.CommandDefinition();
         existing.setModelCode("orders");
         existing.setStatus(com.auraboot.framework.common.constant.StatusConstants.PUBLISHED);
-        existing.setExecutionConfig("{ \"type\": \"update\", \"handlerParams\": {\"invocationAuthorization\": \"handler\"}, \"handler\": \"dynamic.update\" }");
+        existing.setExecutionConfig("{ \"type\": \"update\", \"handlerParams\": {\"transactionIsolation\": \"serializable\", \"invocationAuthorization\": \"handler\"}, \"handler\": \"dynamic.update\" }");
         when(mapper.findCurrentByCode("dynamic.update.orders")).thenReturn(null, existing);
         when(mapper.insertIdempotent(any())).thenReturn(0);
         var seeds = new DynamicWriteCommandSeedService(mapper, json);
