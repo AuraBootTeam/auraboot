@@ -1,4 +1,7 @@
 import { resolveRowActionModel } from './rowActionModel';
+import { hasButtonPermissions, isButtonDisabled } from '~/framework/meta/utils/buttonPermissions';
+import { useActionTriggerFocus } from '~/hooks/useActionTriggerFocus';
+import { reconcileDraftRows } from '../../runtime/state/reconcile-draft-rows';
 /**
  * CardGridBlockRenderer - Generic responsive card-grid block.
  *
@@ -25,9 +28,9 @@ import { resolveRowActionModel } from './rowActionModel';
 
 import { initializeSelectedRows, indexSelectionRows, positiveRowValue, type RowSelectionRule } from '../../runtime/expression/row-selection';
 import { readOwnPath } from '../../runtime/expression/row-projection';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import type { BlockConfig, CardImageViewport, FieldConfig, LayoutConfig } from '~/framework/meta/schemas/types';
+import type { BlockConfig, ButtonConfig, CardImageViewport, FieldConfig, LayoutConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
@@ -93,7 +96,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   // Missing or broken URLs degrade to a neutral placeholder tile, never a
   // broken-image icon.
   const imageField: string | undefined = cfg.imageField;
-  const cardActions: Array<{ code: string; label?: any; variant?: string; action?: any }> =
+  const cardActions: ButtonConfig[] =
     Array.isArray(cfg.cardActions) ? cfg.cardActions : [];
   const autoFitColumns = cfg.autoFitColumns === true;
   const autoFillColumns = cfg.autoFillColumns === true;
@@ -135,7 +138,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
 
   // Action dispatch — mirror ToolbarBlockRenderer pattern
   const navigate = useNavigate();
-  const { token } = useAuth();
+  const { token, hasPermission } = useAuth();
   const { loaded: badgeDictLoaded, getDictLabel } = useDictCache({
     dictCodes: badgeDictCode ? [badgeDictCode] : [],
     token: token || undefined,
@@ -163,17 +166,34 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
     [showSuccessToast, showErrorToast, showWarningToast, showInfoToast],
   );
 
-  const { handleAction } = useActionHandler({
+  const { handleAction, loading } = useActionHandler({
     runtime,
     navigate,
     tableName,
-    context: {},
+    context,
     dataSourceManager,
     locale,
     t,
     token: token || undefined,
     showToast,
   });
+  const [runningAction, setRunningAction] = useState<string | null>(null);
+  const actionInFlight = useRef(false);
+  const actionBusy = Boolean(loading) || runningAction !== null;
+  const captureTriggerFocus = useActionTriggerFocus(actionBusy);
+  const actionContext = (row: any) => ({ ...runtime.getContext(), record: row, row });
+  const actionAllowed = (action: ButtonConfig, row: any) => hasButtonPermissions(action, hasPermission)
+    && (!action.visibleWhen || runtime.getEvaluator().evaluateCondition(action.visibleWhen, actionContext(row)));
+  const actionDisabled = (action: ButtonConfig, row: any) => isButtonDisabled(action,
+    expression => runtime.getEvaluator().evaluateCondition(expression, actionContext(row)), actionBusy);
+  const runCardAction = async (action: ButtonConfig, row: any, index: number) => {
+    if (actionInFlight.current || !actionAllowed(action, row) || actionDisabled(action, row)) return;
+    captureTriggerFocus();
+    actionInFlight.current = true;
+    setRunningAction(`${index}:${action.code}`);
+    try { await handleAction(action, row); }
+    finally { actionInFlight.current = false; setRunningAction(null); }
+  };
 
   const rawData = dataSourceId
     ? (() => {
@@ -191,9 +211,21 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   const rawParents = parentConfig ? dataSourceManager.getData(parentConfig.dataSource) : undefined;
   const storedParents = parentConfig ? stateManager?.getFieldValue(scopeId, parentConfig.field) : undefined;
   const parentRows = Array.isArray(storedParents) ? storedParents : normalizeRows(rawParents);
+  const previousParents = useRef<unknown>(undefined);
+  const previousRows = useRef<unknown>(undefined);
+  const preserveDraft = (condition: string | undefined) => (row: Record<string, unknown>) => !condition
+    || runtime.getEvaluator().evaluateCondition(condition, actionContext(row));
   useEffect(() => {
-    if (parentConfig && storedParents === undefined && parentState?.data !== undefined && !parentState.loading && !parentState.error)
+    if (!parentConfig || parentState?.data === undefined || parentState.loading || parentState.error) return;
+    if (storedParents === undefined) {
+      previousParents.current = rawParents;
       stateManager.updateField(scopeId, parentConfig.field, normalizeRows(rawParents));
+    } else if (parentConfig.draftRows && previousParents.current !== rawParents) {
+      if (!Array.isArray(storedParents)) throw new Error('Parent draft rows must be an array');
+      previousParents.current = rawParents;
+      stateManager.updateField(scopeId, parentConfig.field, reconcileDraftRows(normalizeRows(rawParents), storedParents,
+        parentConfig.draftRows, preserveDraft(parentConfig.draftRows.preserveWhen)));
+    }
   }, [parentConfig, storedParents, parentState, rawParents, scopeId, stateManager]);
   const currentSelectionRows = selectionRule ? indexSelectionRows(freshRows,selectionRule) : undefined;
   if (selectionRule) {
@@ -204,9 +236,16 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   useEffect(() => {
     if (formField && formRows === undefined && dataSourceState?.data !== undefined
         && !dataSourceState.loading && !dataSourceState.error) {
+      previousRows.current = rawData;
       stateManager.updateField(scopeId, formField, rowSelection ? initializeSelectedRows(normalizeRows(rawData),rowSelection) : normalizeRows(rawData));
+    } else if (formField && cfg.draftRows && dataSourceState?.data !== undefined
+        && !dataSourceState.loading && !dataSourceState.error && previousRows.current !== rawData) {
+      if (!Array.isArray(formRows)) throw new Error('Card draft rows must be an array');
+      previousRows.current = rawData;
+      stateManager.updateField(scopeId, formField, reconcileDraftRows(normalizeRows(rawData), formRows,
+        cfg.draftRows, preserveDraft(cfg.draftRows.preserveWhen)));
     }
-  }, [formField, formRows, dataSourceState, rawData, scopeId, stateManager, rowSelection]);
+  }, [formField, formRows, dataSourceState, rawData, scopeId, stateManager, rowSelection, cfg.draftRows]);
 
   // ── Error state ────────────────────────────────────────────────────────────
   if (dataSourceState?.error || parentState?.error) {
@@ -389,30 +428,26 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
             {cardActions.length > 0 && (
               <div className="mt-auto flex flex-wrap gap-2 pt-2">
                 {cardActions.map((action) => {
+                  if (!actionAllowed(action, row)) return null;
                   const label = getLocalizedText(action.label || action.code, locale, t);
+                  const disabled = actionDisabled(action, row);
+                  const running = runningAction === `${idx}:${action.code}`;
                   return (
                     <button
                       key={action.code}
                       type="button"
                       data-testid={`card-grid-action-${action.code}`}
-                      onClick={() =>
-                        handleAction(
-                          {
-                            code: action.code,
-                            label: action.label,
-                            variant: action.variant as any,
-                            action: action.action,
-                          },
-                          row,
-                        )
-                      }
+                      onClick={() => runCardAction(action, row, idx)}
+                      disabled={disabled}
+                      aria-busy={running}
                       className={`rounded-control inline-flex h-8 items-center px-3 text-sm font-medium focus:outline-none focus:ring-[0_0_0_3px] focus:ring-accent/30 ${
                         action.variant === 'primary'
                           ? 'bg-accent hover:bg-accent-hover text-white'
+                          : action.variant === 'danger' ? 'bg-status-red text-white hover:opacity-90'
                           : 'border-border-strong bg-panel text-text-2 hover:bg-hover border'
-                      }`}
+                      } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
                     >
-                      {label}
+                      {running ? t('common.loading') : label}
                     </button>
                   );
                 })}

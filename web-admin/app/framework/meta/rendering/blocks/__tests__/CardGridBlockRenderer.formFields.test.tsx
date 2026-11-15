@@ -6,9 +6,9 @@ import { businessFunctions } from '../../../runtime/expression/business-function
 import { ScopedStateManager } from '../../../runtime/state/scoped-state';
 import { CardGridBlockRenderer } from '../CardGridBlockRenderer';
 
-const { handleAction } = vi.hoisted(() => ({ handleAction: vi.fn() }));
+const { handleAction, hasPermission } = vi.hoisted(() => ({ handleAction: vi.fn(), hasPermission: vi.fn<(code: string) => boolean>(() => true) }));
 vi.mock('~/framework/meta/hooks/useActionHandler', () => ({ useActionHandler: () => ({ handleAction }) }));
-vi.mock('~/contexts/AuthContext', () => ({ useAuth: () => ({ token: 'local' }), usePermission: () => true }));
+vi.mock('~/contexts/AuthContext', () => ({ useAuth: () => ({ token: 'local', hasPermission }), usePermission: () => true }));
 vi.mock('~/contexts/ToastContext', () => ({ useToastContext: () => ({
   showSuccessToast: vi.fn(), showErrorToast: vi.fn(), showWarningToast: vi.fn(), showInfoToast: vi.fn(),
 }) }));
@@ -21,10 +21,10 @@ vi.mock('../../components/ComponentLoader', () => ({ ComponentLoader: ({ props }
     readOnly={props.readOnly} onChange={(event) => props.onChange(event.target.value)} /></label>
 ) }));
 
-function setup(bind = true, grouped = false, computed = false, grid = false) {
+function setup(bind = true, grouped = false, computed = false, grid = false, reconcile = false, actions?: any[]) {
   const state = new ScopedStateManager({} as any);
   state.createScope('review');
-  let rows = [
+  let rows: any[] = [
     { pid: 'quote-a', supplierName: 'Supplier A', availableQty: '60', proposedQty: '60', score: '100', sourcePid: 'source-a', sourceLabel: 'Same material' },
     { pid: 'quote-b', supplierName: 'Supplier B', availableQty: '70', proposedQty: '40', score: '90', sourcePid: 'source-b', sourceLabel: 'Same material' },
   ];
@@ -42,6 +42,7 @@ function setup(bind = true, grouped = false, computed = false, grid = false) {
   } as any;
   render(<CardGridBlockRenderer runtime={runtime} block={{ id: 'offers', blockType: 'card-grid',
     dataSource: 'offers', titleField: 'supplierName', ...(bind ? { field: 'choices' } : {}),
+    ...(reconcile ? { draftRows: { identityFields: ['pid'], preserveFields: ['proposedQty'], preserveWhen: 'record.eligible !== false' } } : {}),
     ...(grid ? { fieldsLayout: { type: 'grid', cols: 12, rowGap: 12, colGap: 12 } } : {}),
     ...(grouped ? { groupByField: 'sourcePid', groupTitleField: 'sourceLabel' } : {}),
     fields: [
@@ -50,16 +51,51 @@ function setup(bind = true, grouped = false, computed = false, grid = false) {
       { field: 'score', label: 'Score', component: 'SmartInput', readOnly: true, ...(grid ? { layout: { colSpan: 12 } } : {}) },
       ...(computed ? [{ field: 'groupTotal', label: 'Group total', component: 'SmartInput', valueWhen: '${fn.DECIMAL_SUM_BY(form.choices, "proposedQty", "sourcePid", row.sourcePid)}' }] : []),
     ],
-    cardActions: [{ code: 'preview', label: 'Preview', action: { type: 'command', command: 'test:preview' } }],
+    cardActions: actions || [{ code: 'preview', label: 'Preview', action: { type: 'command', command: 'test:preview' } }],
   } as any} />);
-  return { state, refresh: () => {
-    rows = rows.map(row => ({ ...row, proposedQty: '999' }));
+  return { state, refresh: (replacement?: any[]) => {
+    rows = replacement || rows.map(row => ({ ...row, proposedQty: '999' }));
     listeners.forEach(listener => listener());
   } };
 }
 
 describe('Card-grid draft form fields', () => {
-  beforeEach(() => handleAction.mockClear());
+  beforeEach(() => {handleAction.mockReset(); hasPermission.mockReset().mockReturnValue(true);});
+
+  it('gates actions by current row and permissions and prevents concurrent duplicate actions', async () => {
+    hasPermission.mockImplementation(code => code !== 'denied');
+    let complete!: () => void;
+    handleAction.mockImplementation(() => new Promise<void>(resolve => {complete = resolve;}));
+    setup(true, false, false, false, false, [
+      {code: 'return', label: 'Return', permissionCode: 'allowed', visibleWhen: 'record.sourcePid === "source-a"', action: {type: 'command', command: 'test:return'}},
+      {code: 'denied', label: 'Denied action', permissionCode: 'denied', action: {type: 'command', command: 'test:denied'}},
+      {code: 'eligible', label: 'Eligible action', enableWhen: 'record.availableQty > 65', action: {type: 'command', command: 'test:eligible'}},
+    ]);
+    expect(screen.getAllByRole('button', {name: 'Return'})).toHaveLength(1);
+    expect(screen.queryByRole('button', {name: 'Denied action'})).toBeNull();
+    const available = screen.getAllByRole('button', {name: 'Eligible action'});
+    expect(available[0]).toBeDisabled(); expect(available[1]).toBeEnabled();
+    fireEvent.click(available[1]); fireEvent.click(available[1]);
+    expect(handleAction).toHaveBeenCalledTimes(1);
+    expect(handleAction.mock.calls[0][1]).toMatchObject({pid: 'quote-b', availableQty: '70'});
+    expect(screen.getByRole('button', {name: 'Return'})).toBeDisabled();
+    await act(async () => complete());
+    expect(screen.getByRole('button', {name: 'Return'})).toBeEnabled();
+  });
+
+  it('refreshes authoritative row facts while retaining only declared eligible draft inputs', () => {
+    const {state, refresh} = setup(true, false, false, false, true);
+    const first = () => within(screen.getByRole('group', {name: 'Supplier A'}));
+    fireEvent.change(first().getByRole('textbox', {name: 'Proposed quantity'}), {target: {value: '59.000001'}});
+    act(() => refresh([{pid: 'quote-a', supplierName: 'Supplier A', availableQty: '90', proposedQty: '70', score: '80', eligible: true, rowVersion: 7}]));
+    expect(first().getByRole('textbox', {name: 'Available capacity'})).toHaveValue('90');
+    expect(first().getByRole('textbox', {name: 'Proposed quantity'})).toHaveValue('59.000001');
+    expect(state.getFieldValue('review', 'choices')[0]).toMatchObject({rowVersion: 7, eligible: true});
+    expect(screen.queryByRole('group', {name: 'Supplier B'})).toBeNull();
+    act(() => refresh([{pid: 'quote-a', supplierName: 'Supplier A', availableQty: '90', proposedQty: '0', score: '80', eligible: false, rowVersion: 8}]));
+    expect(first().getByRole('textbox', {name: 'Proposed quantity'})).toHaveValue('0');
+    expect(state.getFieldValue('review', 'choices')[0]).toMatchObject({rowVersion: 8, eligible: false});
+  });
 
   it('uses opt-in field grid without changing read-only capacity or independent draft edits', () => {
     const { state } = setup(true, false, false, true);

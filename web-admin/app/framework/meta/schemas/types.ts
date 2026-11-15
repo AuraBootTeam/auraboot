@@ -106,6 +106,12 @@ export interface BusinessActivityDetailField {
 export interface BusinessActivitySnapshotField extends BusinessActivityDetailField {}
 
 // Block 配置 (新 DSL)
+export interface CardDraftRows {
+  identityFields: string[];
+  preserveFields: string[];
+  preserveWhen?: string;
+}
+
 export interface CardGroupRows {
   dataSource: string;
   field: string;
@@ -114,6 +120,7 @@ export interface CardGroupRows {
   summaryFields?: FieldConfig[];
   fields?: FieldConfig[];
   emptyText?: string | LocalizedText;
+  draftRows?: CardDraftRows;
 }
 
 export interface BlockConfig {
@@ -151,6 +158,9 @@ export interface BlockConfig {
   groupWarningField?: string;
   /** Join child cards to explicit parent rows, including parents without children. */
   groupRows?: CardGroupRows;
+  /** Reconcile refreshed facts by stable identity while preserving declared draft fields. */
+  draftRows?: CardDraftRows;
+  cardActions?: ButtonConfig[];
   /** Per-group local search never removes rows from the submitted draft array. */
   searchFields?: string[];
   searchPlaceholder?: string | LocalizedText;

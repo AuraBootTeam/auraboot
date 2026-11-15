@@ -24,6 +24,7 @@ import {
   resolveDetailReturnTarget,
   shouldRenderInlineDetailApproval,
   resolveDetailPdfFileName,
+  resolveDetailRelatedLinks,
 } from './detailLayoutValues';
 import { resolveTextFallback } from './detailFieldDisplay';
 import { prepareDetailRuntimeBlock } from './detailBlockValues';
@@ -249,6 +250,7 @@ export function renderDetailPageView({
     })
     .filter(Boolean)
     .join(' · ');
+  const relatedLinks = resolveDetailRelatedLinks(schema.extension?.headerRelatedLinks, recordData || {});
   const preserveListContext = schema?.extension?.preserveListContext === true;
   const preservedReturnTarget = preserveListContext
     ? resolveDetailReturnTarget(location.search)
@@ -360,10 +362,16 @@ export function renderDetailPageView({
                   )}
                 </div>
                 {headerSubtitle ? (
-                  <p className="text-text-3 mt-1 truncate text-xs" title={headerSubtitle}>
+                  <p className="text-text-3 mt-2 break-words text-sm" title={headerSubtitle}>
                     {headerSubtitle}
                   </p>
                 ) : null}
+                {relatedLinks.length > 0 && (
+                  <div className="text-text-3 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm" data-testid="detail-related-links">
+                    <span>{getLocalizedText(schema.extension?.headerRelatedLinks?.label, locale, t)}</span>
+                    {relatedLinks.map(link => <Link key={link.pid} to={link.to} className="text-accent hover:underline">{link.label} ↗</Link>)}
+                  </div>
+                )}
               </div>
             </div>
 
