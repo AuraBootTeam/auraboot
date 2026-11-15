@@ -68,6 +68,7 @@ public class DynamicWriteCommandSeedService {
         def.setDescription("Platform-seeded synthesized command routing the dynamic CRUD surface through the pipeline (aura.command.synthesized-dynamic-writes)");
         def.setInputSchema("{}");
         def.setTargetModels(targets);
+        def.setExtension(new com.auraboot.framework.meta.entity.payload.ExtensionBean());
         // executionConfig drives the pipeline: handler + handler-owned invocation authorization
         def.setExecutionConfig(config);
         def.setCmdRiskLevel("L2");

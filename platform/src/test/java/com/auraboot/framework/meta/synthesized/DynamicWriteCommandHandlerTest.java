@@ -163,6 +163,13 @@ class DynamicWriteCommandHandlerTest {
         assertThat(commands.getAllValues()).extracting(com.auraboot.framework.meta.entity.CommandDefinition::getModelCode)
                 .containsExactly("orders", "invoices");
         for (var command : commands.getAllValues()) {
+            assertThat(java.util.Arrays.asList(command.getPid(), command.getTenantId(), command.getCode(),
+                    command.getModelCode(), command.getInputSchema(), command.getTargetModels(),
+                    command.getExecutionConfig(), command.getExtension(), command.getVersion(),
+                    command.getIsCurrent(), command.getRowVersion(), command.getStatus(),
+                    command.getDeletedFlag(), command.getCreatedAt(), command.getUpdatedAt()))
+                    .doesNotContainNull();
+            assertThat(json.readTree(json.writeValueAsString(command.getExtension())).isObject()).isTrue();
             assertThat(json.readTree(command.getTargetModels()).get(0).asText()).isEqualTo(command.getModelCode());
             var config = json.readTree(command.getExecutionConfig());
             assertThat(config.get("handler").asText()).isEqualTo(DynamicWriteCommandHandler.UPDATE);
