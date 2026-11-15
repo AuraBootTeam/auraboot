@@ -18,7 +18,7 @@
 
 # ── Stage 1: Build ──────────────────────────────────────────
 ARG BUILD_JDK_IMAGE=eclipse-temurin:21-jdk
-ARG RUNTIME_JRE_IMAGE=eclipse-temurin:21-jre-alpine
+ARG RUNTIME_JRE_IMAGE=eclipse-temurin:21-jre-alpine@sha256:b6ea71e690a72ba240b3d1b5c477410014862f9ea2cc73ab40e41ff21b03ba1c
 FROM ${BUILD_JDK_IMAGE} AS builder
 ARG AURA_GRADLE_REPOSITORY_POLICY=project
 
@@ -113,7 +113,7 @@ FROM ${RUNTIME_JRE_IMAGE}
 WORKDIR /app
 
 # Install wget for health checks
-RUN apk add --no-cache wget
+RUN apk add --no-cache wget zlib=1.4-r0
 
 # Create non-root user
 RUN addgroup -g 1000 appuser && \

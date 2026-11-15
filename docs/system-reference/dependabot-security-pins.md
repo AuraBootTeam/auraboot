@@ -55,3 +55,37 @@ This repo pins known-vulnerable transitive dependencies with `overrides` and exp
 5. Audit the lock diffs so only the intended packages moved.
 6. Run the validation battery (match the surface you touched): `pnpm install --frozen-lockfile`; `web-admin` `pnpm test:unit` (plus the full production build when the vite/build chain moved); `plugins/cli` `npm ci --ignore-scripts --no-audit --no-fund && npm run build && npm test`; `airflow-provider` `poetry install && poetry run pytest` (install the project itself first or pytest dies at collection with `No module named airflow_provider_auraboot`).
 7. Open the PR. After merge, the next push refreshes the graph, Dependabot re-sweeps (its security-update jobs should all succeed), alerts close, and superseded Dependabot PRs close automatically. Confirm all three before declaring the incident closed.
+
+## Native OCI security baseline
+
+The native OCI builder (`scripts/application/oci-layout.mjs`) and the public
+Compose backend (`platform/Dockerfile`) use the official Temurin Java 21 Alpine
+runtime, pinned to the linux/amd64 manifest digest. The native image runs the
+Java application directly; it does not require Ubuntu's package manager, mount,
+login, SASL or GnuTLS tools. Signed APK installation pins zlib to `1.4-r0`, the
+repair for CVE-2026-4738 in the selected upstream image. Missing packages or
+signature failures must fail the build; no scanner ignore entries are allowed.
+
+Changing from glibc to musl is a compatibility change, not just a scanner
+configuration change. A new candidate must pass the original real OCI startup,
+native installation, upgrade, backup/restore and public cold-install protocols.
+An isolated base-image scan is preliminary evidence only. Keep the former RC
+archive and its findings immutable; attach new scans to the new candidate bytes.
+Extensions that provide native JNI libraries must supply musl-compatible builds
+for this OCI runtime; host-native distribution retains the host JVM contract.
+
+### Embedded OGNL is a carrier dependency
+
+MyBatis 3.5.19 embeds OGNL 3.4.4 under `org.apache.ibatis.ognl`. An ordinary
+`ognl:ognl` override cannot replace those classes. CVE-2026-113730 is fixed in
+upstream OGNL 3.4.13 and later, but the MyBatis-Plus 3.5.18.1 dependency declaration
+still selects MyBatis 3.5.19. MyBatis 3.6.0 removes the `addMappedStatement`
+descriptor used by that family; prior real database Mapper tests fail with
+`NoSuchMethodError`. Do not conceal the remaining finding or introduce a broken
+major upgrade. A compatible upstream carrier or a reproducible, separately
+qualified security backport is required before claiming remediation.
+
+Until that carrier is qualified, only trusted maintainers may author SQL/Mapper
+expressions and plugin code. That boundary limits exposure; it is not a patched
+OGNL version or proof that the vulnerability cannot be reached. Keep its finding
+and ownership in the candidate risk ledger.
