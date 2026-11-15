@@ -192,8 +192,9 @@ describe('Card-grid draft form fields', () => {
   });
 });
 
-function setupJoinedGroups(duplicate = false) {
-  const state = new ScopedStateManager({} as any);state.createScope('joined');
+function setupJoinedGroups(duplicate = false, pendingParents = false) {
+  let parentsReady = !pendingParents;
+  const state = new ScopedStateManager({} as any);state.createScope('joined', { form: pendingParents ? { demands: [] } : {} });
   const parents = [
     { sourcePid: 's-a', sourceLabel: 'Same material', remainingQty: '100', quantity: '100' },
     { sourcePid: duplicate ? 's-a' : 's-b', sourceLabel: 'Same material', remainingQty: '80', quantity: '80' },
@@ -206,8 +207,8 @@ function setupJoinedGroups(duplicate = false) {
   ];
   const listeners = new Set<() => void>();
   const manager = {
-    getData: (id: string) => id === 'parents' ? parents : offers,
-    getState: (id: string) => ({ data: id === 'parents' ? parents : offers }),
+    getData: (id: string) => id === 'parents' ? (parentsReady ? parents : null) : offers,
+    getState: (id: string) => ({ data: id === 'parents' ? (parentsReady ? parents : null) : offers, loading: id === 'parents' && !parentsReady }),
     subscribe: (_id: string, listener: () => void) => {listeners.add(listener);return () => listeners.delete(listener);},
   };
   const runtime = {
@@ -221,13 +222,22 @@ function setupJoinedGroups(duplicate = false) {
     searchFields: ['supplierName'],searchPlaceholder: 'Search suppliers',
     groupRows: { dataSource: 'parents',field: 'demands',identityField: 'sourcePid',titleField: 'sourceLabel',
       summaryFields: [{ field: 'remainingQty',label: 'Remaining',component: 'SmartInput',readOnly: true }],
-      fields: [{ field: 'quantity',label: 'Purchase target',component: 'SmartInput' }],emptyText: 'Not dispatched',
+      fields: [{ field: 'quantity',label: 'Purchase target',component: 'SmartInput', readOnly: pendingParents }],emptyText: 'Not dispatched',
     },fields: [{field:'proposedQty',label:'Proposed quantity',component:'SmartInput'}],
   } as any} />);
-  return { state,refresh: () => { offers = offers.map(row => ({...row,proposedQty:'999'}));listeners.forEach(fn => fn()); } };
+  return { state, loadParents: () => { parentsReady = true; listeners.forEach(fn => fn()); }, refresh: () => { offers = offers.map(row => ({...row,proposedQty:'999'}));listeners.forEach(fn => fn()); } };
 }
 
 describe('Joined card groups keep source and offer drafts independent', () => {
+  it('waits for parent data when offers arrive first and then joins every source', () => {
+    const { state, loadParents } = setupJoinedGroups(false, true);
+    expect(screen.getByTestId('card-grid-loading')).toBeInTheDocument();
+    expect(state.getFieldValue('joined', 'demands')).toEqual([]);
+    act(loadParents);
+    expect(screen.getAllByTestId('card-grid-group')).toHaveLength(3);
+    expect(screen.getAllByTestId('card-grid-card')).toHaveLength(3);
+  });
+
   it('retains empty parent groups and does not lose or redirect edited rows through search and collapse', () => {
     const { state,refresh } = setupJoinedGroups();
     const groups = screen.getAllByTestId('card-grid-group');expect(groups).toHaveLength(3);

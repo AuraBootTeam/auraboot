@@ -142,7 +142,7 @@ export function ListToolbar({
     <>
       {/* Main toolbar row */}
       <div
-        className={`print-hide border-border bg-panel flex flex-wrap items-center gap-2 border-b px-4 py-3 sm:px-6 ${workspace ? '[&>div:first-child]:sm:mr-auto' : ''}`}
+        className={`print-hide border-border bg-panel flex flex-wrap ${inlineFilters ? 'items-end' : 'items-center'} gap-2 border-b px-4 py-3 sm:px-6 ${workspace ? '[&>div:first-child]:sm:mr-auto' : ''}`}
         data-print="hide"
         data-testid="list-toolbar"
       >

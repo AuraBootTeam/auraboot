@@ -210,23 +210,24 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   const rows = Array.isArray(formRows) ? formRows : initialRows;
   const rawParents = parentConfig ? dataSourceManager.getData(parentConfig.dataSource) : undefined;
   const storedParents = parentConfig ? stateManager?.getFieldValue(scopeId, parentConfig.field) : undefined;
-  const parentRows = Array.isArray(storedParents) ? storedParents : normalizeRows(rawParents);
+  const parentsReadOnly = Boolean(parentConfig && (parentConfig.fields || []).every((field: FieldConfig) => field.readOnly || field.valueWhen));
+  const parentRows = parentsReadOnly ? normalizeRows(rawParents) : Array.isArray(storedParents) ? storedParents : normalizeRows(rawParents);
   const previousParents = useRef<unknown>(undefined);
   const previousRows = useRef<unknown>(undefined);
   const preserveDraft = (condition: string | undefined) => (row: Record<string, unknown>) => !condition
     || runtime.getEvaluator().evaluateCondition(condition, actionContext(row));
   useEffect(() => {
-    if (!parentConfig || parentState?.data === undefined || parentState.loading || parentState.error) return;
+    if (!parentConfig || parentState?.data == null || parentState.loading || parentState.error) return;
     if (storedParents === undefined) {
       previousParents.current = rawParents;
       stateManager.updateField(scopeId, parentConfig.field, normalizeRows(rawParents));
-    } else if (parentConfig.draftRows && previousParents.current !== rawParents) {
+    } else if ((parentConfig.draftRows || parentsReadOnly) && previousParents.current !== rawParents) {
       if (!Array.isArray(storedParents)) throw new Error('Parent draft rows must be an array');
       previousParents.current = rawParents;
-      stateManager.updateField(scopeId, parentConfig.field, reconcileDraftRows(normalizeRows(rawParents), storedParents,
-        parentConfig.draftRows, preserveDraft(parentConfig.draftRows.preserveWhen)));
+      stateManager.updateField(scopeId, parentConfig.field, parentsReadOnly ? normalizeRows(rawParents) : reconcileDraftRows(normalizeRows(rawParents), storedParents,
+        parentConfig.draftRows!, preserveDraft(parentConfig.draftRows!.preserveWhen)));
     }
-  }, [parentConfig, storedParents, parentState, rawParents, scopeId, stateManager]);
+  }, [parentConfig, parentsReadOnly, storedParents, parentState, rawParents, scopeId, stateManager]);
   const currentSelectionRows = selectionRule ? indexSelectionRows(freshRows,selectionRule) : undefined;
   if (selectionRule) {
     for (const row of indexSelectionRows(rows,selectionRule).values()) {
@@ -270,7 +271,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
 
   // ── Loading state ──────────────────────────────────────────────────────────
   if ((dataSourceState?.loading && !dataSourceState.data)
-      || (parentConfig && storedParents === undefined && (parentState?.data === undefined || parentState.loading && !parentState.data))) {
+      || (parentConfig && (parentState?.data == null || parentState.loading && !parentState.data))) {
     return (
       <div
         data-testid="card-grid-loading"
