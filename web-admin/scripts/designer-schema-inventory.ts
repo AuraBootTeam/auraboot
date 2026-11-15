@@ -22,16 +22,27 @@ export function flattenFields(fields:any[],prefix=''):any[] {
     registeredAssertions:[],execution:'did_not_run',
   },...flattenFields(field.itemSchema||[],prefix+field.key+'[].')]);
 }
+export function collectPropertyEditorDeclarations(source: string): Set<string> {
+  const declarations = new Set<string>();
+  const ast = ts.createSourceFile('property-editors.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const visit = (node: ts.Node) => {
+    if (ts.isCallExpression(node)) {
+      const method = node.expression.getText(ast);
+      const registered = method === 'propertyEditorRegistry.register' && node.arguments.length >= 2;
+      const owned = method === 'propertyEditorRegistry.registerOwned' && node.arguments.length >= 3;
+      if ((registered || owned) && ts.isStringLiteral(node.arguments[0])) declarations.add(node.arguments[0].text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(ast);
+  return declarations;
+}
 export function collectDesignerSchemas() {
   const rows:any[]=[];
   const declarations=new Set<string>();
   for(const relative of ['shared/designer/PropertyFieldRenderer.tsx','shared/designer/ColorPropertyEditor.tsx','plugins/core-dashboard/components/dashboardPropertySchemas.tsx','plugins/core-designer/components/report-designer/components/ReportDataSourceEditor.tsx']) {
     const file=path.join(root,'web-admin/app',relative);
-    const ast=ts.createSourceFile(file,fs.readFileSync(file,'utf8'),ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
-    const visit=(node:ts.Node)=>{
-      if(ts.isCallExpression(node)&&node.expression.getText(ast)==='propertyEditorRegistry.register'&&node.arguments[0]&&ts.isStringLiteral(node.arguments[0]))declarations.add(node.arguments[0].text);
-      ts.forEachChild(node,visit);
-    };visit(ast);
+    for (const key of collectPropertyEditorDeclarations(fs.readFileSync(file, 'utf8'))) declarations.add(key);
   }
   const add=(surface:string,component:string,variant:string,fields:any[])=>{
     const properties=flattenFields(fields);

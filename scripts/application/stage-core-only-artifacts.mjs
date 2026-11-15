@@ -411,6 +411,15 @@ async function main() {
   const version = readFileSync(resolve(repoRoot, 'VERSION'), 'utf8').trim();
   const manifestPath = resolve(repoRoot, 'distribution/application/examples/core-only/app.yaml');
   const manifest = validateManifest(readStructuredFile(manifestPath));
+  const candidatePath = resolve(repoRoot, 'distribution/application/examples/core-only/release-candidate.json');
+  const candidate = existsSync(candidatePath) ? JSON.parse(readFileSync(candidatePath, 'utf8')) : undefined;
+  if (candidate && (candidate.schemaVersion !== 1 || candidate.version !== version
+    || typeof candidate.id !== 'string' || !candidate.id.startsWith(`v${version}-rc.`)
+    || !/^[1-9]\d*$/.test(candidate.id.slice(`v${version}-rc.`.length)) || candidate.phase !== 'release-candidate'
+    || candidate.status !== 'unpublished' || candidate.targetPlatform !== 'linux-amd64'
+    || candidate.licenseFile !== 'LICENSE.txt' || candidate.noticeFile !== 'NOTICE')) {
+    throw new Error('Release candidate must match VERSION and remain explicitly unpublished');
+  }
   for (const [name, actual] of Object.entries({
     runtime: manifest.platform.runtime,
     pluginApi: manifest.platform.pluginApi,
@@ -653,6 +662,7 @@ async function main() {
     `${JSON.stringify({
       schemaVersion: 1,
       source: sourceRecord(repository, commit),
+      ...(candidate ? { candidate } : {}),
       ...webProof,
       application: lock.application,
       manifestDigest: lock.manifestDigest,
