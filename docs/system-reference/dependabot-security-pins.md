@@ -60,7 +60,8 @@ This repo pins known-vulnerable transitive dependencies with `overrides` and exp
 
 The native OCI builder (`scripts/application/oci-layout.mjs`) and the public
 Compose backend (`platform/Dockerfile`) use the official Temurin Java 21 Alpine
-runtime, pinned to the linux/amd64 manifest digest. The native image runs the
+runtime. Native OCI pins its linux/amd64 manifest; Compose pins the corresponding
+multi-architecture index to preserve its existing platform selection. The native image runs the
 Java application directly; it does not require Ubuntu's package manager, mount,
 login, SASL or GnuTLS tools. Signed APK installation pins zlib to `1.4-r0`, the
 repair for CVE-2026-4738 in the selected upstream image. Missing packages or

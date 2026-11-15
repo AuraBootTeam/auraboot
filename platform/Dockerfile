@@ -18,7 +18,7 @@
 
 # ── Stage 1: Build ──────────────────────────────────────────
 ARG BUILD_JDK_IMAGE=eclipse-temurin:21-jdk
-ARG RUNTIME_JRE_IMAGE=eclipse-temurin:21-jre-alpine@sha256:b6ea71e690a72ba240b3d1b5c477410014862f9ea2cc73ab40e41ff21b03ba1c
+ARG RUNTIME_JRE_IMAGE=eclipse-temurin:21-jre-alpine@sha256:ac05c3c42b7c2f1a52c9bd52f01041fa1958231b15ebeae7420429cbc5baf474
 FROM ${BUILD_JDK_IMAGE} AS builder
 ARG AURA_GRADLE_REPOSITORY_POLICY=project
 
