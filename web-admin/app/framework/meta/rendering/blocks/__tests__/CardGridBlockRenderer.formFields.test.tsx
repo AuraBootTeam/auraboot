@@ -192,7 +192,7 @@ describe('Card-grid draft form fields', () => {
   });
 });
 
-function setupJoinedGroups(duplicate = false, pendingParents = false, compact = false) {
+function setupJoinedGroups(duplicate = false, pendingParents = false, compact = false, formOnly = false) {
   let parentsReady = !pendingParents;
   const state = new ScopedStateManager({} as any);state.createScope('joined', { form: pendingParents ? { demands: [] } : {} });
   const parents = [
@@ -206,8 +206,10 @@ function setupJoinedGroups(duplicate = false, pendingParents = false, compact = 
     { pid: 'offer-c', sourcePid: 's-b', supplierName: 'Alpha', proposedQty: '80' },
   ];
   const listeners = new Set<() => void>();
+  const reads: string[] = [];
+  if (formOnly) state.updateField('joined', 'demands', parents);
   const manager = {
-    getData: (id: string) => id === 'parents' ? (parentsReady ? parents : null) : offers,
+    getData: (id: string) => { reads.push(id); return id === 'parents' ? (parentsReady ? parents : null) : offers; },
     getState: (id: string) => ({ data: id === 'parents' ? (parentsReady ? parents : null) : offers, loading: id === 'parents' && !parentsReady }),
     subscribe: (_id: string, listener: () => void) => {listeners.add(listener);return () => listeners.delete(listener);},
   };
@@ -220,15 +222,30 @@ function setupJoinedGroups(duplicate = false, pendingParents = false, compact = 
     id: 'joined',blockType: 'card-grid',dataSource: 'offers',field: 'allocations',titleField: 'supplierName',
     groupByField: 'sourcePid',groupTitleField: 'sourceLabel',collapsibleGroups: true,groupsDefaultOpen: true,compact,groupDescriptionField: 'remainingQty',
     searchFields: ['supplierName'],searchPlaceholder: 'Search suppliers',
-    groupRows: { dataSource: 'parents',field: 'demands',identityField: 'sourcePid',titleField: 'sourceLabel',
+    groupRows: { ...(formOnly ? {} : {dataSource: 'parents'}),field: 'demands',identityField: 'sourcePid',titleField: 'sourceLabel',
       summaryFields: [{ field: 'remainingQty',label: 'Remaining',component: 'SmartInput',readOnly: true }],
-      fields: [{ field: 'quantity',label: 'Purchase target',component: 'SmartInput', readOnly: pendingParents }],emptyText: 'Not dispatched',
+      fields: [{ field: 'quantity',label: 'Purchase target',component: 'SmartInput', readOnly: pendingParents || formOnly }],emptyText: 'Not dispatched',
     },fields: [{field:'proposedQty',label:'Proposed quantity',component:'SmartInput'}],
   } as any} />);
-  return { state, loadParents: () => { parentsReady = true; listeners.forEach(fn => fn()); }, refresh: () => { offers = offers.map(row => ({...row,proposedQty:'999'}));listeners.forEach(fn => fn()); } };
+  return { state, reads, loadParents: () => { parentsReady = true; listeners.forEach(fn => fn()); }, refresh: () => { offers = offers.map(row => ({...row,proposedQty:'999'}));listeners.forEach(fn => fn()); } };
 }
 
 describe('Joined card groups keep source and offer drafts independent', () => {
+  it('groups an explicit form-only preview without fetching or overwriting its parent snapshot', () => {
+    const {state,reads,refresh} = setupJoinedGroups(false,false,true,true);
+    expect(reads).not.toContain('parents');
+    expect(screen.queryByTestId('card-grid-loading')).not.toBeInTheDocument();
+    const groups = screen.getAllByTestId('card-grid-group');
+    expect(groups).toHaveLength(3);
+    expect(groups[2]).toHaveTextContent('Not dispatched');
+    expect(within(groups[0]).getByRole('textbox',{name:'Purchase target'})).toHaveProperty('readOnly',true);
+    const original=state.getFieldValue('joined','demands');
+    act(refresh);
+    expect(state.getFieldValue('joined','demands')).toBe(original);
+    expect(within(groups[0]).getByRole('textbox',{name:'Remaining'})).toHaveValue('100');
+    expect(reads).not.toContain('parents');
+  });
+
   it('separates compact material context from immutable summary without redirecting draft edits', () => {
     const {state} = setupJoinedGroups(false, false, true);
     const first = screen.getAllByTestId('card-grid-group')[0];

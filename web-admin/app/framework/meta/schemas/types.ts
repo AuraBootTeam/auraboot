@@ -113,7 +113,8 @@ export interface CardDraftRows {
 }
 
 export interface CardGroupRows {
-  dataSource: string;
+  /** Omit only when parent rows already reside in the declared form array. */
+  dataSource?: string;
   field: string;
   identityField: string;
   titleField: string;

@@ -110,8 +110,8 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   // A declared form field stores draft card rows; data-source refreshes never replace edits.
   const formField = typeof cfg.field === 'string' && cfg.field.trim() ? cfg.field : undefined;
   const parentConfig = cfg.groupRows;
-  if (parentConfig && (!cfg.groupByField || !parentConfig.dataSource || !parentConfig.field || !parentConfig.identityField || !parentConfig.titleField))
-    throw new Error('Joined card groups require an explicit parent source and group identity');
+  if (parentConfig && (!cfg.groupByField || !parentConfig.field || !parentConfig.identityField || !parentConfig.titleField))
+    throw new Error('Joined card groups require an explicit parent form array and group identity');
   const [groupSearch, setGroupSearch] = useState<Record<string, string>>({});
   const rowSelection = cfg.rowSelection;
   if (rowSelection && !formField) throw new Error('Card row selection requires a form array');
@@ -209,8 +209,10 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   const freshRows = normalizeRows(rawData);
   const initialRows = rowSelection ? initializeSelectedRows(freshRows,rowSelection) : freshRows;
   const rows = Array.isArray(formRows) ? formRows : initialRows;
-  const rawParents = parentConfig ? dataSourceManager.getData(parentConfig.dataSource) : undefined;
   const storedParents = parentConfig ? stateManager?.getFieldValue(scopeId, parentConfig.field) : undefined;
+  if (parentConfig && !parentConfig.dataSource && !Array.isArray(storedParents))
+    throw new Error('Joined card parent form rows must be an array');
+  const rawParents = parentConfig?.dataSource ? dataSourceManager.getData(parentConfig.dataSource) : storedParents;
   const parentsReadOnly = Boolean(parentConfig && (parentConfig.fields || []).every((field: FieldConfig) => field.readOnly || field.valueWhen));
   const parentRows = parentsReadOnly ? normalizeRows(rawParents) : Array.isArray(storedParents) ? storedParents : normalizeRows(rawParents);
   const previousParents = useRef<unknown>(undefined);
@@ -218,7 +220,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   const preserveDraft = (condition: string | undefined) => (row: Record<string, unknown>) => !condition
     || runtime.getEvaluator().evaluateCondition(condition, actionContext(row));
   useEffect(() => {
-    if (!parentConfig || parentState?.data == null || parentState.loading || parentState.error) return;
+    if (!parentConfig?.dataSource || parentState?.data == null || parentState.loading || parentState.error) return;
     if (storedParents === undefined) {
       previousParents.current = rawParents;
       stateManager.updateField(scopeId, parentConfig.field, normalizeRows(rawParents));
@@ -272,7 +274,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
 
   // ── Loading state ──────────────────────────────────────────────────────────
   if ((dataSourceState?.loading && !dataSourceState.data)
-      || (parentConfig && (parentState?.data == null || parentState.loading && !parentState.data))) {
+      || (parentConfig?.dataSource && (parentState?.data == null || parentState.loading && !parentState.data))) {
     return (
       <div
         data-testid="card-grid-loading"
