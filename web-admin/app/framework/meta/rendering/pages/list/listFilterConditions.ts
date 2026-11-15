@@ -174,6 +174,20 @@ export interface ListQueryFilterCondition {
   values?: unknown[];
 }
 
+function normalizeUserFilterValue(value: unknown, fieldConfig?: FieldConfig): unknown {
+  // ControlledFieldRenderer serializes DateRange objects for the field wire contract.
+  if (typeof value === 'string' && fieldConfig?.component?.toLowerCase() === 'daterange') {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        && ('start' in parsed || 'end' in parsed)) value = parsed;
+    } catch {
+      // Keep malformed values intact so query validation can report them.
+    }
+  }
+  return value;
+}
+
 /**
  * Convert one user filter (key -> raw value, sourced from URL filter_* params,
  * drill-down bare params or the quick filter bar) into its query conditions.
@@ -193,16 +207,7 @@ export function resolveUserFilterCondition(
 ): ListQueryFilterCondition[] {
   if (value == null || value === '') return [];
   const fieldConfig = (filterFields || []).find((field) => field.field === key);
-  // ControlledFieldRenderer serializes DateRange objects for the field wire contract.
-  if (typeof value === 'string' && fieldConfig?.component?.toLowerCase() === 'daterange') {
-    try {
-      const parsed = JSON.parse(value);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-        && ('start' in parsed || 'end' in parsed)) value = parsed;
-    } catch {
-      // Keep malformed values intact so query validation can report them.
-    }
-  }
+  value = normalizeUserFilterValue(value, fieldConfig);
   // Date range objects { start, end }
   if (value !== null && typeof value === 'object' && ('start' in value || 'end' in value)) {
     const range = value as { start?: unknown; end?: unknown };
@@ -322,12 +327,18 @@ export function filterListTabDisplayData<T extends Record<string, any>>(
 }
 
 /** Serialize submitted API filters using the same wire contract as the list read. */
-export function applyApiUserFilters(query: Record<string, unknown>, filters: Record<string, any>): void {
-  for (const [key, value] of Object.entries(filters)) {
+export function applyApiUserFilters(
+  query: Record<string, unknown>,
+  filters: Record<string, any>,
+  filterFields?: FieldConfig[],
+): void {
+  for (const [key, rawValue] of Object.entries(filters)) {
+    const value = normalizeUserFilterValue(rawValue, filterFields?.find((field) => field.field === key));
     if (value == null || value === '') continue;
     if (typeof value === 'object' && ('start' in value || 'end' in value)) {
-      if (value.start) query[`${key}_start`] = String(value.start);
-      if (value.end) query[`${key}_end`] = String(value.end);
+      const range = value as { start?: unknown; end?: unknown };
+      if (range.start) query[`${key}_start`] = String(range.start);
+      if (range.end) query[`${key}_end`] = String(range.end);
     } else query[key] = String(value);
   }
 }

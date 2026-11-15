@@ -101,7 +101,10 @@ function ListPageContentInner(props: PageContentProps) {
       },
     },
   );
-  const dataLoader = useListDataLoader({ ...pageRuntime, ...state, ...metadata, ...savedViews });
+  const dataLoader = useListDataLoader(
+    { ...pageRuntime, ...state, ...metadata, ...savedViews },
+    { get filterBlock() { return columns.filterBlock; } },
+  );
   const queryActions = useListQueryActions(
     { ...pageRuntime, ...state, ...dataLoader, ...metadata, ...savedViews },
     {

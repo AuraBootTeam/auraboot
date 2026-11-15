@@ -1,3 +1,4 @@
+import type { FieldConfig } from '~/framework/meta/schemas/types';
 import { completeListReadRequest } from './listReadRequest';
 import { resolveListReadErrorMessage } from '~/framework/meta/utils/listReadErrors';
 import React, { useCallback, useEffect } from 'react';
@@ -120,7 +121,7 @@ export function useListDataLoader({
   setSearchParams,
   listSchemaFieldNameSet,
   pendingSavedViewFiltersRef,
-}: ListDataLoaderInput) {
+}: ListDataLoaderInput, late: { filterBlock?: { fields?: FieldConfig[] } }) {
   // Load data from API - P2-1 fix: use destructured pagination
   const loadData = useCallback(
     async (params?: ListLoadDataParams) => {
@@ -201,7 +202,7 @@ export function useListDataLoader({
 
           if (isApiDatasource) {
             // For API datasources, pass filter values as individual query params
-            applyApiUserFilters(queryParams, submittedFilters || {});
+            applyApiUserFilters(queryParams, submittedFilters || {}, late.filterBlock?.fields);
             applyApiTabCondition(queryParams, getTabFilter());
             if (requestedSorts.length === 1) {
               queryParams.sortField = requestedSorts[0].fieldCode;

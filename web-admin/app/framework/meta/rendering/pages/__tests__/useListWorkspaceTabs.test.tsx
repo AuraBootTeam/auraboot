@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { applyApiUserFilters } from '../list/listFilterConditions';
 import { useListWorkspaceTabs } from '../list/useListWorkspaceTabs';
 const transport = vi.hoisted(() => vi.fn());
 vi.mock('~/shared/services/http-client', () => ({ fetchResult: (...args: any[]) => transport(...args) }));
@@ -25,6 +26,18 @@ describe('list tab counts use the active list source', () => {
     expect(transport.mock.calls[1][1].params.rfqStatus).toBe('quoted');
     expect(args.buildFiltersParam).not.toHaveBeenCalled();
   });
+  it('uses the DateRange renderer string contract for every API tab count', async () => {
+    transport.mockReset().mockResolvedValue({ code: '0', data: { total: 3 } });
+    const args = input();
+    args.filterBlock = { fields: [{ field: 'created_at', component: 'DateRange' }] };
+    args.getSubmittedFilters = () => ({ created_at: '{"start":"2026-11-01","end":"2026-11-14"}' });
+    const { result } = renderHook(() => useListWorkspaceTabs(args));
+    await waitFor(() => expect(result.current.workspaceTabCounts).toEqual({ all: 3, quoted: 3 }));
+    for (const [, options] of transport.mock.calls) {
+      expect(options.params).toMatchObject({ created_at_start: '2026-11-01', created_at_end: '2026-11-14' });
+      expect(options.params).not.toHaveProperty('created_at');
+    }
+  });
   it('keeps native list pagination and filter serialization', async () => {
     transport.mockReset().mockResolvedValue({ code: '0', data: { total: 3 } });
     const args = input(false); const { result } = renderHook(() => useListWorkspaceTabs(args));
@@ -48,5 +61,23 @@ describe('list tab counts use the active list source', () => {
     await waitFor(() => expect(result.current.workspaceTabCounts.all).toBe(9));
     await act(async () => { old.forEach(resolve => resolve({ code: '0', data: { total: 1 } })); });
     await waitFor(() => expect(result.current.workspaceTabCounts.all).toBe(9));
+  });
+});
+
+describe('API filter field wire contract', () => {
+  const fields: any[] = [{ field: 'created_at', component: 'daterange' }];
+  it('serializes open and empty date ranges without sending an object field', () => {
+    const query = { page: 0 };
+    applyApiUserFilters(query, { created_at: '{"start":"2026-11-01","end":""}' }, fields);
+    expect(query).toEqual({ page: 0, created_at_start: '2026-11-01' });
+    const empty = {};
+    applyApiUserFilters(empty, { created_at: '{"start":"","end":""}' }, fields);
+    expect(empty).toEqual({});
+  });
+  it('keeps ordinary JSON text and malformed date values for server validation', () => {
+    const query = {};
+    const literal = '{"start":"literal"}';
+    applyApiUserFilters(query, { note: literal, created_at: '{bad-json' }, fields);
+    expect(query).toEqual({ note: literal, created_at: '{bad-json' });
   });
 });

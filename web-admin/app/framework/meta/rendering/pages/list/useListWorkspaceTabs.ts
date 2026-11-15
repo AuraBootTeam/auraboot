@@ -1,3 +1,4 @@
+import type { FieldConfig } from '~/framework/meta/schemas/types';
 import { findListFilterTabsBlock } from './listSchemaPolicy';
 import React, { useEffect, useMemo, useState } from 'react';
 import { type ViewFilterConfig } from '~/framework/smart/types/savedView';
@@ -30,6 +31,7 @@ interface ListWorkspaceTabsInput {
   keywordRef: React.RefObject<string>;
   data: DynamicEntity[];
   schemaExtension: any;
+  filterBlock?: { fields?: FieldConfig[] };
 }
 
 /** Load workspace tab counts from the active list query. */
@@ -49,6 +51,7 @@ export function useListWorkspaceTabs({
   keywordRef,
   data,
   schemaExtension,
+  filterBlock,
 }: ListWorkspaceTabsInput) {
   const listTabsBlock = useMemo(() => {
     const found = findListFilterTabsBlock(allBlocks);
@@ -86,7 +89,7 @@ export function useListWorkspaceTabs({
         const params: Record<string, any> = api ? { page: 0, size: 1 } : { pageNum: 1, pageSize: 1 };
         if (keywordRef.current.trim()) params.keyword = keywordRef.current.trim();
         if (api) {
-          applyApiUserFilters(params, submitted);
+          applyApiUserFilters(params, submitted, filterBlock?.fields);
           applyApiTabCondition(params, condition);
         } else {
           const queryFilters = buildFiltersParam(condition, submitted, chipFilters, modelFieldMapRef.current);
@@ -116,7 +119,7 @@ export function useListWorkspaceTabs({
     return () => {
       current = false;
     };
-  }, [listTabsBlock, schema?.modelCode, schema?.dataSource, data, dataReady, getSubmittedFilters, chipFilters, token, user?.pid]);
+  }, [listTabsBlock, filterBlock, schema?.modelCode, schema?.dataSource, data, dataReady, getSubmittedFilters, chipFilters, token, user?.pid]);
   const workspace = schemaExtension.presentation === 'workspace';
 
   return { listPageTitle, listTabsBlock, workspaceTabCounts, workspaceTabCountError, workspace };
