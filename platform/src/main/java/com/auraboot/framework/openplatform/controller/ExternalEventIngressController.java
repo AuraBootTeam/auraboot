@@ -22,6 +22,8 @@ import java.util.Map;
 @AuthenticatedAccess
 @RequiredArgsConstructor
 public class ExternalEventIngressController {
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(ExternalEventIngressController.class);
+
     private final ExternalEventIngressService ingressService;
 
     private final com.auraboot.framework.openplatform.service.InstalledIntegrationService installedIntegrations;
@@ -43,7 +45,12 @@ public class ExternalEventIngressController {
     }
 
     @ExceptionHandler(SecurityException.class)
-    public ResponseEntity<Map<String,Object>> bindingDenied() {
+    public ResponseEntity<Map<String,Object>> bindingDenied(SecurityException denial) {
+        // Fail closed toward the client (no internal diagnostics in the body) but never
+        // silently: the denial is logged with its stack, whose frames pinpoint the exact
+        // failing check inside resolve()/verify — matching MetaApiExceptionHandler's
+        // convention for the platform-wide SecurityException handling.
+        LOG.warn("Installed integration binding denied: {}", denial.getMessage(), denial);
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("code","installation_binding_denied"));
     }
 
