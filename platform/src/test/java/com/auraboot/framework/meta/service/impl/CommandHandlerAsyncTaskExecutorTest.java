@@ -88,6 +88,48 @@ class CommandHandlerAsyncTaskExecutorTest {
     }
 
     @Test
+    void resumable_pipeline_command_uses_current_command_boundary_without_direct_handler_or_stale_permits() throws Exception {
+        var handler=mock(CommandHandlerExtension.class);
+        when(extensionRegistry.getCommandHandler("bom:import_material_library")).thenReturn(Optional.of(handler));
+        var pipeline=mock(com.auraboot.framework.meta.service.CommandExecutor.class);
+        ReflectionTestUtils.setField(executor,"commandExecutor",pipeline);
+        when(pipeline.execute(eq("bom:import_material_library"),org.mockito.ArgumentMatchers.any())).thenAnswer(call->{
+            com.auraboot.framework.meta.dto.CommandExecuteRequest request=call.getArgument(1);
+            assertThat(request.getTargetRecordPid()).isEqualTo("owned-record");
+            assertThat(request.getTargetRecordId()).isEqualTo("owned-record");
+            assertThat(request.getPayload()).containsEntry("source_file_id","01KFILE");
+            assertThat(MetaContext.getCurrentTenantId()).isEqualTo(123L);
+            assertThat(MetaContext.snapshot().memberId()).isEqualTo(67L);
+            assertThat(MetaContext.snapshot().roleIds()).containsExactly(89L);
+            assertThat(MetaContext.hasCommandAuthority()).isFalse();
+            assertThat(MetaContext.hasCommandPermitScope()).isFalse();
+            return com.auraboot.framework.meta.dto.CommandExecuteResult.builder().commandCode("bom:import_material_library")
+                    .phaseReached("completed").data(Map.of("state","succeeded","billNo","TEST-PO")).build();
+        });
+        var input=params("bom:import_material_library");input.put("recordPid","owned-record");
+        input.put("resumeOnRestart",true);input.put("dispatchThroughPipeline",true);
+        input.put("commandAuthority","stale-authority");input.put("commandPermitScope","ALL");
+        var result=executor.execute(input,noop);
+        assertThat(result.isSuccess()).isTrue();assertThat(result.getData().path("billNo").asText()).isEqualTo("TEST-PO");
+        verify(handler,org.mockito.Mockito.never()).execute(org.mockito.ArgumentMatchers.any());
+        assertThat(MetaContext.exists()).isFalse();
+    }
+
+    @Test
+    void revoked_membership_stops_pipeline_dispatch_before_any_command_or_handler() throws Exception {
+        var handler=mock(CommandHandlerExtension.class);
+        when(extensionRegistry.getCommandHandler("bom:import_material_library")).thenReturn(Optional.of(handler));
+        var pipeline=mock(com.auraboot.framework.meta.service.CommandExecutor.class);
+        ReflectionTestUtils.setField(executor,"commandExecutor",pipeline);
+        ReflectionTestUtils.setField(executor,"tenantMemberService",mock(com.auraboot.framework.tenant.service.TenantMemberService.class));
+        var input=params("bom:import_material_library");input.put("recordPid","owned-record");
+        input.put("resumeOnRestart",true);input.put("dispatchThroughPipeline",true);
+        assertThat(executor.execute(input,noop).isSuccess()).isFalse();
+        org.mockito.Mockito.verifyNoInteractions(pipeline);verify(handler,org.mockito.Mockito.never()).execute(org.mockito.ArgumentMatchers.any());
+        assertThat(MetaContext.exists()).isFalse();
+    }
+
+    @Test
     void resumable_handler_receives_real_checkpoint_transaction_bridge() throws Exception {
         var manager = mock(org.springframework.transaction.PlatformTransactionManager.class);
         var status = mock(org.springframework.transaction.TransactionStatus.class);

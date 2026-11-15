@@ -164,6 +164,26 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
             MetaContext.setContext(tenantId, userId, currentUserPid, String.valueOf(userId),
                     roles == null ? java.util.Set.of() : new java.util.HashSet<>(roles));
             MetaContext.setMemberId(member.getId());
+            if (inputParams.path("dispatchThroughPipeline").asBoolean(false)) {
+                // Checkpointed follow-ups need the current command definition, target authority,
+                // secret capabilities and audit boundary, not the enqueue caller's old settings.
+                if (!inputParams.path("resumeOnRestart").asBoolean(false) || commandExecutor == null
+                        || commandCode == null || !commandCode.equals(handlerCode)
+                        || recordPid == null || recordPid.isBlank()) {
+                    return AsyncTaskResult.nonRetryableFailure("Invalid resumable pipeline command");
+                }
+                var request = new com.auraboot.framework.meta.dto.CommandExecuteRequest();
+                request.setTargetRecordPid(recordPid);
+                request.setTargetRecordId(recordPid);
+                request.setPayload(payload);
+                if (clientRequestId != null && !clientRequestId.isBlank()) request.setClientRequestId(clientRequestId);
+                var result = commandExecutor.execute(commandCode, request);
+                if (result == null || !"completed".equals(result.getPhaseReached())) {
+                    return AsyncTaskResult.nonRetryableFailure("Resumable pipeline command did not complete");
+                }
+                callback.report(100, "Completed");
+                return AsyncTaskResult.ok(objectMapper.valueToTree(result.getData() == null ? Map.of() : result.getData()));
+            }
             com.auraboot.framework.plugin.pf4j.CommandHandlerCapabilityGuard.requireAvailable(
                     handler, handlerCode, aiProviderAccessorFactory != null, knowledgeBaseAccessor != null);
             String namespace = handlerCode.contains(":") ? handlerCode.split(":")[0] : null;
