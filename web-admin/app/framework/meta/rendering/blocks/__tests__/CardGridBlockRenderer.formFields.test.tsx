@@ -248,10 +248,10 @@ describe('Joined card groups keep source and offer drafts independent', () => {
 
   it('separates compact material context from immutable summary without redirecting draft edits', () => {
     const {state} = setupJoinedGroups(false, false, true);
-    const first = screen.getAllByTestId('card-grid-group')[0];
-    expect(within(first).getByTestId('card-group-description')).toHaveClass('block');
-    expect(within(first).getByTestId('card-group-heading').style.gridTemplateColumns).toContain('24rem');
-    expect(within(first).getByTestId('card-group-summary').style.gridTemplateColumns).toContain('6rem');
+    const first: HTMLElement = screen.getAllByTestId('card-grid-group')[0];
+    expect(first.querySelector('[data-testid="card-group-description"]')).toHaveClass('block');
+    expect(first.querySelector<HTMLElement>('[data-testid="card-group-heading"]')!.style.gridTemplateColumns).toContain('24rem');
+    expect(first.querySelector<HTMLElement>('[data-testid="card-group-summary"]')!.style.gridTemplateColumns).toContain('6rem');
     expect(within(first).getByRole('textbox', {name: 'Remaining'})).toHaveProperty('readOnly',true);
     const quantity = within(within(first).getByRole('group',{name:'Beta'})).getByRole('textbox',{name:'Proposed quantity'});
     fireEvent.change(quantity,{target:{value:'30.000001'}});

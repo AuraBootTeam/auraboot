@@ -922,6 +922,19 @@ describe('ActionRegistry search / reset / setState handlers', () => {
     expect(updater({ current: 3, pageSize: 20 })).toEqual({ current: 1, pageSize: 20 });
   });
 
+  it('reset clears the visible keyword before loading the unfiltered first page', async () => {
+    let keyword = 'previous supplier';
+    const setKeyword = vi.fn((value: string) => { keyword = value; });
+    const loadedKeywords: string[] = [];
+    const loadData = vi.fn(async () => { loadedKeywords.push(keyword); });
+    const setFilters = vi.fn();
+    const setPagination = vi.fn();
+    await actionRegistry.execute('reset', { loadData, setKeyword, setFilters, setPagination });
+    expect(setKeyword).toHaveBeenCalledWith('');
+    expect(loadedKeywords).toEqual(['']);
+    expect(loadData).toHaveBeenCalledWith({ page: 0, filters: {} });
+  });
+
   it('setState merges args into the filter state', async () => {
     const setFilters = vi.fn();
     await actionRegistry.execute('setState', { setFilters, args: { region: 'EMEA' } });

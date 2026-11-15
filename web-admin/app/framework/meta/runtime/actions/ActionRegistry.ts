@@ -78,6 +78,7 @@ export interface ActionContext {
 
   // 筛选器状态 (可选 - 列表页使用)
   filters?: Record<string, any>;
+  setKeyword?: (keyword: string) => void;
   setFilters?: (
     filters: Record<string, any> | ((prev: Record<string, any>) => Record<string, any>),
   ) => void;
@@ -486,11 +487,13 @@ actionRegistry.register('search', ({ loadData, filters, setPagination }) => {
 /**
  * 重置筛选器 - 清空筛选条件并重新加载数据
  */
-actionRegistry.register('reset', ({ setFilters, loadData, setPagination }) => {
+actionRegistry.register('reset', ({ setFilters, setKeyword, loadData, setPagination }) => {
   if (!setFilters || !loadData || !setPagination) {
     console.error('[ActionRegistry] reset: missing setFilters, loadData or setPagination');
     return;
   }
+  // Update the list's synchronous keyword ref before issuing the reset read.
+  setKeyword?.('');
   setFilters({});
   setPagination((prev) => ({ ...prev, current: 1 }));
   loadData({ page: 0, filters: {} });

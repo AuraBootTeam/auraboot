@@ -45,6 +45,7 @@ interface ListQueryActionsInput {
   setFilters: (
     filters: Record<string, any> | ((prev: Record<string, any>) => Record<string, any>),
   ) => void;
+  setKeyword: (keyword: string) => void;
   pagination: { current: number; pageSize: number; total: number };
   setPagination: (pagination: any) => void;
   dataSourceManager: DataSourceManager;
@@ -128,6 +129,7 @@ export function useListQueryActions(
     loadData,
     filters,
     setFilters,
+    setKeyword,
     pagination,
     setPagination,
     dataSourceManager,
@@ -562,6 +564,7 @@ export function useListQueryActions(
       loadData,
       filters,
       setFilters,
+      setKeyword,
       pagination,
       setPagination,
       dataSourceManager,
@@ -571,7 +574,7 @@ export function useListQueryActions(
       fetchResult,
       buildApiEndpoint,
     });
-  }, [loadData, navigate, tableName, dataSourceManager, locale, t, token, filters, pagination]);
+  }, [loadData, navigate, tableName, dataSourceManager, locale, t, token, filters, pagination, setKeyword]);
 
   // Handle pagination - P2-1 fix: use destructured pagination
   const handlePageChange = useCallback(
