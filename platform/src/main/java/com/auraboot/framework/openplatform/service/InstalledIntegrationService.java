@@ -168,7 +168,15 @@ public class InstalledIntegrationService {
             payload.put("requestId", external);
             payload.put("externalSubject",Map.of("type",envelope.headers().get("externalSubjectType"),
                     "pid",envelope.headers().get("externalSubjectPid")));
-            Map<String,Object> data = execute(resolved, resolved.registration().acceptCommand(), payload, null, false, envelope);
+            Map<String,Object> data;
+            // The accept command runs with the same machine data-access context as the
+            // process/result legs: its handler reads worker/pool/intent records through the
+            // data accessor, and RequiredRecordReadGuard resolves the machine actor (userId 0,
+            // no member) from MachineDataAccessContext — without it the guard falls back to the
+            // human branch and denies the pseudo "installation:" user on the first record read.
+            try (var machine = com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal)) {
+                data = execute(resolved, resolved.registration().acceptCommand(), payload, null, false, envelope);
+            }
             Object record = data.get("recordPid");
             if (!(record instanceof String pid) || !pid.matches("[A-Za-z0-9_-]{1,100}")
                     || !"accepted".equals(data.get("state"))) throw new IllegalStateException("Invalid native acceptance result");
