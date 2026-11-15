@@ -129,6 +129,40 @@ describe('detail permission recovery', () => {
 });
 
 describe('detail header business status', () => {
+  it('does not display header values retained for a different record', () => {
+    render(<MemoryRouter>{renderDetailPageView({
+      ...args(null), recordData: { pid: 'current', subject: 'Current record' },
+      runtime: { getContext: () => ({ form: { pid: 'previous', subject: 'Previous record' } }) } as any,
+    } as Parameters<typeof renderDetailPageView>[0])}</MemoryRouter>);
+    expect(screen.getByRole('heading', { name: 'Current record', exact: true })).toBeInTheDocument();
+    expect(screen.queryByText('Previous record')).not.toBeInTheDocument();
+  });
+
+  it('reflects refreshed form header facts without replacing the persisted record or drafts', () => {
+    const base = args(null);
+    const persisted = { subject: 'Original title', progress: 'ready', deadline_display: 'Original cutoff' };
+    let form: Record<string, unknown> = {};
+    const renderView = () => <MemoryRouter>{renderDetailPageView({
+      ...base,
+      schema: { ...base.schema, extension: { ...base.schema.extension,
+        headerStatusField: 'progress', headerStatusDictCode: 'business_status', headerSubtitleFields: ['deadline'],
+      } },
+      recordData: persisted,
+      runtime: { getContext: () => ({ form }) } as any,
+      enrichField: (field: any) => field,
+      getDictItems: () => [{ value: 'ready', label: 'All replied' }, { value: 'collecting', label: 'Awaiting reply' }],
+    } as Parameters<typeof renderDetailPageView>[0])}</MemoryRouter>;
+    const view = render(renderView());
+    expect(screen.getByText('All replied')).toBeInTheDocument();
+    form = { subject: 'Updated title', progress: 'collecting', deadline_display: 'Updated cutoff', rows: [{ quantity: '99' }] };
+    view.rerender(renderView());
+    expect(screen.getByRole('heading', { name: 'Updated title', exact: true })).toBeInTheDocument();
+    expect(screen.getByText('Awaiting reply')).toBeInTheDocument();
+    expect(screen.getByText('Updated cutoff')).toBeInTheDocument();
+    expect(persisted.progress).toBe('ready');
+    expect(form.rows).toEqual([{ quantity: '99' }]);
+  });
+
   it.each([['business_status', 'business_status'], [undefined, 'native_status']])(
     'uses the configured header dictionary %s while retaining the field default', (override, expected) => {
       const base = args(null);

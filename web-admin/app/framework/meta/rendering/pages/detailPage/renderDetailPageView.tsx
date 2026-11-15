@@ -232,8 +232,13 @@ export function renderDetailPageView({
 
   const workspace = schema.extension?.presentation === 'workspace';
   const workspaceShell = workspace ? resolveWorkspaceShell(schema.extension?.workspaceShell) : null;
+  // Follow current scoped form facts without replacing the persisted record or body drafts.
+  const scopedForm = runtime?.getContext()?.form;
+  const currentHeaderForm = scopedForm && typeof scopedForm === 'object' && !Array.isArray(scopedForm)
+    && (!recordData?.pid || !scopedForm.pid || scopedForm.pid === recordData.pid) ? scopedForm : {};
+  const headerRecord = { ...recordData, ...currentHeaderForm };
   const headerTitleField = String(schema?.extension?.headerTitleField || '').trim();
-  const headerTitleValue = headerTitleField ? recordData?.[headerTitleField] : undefined;
+  const headerTitleValue = headerTitleField ? headerRecord[headerTitleField] : undefined;
   const headerTitle =
     headerTitleValue !== undefined && headerTitleValue !== null && headerTitleValue !== ''
       ? String(headerTitleValue)
@@ -245,12 +250,12 @@ export function renderDetailPageView({
     .map((field: unknown) => {
       const key = String(field || '').trim();
       if (!key) return '';
-      const value = recordData?.[`${key}_display`] ?? recordData?.[key];
+      const value = headerRecord[`${key}_display`] ?? headerRecord[key];
       return value === undefined || value === null || value === '' ? '' : String(value);
     })
     .filter(Boolean)
     .join(' · ');
-  const relatedLinks = resolveDetailRelatedLinks(schema.extension?.headerRelatedLinks, recordData || {});
+  const relatedLinks = resolveDetailRelatedLinks(schema.extension?.headerRelatedLinks, headerRecord);
   const preserveListContext = schema?.extension?.preserveListContext === true;
   const preservedReturnTarget = preserveListContext
     ? resolveDetailReturnTarget(location.search)
@@ -354,7 +359,7 @@ export function renderDetailPageView({
                           field: schema.extension.headerStatusField,
                         } as FieldConfig);
                         const item = (getDictItems(schema.extension?.headerStatusDictCode || field.dictCode || '') || []).find(
-                          (item) => String(item.value) === String(recordData?.[field.field]),
+                          (item) => String(item.value) === String(headerRecord[field.field]),
                         );
                         return item ? getLocalizedText(item.label as any, locale, t) : '—';
                       })()}
