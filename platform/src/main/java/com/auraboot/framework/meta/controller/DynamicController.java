@@ -593,7 +593,7 @@ public class DynamicController {
 
     /**
      * Flag-on path: route the write through the command pipeline as a
-     * synthesized {@code dynamic.*} command (seeded per tenant on first use).
+     * model-bound {@code dynamic.operation.model} command (seeded per tenant on first use).
      * The pipeline then owns permissions (handler-owned invocation
      * authorization re-derives model.{pageKey}.{op} server-side), SoD,
      * idempotency, state guards, events and auditing. Payload must carry
@@ -601,11 +601,11 @@ public class DynamicController {
      */
     @SuppressWarnings("unchecked")
     private <T> T executeAsSynthesizedCommand(String operation, String pageKey, Map<String, Object> synthPayload) {
-        String commandCode = "dynamic." + operation.substring("dynamic.".length());
-        dynamicWriteCommandSeedService.ensureSeeded(commandCode);
+        String commandCode = dynamicWriteCommandSeedService.ensureSeeded(operation, (String) synthPayload.get("modelCode"));
         com.auraboot.framework.meta.dto.CommandExecuteRequest request =
                 new com.auraboot.framework.meta.dto.CommandExecuteRequest();
         request.setPayload(synthPayload);
+        request.setOperationType(operation.contains("create") ? "CREATE" : operation.contains("update") ? "UPDATE" : "DELETE");
         Object recordPid = synthPayload.get("recordPid");
         if (recordIdCarryingOperations().contains(operation)) {
             request.setTargetRecordId(recordPid instanceof String rp ? rp : null);
@@ -615,7 +615,17 @@ public class DynamicController {
         // endpoint's declared return type holds (Map for single-record writes,
         // DynamicBatchResponse for batches, Void for deletes).
         if (result instanceof com.auraboot.framework.meta.dto.CommandExecuteResult cer) {
+            if (!"completed".equals(cer.getPhaseReached())) {
+                throw new com.auraboot.framework.exception.BusinessException("Dynamic write did not complete: " + operation);
+            }
             Object data = cer.getData();
+            if (operation.equals("dynamic.delete") || operation.equals("dynamic.batch_delete")) return null;
+            if (operation.equals("dynamic.batch_create") || operation.equals("dynamic.batch_update")) {
+                Object batch = cer.getData() == null ? null : cer.getData().get("pluginResult");
+                if (batch instanceof DynamicBatchResponse response) return (T) response;
+                if (batch instanceof Map<?, ?>) return (T) filterMapper.convertValue(batch, DynamicBatchResponse.class);
+                throw new com.auraboot.framework.exception.BusinessException("Dynamic batch result is unavailable");
+            }
             return data == null ? null : (T) data;
         }
         return (T) result;
@@ -673,7 +683,8 @@ public class DynamicController {
             @RequestBody Map<String, Object> data) {
         log.info("创建数据: {}", logSafe(pageKey));
         String modelCode = resolveModelCode(pageKey);
-        Map<String, Object> synthPayload = new java.util.HashMap<>(data);
+        Map<String, Object> synthPayload = new java.util.HashMap<>();
+        synthPayload.put("data", new java.util.HashMap<>(data));
         synthPayload.put("pageKey", pageKey);
         synthPayload.put("modelCode", modelCode);
         Map<String, Object> result = auditedDirectWrite("dynamic.create", pageKey, synthPayload,
@@ -717,7 +728,8 @@ public class DynamicController {
             data.put("_expectedVersion", baseRecordVersion);
         }
         String modelCode = resolveModelCode(pageKey);
-        Map<String, Object> synthPayload = new java.util.HashMap<>(data);
+        Map<String, Object> synthPayload = new java.util.HashMap<>();
+        synthPayload.put("data", new java.util.HashMap<>(data));
         synthPayload.put("pageKey", pageKey);
         synthPayload.put("modelCode", modelCode);
         synthPayload.put("recordPid", recordPid);

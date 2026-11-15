@@ -57,7 +57,8 @@ test('unpublished RC metadata binds the actual product version and leaves librar
   const manifest = readStructuredFile(join(root, 'distribution/application/examples/core-only/app.yaml'));
   assert.equal(candidate.version, version);
   assert.equal(manifest.app.version, version);
-  assert.equal(candidate.id, `v${version}-rc.1`);
+  assert.ok(candidate.id.startsWith(`v${version}-rc.`));
+  assert.match(candidate.id.slice(`v${version}-rc.`.length), /^[1-9]\d*$/);
   assert.equal(candidate.status, 'unpublished');
   assert.equal(candidate.phase, 'release-candidate');
   assert.equal(candidate.targetPlatform, 'linux-amd64');

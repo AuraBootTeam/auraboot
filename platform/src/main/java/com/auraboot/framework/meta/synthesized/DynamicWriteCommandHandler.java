@@ -20,10 +20,10 @@ import java.util.Set;
  * this handler carrying the persistence, so SoD, idempotency, state guards,
  * events and pipeline auditing all apply.
  * <p>
- * Invocation authorization mirrors the HTTP-layer {@code @RequirePermission}
- * codes ({@code model.{pageKey}.{create|update|delete}}): payload values are
- * untrusted, so the authorizer re-derives the permission code from the page
- * key and checks the caller's effective permissions server-side.
+ * Invocation authorization uses the command's persisted model binding and its
+ * registered operation handler. Payload model values are assertions, never an
+ * alternative authority. The permission service retains normal wildcard and
+ * tenant/member policy semantics.
  */
 @Slf4j
 @Component
@@ -69,11 +69,18 @@ public class DynamicWriteCommandHandler implements CommandHandlerExtension, Comm
 
     @Override
     public Object execute(CommandContext context) {
-        String modelCode = str(context.payload(), "modelCode");
+        String modelCode = context.modelCode();
+        if (modelCode == null || !modelCode.equals(str(context.payload(), "modelCode"))) {
+            throw new IllegalArgumentException("Dynamic write model differs from its command definition");
+        }
         Map<String, Object> data = map(context.payload(), "data");
         List<Map<String, Object>> dataList = mapList(context.payload(), "dataList");
         List<String> recordPids = strList(context.payload(), "recordPids");
-        String recordPid = context.recordId() != null ? context.recordId() : str(context.payload(), "recordPid");
+        String recordPid = context.recordId();
+        if ((UPDATE.equals(context.commandType()) || DELETE.equals(context.commandType()))
+                && (recordPid == null || !recordPid.equals(str(context.payload(), "recordPid")))) {
+            throw new IllegalArgumentException("Dynamic write requires its authorized target record");
+        }
         Long expectedVersion = context.payload().get("expectedVersion") instanceof Number n ? n.longValue() : null;
         if (expectedVersion != null && data != null) {
             data.putIfAbsent("_expectedVersion", expectedVersion);
@@ -98,10 +105,15 @@ public class DynamicWriteCommandHandler implements CommandHandlerExtension, Comm
 
     @Override
     public boolean authorizeInvocation(InvocationContext context) {
-        String pageKey = str(context.payload(), "pageKey");
-        if (pageKey == null || pageKey.isBlank()) {
+        String modelCode = context.modelCode();
+        if (modelCode == null || modelCode.isBlank()
+                || !modelCode.equals(str(context.payload(), "modelCode"))
+                || !ALL.contains(context.handlerCode())) {
             return false;
         }
+        if ((UPDATE.equals(context.handlerCode()) || DELETE.equals(context.handlerCode()))
+                && (context.targetRecordPid() == null || context.targetRecordPid().isBlank()
+                    || !context.targetRecordPid().equals(str(context.payload(), "recordPid")))) return false;
         // Fail-closed: the permission service keys on user id, resolved from the
         // authenticated thread context; no context or lookup failure => deny.
         Long userId;
@@ -113,16 +125,16 @@ public class DynamicWriteCommandHandler implements CommandHandlerExtension, Comm
         if (userId == null) {
             return false;
         }
-        String permission = "model." + pageKey + "." + permissionSuffix(context.commandCode());
-        Set<String> granted = userPermissionService.getUserPermissionCodes(userId);
-        return granted != null && granted.contains(permission);
+        String permission = "model." + modelCode + "." + permissionSuffix(context.handlerCode());
+        return userPermissionService.hasPermission(userId, permission);
     }
 
     static String permissionSuffix(String commandCode) {
         return switch (commandCode) {
             case CREATE, BATCH_CREATE -> "create";
             case UPDATE, BATCH_UPDATE -> "update";
-            default -> "delete";
+            case DELETE, BATCH_DELETE -> "delete";
+            default -> throw new IllegalArgumentException("Unsupported dynamic write operation: " + commandCode);
         };
     }
 
