@@ -101,7 +101,7 @@ public class DynamicController {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.auraboot.framework.meta.synthesized.DynamicWriteCommandSeedService dynamicWriteCommandSeedService;
 
-    @org.springframework.beans.factory.annotation.Value("${aura.command.synthesized-dynamic-writes:false}")
+    @org.springframework.beans.factory.annotation.Value("${aura.command.synthesized-dynamic-writes:true}")
     private boolean synthesizedDynamicWrites;
 
     @Autowired
@@ -611,7 +611,14 @@ public class DynamicController {
             request.setTargetRecordId(recordPid instanceof String rp ? rp : null);
         }
         Object result = synthesizedCommandExecutor.execute(commandCode, request);
-        return result instanceof Map<?, ?> map ? (T) map : (T) result;
+        // The pipeline returns CommandExecuteResult; unwrap the payload so each
+        // endpoint's declared return type holds (Map for single-record writes,
+        // DynamicBatchResponse for batches, Void for deletes).
+        if (result instanceof com.auraboot.framework.meta.dto.CommandExecuteResult cer) {
+            Object data = cer.getData();
+            return data == null ? null : (T) data;
+        }
+        return (T) result;
     }
 
     private static java.util.Set<String> recordIdCarryingOperations() {
