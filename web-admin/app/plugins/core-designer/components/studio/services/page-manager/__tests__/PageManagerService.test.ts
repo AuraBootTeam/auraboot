@@ -132,7 +132,7 @@ describe('PageManagerService.updatePageSchema', () => {
     (PageManagerService as any).instance = undefined;
   });
 
-  it('accepts PageSchema object and derives blockCount from blocks.length', async () => {
+  it('accepts UnifiedPageSchema object and derives blockCount from blocks.length', async () => {
     const updatePageSpy = vi.spyOn(pageApi, 'updatePage').mockResolvedValue({
       code: '0',
       desc: 'ok',
@@ -141,7 +141,7 @@ describe('PageManagerService.updatePageSchema', () => {
 
     const service = PageManagerService.getInstance();
 
-    // Build a minimal PageSchema with 2 blocks
+    // Build a minimal UnifiedPageSchema with 2 blocks
     const pageSchema = {
       schemaVersion: 2,
       kind: 'list',

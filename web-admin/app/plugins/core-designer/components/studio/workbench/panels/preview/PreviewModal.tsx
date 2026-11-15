@@ -3,14 +3,14 @@ import { StudioFormPresentationContext } from '../../StudioFormPresentation';
 /**
  * PreviewModal Component
  *
- * Device-responsive preview for PageSchema V2 pages.
+ * Device-responsive preview for UnifiedPageSchema V2 pages.
  * Renders schema.blocks uniformly via a LayoutContainer dispatching on layout.type.
  *
  * @since 5.0.0
  */
 
 import React, { useCallback, useMemo } from 'react';
-import type { PageSchema, DslBlock, PageLayout } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type { UnifiedPageSchema, DslBlock, PageLayout } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { resolveLocalizedText } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
 /**
@@ -30,7 +30,7 @@ type DeviceType = keyof typeof DEVICE_PRESETS;
 export interface PreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
-  schema?: PageSchema;
+  schema?: UnifiedPageSchema;
   pageTitle?: string;
 }
 

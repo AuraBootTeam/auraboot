@@ -5,7 +5,7 @@ import {
   RectangleGroupIcon,
   WrenchScrewdriverIcon,
 } from '@heroicons/react/24/outline';
-import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type { UnifiedPageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { useModelCapabilities } from '~/shared/hooks/useModelCapabilities';
 import { cn } from '~/utils/cn';
 import { useI18n } from '~/contexts/I18nContext';
@@ -28,9 +28,9 @@ import { StructuralPreview } from './preview/StructuralPreview';
 import { SampleDataLoader } from './preview/SampleDataLoader';
 
 export interface ListConfigPanelProps {
-  schema: PageSchema;
-  onSchemaChange: (schema: PageSchema) => void;
-  onSave?: (schema: PageSchema) => Promise<void>;
+  schema: UnifiedPageSchema;
+  onSchemaChange: (schema: UnifiedPageSchema) => void;
+  onSave?: (schema: UnifiedPageSchema) => Promise<void>;
   modelCode?: string;
   readonly?: boolean;
   previewMode?: boolean;
@@ -75,7 +75,7 @@ const TABS: Array<{
  *
  * Renders 4 vertical tabs (Columns / Filters / Toolbar / Behavior); each tab
  * is a thin editor over the single `ListViewModel` state, which round-trips
- * to `PageSchema.blocks` via `blocksToViewModel` / `viewModelToBlocks`.
+ * to `UnifiedPageSchema.blocks` via `blocksToViewModel` / `viewModelToBlocks`.
  *
  * A capability-validation banner is rendered at the top of the main pane.
  * When the panel is wide enough, a right-side pane shows `StructuralPreview` plus

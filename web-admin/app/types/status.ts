@@ -1,7 +1,7 @@
 /**
  * Version Status Type Definitions
  *
- * Unified status definition for all versioned entities (Model, Field, Dict, PageSchema, etc.)
+ * Unified status definition for all versioned entities (Model, Field, Dict, UnifiedPageSchema, etc.)
  */
 
 /**

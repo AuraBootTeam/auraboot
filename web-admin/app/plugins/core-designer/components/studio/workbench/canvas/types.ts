@@ -65,7 +65,7 @@ export interface Block {
 /**
  * Canvas-internal schema — represents the complete page structure in the designer workbench.
  *
- * NOTE: This is the designer-internal model. The canonical runtime PageSchema
+ * NOTE: This is the designer-internal model. The canonical runtime UnifiedPageSchema
  * lives in domain/dsl/types.ts.
  *
  * @alias CanvasSchema kept for backwards compat within workbench/

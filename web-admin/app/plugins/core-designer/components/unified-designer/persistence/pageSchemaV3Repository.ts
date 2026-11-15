@@ -157,7 +157,7 @@ export async function loadPageSchemaV3({
   api = defaultApi,
 }: LoadPageSchemaV3Options): Promise<LoadedPageSchemaV3> {
   if (!pageId && !pageKey) {
-    throw new Error('pageId or pageKey is required to load a PageSchema V3 document.');
+    throw new Error('pageId or pageKey is required to load a UnifiedPageSchema V3 document.');
   }
 
   const result = pageId

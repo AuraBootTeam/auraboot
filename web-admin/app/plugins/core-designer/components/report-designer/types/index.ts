@@ -1,7 +1,7 @@
 import type { AggregateQueryRequest } from '~/framework/smart/types/chart';
 import type { LocalizedText } from '~/utils/i18n';
 /**
- * ReportDSL Types — independent from PageSchema
+ * ReportDSL Types — independent from UnifiedPageSchema
  *
  * Report Designer has its own DSL schema, following the
  * "Shell unified, DSL independent" architecture principle.

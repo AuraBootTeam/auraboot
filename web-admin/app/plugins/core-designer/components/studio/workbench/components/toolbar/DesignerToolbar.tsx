@@ -18,7 +18,7 @@ import { SaveAsTemplateDialog } from '~/plugins/core-designer/components/studio/
 import { CreateFromTemplateDialog } from '~/plugins/core-designer/components/studio/components/CreateFromTemplateDialog';
 import { AiPageGenerateDialog } from '~/plugins/core-designer/components/studio/components/AiPageGenerateDialog';
 import type { MergeMode } from '~/plugins/core-designer/components/studio/components/ai-page-prompt';
-import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type { UnifiedPageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { usePermissions } from '~/contexts/AuthContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { DESIGNER_I18N } from '~/shared/designer/designerI18n';
@@ -53,9 +53,9 @@ export interface DesignerToolbarProps {
   onPageCreated?: (pid: string) => void;
   onShortcutHelp?: () => void;
   onAiGenerated?: (dsl: {
-    kind: PageSchema['kind'];
-    blocks: PageSchema['blocks'];
-    layout: PageSchema['layout'];
+    kind: UnifiedPageSchema['kind'];
+    blocks: UnifiedPageSchema['blocks'];
+    layout: UnifiedPageSchema['layout'];
     schemaVersion: 2;
     mergeMode?: MergeMode;
   }) => void;

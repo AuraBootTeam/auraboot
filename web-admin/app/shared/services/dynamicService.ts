@@ -1,6 +1,6 @@
 import { get, post, put, del } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
-import type { PaginationRequest, PaginationResult, DynamicEntity, CustomQueryRequest, FieldOptionsRequest, RelatedDataRequest, ExportRequest, ImportRequest, EntityStats, PageSchema, FieldOption, DynamicBatchResult } from '~/types/dynamic';
+import type { PaginationRequest, PaginationResult, DynamicEntity, CustomQueryRequest, FieldOptionsRequest, RelatedDataRequest, ExportRequest, ImportRequest, EntityStats, UnifiedPageSchema, FieldOption, DynamicBatchResult } from '~/types/dynamic';
 
 /**
  * Helper function to handle API responses
@@ -307,8 +307,8 @@ export class DynamicService {
   /**
    * 获取页面元数据
    */
-  async getPageMetadata(entityCode: string, request?: Request): Promise<PageSchema> {
-    const result = await get<PageSchema>(
+  async getPageMetadata(entityCode: string, request?: Request): Promise<UnifiedPageSchema> {
+    const result = await get<UnifiedPageSchema>(
       `/api/schemas/${entityCode}/page`,
       undefined,
       undefined,

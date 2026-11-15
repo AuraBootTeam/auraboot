@@ -1,7 +1,7 @@
 /**
  * Page Manager API Types
  *
- * Types matching the backend PageSchema API DTOs.
+ * Types matching the backend UnifiedPageSchema API DTOs.
  * These types represent the wire format for API communication.
  *
  * @since 3.2.0

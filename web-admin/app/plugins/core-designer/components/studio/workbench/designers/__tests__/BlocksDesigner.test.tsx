@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { BlocksDesigner } from '../BlocksDesigner';
-import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type { UnifiedPageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
 vi.mock('@dnd-kit/core', () => ({
   DndContext: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -54,7 +54,7 @@ vi.mock('~/plugins/core-designer/components/studio/hooks/fields/useApiSchemaDete
   }),
 }));
 
-function createSchema(): PageSchema {
+function createSchema(): UnifiedPageSchema {
   return {
     schemaVersion: 2,
     kind: 'list',
@@ -71,7 +71,7 @@ function createSchema(): PageSchema {
         buttons: [],
       },
     ],
-  } as PageSchema;
+  } as UnifiedPageSchema;
 }
 
 describe('BlocksDesigner', () => {

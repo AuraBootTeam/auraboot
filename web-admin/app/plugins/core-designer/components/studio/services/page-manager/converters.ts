@@ -12,39 +12,39 @@ import type {
   ApiPageStatus,
 } from './api-types';
 import type { PageMeta, PageStatus, CreatePageRequest } from './types';
-import type { PageSchema } from '../../domain/dsl/types';
+import type { UnifiedPageSchema } from '../../domain/dsl/types';
 
 // Kinds handled by Dashboard Designer or deprecated — toPageSchema rejects these.
 const UNSUPPORTED_KINDS = new Set(['dashboard', 'home', 'composite', 'custom']);
 
 /**
- * Convert PageSchemaDTO to PageSchema (V2 flat shape).
+ * Convert PageSchemaDTO to UnifiedPageSchema (V2 flat shape).
  * Rejects dashboard/home/composite — those go through Dashboard Designer.
  * Throws if blocks array is missing.
  */
-export function toPageSchema(dto: PageSchemaDTO): PageSchema {
+export function toPageSchema(dto: PageSchemaDTO): UnifiedPageSchema {
   if (UNSUPPORTED_KINDS.has(dto.kind as string)) {
     throw new Error(
-      `PageSchema does not support kind='${dto.kind}'. ` +
+      `UnifiedPageSchema does not support kind='${dto.kind}'. ` +
         `Dashboard is handled by Dashboard Designer; home/composite are deprecated.`,
     );
   }
   if (!Array.isArray(dto.blocks)) {
-    throw new Error(`PageSchema requires blocks array (pid=${dto.pid})`);
+    throw new Error(`UnifiedPageSchema requires blocks array (pid=${dto.pid})`);
   }
   return {
     schemaVersion: 2,
-    kind: dto.kind as PageSchema['kind'],
+    kind: dto.kind as UnifiedPageSchema['kind'],
     id: dto.pid,
     pageKey: dto.pageKey,
     modelCode: (dto.modelCode ?? dto.extension?.viewModelCode) as string | undefined,
     title: dto.title,
-    layout: (dto.layout as PageSchema['layout']) ?? { type: 'stack' },
+    layout: (dto.layout as UnifiedPageSchema['layout']) ?? { type: 'stack' },
     dataSource: ((dto as any).dataSource ?? dto.extension?.dataSource) as
-      | PageSchema['dataSource']
+      | UnifiedPageSchema['dataSource']
       | undefined,
-    blocks: dto.blocks as PageSchema['blocks'],
-    profile: dto.profile as PageSchema['profile'],
+    blocks: dto.blocks as UnifiedPageSchema['blocks'],
+    profile: dto.profile as UnifiedPageSchema['profile'],
     extension: dto.extension,
   };
 }
@@ -196,7 +196,7 @@ export function toCreateRequest(request: CreatePageRequest): PageSchemaCreateReq
  *   - metaInfo
  */
 export function createDslSchemaPayload(
-  schema: PageSchema,
+  schema: UnifiedPageSchema,
   componentCount: number,
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = {

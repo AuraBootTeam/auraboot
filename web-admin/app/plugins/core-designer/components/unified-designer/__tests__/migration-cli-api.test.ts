@@ -174,7 +174,7 @@ describe('migrate-page-schema-v3 API CLI', () => {
     ]);
   });
 
-  it('converts dashboard resources into PageSchema V3 pages and creates missing page records', async () => {
+  it('converts dashboard resources into UnifiedPageSchema V3 pages and creates missing page records', async () => {
     const requests: RecordedRequest[] = [];
     const server = await createMockApiServer(requests, async (req, res) => {
       if (req.method === 'GET' && req.url?.startsWith('/api/dashboards?')) {

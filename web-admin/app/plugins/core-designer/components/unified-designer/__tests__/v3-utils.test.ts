@@ -17,7 +17,7 @@ import { createDefaultInspectorSchemaRegistry } from '../registry/InspectorSchem
 import { createBlockTemplate, createModelFieldBlock } from '../registry/createBlockTemplate';
 import { validatePageSchemaV3 } from '../validation/validatePageSchemaV3';
 
-describe('Recursive PageSchema V3 utilities', () => {
+describe('Recursive UnifiedPageSchema V3 utilities', () => {
   const schema: PageSchemaV3 = {
     schemaVersion: 3,
     kind: 'composite',
@@ -1119,7 +1119,7 @@ describe('Unified designer existing-block move guards', () => {
   });
 });
 
-describe('Recursive PageSchema V3 migration', () => {
+describe('Recursive UnifiedPageSchema V3 migration', () => {
   it('migrates a form page into a root form block with section field blocks', () => {
     const next = migratePageSchemaV2ToV3({
       schemaVersion: 2,
