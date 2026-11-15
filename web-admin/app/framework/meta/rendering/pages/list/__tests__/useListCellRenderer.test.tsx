@@ -121,6 +121,36 @@ describe('list cell renderer', () => {
     expect(registry.render).not.toHaveBeenCalled();
   });
 
+  it.each([true, false])(
+    'honors dictionary multiline=%s without changing its translated label or tone',
+    (multiline) => {
+      const label =
+        'The provider rejected creation. Correct the required purchasing fields before retrying the original order.';
+      const opts = options({
+        dictDataCache: {
+          current: new Map([
+            ['guidance', [{ value: 'rejected', label, extension: { color: 'error' } }]],
+          ]),
+        },
+      });
+      const { result } = renderHook(() => useListCellRenderer(opts));
+      render(
+        <>
+          {result.current(
+            { field: 'guidance', dictCode: 'guidance', multiline, ellipsis: false },
+            { guidance: 'rejected' },
+            0,
+          )}
+        </>,
+      );
+      const text = screen.getByText(label);
+      expect(text.classList.contains('whitespace-normal')).toBe(multiline);
+      expect(text.parentElement?.classList.contains('max-w-full')).toBe(multiline);
+      expect(text.previousElementSibling).toHaveClass('bg-status-red');
+      expect(registry.render).not.toHaveBeenCalled();
+    },
+  );
+
   it.each([new Map(), new Map([['stage', [{ value: 'approved', label: 'Approved' }]]])])(
     'keeps an unknown dictionary value visible when metadata is missing or unmatched',
     (current) => {

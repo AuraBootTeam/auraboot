@@ -130,6 +130,7 @@ export function useListCellRenderer({
                   typeof item.extension?.color === 'string' ? item.extension.color : undefined,
                 )}
                 label={item.label}
+                multiline={column.multiline === true}
                 icon={typeof item.extension?.icon === 'string' ? item.extension.icon : undefined}
               />
             );
