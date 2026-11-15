@@ -38,6 +38,8 @@ Logger defaults to metadata and summaries. Both sinks use the same redacted reco
 
 ## Node verification API
 
+`portBusy(port)` checks a real TCP connection to the loopback listener and closes it without sending data. Only `ECONNREFUSED` means absent; timeout, permissions and other transport failures reject. `openDevTools` uses this probe before launching, then independently verifies the connected application identity. Binding the port is not an availability check for reusable dual-stack listeners.
+
 Load `scripts/vendor/wechat-mini-runtime/tools/index.cjs` outside the mini-program runtime:
 
 - `prepareProject({source,out,config,mode,identity,purpose})`: separate owned output, excludes node_modules/tests/golden, fingerprints source, records fixture/real-stack identity. Test purpose rejects production; explicit release-build permits offline release preparation.
@@ -53,7 +55,7 @@ Screenshots may contain real product data and require appropriate evidence acces
 
 ## Verification boundary
 
-Package tests are hermetic behavior tests using independent wx callbacks and filesystem fixtures. Product fixture-native checks are simulator UI checks. Neither proves real WeChat phone authorization, realtime-log ingestion or BFF/backend trace propagation. Verify those boundaries against an isolated, owned runtime and record them separately.
+Package unit tests use independent wx callbacks and filesystem fixtures; the startup test also uses an isolated loopback TCP listener. Product fixture-native checks are simulator UI checks. Neither proves real WeChat phone authorization, realtime-log ingestion or BFF/backend trace propagation. Verify those boundaries against an isolated, owned runtime and record them separately.
 
 `MiniTraceHttpIT` separately starts an actual Spring servlet/OTel server and invokes this client over HTTP, both directly and through Express with the production BffProxyService. It checks the actual server span, response header, client lifecycle logs and BFF correlation ID. Run it through an owned `aura gradle` runtime after installing the frozen web-admin dependencies; registered SERVER_PORT/BFF_PORT must be free. No database seed is required. This component test does not load product routes, authenticate a user or prove device transport. Its probe outputs are `platform/build/mini-trace-http-probe.json` and `platform/build/mini-trace-bff-probe.log`.
 
