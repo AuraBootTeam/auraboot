@@ -574,7 +574,7 @@ export type ActionDef =
       presentation?: { mode: 'modal'; width?: number };
     }
   | { type: 'builtin'; name: string }
-  | { type: 'flow'; steps: FlowStep[] }
+  | { type: 'flow'; steps: FlowStep[]; /** False when steps own refresh and must retain parent drafts. */ refresh?: boolean }
   | { type: 'flow'; handler: string }
   | {
       type: 'workflow';
