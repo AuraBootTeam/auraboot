@@ -170,7 +170,7 @@ describe('RecursiveBlockRenderer', () => {
     expect(container.querySelector('[onerror]')).toBeNull();
   });
 
-  it('renders a PageSchema V3 composite page directly', () => {
+  it('renders a UnifiedPageSchema V3 composite page directly', () => {
     render(<RecursiveBlockRenderer schema={samplePageSchemaV3} />);
 
     expect(screen.getByTestId('runtime-page-customer_workspace')).toBeInTheDocument();

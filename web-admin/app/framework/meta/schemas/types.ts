@@ -18,13 +18,14 @@ import type { LinkageRule } from '~/framework/meta/schemas/linkage-types';
 
 // 多语言文本类型
 // 注意: 此类型应与 i18n-renderer.ts 中的定义保持一致
-export interface LocalizedText {
-  'zh-CN'?: string;
-  'en-US'?: string;
-  'ja-JP'?: string;
-  'ko-KR'?: string;
-  [locale: string]: string | undefined; // 支持动态 locale
-}
+// Single source: the published DSL contract (packages/dsl-types, >=0.0.2).
+// The renderer consumes the record form through ResolvedLocalizedText /
+// getLocalizedText — derived views, not a second definition.
+import type { LocalizedText as ContractLocalizedText } from '@auraboot/dsl-types';
+export type LocalizedText = ContractLocalizedText;
+/** Record-form view for consumers that require a locale map (not a bare string). */
+export type ResolvedLocalizedText = Exclude<LocalizedText, string>;
+
 
 /** Optional shared workspace shell. Omission preserves the existing shell. */
 export interface WorkspaceShellConfig {
@@ -1010,7 +1011,7 @@ export interface ListSchema extends UnifiedSchema {
 }
 
 // 页面专用 Schema
-export interface PageSchema extends UnifiedSchema {
+export interface UnifiedPageSchema extends UnifiedSchema {
   kind: 'page';
 }
 

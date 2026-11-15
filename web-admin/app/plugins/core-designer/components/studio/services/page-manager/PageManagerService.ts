@@ -16,7 +16,7 @@ import type {
   UpdatePageRequest,
   PageTemplate,
 } from './types';
-import type { PageSchema } from '../../domain/dsl/types';
+import type { UnifiedPageSchema } from '../../domain/dsl/types';
 import * as pageApi from './pageApi';
 import { toPageMeta, toPageSchema, toCreateRequest, toUpdateRequest, createDslSchemaPayload } from './converters';
 import { ResultHelper } from '~/utils/type';
@@ -85,7 +85,7 @@ const DRAFT_CACHE_KEY = 'aura-page-designer-drafts';
  */
 export class PageManagerService {
   private static instance: PageManagerService;
-  private draftCache: Map<string, { schema: PageSchema; timestamp: number }> =
+  private draftCache: Map<string, { schema: UnifiedPageSchema; timestamp: number }> =
     new Map();
   private templates: PageTemplate[] = [...DEFAULT_TEMPLATES];
 
@@ -130,7 +130,7 @@ export class PageManagerService {
       if (stored) {
         const data = JSON.parse(stored) as Record<
           string,
-          { schema: PageSchema; timestamp: number }
+          { schema: UnifiedPageSchema; timestamp: number }
         >;
         Object.entries(data).forEach(([key, value]) => {
           this.draftCache.set(key, value);
@@ -148,7 +148,7 @@ export class PageManagerService {
     if (!this.isBrowser()) return;
 
     try {
-      const data: Record<string, { schema: PageSchema; timestamp: number }> = {};
+      const data: Record<string, { schema: UnifiedPageSchema; timestamp: number }> = {};
       this.draftCache.forEach((value, key) => {
         data[key] = value;
       });
@@ -161,7 +161,7 @@ export class PageManagerService {
   /**
    * Cache draft schema locally
    */
-  public cacheDraft(pageId: string, schema: PageSchema): void {
+  public cacheDraft(pageId: string, schema: UnifiedPageSchema): void {
     this.draftCache.set(pageId, {
       schema,
       timestamp: Date.now(),
@@ -172,7 +172,7 @@ export class PageManagerService {
   /**
    * Get cached draft schema
    */
-  public getCachedDraft(pageId: string): PageSchema | null {
+  public getCachedDraft(pageId: string): UnifiedPageSchema | null {
     const cached = this.draftCache.get(pageId);
     return cached?.schema || null;
   }
@@ -245,11 +245,11 @@ export class PageManagerService {
 
   /**
    * Get page by ID from API.
-   * Returns both the PageMeta (display/list info) and PageSchema (DSL blocks/layout).
+   * Returns both the PageMeta (display/list info) and UnifiedPageSchema (DSL blocks/layout).
    * Throws if the DTO has an unsupported kind (e.g. dashboard) or missing blocks —
    * callers must not swallow these, they indicate a corrupt/misrouted page.
    */
-  public async getPage(id: string): Promise<{ meta: PageMeta; schema: PageSchema } | null> {
+  public async getPage(id: string): Promise<{ meta: PageMeta; schema: UnifiedPageSchema } | null> {
     const result = await pageApi.getPageByPid(id);
 
     if (!ResultHelper.isSuccess(result) || !result.data) {
@@ -438,12 +438,12 @@ export class PageManagerService {
   /**
    * Update page schema (DSL)
    *
-   * Accepts a PageSchema object and derives blockCount from schema.blocks.length.
+   * Accepts a UnifiedPageSchema object and derives blockCount from schema.blocks.length.
    * Callers no longer need to compute blockCount manually.
    */
   public async updatePageSchema(
     id: string,
-    schema: PageSchema,
+    schema: UnifiedPageSchema,
   ): Promise<void> {
     // Cache locally first for auto-save
     this.cacheDraft(id, schema);
@@ -471,7 +471,7 @@ export class PageManagerService {
   public async updatePageStatus(id: string, componentCount: number): Promise<void> {
     const cached = this.getCachedDraft(id);
     if (cached) {
-      // Cast cached draft to PageSchema — assumes it's already a valid schema
+      // Cast cached draft to UnifiedPageSchema — assumes it's already a valid schema
       await this.updatePageSchema(id, cached);
     }
   }

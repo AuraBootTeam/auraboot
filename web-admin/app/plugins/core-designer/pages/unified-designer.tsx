@@ -1922,7 +1922,7 @@ function NewPageWorkspaceWizard({
                   <option value="detail">详情</option>
                 </select>
                 <span className="text-xs font-normal leading-5 text-slate-500">
-                  仪表板是一等资源，不属于 PageSchema 页面类型；请使用
+                  仪表板是一等资源，不属于 UnifiedPageSchema 页面类型；请使用
                   <a
                     href="/dashboard-designer"
                     className="ml-1 font-semibold text-blue-700 underline-offset-2 hover:underline"

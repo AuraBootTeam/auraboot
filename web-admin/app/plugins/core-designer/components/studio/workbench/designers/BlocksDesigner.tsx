@@ -2,7 +2,7 @@ import { StudioFormPresentationContext } from '../StudioFormPresentation';
 /**
  * Blocks Designer
  *
- * Unified designer for list/form/detail pages using V2 flat PageSchema.blocks.
+ * Unified designer for list/form/detail pages using V2 flat UnifiedPageSchema.blocks.
  * Unified designer for list/form/detail pages (replaced legacy AreasDesigner, Task 4.4).
  *
  * Layout:
@@ -35,7 +35,7 @@ import {
   serializeFieldOverride,
 } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import type {
-  PageSchema,
+  UnifiedPageSchema,
   DslBlock,
   BlockType,
   DslFieldRef,
@@ -51,9 +51,9 @@ import { useApiSchemaDetection } from '~/plugins/core-designer/components/studio
 import { useI18n } from '~/contexts/I18nContext';
 
 export interface BlocksDesignerProps {
-  schema: PageSchema;
-  onSchemaChange: (schema: PageSchema) => void;
-  onSave?: (schema: PageSchema) => Promise<void>;
+  schema: UnifiedPageSchema;
+  onSchemaChange: (schema: UnifiedPageSchema) => void;
+  onSave?: (schema: UnifiedPageSchema) => Promise<void>;
   modelCode?: string;
   readonly?: boolean;
   previewMode?: boolean;
@@ -165,7 +165,7 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
   // Drag state for visual feedback
   const [draggedBlock, setDraggedBlock] = useState<DslBlock | null>(null);
   const [draggedFieldName, setDraggedFieldName] = useState<string | null>(null);
-  const latestSchemaRef = useRef<PageSchema>(schema);
+  const latestSchemaRef = useRef<UnifiedPageSchema>(schema);
   const lastTabDropRef = useRef<{ signature: string; at: number } | null>(null);
 
   useEffect(() => {
@@ -173,7 +173,7 @@ export const BlocksDesigner: React.FC<BlocksDesignerProps> = ({
   }, [schema]);
 
   const commitSchema = useCallback(
-    (nextSchema: PageSchema) => {
+    (nextSchema: UnifiedPageSchema) => {
       latestSchemaRef.current = nextSchema;
       onSchemaChange(nextSchema);
     },

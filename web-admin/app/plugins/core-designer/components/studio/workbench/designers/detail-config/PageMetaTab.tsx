@@ -1,18 +1,18 @@
 import React, { useEffect, useRef } from 'react';
 import { DocumentTextIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
-import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type { UnifiedPageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { LocalizedTextInput, type LocalizedTextValue } from '~/shared/designer';
 
 export interface PageMetaTabProps {
-  schema: PageSchema;
-  onSchemaChange: (schema: PageSchema) => void;
+  schema: UnifiedPageSchema;
+  onSchemaChange: (schema: UnifiedPageSchema) => void;
   readonly?: boolean;
 }
 
 function normalizeTitleValue(
   next: LocalizedTextValue,
-  current: PageSchema['title'],
-): PageSchema['title'] {
+  current: UnifiedPageSchema['title'],
+): UnifiedPageSchema['title'] {
   if (next == null || next === '') {
     return undefined;
   }
@@ -24,29 +24,29 @@ function normalizeTitleValue(
 
   if (typeof next !== 'string') {
     if (!currentObject || !next) {
-      return next as PageSchema['title'];
+      return next as UnifiedPageSchema['title'];
     }
     return {
       ...currentObject,
       ...(next as Record<string, string>),
-    } as PageSchema['title'];
+    } as UnifiedPageSchema['title'];
   }
 
   if (next.startsWith('$i18n:')) {
-    return next as PageSchema['title'];
+    return next as UnifiedPageSchema['title'];
   }
 
   if (currentObject) {
     currentObject['zh-CN'] = next;
-    return currentObject as PageSchema['title'];
+    return currentObject as UnifiedPageSchema['title'];
   }
 
   const hasNonAscii = /[^\u0000-\u007f]/.test(next);
   if (hasNonAscii) {
-    return { 'zh-CN': next } as PageSchema['title'];
+    return { 'zh-CN': next } as UnifiedPageSchema['title'];
   }
 
-  return next as PageSchema['title'];
+  return next as UnifiedPageSchema['title'];
 }
 
 export const PageMetaTab: React.FC<PageMetaTabProps> = ({ schema, onSchemaChange, readonly }) => {
@@ -56,7 +56,7 @@ export const PageMetaTab: React.FC<PageMetaTabProps> = ({ schema, onSchemaChange
     latestSchemaRef.current = schema;
   }, [schema]);
 
-  const updateSchema = (patch: Partial<PageSchema>) => {
+  const updateSchema = (patch: Partial<UnifiedPageSchema>) => {
     const nextSchema = { ...latestSchemaRef.current, ...patch };
     latestSchemaRef.current = nextSchema;
     onSchemaChange(nextSchema);

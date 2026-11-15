@@ -13,26 +13,26 @@
  */
 
 import React from 'react';
-import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type { UnifiedPageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { BlocksDesigner } from './BlocksDesigner';
 import { ListConfigPanel } from './ListConfigPanel';
 import { DetailConfigPanel } from './DetailConfigPanel';
 
 export interface DesignerRouterProps {
   /**
-   * The V2 PageSchema to edit
+   * The V2 UnifiedPageSchema to edit
    */
-  schema: PageSchema;
+  schema: UnifiedPageSchema;
 
   /**
    * Callback when schema is modified
    */
-  onSchemaChange: (schema: PageSchema) => void;
+  onSchemaChange: (schema: UnifiedPageSchema) => void;
 
   /**
    * Callback to save schema
    */
-  onSave?: (schema: PageSchema) => Promise<void>;
+  onSave?: (schema: UnifiedPageSchema) => Promise<void>;
 
   /**
    * Model code for field lookup

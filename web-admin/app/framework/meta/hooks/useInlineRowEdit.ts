@@ -9,6 +9,7 @@
  * - Optimistic UI with rollback on failure
  */
 
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { useState, useCallback, useRef } from 'react';
 import type {
   ColumnConfig,
@@ -386,5 +387,5 @@ function evaluateValidationRule(
 }
 
 function getLocalizedMessage(msg: LocalizedText): string {
-  return msg['zh-CN'] || msg['en-US'] || Object.values(msg).find(Boolean) || '';
+  return getLocalizedText(msg);
 }

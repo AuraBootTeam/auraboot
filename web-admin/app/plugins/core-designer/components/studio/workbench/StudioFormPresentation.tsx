@@ -2,7 +2,7 @@ import React, { createContext, useEffect, useState } from 'react';
 import { resolveFormPresentation } from '~/framework/meta/rendering/pages/formPage/formPresentation';
 import { loadModelFieldsByModelCodes } from '../../unified-designer/persistence/modelFieldsRepository';
 import type { ModelFieldDefinition } from '../../unified-designer/types';
-import type { PageSchema } from '../domain/dsl/types';
+import type { UnifiedPageSchema } from '../domain/dsl/types';
 
 export const StudioFormPresentationContext = createContext({
   presentation: resolveFormPresentation(),
@@ -14,7 +14,7 @@ export function StudioFormPresentationProvider({
   schema,
   children,
 }: {
-  schema: PageSchema | null;
+  schema: UnifiedPageSchema | null;
   children: React.ReactNode;
 }) {
   const [fields, setFields] = useState<ModelFieldDefinition[]>([]);

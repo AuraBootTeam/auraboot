@@ -29,7 +29,7 @@ export type PageLayout =
 export type PageKind = 'list' | 'form' | 'detail';
 
 /**
- * Typed extension bag for PageSchema.
+ * Typed extension bag for UnifiedPageSchema.
  * All page-level feature flags and runtime hints live here.
  */
 export interface PageSchemaExtension {
@@ -74,7 +74,7 @@ export interface PageDataSourceConfig {
 /**
  * Page Schema V2 — flat shape stored in ab_page_schema.blocks (JSONB).
  */
-export interface PageSchema {
+export interface UnifiedPageSchema {
   schemaVersion: 2;
   kind: PageKind;
   id: string;

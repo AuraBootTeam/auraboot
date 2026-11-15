@@ -190,7 +190,7 @@ export interface ListSchema {
 /**
  * 页面Schema
  */
-export interface PageSchema {
+export interface UnifiedPageSchema {
   entityCode: string;
   entityName: string;
   listSchema: ListSchema;
@@ -348,7 +348,7 @@ export interface UseDynamicApiReturn {
   getStats: (entityCode: string) => Promise<EntityStats>;
 
   // Schema相关
-  getPageSchema: (entityCode: string) => Promise<PageSchema>;
+  getPageSchema: (entityCode: string) => Promise<UnifiedPageSchema>;
 
   // 状态管理
   loading: boolean;
