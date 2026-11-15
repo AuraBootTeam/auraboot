@@ -51,7 +51,7 @@ jobs:
           head="${{ github.event.pull_request.head.sha }}"
 
           if git diff --name-only "$base" "$head" \
-            | grep -E '^(platform/|contracts/internal-web-admin/|scripts/internal-api/|scripts/ci/gradle-repositories\.init\.gradle|docker-compose(\..*)?\.yml|platform/Dockerfile|web-admin/Dockerfile|web-admin/app/server/|web-admin/package\.json|pnpm-lock\.yaml|platform/build\.gradle|platform/gradle/wrapper/|plugins/|scripts/quickstart\.sh|scripts/prepare-quickstart-env(\.test)?\.py|\.env\.example|scripts/docker-bootstrap\.sh|scripts/dev/plugin-import-profiles\.json|scripts/dev/verify-quickstart\.sh|\.github/workflows/quickstart\.yml)' >/dev/null; then
+            | grep -E '^(platform/|contracts/internal-web-admin/|scripts/internal-api/|scripts/ci/gradle-repositories\.init\.gradle|docker-compose(\..*)?\.yml|platform/Dockerfile|web-admin/Dockerfile|web-admin/app/server/|web-admin/package\.json|pnpm-lock\.yaml|platform/build\.gradle|platform/gradle/wrapper/|plugins/|scripts/quickstart\.sh|scripts/prepare-quickstart-env(\.test)?\.py|\.env\.example|scripts/docker/|scripts/docker-bootstrap\.sh|scripts/dev/plugin-import-profiles\.json|scripts/dev/verify-quickstart\.sh|\.github/workflows/quickstart\.yml)' >/dev/null; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
@@ -61,6 +61,12 @@ jobs:
       - name: Set up Docker Buildx
         if: steps.changes.outputs.run == 'true'
         uses: docker/setup-buildx-action@v4
+
+      - name: Verify private configuration and atomic database bootstrap contracts
+        if: steps.changes.outputs.run == 'true'
+        run: |
+          python3 scripts/prepare-quickstart-env.test.py
+          python3 scripts/docker/postgres-bootstrap.test.py
 
       - name: Prepare private protocol signing key
         if: steps.changes.outputs.run == 'true'

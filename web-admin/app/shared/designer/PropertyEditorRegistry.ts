@@ -10,28 +10,36 @@ export interface RegisteredPropertyEditorProps {
 
 /** Explicit extension seam; unknown and conflicting controls fail closed. */
 export class PropertyEditorRegistry {
-  private readonly editors = new Map<string, ComponentType<RegisteredPropertyEditorProps>>();
+  private readonly editors = new Map<string, {
+    editor: ComponentType<RegisteredPropertyEditorProps>;
+    owner?: symbol;
+  }>();
 
   register(key: string, editor: ComponentType<RegisteredPropertyEditorProps>): () => void {
+    return this.registerEntry(key, editor);
+  }
+
+  /** An explicit module owner may replace its own editor during SSR/HMR reevaluation. */
+  registerOwned(key: string, editor: ComponentType<RegisteredPropertyEditorProps>, owner: symbol): () => void {
+    if (typeof owner !== 'symbol') throw new Error('Property editor module owner must be a symbol');
+    return this.registerEntry(key, editor, owner);
+  }
+
+  private registerEntry(key: string, editor: ComponentType<RegisteredPropertyEditorProps>, owner?: symbol): () => void {
     if (!key.trim()) {
       throw new Error(`Conflicting property editor registration: ${key}`);
     }
-    // Vite HMR re-evaluates importer modules after any web-admin file change while older
-    // instances of this registry survive in the module graph; the re-registration is the SAME
-    // editor component under a fresh module identity, so identical editors overwrite instead
-    // of failing every page behind the dev error overlay.
     const existing = this.editors.get(key);
-    if (existing && existing !== editor) {
-      // The dev-server module runner can evaluate the same editor module twice under
-      // different identities (SSR runner + HMR re-import chains); failing closed here
-      // takes the whole app down behind the error overlay for what is the same editor.
-      // Last registration wins; genuine conflicting registrations surface immediately
-      // in the designer as a missing/wrong editor instead of a dead app.
-      console.warn(`Property editor re-registered with a new identity: ${key}; last one wins`);
+    const sameOwner = owner !== undefined && existing?.owner === owner;
+    const sameUnownedEditor = owner === undefined && existing?.owner === undefined && existing?.editor === editor;
+    if (existing && !sameOwner && !sameUnownedEditor) {
+      throw new Error(`Conflicting property editor registration: ${key}`);
     }
-    this.editors.set(key, editor);
+    const registration = { editor, owner };
+    this.editors.set(key, registration);
     return () => {
-      if (this.editors.get(key) === editor) this.editors.delete(key);
+      // A disposer from a previous module generation must not remove its replacement.
+      if (this.editors.get(key) === registration) this.editors.delete(key);
     };
   }
 
@@ -46,9 +54,9 @@ export class PropertyEditorRegistry {
   }
 
   resolve(key: string): ComponentType<RegisteredPropertyEditorProps> {
-    const editor = this.editors.get(key);
-    if (!editor) throw new Error(`Unregistered property editor: ${key}`);
-    return editor;
+    const registration = this.editors.get(key);
+    if (!registration) throw new Error(`Unregistered property editor: ${key}`);
+    return registration.editor;
   }
 }
 

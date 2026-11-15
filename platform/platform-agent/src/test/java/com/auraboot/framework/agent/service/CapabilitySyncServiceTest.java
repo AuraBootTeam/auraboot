@@ -44,4 +44,20 @@ class CapabilitySyncServiceTest {
         verify(workflowCapabilities).available("catalog.list");
         verify(workflowCapabilities, never()).execute(anyString(), any());
     }
+    @Test
+    void failedCatalogReadsPropagateRatherThanReportingAZeroCountSuccess() {
+        DynamicDataMapper rows = mock(DynamicDataMapper.class);
+        AbCapabilityMapper catalog = mock(AbCapabilityMapper.class);
+        CapabilityGraphService graph = mock(CapabilityGraphService.class);
+        CapabilityMappingSupport mapping = mock(CapabilityMappingSupport.class);
+        WorkflowCapabilityRegistry workflows = mock(WorkflowCapabilityRegistry.class);
+        IllegalStateException failure = new IllegalStateException("catalog unavailable");
+        when(rows.selectByQuery(anyString(), any(Map.class))).thenThrow(failure);
+        CapabilitySyncService service = new CapabilitySyncService(rows, new ObjectMapper(), catalog, graph, mapping, workflows);
+        java.util.concurrent.CompletionException rejected = org.junit.jupiter.api.Assertions.assertThrows(
+                java.util.concurrent.CompletionException.class, () -> service.syncCapabilities(42L).join());
+        org.junit.jupiter.api.Assertions.assertSame(failure, rejected.getCause());
+        org.mockito.Mockito.verifyNoInteractions(catalog, graph, mapping, workflows);
+    }
+
 }

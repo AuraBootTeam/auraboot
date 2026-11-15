@@ -67,22 +67,23 @@ class DynamicControllerSynthesizedRoutingTest {
         wireSynthesizedPath();
         when(metaModelService.getModelDefinition(anyString())).thenReturn(java.util.Optional.of(com.auraboot.framework.meta.dto.ModelDefinition.builder().build()));
         
-        when(dynamicWriteCommandSeedService.ensureSeeded(anyString())).thenReturn("dynamic.update");
-        CommandExecuteResult result = CommandExecuteResult.builder().data(Map.of("ok", true)).build();
-        when(synthesizedCommandExecutor.execute(eq("dynamic.update"), any(CommandExecuteRequest.class)))
+        when(dynamicWriteCommandSeedService.ensureSeeded(anyString(), anyString())).thenReturn("dynamic.update.demo_page");
+        CommandExecuteResult result = CommandExecuteResult.builder().phaseReached("completed").data(Map.of("ok", true)).build();
+        when(synthesizedCommandExecutor.execute(eq("dynamic.update.demo_page"), any(CommandExecuteRequest.class)))
                 .thenReturn(result);
 
         var response = controller.update("demo_page", "rec-1",
                 new java.util.HashMap<>(Map.of("name", "x")), null);
 
-        verify(dynamicWriteCommandSeedService).ensureSeeded("dynamic.update");
+        verify(dynamicWriteCommandSeedService).ensureSeeded("dynamic.update", "demo_page");
         ArgumentCaptor<CommandExecuteRequest> captor = ArgumentCaptor.forClass(CommandExecuteRequest.class);
-        verify(synthesizedCommandExecutor).execute(eq("dynamic.update"), captor.capture());
+        verify(synthesizedCommandExecutor).execute(eq("dynamic.update.demo_page"), captor.capture());
         assertThat(captor.getValue().getPayload())
                 .containsEntry("pageKey", "demo_page")
                 .containsEntry("modelCode", "demo_page")
                 .containsEntry("recordPid", "rec-1")
-                .containsEntry("name", "x");
+                .containsEntry("data", Map.of("name", "x"));
+        assertThat(captor.getValue().getOperationType()).isEqualTo("UPDATE");
         assertThat(captor.getValue().getTargetRecordId()).isEqualTo("rec-1");
         verify(dynamicDataService, never()).update(anyString(), anyString(), any());
         assertThat(response.isSuccess()).isTrue();
@@ -98,7 +99,7 @@ class DynamicControllerSynthesizedRoutingTest {
         controller.update("demo_page", "rec-1", new java.util.HashMap<>(Map.of("name", "x")), null);
 
         verify(dynamicDataService).update(eq("demo_page"), eq("rec-1"), any());
-        verify(dynamicWriteCommandSeedService, never()).ensureSeeded(anyString());
+        verify(dynamicWriteCommandSeedService, never()).ensureSeeded(anyString(), anyString());
         verify(synthesizedCommandExecutor, never()).execute(anyString(), any());
     }
 
@@ -107,16 +108,63 @@ class DynamicControllerSynthesizedRoutingTest {
         wireSynthesizedPath();
         when(metaModelService.getModelDefinition(anyString())).thenReturn(java.util.Optional.of(com.auraboot.framework.meta.dto.ModelDefinition.builder().build()));
         
-        when(dynamicWriteCommandSeedService.ensureSeeded(anyString())).thenReturn("dynamic.delete");
-        when(synthesizedCommandExecutor.execute(eq("dynamic.delete"), any(CommandExecuteRequest.class)))
-                .thenReturn(CommandExecuteResult.builder().build());
+        when(dynamicWriteCommandSeedService.ensureSeeded(anyString(), anyString())).thenReturn("dynamic.delete.demo_page");
+        when(synthesizedCommandExecutor.execute(eq("dynamic.delete.demo_page"), any(CommandExecuteRequest.class)))
+                .thenReturn(CommandExecuteResult.builder().phaseReached("completed").build());
 
         controller.delete("demo_page", "rec-9");
 
         ArgumentCaptor<CommandExecuteRequest> captor = ArgumentCaptor.forClass(CommandExecuteRequest.class);
-        verify(synthesizedCommandExecutor).execute(eq("dynamic.delete"), captor.capture());
+        verify(synthesizedCommandExecutor).execute(eq("dynamic.delete.demo_page"), captor.capture());
         assertThat(captor.getValue().getTargetRecordId()).isEqualTo("rec-9");
         assertThat(captor.getValue().getPayload()).containsEntry("recordPid", "rec-9");
+        verify(dynamicDataService, never()).delete(anyString(), anyString());
+    }
+
+    @Test
+    void createKeepsBusinessDataNestedAndCannotOverrideTheResolvedModel() {
+        wireSynthesizedPath();
+        when(metaModelService.getModelDefinition(anyString())).thenReturn(java.util.Optional.of(com.auraboot.framework.meta.dto.ModelDefinition.builder().build()));
+        when(dynamicWriteCommandSeedService.ensureSeeded("dynamic.create", "demo_page")).thenReturn("dynamic.create.demo_page");
+        when(synthesizedCommandExecutor.execute(eq("dynamic.create.demo_page"), any()))
+                .thenReturn(CommandExecuteResult.builder().phaseReached("completed").data(Map.of("pid", "created")).build());
+        Map<String, Object> values = Map.of("name", "new", "modelCode", "untrusted", "pageKey", "untrusted");
+        assertThat(controller.create("demo_page", values).getData()).isEqualTo(Map.of("pid", "created"));
+        ArgumentCaptor<CommandExecuteRequest> request = ArgumentCaptor.forClass(CommandExecuteRequest.class);
+        verify(synthesizedCommandExecutor).execute(eq("dynamic.create.demo_page"), request.capture());
+        assertThat(request.getValue().getPayload()).containsEntry("modelCode", "demo_page").containsEntry("data", values);
+        assertThat(request.getValue().getOperationType()).isEqualTo("CREATE");
+        assertThat(request.getValue().getTargetRecordPid()).isNull();
+    }
+
+    @Test
+    void batchResponseAndVersionPreconditionKeepTheirRestContract() {
+        wireSynthesizedPath();
+        when(metaModelService.getModelDefinition(anyString())).thenReturn(java.util.Optional.of(com.auraboot.framework.meta.dto.ModelDefinition.builder().build()));
+        when(dynamicWriteCommandSeedService.ensureSeeded("dynamic.batch_create", "demo_page")).thenReturn("dynamic.batch_create.demo_page");
+        var batch = new com.auraboot.framework.meta.dto.DynamicBatchResponse();
+        batch.setTotal(1); batch.setSuccess(1); batch.setFailed(0);
+        when(synthesizedCommandExecutor.execute(eq("dynamic.batch_create.demo_page"), any()))
+                .thenReturn(CommandExecuteResult.builder().phaseReached("completed").data(Map.of("pluginResult", batch)).build());
+        assertThat(controller.batchCreate("demo_page", java.util.List.of(Map.of("name", "new"))).getData()).isEqualTo(batch);
+        when(dynamicWriteCommandSeedService.ensureSeeded("dynamic.update", "demo_page")).thenReturn("dynamic.update.demo_page");
+        when(synthesizedCommandExecutor.execute(eq("dynamic.update.demo_page"), any()))
+                .thenReturn(CommandExecuteResult.builder().phaseReached("completed").data(Map.of("pid", "r1")).build());
+        controller.update("demo_page", "r1", new java.util.HashMap<>(Map.of("name", "changed")), 7L);
+        ArgumentCaptor<CommandExecuteRequest> request = ArgumentCaptor.forClass(CommandExecuteRequest.class);
+        verify(synthesizedCommandExecutor).execute(eq("dynamic.update.demo_page"), request.capture());
+        assertThat(request.getValue().getPayload()).containsEntry("data", Map.of("name", "changed", "_expectedVersion", 7L));
+    }
+
+    @Test
+    void rejectedPipelineCannotBecomeSuccessfulRestResponse() {
+        wireSynthesizedPath();
+        when(metaModelService.getModelDefinition(anyString())).thenReturn(java.util.Optional.of(com.auraboot.framework.meta.dto.ModelDefinition.builder().build()));
+        when(dynamicWriteCommandSeedService.ensureSeeded("dynamic.delete", "demo_page")).thenReturn("dynamic.delete.demo_page");
+        when(synthesizedCommandExecutor.execute(eq("dynamic.delete.demo_page"), any()))
+                .thenReturn(CommandExecuteResult.builder().phaseReached("rejected").build());
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> controller.delete("demo_page", "r1"))
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
         verify(dynamicDataService, never()).delete(anyString(), anyString());
     }
 }

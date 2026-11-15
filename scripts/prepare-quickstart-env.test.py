@@ -121,6 +121,12 @@ class NewLocalEvaluationTests(unittest.TestCase):
         self.plugin = self.root / 'plugins/fixture/config.json'
         self.plugin.parent.mkdir(parents=True)
         self.plugin.write_text('{"public":"fixture"}\n')
+        self.bootstrap = self.root / 'scripts/docker/postgres-init.sh'
+        self.health = self.bootstrap.with_name('postgres-health.sh')
+        self.bootstrap.parent.mkdir(parents=True)
+        for file in [self.bootstrap, self.health]:
+            file.write_text('#!/usr/bin/env bash\nexit 0\n'); file.chmod(0o600)
+        self.bootstrap.parent.chmod(0o700)
         self.private = self.plugin.with_name('private-key.txt')
         self.private.write_text('untracked-private-fixture')
         for file in [self.schema, self.plugin, self.private]: file.chmod(0o600)
@@ -128,7 +134,7 @@ class NewLocalEvaluationTests(unittest.TestCase):
         (self.root / '.env.example').write_text('JWT_SECRET=public-template-fixture\nOTHER=preserved\n')
         (self.root / 'docker-compose.yml').write_text('services: {}\n')
         subprocess.run(['git', 'init', '-q', str(self.root)], check=True)
-        subprocess.run(['git', '-C', str(self.root), 'add', str(self.schema), str(self.plugin)], check=True)
+        subprocess.run(['git', '-C', str(self.root), 'add', str(self.schema), str(self.plugin), str(self.bootstrap), str(self.health)], check=True)
         values = dict(COMPOSE_PROJECT_NAME='isolated-test', AURABOOT_PORT='3000', POSTGRES_PORT='15432')
         self.environment = patch.dict(os.environ, values)
         self.environment.start(); self.addCleanup(self.environment.stop)
@@ -164,6 +170,9 @@ class NewLocalEvaluationTests(unittest.TestCase):
         self.assertEqual(self.schema.stat().st_mode & 0o777, 0o644)
         self.assertEqual(self.plugin.stat().st_mode & 0o777, 0o644)
         self.assertEqual(self.plugin.parent.stat().st_mode & 0o777, 0o755)
+        for file in [self.bootstrap, self.health]:
+            self.assertEqual(file.stat().st_mode & 0o777, 0o644)
+        self.assertEqual(self.bootstrap.parent.stat().st_mode & 0o777, 0o755)
         self.assertEqual(self.private.stat().st_mode & 0o777, 0o600)
         self.assertTrue(all(p.read_bytes() == data for p,data in before.items()))
         self.assertFalse(result['existingConfigurationReplaced'])

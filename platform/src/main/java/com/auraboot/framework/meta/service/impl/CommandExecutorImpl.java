@@ -226,7 +226,8 @@ public class CommandExecutorImpl implements CommandExecutor {
             if (e instanceof BusinessException || e instanceof ValidationException
                     || e instanceof com.auraboot.framework.exception.ConflictException
                     || e instanceof org.springframework.dao.DataAccessException
-                    || e instanceof AccessDeniedException) {
+                    || e instanceof AccessDeniedException
+                    || e instanceof com.auraboot.framework.meta.exception.MetaRecordNotFoundException) {
                 throw e;
             }
             // Unclassified failures (NPE, serialization, infra errors) are server

@@ -122,14 +122,16 @@ def prepare_new_local_evaluation(path: Path, run=None):
             probe.bind(('127.0.0.1', int(port)))
     # Derive public files from Git; never chmod untracked customer resources or keys.
     tracked = run(['git', '-C', str(root), 'ls-files', '-z', '--', 'plugins',
-                   'platform/src/main/resources/db/snapshots/schema-current.sql'],
+                   'platform/src/main/resources/db/snapshots/schema-current.sql',
+                   'scripts/docker/postgres-init.sh', 'scripts/docker/postgres-health.sh'],
                   check=True, capture_output=True, timeout=20).stdout
     tracked = tracked.decode() if isinstance(tracked, bytes) else tracked
     files, directories = [], set()
     schema = 'platform/src/main/resources/db/snapshots/schema-current.sql'
     relative_files = [value for value in tracked.split('\0') if value]
-    if schema not in relative_files or not any(value.startswith('plugins/') for value in relative_files):
-        raise ValueError('Complete tracked public schema and plugins are required')
+    required = {schema, 'scripts/docker/postgres-init.sh', 'scripts/docker/postgres-health.sh'}
+    if not required.issubset(relative_files) or not any(value.startswith('plugins/') for value in relative_files):
+        raise ValueError('Complete tracked public schema, bootstrap scripts and plugins are required')
     for relative in relative_files:
         file = root / relative
         if os.path.commonpath([str(file.resolve()), str(root)]) != str(root) or file.is_symlink() or not file.is_file():
@@ -138,7 +140,7 @@ def prepare_new_local_evaluation(path: Path, run=None):
         while parent != root:
             if parent.is_symlink() or not parent.is_dir():
                 raise ValueError('Public resource directories must not be symlinks')
-            if relative.startswith('plugins/'):
+            if relative.startswith(('plugins/', 'scripts/docker/')):
                 directories.add(parent)
             parent = parent.parent
         files.append(file)
