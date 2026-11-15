@@ -169,11 +169,11 @@ describe('CardGridBlockRenderer', () => {
     expect(groups[0].hasAttribute('open')).toBe(false);
     expect(screen.getByText('10 PCS')).toBeTruthy();
     expect(screen.getByText('Template A')).toBeTruthy();
-    expect((groups[0].lastElementChild as HTMLElement).style.gridTemplateColumns)
+    expect((groups[0].querySelector('[data-testid="card-grid-tracks"]') as HTMLElement).style.gridTemplateColumns)
       .toBe('repeat(auto-fit, minmax(min(100%, 220px), 1fr))');
     rerender(<CardGridBlockRenderer runtime={runtime as any}
       block={{ ...baseBlock, autoFitColumns: true, minCardWidth: 10, groupByField: 'source', collapsibleGroups: true }} />);
-    expect((screen.getAllByTestId('card-grid-group')[0].lastElementChild as HTMLElement).style.gridTemplateColumns)
+    expect((screen.getAllByTestId('card-grid-group')[0].querySelector('[data-testid="card-grid-tracks"]') as HTMLElement).style.gridTemplateColumns)
       .toBe('repeat(auto-fit, minmax(min(100%, 20rem), 1fr))');
   });
 

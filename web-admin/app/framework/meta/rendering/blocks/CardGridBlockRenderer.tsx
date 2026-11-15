@@ -98,6 +98,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   const imageField: string | undefined = cfg.imageField;
   const cardActions: ButtonConfig[] =
     Array.isArray(cfg.cardActions) ? cfg.cardActions : [];
+  const compact = cfg.compact === true;
   const autoFitColumns = cfg.autoFitColumns === true;
   const autoFillColumns = cfg.autoFillColumns === true;
   const minCardWidth = Number.isFinite(cfg.minCardWidth) && cfg.minCardWidth >= 180 && cfg.minCardWidth <= 640
@@ -349,7 +350,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
           <div
             key={rowKey}
             data-testid="card-grid-card"
-            className="rounded-card border-border bg-panel flex flex-col border p-4 shadow-sm"
+            className={`rounded-card border-border bg-panel flex flex-col border shadow-sm ${compact ? 'p-3' : 'p-4'}`}
           >
             {selectionRule && (
               <label className="mb-3 flex items-center gap-2 text-sm">
@@ -403,7 +404,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
             )}
 
             {/* Title */}
-            <h3 className="text-text mb-1 text-base font-semibold">{title}</h3>
+            <h3 className={`text-text mb-1 break-words font-semibold ${compact ? 'text-sm' : 'text-base'}`}>{title}</h3>
 
             {/* Description */}
             {description && (
@@ -483,7 +484,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
     const parentFields = (group: Group, fields: FieldConfig[], summary: boolean) => {
       if (!group.parent || !parentConfig) return null;
       const row = group.parent;
-      return <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 12rem), 1fr))', gap: '0.75rem', pointerEvents: summary ? 'none' : undefined}} data-testid={summary ? 'card-group-summary' : 'card-group-fields'}>
+      return <div style={{display: 'grid', gridTemplateColumns: compact && summary ? 'repeat(auto-fit, minmax(min(100%, 6rem), 1fr))' : 'repeat(auto-fit, minmax(min(100%, 12rem), 1fr))', gap: '0.75rem', pointerEvents: summary ? 'none' : undefined}} data-testid={summary ? 'card-group-summary' : 'card-group-fields'}>
         {fields.map(field => {
           const ctx = { ...runtime.getContext(), row } as any;
           if (field.visibleWhen && !runtime.getEvaluator().evaluateCondition(field.visibleWhen, ctx)) return null;
@@ -513,7 +514,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
             onChange={event => setGroupSearch(current => ({ ...current, [key]: event.target.value }))} />
         </div> : null}
         {group.entries.length === 0 && parentConfig?.emptyText ? <p className="text-text-2 py-3 text-sm">{getLocalizedText(parentConfig.emptyText, locale, t)}</p> : null}
-        <div className={`mt-3 grid gap-3 ${columnsClass}`} style={columnsStyle}>
+        <div data-testid="card-grid-tracks" className={`mt-3 grid gap-3 ${columnsClass}`} style={columnsStyle}>
           {entries.map(({ row, index: originalIndex }) => renderCard(row, originalIndex))}
         </div>
       </>;
@@ -523,15 +524,19 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
         {selectionHint}
         {Array.from(groups.entries()).map(([key, group], index) => cfg.collapsibleGroups === true ? (
           <details key={key} data-testid="card-grid-group" open={cfg.groupsDefaultOpen !== false}
-            className={`rounded-lg border border-border p-3 ${cfg.groupWarningField && (group.parent?.[cfg.groupWarningField] === true || group.entries.some(({ row }) => row[cfg.groupWarningField] === true)) ? 'bg-amber-50' : 'bg-surface'}`}>
-            <summary className="cursor-pointer select-none text-sm font-semibold text-text">
-              {group.title}
-              {cfg.groupDescriptionField && <span className="ml-3 font-normal text-text-2 whitespace-pre-wrap">
-                {getLocalizedText((group.parent || group.entries[0]?.row)?.[cfg.groupDescriptionField], locale, t)}
-              </span>}
-              {parentFields(group, parentConfig?.summaryFields || [], true)}
+            className={`rounded-lg border border-border ${compact ? 'group overflow-hidden' : 'p-3'} ${cfg.groupWarningField && (group.parent?.[cfg.groupWarningField] === true || group.entries.some(({ row }) => row[cfg.groupWarningField] === true)) ? 'bg-amber-50' : 'bg-surface'}`}>
+            <summary className={`cursor-pointer select-none text-sm font-semibold text-text ${compact ? 'list-none p-4' : ''}`}>
+              <div data-testid="card-group-heading" style={compact ? { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 24rem), 1fr))', gap: '1rem' } : undefined}>
+                <div className="min-w-0">
+                  <span data-testid="card-group-title">{compact && <span aria-hidden="true" className="mr-2 inline-block transition-transform group-open:rotate-90">›</span>}{group.title}</span>
+                  {cfg.groupDescriptionField && <span data-testid="card-group-description" className={`${compact ? 'mt-1 block text-xs' : 'ml-3'} font-normal text-text-2 whitespace-pre-wrap break-words`}>
+                    {getLocalizedText((group.parent || group.entries[0]?.row)?.[cfg.groupDescriptionField], locale, t)}
+                  </span>}
+                </div>
+                {parentFields(group, parentConfig?.summaryFields || [], true)}
+              </div>
             </summary>
-            <div className="mt-3">{groupCards(key, group)}</div>
+            <div className={compact ? 'border-t border-border bg-subtle p-4' : 'mt-3'}>{groupCards(key, group)}</div>
           </details>
         ) : (
           <section key={key} data-testid="card-grid-group"

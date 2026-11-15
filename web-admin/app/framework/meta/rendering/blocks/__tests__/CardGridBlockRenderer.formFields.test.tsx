@@ -192,7 +192,7 @@ describe('Card-grid draft form fields', () => {
   });
 });
 
-function setupJoinedGroups(duplicate = false, pendingParents = false) {
+function setupJoinedGroups(duplicate = false, pendingParents = false, compact = false) {
   let parentsReady = !pendingParents;
   const state = new ScopedStateManager({} as any);state.createScope('joined', { form: pendingParents ? { demands: [] } : {} });
   const parents = [
@@ -218,7 +218,7 @@ function setupJoinedGroups(duplicate = false, pendingParents = false) {
   } as any;
   render(<CardGridBlockRenderer runtime={runtime} block={{
     id: 'joined',blockType: 'card-grid',dataSource: 'offers',field: 'allocations',titleField: 'supplierName',
-    groupByField: 'sourcePid',groupTitleField: 'sourceLabel',collapsibleGroups: true,groupsDefaultOpen: true,
+    groupByField: 'sourcePid',groupTitleField: 'sourceLabel',collapsibleGroups: true,groupsDefaultOpen: true,compact,groupDescriptionField: 'remainingQty',
     searchFields: ['supplierName'],searchPlaceholder: 'Search suppliers',
     groupRows: { dataSource: 'parents',field: 'demands',identityField: 'sourcePid',titleField: 'sourceLabel',
       summaryFields: [{ field: 'remainingQty',label: 'Remaining',component: 'SmartInput',readOnly: true }],
@@ -229,6 +229,20 @@ function setupJoinedGroups(duplicate = false, pendingParents = false) {
 }
 
 describe('Joined card groups keep source and offer drafts independent', () => {
+  it('separates compact material context from immutable summary without redirecting draft edits', () => {
+    const {state} = setupJoinedGroups(false, false, true);
+    const first = screen.getAllByTestId('card-grid-group')[0];
+    expect(within(first).getByTestId('card-group-description')).toHaveClass('block');
+    expect(within(first).getByTestId('card-group-heading').style.gridTemplateColumns).toContain('24rem');
+    expect(within(first).getByTestId('card-group-summary').style.gridTemplateColumns).toContain('6rem');
+    expect(within(first).getByRole('textbox', {name: 'Remaining'})).toHaveProperty('readOnly',true);
+    const quantity = within(within(first).getByRole('group',{name:'Beta'})).getByRole('textbox',{name:'Proposed quantity'});
+    fireEvent.change(quantity,{target:{value:'30.000001'}});
+    fireEvent.click(first.querySelector('summary')!);fireEvent.click(first.querySelector('summary')!);
+    expect(quantity).toHaveValue('30.000001');
+    expect(state.getFieldValue('joined','allocations').map((row:any)=>row.proposedQty)).toEqual(['60','30.000001','80']);
+  });
+
   it('waits for parent data when offers arrive first and then joins every source', () => {
     const { state, loadParents } = setupJoinedGroups(false, true);
     expect(screen.getByTestId('card-grid-loading')).toBeInTheDocument();
