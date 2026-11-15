@@ -20,4 +20,13 @@ public interface IndependentTransactionAccessor {
 
     /** Executes one bounded unit of dynamic-data work in an independent transaction. */
     <T> T requiresNew(Function<DataAccessor, T> work);
+    /**
+     * Serialize a bounded replacement for one already readable record across host instances,
+     * then start the ordinary independent transaction after acquiring that record's lock.
+     * The lock does not grant reads or writes and never changes the record or its version.
+     * Unsupported hosts must reject rather than execute an unlocked replacement.
+     */
+    default <T> T requiresNewSerialized(String modelCode, String recordPid, Function<DataAccessor, T> work) {
+        throw new UnsupportedOperationException("Serialized independent transactions are unavailable");
+    }
 }

@@ -204,10 +204,12 @@ test.describe('Quote/BOM forms + search + dropdown + linkage + project data-scop
       await listSearch(page, CUST_LIST, marker);
       await expect(markerRow).toHaveCount(1);
       await expect(otherRow).toHaveCount(0);
+      await page.screenshot({ path: test.info().outputPath('customer-search-match.png'), fullPage: true });
       await listSearch(page, CUST_LIST, `NOMATCH${uid}ZZZ`);
       await expect(markerRow).toHaveCount(0);
       await expect(otherRow).toHaveCount(0);
       await expect(page.locator('main').getByText(/暂无符合条件的客户|暂无数据|无数据|No data|empty/i).first()).toBeVisible();
+      await page.screenshot({ path: test.info().outputPath('customer-search-empty.png'), fullPage: true });
 
     } finally {
       await context.close();

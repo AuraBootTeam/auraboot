@@ -199,14 +199,14 @@ test.describe('PCBA quote minimal create regression', () => {
       expect(accountId).toBeTruthy();
       created.rows.push({ model: 'crm_account_common', pid: accountId });
       await expect(customerDialog).toHaveCount(0);
-      await expect(page.getByTestId('select-trigger-qo_quote_crm_account_id')).toContainText(accountName);
+      await expect(page.getByTestId('select-trigger-qo_quote_crm_account_id')).toHaveValue(accountName);
       expect((await readDynamicRecord(page, 'crm_account_common', accountId)).crm_acc_name).toBe(accountName);
 
       await page.getByTestId('select-trigger-qo_quote_project_id').click();
       await page.getByTestId('select-create-new-qo_quote_project_id').click();
       const projectDialog = page.getByRole('dialog', { name: '新建BOM 项目', exact: true });
       await expect(projectDialog).toBeVisible();
-      await expect(projectDialog.getByRole('combobox', { name: '客户', exact: true })).toContainText(accountName);
+      await expect(projectDialog.getByRole('combobox', { name: '客户', exact: true })).toHaveValue(accountName);
       await projectDialog.getByRole('textbox', { name: '项目名称', exact: true }).fill(projectName);
       const projectResponse = page.waitForResponse((response) =>
         response.request().method() === 'POST' && response.url().includes('/api/meta/commands/execute/bom:create_project'));
@@ -222,10 +222,12 @@ test.describe('PCBA quote minimal create regression', () => {
       expect(projectId).toBeTruthy();
       created.rows.push({ model: 'req_requirement_set_pcba_bom', pid: projectId });
       await expect(projectDialog).toHaveCount(0);
-      await expect(page.getByTestId('select-trigger-qo_quote_project_id')).toContainText(projectName);
+      await expect(page.getByTestId('select-trigger-qo_quote_project_id')).toHaveValue(projectName);
       const persistedProject = await readDynamicRecord(page, 'req_requirement_set_pcba_bom', projectId);
       expect(persistedProject.bom_project_customer_id).toBe(accountId);
       expect(persistedProject.bom_project_name).toBe(projectName);
+      await expect(page.getByTestId('form-field-qo_quote_crm_account_id').getByText('此字段为必填项', { exact: true })).toHaveCount(0);
+      await expect(page.getByTestId('form-field-qo_quote_project_id').getByText('此字段为必填项', { exact: true })).toHaveCount(0);
       await page.screenshot({ path: testInfo.outputPath('quote-inline-customer-project-selected.png'), fullPage: true });
     } finally {
       // Keep the business deadline; fixture teardown receives its own bounded allowance.

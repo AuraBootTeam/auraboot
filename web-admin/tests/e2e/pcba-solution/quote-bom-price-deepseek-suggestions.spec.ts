@@ -1,3 +1,4 @@
+import { createControlledQuoteProvider } from './quote-controlled-provider';
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
 import {
@@ -165,6 +166,7 @@ test.describe('QuoteOps DeepSeek BOM price suggestions', () => {
     page,
   }) => {
     const created = await seedMinimalDeepSeekQuote(page);
+    const provider = await createControlledQuoteProvider(page);
 
     try {
       await openQuoteDetailFromList(page, created);
@@ -211,6 +213,7 @@ test.describe('QuoteOps DeepSeek BOM price suggestions', () => {
         )
         .toMatch(/CNY|待定|\d|暂不可用|未配置|unavailable/i);
 
+      expect(provider.requests, 'the UI journey must reach only the controlled local provider').toBeGreaterThan(0);
       const evidenceRows = await queryDynamicRecords(
         page,
         'qo_price_evidence_common',
@@ -253,6 +256,7 @@ test.describe('QuoteOps DeepSeek BOM price suggestions', () => {
         { timeout: 20_000 },
       );
     } finally {
+      await provider.close();
       await cleanupRows(page, created);
     }
   });

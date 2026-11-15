@@ -100,6 +100,9 @@ test.describe('customer related-projects tab golden (B01-01) @smoke', () => {
         await own.page.getByText(`E2E B01-01 Project B ${uid}`).count(),
         'customer B project still absent after reload',
       ).toBe(0);
+      const projectRow = own.page.getByRole('row').filter({ hasText: `E2E B01-01 Project A ${uid}` }).first();
+      await expect(projectRow).toContainText('工规');
+      await expect(projectRow).not.toContainText('industrial');
       await info.attach('B01-01-related-projects', {
         body: await own.page.screenshot({ fullPage: true }), contentType: 'image/png',
       });

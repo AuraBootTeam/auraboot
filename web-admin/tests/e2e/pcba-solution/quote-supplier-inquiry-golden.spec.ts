@@ -1,4 +1,5 @@
 import { test, expect } from '../../fixtures';
+import { clickRowActionByLocator } from '../helpers';
 import {
   cleanupRows,
   ensureQuoteRoleUser,
@@ -21,6 +22,8 @@ test.describe('PCBA quote supplier inquiry golden', () => {
     const page = await ctx.newPage();
     users['sales'] = makeQuoteRoleUser('qo_sales', uid, ['qo_sales']);
     await ensureQuoteRoleUser(page, users['sales']);
+    users['procurement'] = makeQuoteRoleUser('inquiry_procurement', uid, ['qo_procurement']);
+    await ensureQuoteRoleUser(page, users['procurement']);
     const code = `e2e_inquiry_reader_${uid}`;
     const roleResponse = await page.request.post('/api/roles', { data: { code, name: code, type: 'custom' } });
     expect(roleResponse.ok()).toBe(true);
@@ -46,12 +49,60 @@ test.describe('PCBA quote supplier inquiry golden', () => {
     const marker = `SRFE2E-${Date.now()}`;
     const created: CreatedRows = { quoteId: '', quoteCode: '', rows: [] };
     try {
-      // 询价单头 + 询价行(挂接真实报价行)
-      const head = await page.request.post('/api/dynamic/qo_supplier_request_common/create', {
-        data: { qo_sr_code: marker, qo_sr_category: 'pcb', qo_sr_status: 'draft', qo_sr_supplier: 'E2E Supplier' },
-      });
-      expect(head.ok(), await head.text()).toBe(true);
-      const headPid = String(((await head.json()).data ?? {}).pid ?? '');
+      // Q19-01 uses the existing RFQ page and commands; API remains setup/readback only.
+      const procurement = await openQuoteRolePage(page.context().browser()!, users['procurement']);
+      let headPid = '';
+      try {
+        const ui = procurement.page;
+        await ui.goto('/p/qo_procurement_workbench');
+        await ui.getByRole('button', { name: '供应商询价', exact: true }).click();
+        await expect(ui).toHaveURL(/\/p\/qo_supplier_request_common$/);
+        await ui.getByRole('button', { name: '新建', exact: true }).click();
+        const field = (name: string) => ui.getByTestId(`form-field-${name}`).getByRole('textbox');
+        const commands: string[] = [];
+        ui.on('request', request => {
+          if (request.method() === 'POST' && request.url().includes('/api/meta/commands/execute/qo_supplier_request_common:')) commands.push(request.url());
+        });
+        await ui.getByTestId('form-btn-create').click();
+        await expect(ui.getByTestId('form-field-qo_sr_code')).toContainText('请填写询价编号');
+        await expect(ui.getByTestId('form-field-qo_sr_category')).toContainText('请填写物料类别');
+        expect(commands, 'missing required fields must not send a command').toEqual([]);
+        await ui.screenshot({ path: test.info().outputPath('inquiry-required-fields.png'), fullPage: true });
+        await field('qo_sr_code').fill(marker);
+        await field('qo_sr_category').fill('pcb');
+        await field('qo_sr_supplier').fill('E2E Supplier');
+        const createdResponse = ui.waitForResponse(response => response.request().method() === 'POST' && response.url().includes('/api/meta/commands/execute/qo_supplier_request_common:create'));
+        await ui.getByTestId('form-btn-create').click();
+        const createdBody = await (await createdResponse).json();
+        expect(String(createdBody.code)).toBe('0');
+        const heads = await queryDynamicRecords(page, 'qo_supplier_request_common', [{ fieldName: 'qo_sr_code', operator: 'EQ', value: marker }]);
+        expect(heads).toHaveLength(1);
+        headPid = String(heads[0].pid);
+        created.rows.push({ model: 'qo_supplier_request_common', pid: headPid });
+        expect(heads[0].qo_sr_category).toBe('pcb');
+        expect(heads[0].qo_sr_supplier).toBe('E2E Supplier');
+        expect(heads[0].qo_sr_status).toBe('draft');
+        await searchBusinessList(ui, '/p/qo_supplier_request_common', marker);
+        await clickRowActionByLocator(ui, ui.getByRole('row').filter({ hasText: marker }), 'edit', '编辑');
+        await expect(field('qo_sr_code')).toHaveValue(marker);
+        await field('qo_sr_supplier').fill('E2E Supplier Updated');
+        const updatedResponse = ui.waitForResponse(response => response.request().method() === 'POST' && response.url().includes('/api/meta/commands/execute/qo_supplier_request_common:update'));
+        await ui.getByTestId('form-btn-update').click();
+        expect(String((await (await updatedResponse).json()).code)).toBe('0');
+        await searchBusinessList(ui, '/p/qo_supplier_request_common', marker);
+        await ui.reload();
+        const row = ui.getByRole('row').filter({ hasText: marker });
+        await expect(row).toContainText('E2E Supplier Updated');
+        await expect(row).toContainText('草稿');
+        const saved = await queryDynamicRecords(page, 'qo_supplier_request_common', [{ fieldName: 'pid', operator: 'EQ', value: headPid }]);
+        expect(saved[0].qo_sr_supplier).toBe('E2E Supplier Updated');
+        await ui.screenshot({ path: test.info().outputPath('inquiry-created-edited-reloaded.png'), fullPage: true });
+        await clickRowActionByLocator(ui, row, 'edit', '编辑');
+        await expect(field('qo_sr_code')).toHaveValue(marker);
+        await expect(field('qo_sr_category')).toHaveValue('pcb');
+        await expect(field('qo_sr_supplier')).toHaveValue('E2E Supplier Updated');
+        await ui.screenshot({ path: test.info().outputPath('inquiry-edited-form-reloaded.png'), fullPage: true });
+      } finally { await procurement.context.close(); }
 
       const quoteLine = (
         await queryDynamicRecords(page, 'qo_quote_line_common', [], { pageSize: 1 })
@@ -73,7 +124,6 @@ test.describe('PCBA quote supplier inquiry golden', () => {
       });
       expect(line.ok(), await line.text()).toBe(true);
       const linePid = String(((await line.json()).data ?? {}).pid ?? '');
-      created.rows.push({ model: 'qo_supplier_request_common', pid: headPid });
       created.rows.push({ model: 'qo_supplier_request_line_common', pid: linePid });
 
       // 供应商报价回填:价格/引用/状态

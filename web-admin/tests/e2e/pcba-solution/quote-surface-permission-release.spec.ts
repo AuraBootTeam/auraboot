@@ -582,7 +582,9 @@ test('formal invalid predecessor: missing quote is rejected without creating a f
     const illegalBody=await illegalResponse.json();
     expect(illegalResponse.status()).toBe(400);
     expect(String(illegalBody.code)).not.toBe('0');
-    expect(JSON.stringify(illegalBody)).toContain('previous_quote_id must reference a formal Quote Version');
+    expect(JSON.stringify(illegalBody)).toContain('请选择正式报价版本作为上一版本，不能选择普通报价。');
+    await expect(page.getByText('请选择正式报价版本作为上一版本，不能选择普通报价。', {exact:true}).first()).toBeVisible();
+    await expect(page.locator('main')).not.toContainText('previous_quote_id');
     expect(await queryDynamicRecords(page,'qo_quote_common',[{fieldName:'qo_quote_cost_scenario_id',operator:'EQ',value:scenarioId}])).toHaveLength(0);
     await info.attach('illegal-previous-rejection',{body:JSON.stringify({status:illegalResponse.status(),body:illegalBody}),contentType:'application/json'});
     await info.attach('illegal-previous-browser',{body:await page.screenshot({fullPage:true}),contentType:'image/png'});

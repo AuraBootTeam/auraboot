@@ -35,7 +35,7 @@ test.describe('BOM & Quote domain levels', () => {
       const login = await page.request.post('/login', {
         form: {
           identifier: process.env.AURA_ADMIN_EMAIL || 'admin@auraboot.com',
-          password: process.env.AURA_ADMIN_PASSWORD || 'Test2026x',
+          password: process.env.AURA_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD || process.env.E2E_ADMIN_PASSWORD || process.env.PW_ADMIN_PASSWORD || 'Test2026x',
           remember: 'on',
           redirectTo: '/home',
         },

@@ -9,7 +9,7 @@ import {
 test.describe('PCBA requirement set golden', () => {
   test.describe.configure({ timeout: 120_000 });
 
-  // Q21-01: 维护 PCBA 需求集并触发行计算——扩展模型字段生效于持久化;非法取值拒绝。
+  // Q21-01: existing requirement-field persistence and validation; no independent line calculation command.
   test('Q21-01 requirement set and lines persist extended fields; invalid values are rejected', async ({
     page,
   }) => {
@@ -19,13 +19,20 @@ test.describe('PCBA requirement set golden', () => {
       const setPid = await dynamicCreate(page, 'req_requirement_set_pcba_bom', {
         bom_pcba_code: `${marker}-001`,
         bom_project_name: `E2E 需求集 ${marker}`,
-        bom_project_quality_level: '一级',
+        bom_project_quality_level: 'industrial',
         bom_project_remark: 'Q21-01 golden',
       }, created.rows);
 
       const taskPid = await dynamicCreate(page, 'bom_conversion_task_pcba', {
         bom_task_no: `${marker}-TASK`, bom_task_project_id: setPid, bom_task_status: 'draft',
       }, created.rows);
+      const setRows = await queryDynamicRecords(page, 'req_requirement_set_pcba_bom', [
+        { fieldName: 'pid', operator: 'EQ', value: setPid },
+      ]);
+      expect(setRows).toHaveLength(1);
+      expect(setRows[0].bom_pcba_code).toBe(`${marker}-001`);
+      expect(setRows[0].bom_project_name).toBe(`E2E 需求集 ${marker}`);
+      expect(setRows[0].bom_project_quality_level).toBe('industrial');
       // Canonical lines reference a conversion task owned by the BOM project.
       const linePid = await dynamicCreate(page, 'req_requirement_line_pcba_bom', {
         bom_cl_task_id: taskPid,
@@ -40,6 +47,10 @@ test.describe('PCBA requirement set golden', () => {
       const lineRows = await queryDynamicRecords(page, 'req_requirement_line_pcba_bom', [
         { fieldName: 'pid', operator: 'EQ', value: linePid },
       ]);
+      expect(lineRows).toHaveLength(1);
+      expect(String(lineRows[0].bom_cl_task_id)).toBe(taskPid);
+      expect(String(lineRows[0].bom_cl_level)).toBe('1');
+      expect(lineRows[0].bom_cl_category).toBe('capacitor');
       expect(String(lineRows[0].bom_cl_mpn)).toBe(`E2E-REQ-${marker}`);
       expect(Number(lineRows[0].bom_cl_qty)).toBe(5);
 
@@ -78,6 +89,11 @@ test.describe('PCBA requirement set golden', () => {
       ).toBe(true);
       expect(JSON.stringify(missingMpnBody), 'the rejection names the required rule').toContain('required');
 
+      const negativeRows = await queryDynamicRecords(page, 'req_requirement_line_pcba_bom', [
+        { fieldName: 'bom_cl_task_id', operator: 'EQ', value: taskPid },
+        { fieldName: 'bom_cl_line_no', operator: 'EQ', value: 2 },
+      ]);
+      expect(negativeRows, 'the rejected negative-quantity row is not persisted').toHaveLength(0);
       const invalidRows = await queryDynamicRecords(page, 'req_requirement_line_pcba_bom', [
         { fieldName: 'bom_cl_task_id', operator: 'EQ', value: taskPid },
         { fieldName: 'bom_cl_line_no', operator: 'EQ', value: 3 },

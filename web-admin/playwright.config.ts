@@ -263,10 +263,11 @@ export default defineConfig({
   // Shared settings for all projects
   use: {
     baseURL,
+    ...(process.env.PW_LOCALE ? { locale: process.env.PW_LOCALE } : {}),
     headless: true,
     // OSS gates have zero retries; retain the original failing attempt's trace.
     trace: runProfile === 'oss' ? 'retain-on-failure' : 'on-first-retry',
-    screenshot: 'only-on-failure',
+    screenshot: process.env.PW_SCREENSHOT === 'on' ? 'on' : 'only-on-failure',
     video: process.env.CI ? 'on-first-retry' : 'off',
     actionTimeout: 5000,
     navigationTimeout: 15000,

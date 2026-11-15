@@ -245,18 +245,9 @@ test.describe('Quote pricing + document excel (QO-04 / QO-07 / XLS-Q) @smoke', (
           fullPage: true,
         });
       }
-      // Job center is owner-scoped. Both document generations were performed
-      // by the sales user, while the administrator only verifies output access.
+      // Document history is available in the Quote tab; the retired task menu stays absent.
       await ensureSidebarExpanded(page);
-      const jobsMenu = page.locator('nav a[href="/p/c/exchange_job_center"], aside a[href="/p/c/exchange_job_center"]').first();
-      await expect(jobsMenu).toBeVisible({ timeout: 20_000 });
-      await jobsMenu.click();
-      await expect(page).toHaveURL(/\/p\/c\/exchange_job_center(?:[?#].*)?$/);
-      await expect(page.getByRole('button', { name: '刷新任务', exact: true })).toBeVisible();
-      await expect(page.getByText('正式文档 v2，2 个文件', { exact: true })).toBeVisible({ timeout: 20_000 });
-      await expect(page.getByText('正式文档', { exact: true }).first()).toBeVisible();
-      await expect(page.getByRole('link', { name: '下载', exact: true }).first()).toBeVisible();
-      await page.screenshot({ path: info.outputPath('quote-job-center.png'), fullPage: true });
+      await expect(page.locator('nav a[href="/p/c/exchange_job_center"], aside a[href="/p/c/exchange_job_center"]')).toHaveCount(0);
       // Immutable files may retain bytes, but current source-field visibility must
       // still govern the same known URL after generation. Restrict only our copied role.
       let restricted = false;
