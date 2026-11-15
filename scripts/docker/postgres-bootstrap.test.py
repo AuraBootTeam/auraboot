@@ -57,7 +57,7 @@ sys.exit(int(os.environ.get('QUERY_EXIT', '0')))
         ready, query = self.calls()
         self.assertIn('--host=127.0.0.1', ready['args'])
         self.assertIn('--host=127.0.0.1', query['args'])
-        self.assertIn('public.ab_model_definition', query['args'][-1])
+        self.assertIn('public.ab_meta_model', query['args'][-1])
         self.assertIn('public.ab_command_definition', query['args'][-1])
         self.assertEqual(query['password'], self.env['POSTGRES_PASSWORD'])
         self.assertNotIn(self.env['POSTGRES_PASSWORD'], ' '.join(query['args']))
@@ -66,6 +66,15 @@ sys.exit(int(os.environ.get('QUERY_EXIT', '0')))
         for overrides in [{'QUERY_RESULT': 'f'}, {'QUERY_EXIT': '1'}, {'QUERY_RESULT': 't\nf'}, {'QUERY_RESULT': ''}]:
             with self.subTest(overrides=overrides):
                 self.assertNotEqual(self.run_script('postgres-health.sh', **overrides).returncode, 0)
+
+    def test_health_relations_exist_in_the_shipped_schema(self):
+        import re
+        script = (ROOT / 'scripts/docker/postgres-health.sh').read_text()
+        schema = (ROOT / 'platform/src/main/resources/db/snapshots/schema-current.sql').read_text()
+        relations = re.findall(r"to_regclass\('public\.([a-z_]+)'\)", script)
+        self.assertGreaterEqual(len(relations), 2)
+        for relation in relations:
+            self.assertRegex(schema, r'CREATE TABLE public\.' + re.escape(relation) + r'\s*\(')
 
     def test_unready_tcp_does_not_attempt_schema_query(self):
         self.assertNotEqual(self.run_script('postgres-health.sh', READY_EXIT='2').returncode, 0)
