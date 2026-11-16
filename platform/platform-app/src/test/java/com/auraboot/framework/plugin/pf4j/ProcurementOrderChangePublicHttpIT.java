@@ -117,7 +117,7 @@ class ProcurementOrderChangePublicHttpIT extends ProcurementOrderChangeNativeDbI
         Object identity=construct("ProcurementExternalReferences$Identity",new Class<?>[]{String.class,String.class,String.class,String.class,String.class,String.class,String.class},
             Long.toString(tenant),"KINGDEE",connection,namespace,form,external,entry==null?"":entry);
         Object registry=construct("ProcurementExternalReferences",new Class<?>[]{DataAccessor.class},db);
-        tx(SYNC,()->{invoke(registry,"bind",new Class<?>[]{identityClass,String.class,String.class,String.class},identity,model,local,namespace);return null;});
+        tx("qo_procurement_inquiry_request_common:process",()->{invoke(registry,"bind",new Class<?>[]{identityClass,String.class,String.class,String.class},identity,model,local,namespace);return null;});
     }
     Map<String,Object> contract(){var value=new LinkedHashMap<String,Object>();
         value.put("connectionPid",connection);value.put("accountId",namespace);value.put("formId","PUR_PurchaseOrder");value.put("supplierReferenceFormId","BD_Supplier");value.put("readMode","kingdee-po-view-v1");
