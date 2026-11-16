@@ -7347,10 +7347,16 @@ CREATE TABLE public.ab_command_definition (
 
 
 --
+-- Name: COLUMN ab_command_definition.model_code; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_command_definition.model_code IS '目标模型;路由级命令(dynamic.*)无单模型归属,为 NULL——授权按调用时目标模型校验';
+
+
+--
 -- Name: COLUMN ab_command_definition.plugin_pid; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.ab_command_definition.model_code IS 'Target model; NULL for route-level commands (dynamic.*) that have no single-model owner — authorization validates the per-call target model';
 COMMENT ON COLUMN public.ab_command_definition.plugin_pid IS 'Reference to plugin that created this command';
 
 
