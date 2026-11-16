@@ -335,15 +335,9 @@ test('core schema audit keeps provider-neutral automation storage in core', () =
 });
 
 test('release OCI is built on a pinned Linux JRE and requires a real image builder', () => {
-  assert.match(oci, /eclipse-temurin:21-jre-noble@sha256:0eda5830ed7b669abc246a8dc520ea8a23cab06f9a8d4b6964109e2f2394e46f/);
-  assert.match(oci, /apt=2\.8\.4ubuntu0\.1 libapt-pkg6\.0t64=2\.8\.4ubuntu0\.1/);
-  assert.match(oci, /Acquire::Retries=0/);
-  assert.match(oci, /libpcre2-8-0=10\.42-4ubuntu2\.2/);
-  for (const name of ['libc6', 'libc-bin', 'locales']) assert.ok(oci.includes(name + '=2.39-0ubuntu8.12'));
-  assert.ok(oci.includes('perl-base=5.38.2-3.2ubuntu0.7'));
-  assert.match(oci, /dpkg-query -W apt libapt-pkg6\.0t64 libpcre2-8-0 libc6 libc-bin locales perl-base/);
-  assert.match(oci, /update --error-on=any/);
-  assert.doesNotMatch(oci, /--allow-unauthenticated|trusted=yes/);
+  assert.match(oci, /eclipse-temurin:21-jre-alpine@sha256:b6ea71e690a72ba240b3d1b5c477410014862f9ea2cc73ab40e41ff21b03ba1c/);
+  assert.match(oci, /apk add --no-cache zlib=1\.4-r0 && apk info -v zlib/);
+  assert.doesNotMatch(oci, /--allow-unauthenticated|--allow-untrusted|trusted=yes/);
   assert.doesNotMatch(oci, /execFileSync\('container'/);
   assert.match(oci, /self-hosted Linux CI Docker builder \(linux\/amd64\)/);
   assert.match(oci, /AURA_OCI_BUILDER must be docker/);

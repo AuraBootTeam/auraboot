@@ -14,6 +14,7 @@ include 'platform-plugin-api'
 include 'platform-agent'
 include 'platform-app'
 include 'platform-bom'
+include 'platform-mybatis-compat'
 
 // Infrastructure provider modules (add to platform/build.gradle dependencies as needed)
 include 'platform-storage-minio'

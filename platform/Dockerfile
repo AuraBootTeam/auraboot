@@ -18,9 +18,11 @@
 
 # ── Stage 1: Build ──────────────────────────────────────────
 ARG BUILD_JDK_IMAGE=eclipse-temurin:21-jdk
-ARG RUNTIME_JRE_IMAGE=eclipse-temurin:21-jre-alpine
+ARG RUNTIME_JRE_IMAGE=eclipse-temurin:21-jre-alpine@sha256:ac05c3c42b7c2f1a52c9bd52f01041fa1958231b15ebeae7420429cbc5baf474
 FROM ${BUILD_JDK_IMAGE} AS builder
 ARG AURA_GRADLE_REPOSITORY_POLICY=project
+# Optional HTTPS mirror for all dependency configurations, including child modules.
+ARG AURA_GRADLE_MIRROR_URL=
 
 WORKDIR /app
 
@@ -47,6 +49,8 @@ COPY scripts/ci/gradle-repositories.init.gradle /opt/aura-ci/gradle-repositories
 
 # Copy subproject build files for dependency resolution
 COPY platform/platform-bom/build.gradle platform-bom/build.gradle
+COPY platform/platform-mybatis-compat/build.gradle platform-mybatis-compat/build.gradle
+COPY platform/platform-mybatis-compat/gradle.lockfile platform-mybatis-compat/gradle.lockfile
 COPY platform/platform-app/build.gradle platform-app/build.gradle
 COPY platform/platform-agent/build.gradle platform-agent/build.gradle
 COPY platform/platform-plugin-api/build.gradle platform-plugin-api/build.gradle
@@ -79,10 +83,13 @@ RUN --mount=type=cache,target=/root/.gradle/wrapper \
     --mount=type=cache,target=/root/.gradle/caches \
     --mount=type=cache,target=/root/.m2/repository,id=aura-m2,sharing=locked \
     AURA_GRADLE_REPOSITORY_POLICY="$AURA_GRADLE_REPOSITORY_POLICY" \
+    AURA_GRADLE_MIRROR_URL="$AURA_GRADLE_MIRROR_URL" \
     ./gradlew --init-script /opt/aura-ci/gradle-repositories.init.gradle dependencies --no-daemon --no-parallel --max-workers=2 \
     "-Dorg.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8" || true
 
 # Copy source code
+COPY platform/platform-mybatis-compat/licenses platform-mybatis-compat/licenses
+COPY platform/platform-mybatis-compat/NOTICE.auraboot platform/platform-mybatis-compat/upstream-inputs.json platform-mybatis-compat/
 COPY platform/src ./src
 COPY platform/platform-app/src platform-app/src
 COPY platform/platform-agent/src platform-agent/src
@@ -104,6 +111,7 @@ RUN --mount=type=cache,target=/root/.gradle/wrapper \
     --mount=type=cache,target=/root/.gradle/caches \
     --mount=type=cache,target=/root/.m2/repository,id=aura-m2,sharing=locked \
     AURA_GRADLE_REPOSITORY_POLICY="$AURA_GRADLE_REPOSITORY_POLICY" \
+    AURA_GRADLE_MIRROR_URL="$AURA_GRADLE_MIRROR_URL" \
     ./gradlew --init-script /opt/aura-ci/gradle-repositories.init.gradle :platform-plugin-api:publishToMavenLocal bootJar --no-daemon -x test --no-parallel --max-workers=2 \
     "-Dorg.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8"
 
@@ -113,7 +121,7 @@ FROM ${RUNTIME_JRE_IMAGE}
 WORKDIR /app
 
 # Install wget for health checks
-RUN apk add --no-cache wget
+RUN apk add --no-cache wget zlib=1.4-r0
 
 # Create non-root user
 RUN addgroup -g 1000 appuser && \

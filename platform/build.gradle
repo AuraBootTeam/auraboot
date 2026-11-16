@@ -22,6 +22,12 @@ plugins {
 //   ./gradlew dependencies --write-locks
 allprojects {
     apply from: rootProject.file('gradle/java-conventions.gradle')
+    if (project.path != ':platform-mybatis-compat') {
+        configurations.configureEach {
+            // The compatible carrier is the only implementation; never ship the old embedded OGNL alongside it.
+            exclude group: 'org.mybatis', module: 'mybatis'
+        }
+    }
 }
 
 // Publish plain jar (not fat boot jar) for downstream modules
@@ -81,6 +87,12 @@ publishing {
             }
         }
     }
+}
+
+// A direct Core publication must include its required implementation dependency.
+// Otherwise isolated Maven consumers receive a valid POM pointing at a missing carrier.
+tasks.withType(org.gradle.api.publish.maven.tasks.PublishToMavenLocal).configureEach {
+    dependsOn ':platform-mybatis-compat:publishMavenJavaPublicationToMavenLocal'
 }
 
 // Multi-worktree pre-flight guard for publishToMavenLocal.
@@ -301,6 +313,7 @@ def jacocoToolVersion = '0.8.14'
 
 dependencies {
     // Declarative validation accepts configurable patterns; never use a backtracking engine.
+    api project(':platform-mybatis-compat')
     implementation 'com.google.re2j:re2j:1.8'
     testImplementation 'io.qameta.allure:allure-junit5:2.35.5'
     // Plugin API module
@@ -1290,6 +1303,8 @@ tasks.named('check').configure {
 
 // Core boundary tests inspect the actual plain jar, without agent/app test dependencies.
 tasks.named('test', Test) {
+    // Every selected Core regression also exercises the embedded security carrier contract.
+    dependsOn ':platform-mybatis-compat:test'
     dependsOn 'jar'
     inputs.file tasks.named('jar').flatMap { it.archiveFile }
     systemProperty 'auraboot.core.jar', tasks.named('jar').get().archiveFile.get().asFile.absolutePath
