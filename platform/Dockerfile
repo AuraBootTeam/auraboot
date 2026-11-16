@@ -47,6 +47,8 @@ COPY scripts/ci/gradle-repositories.init.gradle /opt/aura-ci/gradle-repositories
 
 # Copy subproject build files for dependency resolution
 COPY platform/platform-bom/build.gradle platform-bom/build.gradle
+COPY platform/platform-mybatis-compat/build.gradle platform-mybatis-compat/build.gradle
+COPY platform/platform-mybatis-compat/gradle.lockfile platform-mybatis-compat/gradle.lockfile
 COPY platform/platform-app/build.gradle platform-app/build.gradle
 COPY platform/platform-agent/build.gradle platform-agent/build.gradle
 COPY platform/platform-plugin-api/build.gradle platform-plugin-api/build.gradle
@@ -83,6 +85,8 @@ RUN --mount=type=cache,target=/root/.gradle/wrapper \
     "-Dorg.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8" || true
 
 # Copy source code
+COPY platform/platform-mybatis-compat/licenses platform-mybatis-compat/licenses
+COPY platform/platform-mybatis-compat/NOTICE.auraboot platform/platform-mybatis-compat/upstream-inputs.json platform-mybatis-compat/
 COPY platform/src ./src
 COPY platform/platform-app/src platform-app/src
 COPY platform/platform-agent/src platform-agent/src

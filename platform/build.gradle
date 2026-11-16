@@ -22,6 +22,12 @@ plugins {
 //   ./gradlew dependencies --write-locks
 allprojects {
     apply from: rootProject.file('gradle/java-conventions.gradle')
+    if (project.path != ':platform-mybatis-compat') {
+        configurations.configureEach {
+            // The compatible carrier is the only implementation; never ship the old embedded OGNL alongside it.
+            exclude group: 'org.mybatis', module: 'mybatis'
+        }
+    }
 }
 
 // Publish plain jar (not fat boot jar) for downstream modules
@@ -301,6 +307,7 @@ def jacocoToolVersion = '0.8.14'
 
 dependencies {
     // Declarative validation accepts configurable patterns; never use a backtracking engine.
+    api project(':platform-mybatis-compat')
     implementation 'com.google.re2j:re2j:1.8'
     testImplementation 'io.qameta.allure:allure-junit5:2.35.5'
     // Plugin API module

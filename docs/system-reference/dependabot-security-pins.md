@@ -90,3 +90,36 @@ Until that carrier is qualified, only trusted maintainers may author SQL/Mapper
 expressions and plugin code. That boundary limits exposure; it is not a patched
 OGNL version or proof that the vulnerability cannot be reached. Keep its finding
 and ownership in the candidate risk ledger.
+
+
+### Reproducible compatible carrier
+
+`platform/platform-mybatis-compat` builds `com.auraboot:mybatis-compat` at the
+selected platform/library version. It preserves every non-OGNL/non-Javassist
+MyBatis 3.5.19 class byte-for-byte and replaces only the embedded dependencies
+with OGNL 3.4.17 and Javassist 3.33.0-GA under MyBatis's original relocated
+namespaces. This is an AuraBoot vendor build, not an official MyBatis release.
+The module README defines input hashes, provenance, licensing and verification.
+
+Core exports the carrier through its API and BOM; Core and Enterprise exclude
+`org.mybatis:mybatis` from consumer configurations. The carrier's isolated
+upstream input configuration is the sole exception. Lightweight consumers that
+do not depend on Core must select the carrier explicitly. Never ship both JARs
+or overlay selected classes in the application. Application startup and PF4J
+loading verify one colocated implementation and marker, including duplicate
+resources in plugin JARs and directory loaders; verification failure blocks
+startup/loading instead of relying on classpath order.
+
+Carrier tests compare original implementation bytes, demonstrate the advisory's
+harmless reflection PoC against old and repaired inputs, and reject changed
+input hashes. Real PostgreSQL and published-artifact Enterprise consumption
+are separate checks. Every new release candidate must still run the original
+native/OCI security, installation, upgrade, recovery and public-install gates.
+A standalone clean carrier scan is not a release qualification. RC8 evidence
+remains immutable; RC9 is a new candidate and must earn its own result.
+
+The stricter invocation list is secondary protection, not a sandbox for
+untrusted SQL, Mapper expressions or plugin code. Keep existing authoring and
+execution permissions. Once upstream MyBatis-Plus supports a compatible repaired
+upstream carrier, remove the vendor replacement only after the same API,
+plugin, database and distribution checks pass; do not silently mix implementations.
