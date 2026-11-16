@@ -186,7 +186,8 @@ public class InstalledIntegrationService {
     }
 
     @Transactional
-    public void consume(IntegrationEventEnvelope envelope) {
+    public void consume(IntegrationEventEnvelope persisted) {
+        IntegrationEventEnvelope envelope = restoreOriginalTime(persisted);
         String installation = envelope.headers().get("installationPid");
         String source = envelope.headers().get("sourceCode");
         String external = envelope.headers().get("externalEventId");
@@ -263,6 +264,26 @@ public class InstalledIntegrationService {
                     throw new IllegalStateException("Installed command did not complete synchronously");
                 return result.getData();
             }));
+    }
+
+    static final String ORIGINAL_OCCURRED_AT_HEADER = "externalOccurredAt";
+
+    private IntegrationEventEnvelope restoreOriginalTime(IntegrationEventEnvelope persisted) {
+        String value = persisted.headers().get(ORIGINAL_OCCURRED_AT_HEADER);
+        if (value == null) return persisted;
+        try {
+            java.time.Instant original = java.time.Instant.parse(value);
+            // PostgreSQL stores timestamps to microseconds. Preserve the exact
+            // server-owned event time for receipt verification and business facts.
+            java.time.Instant projected = original.plusNanos(500)
+                    .truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+            if (!persisted.occurredAt().equals(original) && !persisted.occurredAt().equals(projected)) throw denied();
+            return new IntegrationEventEnvelope(persisted.schemaVersion(), persisted.eventId(), persisted.eventType(),
+                    persisted.source(), persisted.subject(), original, persisted.tenantId(), persisted.correlationId(),
+                    persisted.causationId(), persisted.orderingKey(), persisted.sequence(), persisted.payload(), persisted.headers());
+        } catch (java.time.DateTimeException failure) {
+            throw denied();
+        }
     }
 
     private void verifyEnvelope(Resolved resolved, IntegrationEventEnvelope event) {

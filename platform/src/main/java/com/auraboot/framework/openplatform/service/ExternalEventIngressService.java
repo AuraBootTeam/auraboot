@@ -104,6 +104,7 @@ public class ExternalEventIngressService {
         if (installed) {
             traceHeaders.put("externalSubjectType",event.subjectType());
             traceHeaders.put("externalSubjectPid",event.subjectPid());
+            traceHeaders.put(InstalledIntegrationService.ORIGINAL_OCCURRED_AT_HEADER,event.occurredAt().toString());
         }
         if (requestId != null && !requestId.isBlank()) {
             traceHeaders.put("requestId", requestId);
