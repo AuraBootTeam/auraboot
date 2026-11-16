@@ -110,13 +110,17 @@ loading verify one colocated implementation and marker, including duplicate
 resources in plugin JARs and directory loaders; verification failure blocks
 startup/loading instead of relying on classpath order.
 
+Core `:test` always includes the carrier security suite, including filtered Core
+regression invocations. Carrier archives normalize file/directory modes to
+0644/0755 so private CI umasks do not change their identity.
+
 Carrier tests compare original implementation bytes, demonstrate the advisory's
 harmless reflection PoC against old and repaired inputs, and reject changed
 input hashes. Real PostgreSQL and published-artifact Enterprise consumption
 are separate checks. Every new release candidate must still run the original
 native/OCI security, installation, upgrade, recovery and public-install gates.
 A standalone clean carrier scan is not a release qualification. RC8 evidence
-remains immutable; RC9 is a new candidate and must earn its own result.
+remains immutable; subsequent candidates must earn their own results.
 
 The stricter invocation list is secondary protection, not a sandbox for
 untrusted SQL, Mapper expressions or plugin code. Keep existing authoring and

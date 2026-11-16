@@ -105,6 +105,9 @@ def provenance = tasks.register('generateCarrierProvenance') {
 }
 
 tasks.named('jar', Jar) {
+    // Build inputs may be materialized under a private CI umask; archive identity must not inherit it.
+    filePermissions { unix('rw-r--r--') }
+    dirPermissions { unix('rwxr-xr-x') }
     dependsOn relocated, provenance
     duplicatesStrategy = DuplicatesStrategy.FAIL
     from({ zipTree(configurations.originalMybatis.singleFile) }) {

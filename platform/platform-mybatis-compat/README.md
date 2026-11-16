@@ -22,6 +22,10 @@ Use the Core API/BOM or depend explicitly on this carrier. Exclude
 plugins or rely on classpath order. Host startup and PF4J plugin loading reject
 split or duplicate implementations through `MybatisCarrierIntegrity`.
 
+The standard Core `:test` task depends on this module's complete security suite,
+including when a caller selects only specific Core tests. Archive file and
+directory modes are fixed to 0644/0755 rather than inherited from the build umask.
+
 The module tests compare implementation bytes, validate metadata and uniqueness,
 execute ordinary expressions and reproduce the advisory's reflection route with
 an isolated classloader and a harmless temporary file. The old input creates the

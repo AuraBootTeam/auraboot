@@ -1303,6 +1303,8 @@ tasks.named('check').configure {
 
 // Core boundary tests inspect the actual plain jar, without agent/app test dependencies.
 tasks.named('test', Test) {
+    // Every selected Core regression also exercises the embedded security carrier contract.
+    dependsOn ':platform-mybatis-compat:test'
     dependsOn 'jar'
     inputs.file tasks.named('jar').flatMap { it.archiveFile }
     systemProperty 'auraboot.core.jar', tasks.named('jar').get().archiveFile.get().asFile.absolutePath
