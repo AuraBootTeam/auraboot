@@ -39,6 +39,7 @@ def relocated = tasks.register('relocateDependencies', ShadowJar) {
 }
 
 def provenance = tasks.register('generateCarrierProvenance') {
+    inputs.property('carrierVersion', project.version.toString())
     inputs.files(configurations.originalMybatis, configurations.relocatedInputs)
     inputs.file('upstream-inputs.json')
     inputs.dir('licenses')

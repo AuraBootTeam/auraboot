@@ -89,6 +89,12 @@ publishing {
     }
 }
 
+// A direct Core publication must include its required implementation dependency.
+// Otherwise isolated Maven consumers receive a valid POM pointing at a missing carrier.
+tasks.withType(org.gradle.api.publish.maven.tasks.PublishToMavenLocal).configureEach {
+    dependsOn ':platform-mybatis-compat:publishMavenJavaPublicationToMavenLocal'
+}
+
 // Multi-worktree pre-flight guard for publishToMavenLocal.
 // Mirrors scripts/lib/multi-worktree-guard.sh — refuses to publish to the
 // shared ~/.m2 cache when ≥ 2 git worktrees are active, since concurrent
