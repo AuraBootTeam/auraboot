@@ -9,6 +9,7 @@ import com.auraboot.framework.meta.mapper.CommandDefinitionMapper;
 import com.auraboot.framework.meta.service.CommandExecutor;
 import com.auraboot.framework.openplatform.mapper.*;
 import com.auraboot.framework.plugin.extension.integration.*;
+import com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension;
 import com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension.Registration;
 import com.auraboot.framework.plugin.pf4j.AuraPluginManager;
 import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
@@ -182,7 +183,10 @@ public class InstalledIntegrationService {
                 return new Acceptance(original.requestPid(), true);
             }
             Map<String,Object> payload = installedPayload(envelope, external);
-            Map<String,Object> data = execute(resolved, resolved.registration().acceptCommand(), payload, null, false, envelope);
+            Map<String,Object> data;
+            try (var machine = com.auraboot.framework.application.security.MachineDataAccessContext.begin(principal)) {
+                data = execute(resolved, resolved.registration().acceptCommand(), payload, null, false, envelope);
+            }
             Object record = data.get("recordPid");
             if (!(record instanceof String pid) || !pid.matches("[A-Za-z0-9_-]{1,100}")
                     || !"accepted".equals(data.get("state"))) throw new IllegalStateException("Invalid native acceptance result");
@@ -209,7 +213,8 @@ public class InstalledIntegrationService {
     }
 
     @Transactional
-    public void consume(IntegrationEventEnvelope envelope) {
+    public void consume(IntegrationEventEnvelope persisted) {
+        IntegrationEventEnvelope envelope = restoreOriginalTime(persisted);
         String installation = envelope.headers().get("installationPid");
         String source = envelope.headers().get("sourceCode");
         String external = envelope.headers().get("externalEventId");
@@ -341,6 +346,10 @@ public class InstalledIntegrationService {
                 CommandExecuteResult result;
                 try { result = executor.execute(code,request); }
                 catch (com.auraboot.framework.exception.BusinessException failure) {
+                    if (code.equals(resolved.registration().acceptCommand())
+                            && failure.getCause() instanceof ExternalEventIngressExtension.RequestValidationException invalid)
+                        throw new ExternalEventIngressService.InvalidExternalEventException("invalid_business_request",
+                                "The business request conflicts with this integration's configured source. Check the listed fields.", invalid.errors());
                     if (code.equals(resolved.registration().acceptCommand()) && resolved.conflictMessageKey() != null
                             && failure.getCause() instanceof com.auraboot.framework.plugin.extension.PluginCommandRejectionException rejection
                             && rejection.code() == com.auraboot.framework.plugin.extension.PluginCommandRejectionException.Code.BUSINESS_RULE_BLOCKED
@@ -352,6 +361,26 @@ public class InstalledIntegrationService {
                     throw new IllegalStateException("Installed command did not complete synchronously");
                 return result.getData();
             }));
+    }
+
+    static final String ORIGINAL_OCCURRED_AT_HEADER = "externalOccurredAt";
+
+    private IntegrationEventEnvelope restoreOriginalTime(IntegrationEventEnvelope persisted) {
+        String value = persisted.headers().get(ORIGINAL_OCCURRED_AT_HEADER);
+        if (value == null) return persisted;
+        try {
+            java.time.Instant original = java.time.Instant.parse(value);
+            // PostgreSQL stores timestamps to microseconds. Preserve the exact
+            // server-owned event time for receipt verification and business facts.
+            java.time.Instant projected = original.plusNanos(500)
+                    .truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+            if (!persisted.occurredAt().equals(original) && !persisted.occurredAt().equals(projected)) throw denied();
+            return new IntegrationEventEnvelope(persisted.schemaVersion(), persisted.eventId(), persisted.eventType(),
+                    persisted.source(), persisted.subject(), original, persisted.tenantId(), persisted.correlationId(),
+                    persisted.causationId(), persisted.orderingKey(), persisted.sequence(), persisted.payload(), persisted.headers());
+        } catch (java.time.DateTimeException failure) {
+            throw denied();
+        }
     }
 
     private void verifyEnvelope(Resolved resolved, IntegrationEventEnvelope event) {

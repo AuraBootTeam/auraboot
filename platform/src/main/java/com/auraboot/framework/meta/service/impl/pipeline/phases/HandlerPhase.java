@@ -891,6 +891,9 @@ public class HandlerPhase implements CommandPhase {
                     throw new com.auraboot.framework.exception.ConflictException(e.getMessage(), e);
                 }
                 // Classification is a public SPI contract, independent of diagnostic text or locale.
+                if (e instanceof com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension.RequestValidationException invalid) {
+                    throw new BusinessException(ResponseCode.BadParam, "Integration business request validation failed", invalid);
+                }
                 if (e instanceof PluginCommandRejectionException rejection) {
                     ResponseCode responseCode = switch (rejection.code()) {
                         case INVALID_ARGUMENT, BUSINESS_RULE_BLOCKED -> ResponseCode.BadParam;

@@ -566,6 +566,21 @@ class HandlerPhaseTest {
     }
 
     @Test
+    void execute_preservesSafeInstalledRequestValidationCause() {
+        var invalid=new com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension.RequestValidationException(
+                List.of(new com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension.FieldError(
+                        "data.context.accountId","conflict","The account does not match the installed source.")));
+        CommandHandlerExtension rejected=new CommandHandlerExtension() {
+            @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+            @Override public Object execute(CommandContext context) { throw invalid; }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(rejected));
+        var ctx=buildContext(BUSINESS_COMMAND_CODE,"pr_purchase_order",Map.of("type","custom","handler",PLUGIN_HANDLER_CODE));
+        assertThatThrownBy(()->phase.execute(ctx)).isInstanceOf(BusinessException.class)
+                .hasMessage("Integration business request validation failed").hasCause(invalid);
+    }
+
+    @Test
     void execute_doesNotTreatDiagnosticTextAsTypedBusinessRejection() {
         IllegalStateException diagnostic = new IllegalStateException("$i18n:inventory.error.quality_hold.issue");
         CommandHandlerExtension rejected = new CommandHandlerExtension() {

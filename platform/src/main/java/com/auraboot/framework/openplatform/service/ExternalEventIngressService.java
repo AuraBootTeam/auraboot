@@ -33,6 +33,11 @@ public class ExternalEventIngressService {
     private final OpenApiProtocolHash protocolHash;
 
     private InstalledIntegrationService installedIntegrations;
+    private ExternalIngressNormalizer normalizer;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setNormalizer(ExternalIngressNormalizer normalizer) { this.normalizer = normalizer; }
+
 
     @org.springframework.beans.factory.annotation.Autowired
     public void setInstalledIntegrations(InstalledIntegrationService installedIntegrations) {
@@ -45,24 +50,41 @@ public class ExternalEventIngressService {
         if (!SOURCE_CODE.matcher(sourceCode).matches()) {
             throw new InvalidExternalEventException("invalid_source_code");
         }
-        if (idempotencyKey != null && !IDEMPOTENCY_KEY.matcher(idempotencyKey).matches())
-            throw new InvalidExternalEventException("invalid_idempotency_key");
         boolean installed = installedIntegrations != null && installedIntegrations.registered(sourceCode);
-        if (!installed && idempotencyKey == null)throw new InvalidExternalEventException("invalid_idempotency_key");
+        boolean defaultsEnabled = normalizer != null && normalizer.supports(sourceCode);
+        if ((!installed && idempotencyKey == null)
+                || idempotencyKey != null && !IDEMPOTENCY_KEY.matcher(idempotencyKey).matches()) {
+            throw new InvalidExternalEventException("invalid_idempotency_key",
+                    "Idempotency-Key must contain 8 to 255 printable ASCII characters when supplied.",
+                    java.util.List.of(new com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension.FieldError(
+                            "Idempotency-Key", "invalid_value", "Use 8 to 255 printable ASCII characters (no spaces or control characters).")));
+        }
         var installation = installationMapper.findByTenantAndPid(
                 principal.tenantId(), principal.installationPid());
         if (installation == null || !"active".equals(installation.getStatus())) {
             throw new InvalidExternalEventException("installation_not_active");
         }
-        ExternalEvent event = installed ? parseInstalled(sourceCode,rawBody) : parse(rawBody);
+        String effectiveBody = defaultsEnabled
+                ? normalizer.normalize(principal.tenantId(), installation.getId(), sourceCode, idempotencyKey, rawBody) : rawBody;
+        ExternalEvent event = installed ? parseInstalled(sourceCode,effectiveBody) : parse(effectiveBody);
         if(idempotencyKey==null) {
-            if(!event.businessRequest())throw new InvalidExternalEventException("invalid_idempotency_key");
-            idempotencyKey="business:"+event.id();
+            if(!defaultsEnabled && !event.businessRequest())throw new InvalidExternalEventException("invalid_idempotency_key");
+            idempotencyKey=(event.businessRequest()?"business:":"event:")+event.id();
         }
         String routeCode = "external-event:" + sourceCode;
         String requestHash = installed && event.businessRequest()
                 ? businessRequestHash(rawBody) : secretCodec.sha256(rawBody);
         boolean verifyStoredReplay = false;
+        if (defaultsEnabled) {
+            try {
+                Map<String, Object> input = objectMapper.readValue(rawBody, new com.fasterxml.jackson.core.type.TypeReference<LinkedHashMap<String, Object>>() { });
+                String canonicalHash = secretCodec.sha256(normalizer.canonical(input));
+                String prior = idempotencyMapper.findRequestHash(principal.tenantId(), installation.getId(), routeCode, idempotencyKey);
+                if (!requestHash.equals(prior)) requestHash = canonicalHash;
+            } catch (com.fasterxml.jackson.core.JsonProcessingException invalid) {
+                throw new InvalidExternalEventException("invalid_event_body");
+            }
+        }
         int claimed = idempotencyMapper.claim(principal.tenantId(), installation.getId(), routeCode,
                 idempotencyKey, requestHash, Instant.now().plusSeconds(86_400));
         if (claimed == 0) {
@@ -101,6 +123,7 @@ public class ExternalEventIngressService {
         if (installed) {
             traceHeaders.put("externalSubjectType",event.subjectType());
             traceHeaders.put("externalSubjectPid",event.subjectPid());
+            traceHeaders.put(InstalledIntegrationService.ORIGINAL_OCCURRED_AT_HEADER,event.occurredAt().toString());
         }
         if (requestId != null && !requestId.isBlank()) {
             traceHeaders.put("requestId", requestId);
@@ -281,8 +304,34 @@ public class ExternalEventIngressService {
     }
 
     public static class InvalidExternalEventException extends RuntimeException {
-        public InvalidExternalEventException(String message) {
-            super(message);
+        private final String code;
+        private final java.util.List<com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension.FieldError> errors;
+        private final String explanation;
+        public InvalidExternalEventException(String code) {
+            this(code, "Request validation failed. Check the field constraints in the API documentation.",
+                    java.util.List.of(new com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension.FieldError(
+                            fieldFor(code), code, "The supplied value is missing, invalid or not supported.")));
+        }
+        public InvalidExternalEventException(String code, String explanation,
+                java.util.List<com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension.FieldError> errors) {
+            super(code); this.code = code; this.explanation = explanation; this.errors = java.util.List.copyOf(errors);
+        }
+        public String code() { return code; }
+        public String explanation() { return explanation; }
+        public java.util.List<com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension.FieldError> errors() { return errors; }
+        private static String fieldFor(String code) {
+            return switch (code) {
+                case "invalid_idempotency_key" -> "Idempotency-Key";
+                case "invalid_source_code" -> "sourceCode";
+                case "invalid_schema_version" -> "schemaVersion";
+                case "invalid_occurred_at" -> "occurredAt";
+                case "invalid_sequence" -> "sequence";
+                case "invalid_id" -> "id";
+                case "invalid_event_type", "invalid_type" -> "type";
+                case "invalid_subject", "invalid_pid" -> "subject";
+                case "invalid_data" -> "data";
+                default -> "$";
+            };
         }
     }
 

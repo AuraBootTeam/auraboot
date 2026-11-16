@@ -54,6 +54,49 @@ class ExternalEventIngressServiceTest {
     void clearTrace() { MDC.remove("requestId"); }
 
     @Test
+    void installedProviderDefaultsReachAcceptanceAndReturnTheCompleteReceipt() {
+        var installed = mock(InstalledIntegrationService.class);
+        var normalizer = mock(ExternalIngressNormalizer.class);
+        service.setInstalledIntegrations(installed);
+        service.setNormalizer(normalizer);
+        when(installed.registered("erp")).thenReturn(true);
+        when(normalizer.supports("erp")).thenReturn(true);
+        String raw = "{\"data\":{\"amount\":10}}";
+        when(normalizer.normalize(42L, 9L, "erp", null, raw)).thenReturn(strictBody());
+        when(normalizer.canonical(any())).thenReturn(raw);
+        when(idempotencyMapper.claim(anyLong(), anyLong(), anyString(), anyString(), anyString(), any())).thenReturn(1);
+        when(idempotencyMapper.complete(anyLong(), anyLong(), anyString(), anyString(), anyString(), anyString())).thenReturn(1);
+        when(installed.accept(eq(principal), eq("erp"), any())).thenReturn(new InstalledIntegrationService.Acceptance("receipt-pid", false));
+        var result = service.accept(principal, "erp", null, raw);
+        assertEquals(java.util.Map.of("eventId", "evt-1", "recordPid", "receipt-pid", "duplicate", false), result.publicReceipt());
+        var envelope = ArgumentCaptor.forClass(IntegrationEventEnvelope.class);
+        verify(installed).accept(eq(principal), eq("erp"), envelope.capture());
+        assertEquals("external.erp.order.created.v1", envelope.getValue().eventType());
+        assertEquals(java.util.Map.of("amount", 10), envelope.getValue().payload());
+        verify(idempotencyMapper).claim(eq(42L), eq(9L), eq("external-event:erp"), eq("event:evt-1"), anyString(), any());
+        verify(installed, never()).prepareBusinessRequest(anyString(), any());
+    }
+
+    @Test
+    void providerFieldErrorsStopBeforeClaimOrEnqueue() {
+        var installed = mock(InstalledIntegrationService.class);
+        var normalizer = mock(ExternalIngressNormalizer.class);
+        service.setInstalledIntegrations(installed);
+        service.setNormalizer(normalizer);
+        when(installed.registered("erp")).thenReturn(true);
+        when(normalizer.supports("erp")).thenReturn(true);
+        var errors = java.util.List.of(new com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension.FieldError(
+                "data.orderIds", "required", "The order identities are required."));
+        when(normalizer.normalize(42L, 9L, "erp", null, "{}"))
+                .thenThrow(new ExternalEventIngressService.InvalidExternalEventException("invalid_business_request", "Correct the listed fields.", errors));
+        var failure = assertThrows(ExternalEventIngressService.InvalidExternalEventException.class,
+                () -> service.accept(principal, "erp", null, "{}"));
+        assertEquals(errors, failure.errors());
+        org.mockito.Mockito.verifyNoInteractions(idempotencyMapper, accessor);
+        verify(installed, never()).accept(any(), anyString(), any());
+    }
+
+    @Test
     void claimsIdempotencyAndEnqueuesTenantBoundReliableEnvelope() {
         assertEquals("invalid_source_code", assertThrows(ExternalEventIngressService.InvalidExternalEventException.class,
                 () -> service.accept(principal, "ERP", "idempotency-0001", body("evt-1"))).getMessage());
@@ -136,6 +179,20 @@ class ExternalEventIngressServiceTest {
         assertEquals("order",envelope.getValue().headers().get("externalSubjectType"));
         assertEquals("ord_1",envelope.getValue().headers().get("externalSubjectPid"));
         sequence.verify(idempotencyMapper).complete(anyLong(),anyLong(),anyString(),anyString(),anyString(),anyString());
+    }
+
+    @Test
+    void installedIngressPreservesExactCallerTimeInHostOwnedTransportMetadata() {
+        var installed=mock(InstalledIntegrationService.class);service.setInstalledIntegrations(installed);
+        when(installed.registered("erp")).thenReturn(true);
+        when(installed.accept(eq(principal),eq("erp"),any())).thenReturn(new InstalledIntegrationService.Acceptance("request-pid",false));
+        when(idempotencyMapper.claim(anyLong(),anyLong(),anyString(),anyString(),anyString(),any())).thenReturn(1);
+        when(idempotencyMapper.complete(anyLong(),anyLong(),anyString(),anyString(),anyString(),anyString())).thenReturn(1);
+        String original="2026-09-14T08:00:00.123456789Z";
+        service.accept(principal,"erp","time-precision-key",strictBody().replace("2026-09-14T08:00:00Z",original));
+        var envelope=ArgumentCaptor.forClass(IntegrationEventEnvelope.class);verify(accessor).enqueue(envelope.capture());
+        assertEquals(java.time.Instant.parse(original),envelope.getValue().occurredAt());
+        assertEquals(original,envelope.getValue().headers().get(InstalledIntegrationService.ORIGINAL_OCCURRED_AT_HEADER));
     }
 
     @Test

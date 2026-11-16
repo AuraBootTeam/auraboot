@@ -48,6 +48,18 @@ public class InstalledIntegrationRegistry {
         return result;
     }
 
+    public Optional<ExternalEventIngressExtension.RequestNormalizer> requestNormalizer(String source) {
+        var current = registration(source);
+        if (current.isEmpty()) return Optional.empty();
+        var matches = plugins.getExtensionsOfType(ExternalEventIngressExtension.class).stream()
+                .filter(extension -> source.equals(extension.registration().sourceCode())).toList();
+        if (matches.size() != 1 || !current.get().getKey().equals(matches.getFirst().registration())) throw denied();
+        var artifact = plugins.observeLoadedArtifact(matches.getFirst().getClass()).orElseThrow(InstalledIntegrationRegistry::denied);
+        if (!artifact.digest().equals(current.get().getValue())
+                || !artifact.pluginId().equals(current.get().getKey().providerPluginId())) throw denied();
+        return Objects.requireNonNull(matches.getFirst().requestNormalizer());
+    }
+
     public Set<Registration> completedReceiptRegistrations(String source) {
         var current = registration(source).orElseThrow(InstalledIntegrationRegistry::denied).getKey();
         var matches = plugins.getExtensionsOfType(ExternalEventIngressExtension.class).stream()
