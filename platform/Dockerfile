@@ -21,6 +21,8 @@ ARG BUILD_JDK_IMAGE=eclipse-temurin:21-jdk
 ARG RUNTIME_JRE_IMAGE=eclipse-temurin:21-jre-alpine@sha256:ac05c3c42b7c2f1a52c9bd52f01041fa1958231b15ebeae7420429cbc5baf474
 FROM ${BUILD_JDK_IMAGE} AS builder
 ARG AURA_GRADLE_REPOSITORY_POLICY=project
+# Optional HTTPS mirror for all dependency configurations, including child modules.
+ARG AURA_GRADLE_MIRROR_URL=
 
 WORKDIR /app
 
@@ -81,6 +83,7 @@ RUN --mount=type=cache,target=/root/.gradle/wrapper \
     --mount=type=cache,target=/root/.gradle/caches \
     --mount=type=cache,target=/root/.m2/repository,id=aura-m2,sharing=locked \
     AURA_GRADLE_REPOSITORY_POLICY="$AURA_GRADLE_REPOSITORY_POLICY" \
+    AURA_GRADLE_MIRROR_URL="$AURA_GRADLE_MIRROR_URL" \
     ./gradlew --init-script /opt/aura-ci/gradle-repositories.init.gradle dependencies --no-daemon --no-parallel --max-workers=2 \
     "-Dorg.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8" || true
 
@@ -108,6 +111,7 @@ RUN --mount=type=cache,target=/root/.gradle/wrapper \
     --mount=type=cache,target=/root/.gradle/caches \
     --mount=type=cache,target=/root/.m2/repository,id=aura-m2,sharing=locked \
     AURA_GRADLE_REPOSITORY_POLICY="$AURA_GRADLE_REPOSITORY_POLICY" \
+    AURA_GRADLE_MIRROR_URL="$AURA_GRADLE_MIRROR_URL" \
     ./gradlew --init-script /opt/aura-ci/gradle-repositories.init.gradle :platform-plugin-api:publishToMavenLocal bootJar --no-daemon -x test --no-parallel --max-workers=2 \
     "-Dorg.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8"
 

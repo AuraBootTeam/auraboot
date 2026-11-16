@@ -28,7 +28,33 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+def reviewedInputs = {
+    def lock = new JsonSlurper().parse(file('upstream-inputs.json'))
+    def records = (configurations.originalMybatis.resolvedConfiguration.resolvedArtifacts +
+        configurations.relocatedInputs.resolvedConfiguration.resolvedArtifacts).collect { artifact ->
+        [coordinate: artifact.moduleVersion.id.toString(),
+         sha256: MessageDigest.getInstance('SHA-256').digest(artifact.file.bytes).encodeHex().toString()]
+    }.sort { it.coordinate }
+    if (records != lock.inputs) throw new GradleException('Carrier upstream input digest differs from reviewed source lock')
+    lock.licenses.each { license ->
+        def source = file("licenses/${license.path}")
+        if (MessageDigest.getInstance('SHA-256').digest(source.bytes).encodeHex().toString() != license.sha256) {
+            throw new GradleException('Carrier upstream license differs from reviewed source lock')
+        }
+    }
+    [lock: lock, records: records]
+}
+
+def verifiedInputs = tasks.register('verifyCarrierInputs') {
+    inputs.files(configurations.originalMybatis, configurations.relocatedInputs)
+    inputs.file('upstream-inputs.json')
+    inputs.dir('licenses')
+    // Run before any archive relocation, manifest reading or license extraction.
+    doLast { reviewedInputs() }
+}
+
 def relocated = tasks.register('relocateDependencies', ShadowJar) {
+    dependsOn verifiedInputs
     archiveClassifier = 'relocated-inputs'
     configurations = [project.configurations.relocatedInputs]
     relocate 'ognl', 'org.apache.ibatis.ognl'
@@ -39,6 +65,7 @@ def relocated = tasks.register('relocateDependencies', ShadowJar) {
 }
 
 def provenance = tasks.register('generateCarrierProvenance') {
+    dependsOn verifiedInputs
     inputs.property('carrierVersion', project.version.toString())
     inputs.files(configurations.originalMybatis, configurations.relocatedInputs)
     inputs.file('upstream-inputs.json')
@@ -46,10 +73,12 @@ def provenance = tasks.register('generateCarrierProvenance') {
     def destination = layout.buildDirectory.dir('carrier-provenance')
     outputs.dir(destination)
     doLast {
+        def reviewed = reviewedInputs()
+        def lock = reviewed.lock
+        def records = reviewed.records
         def dir = destination.get().asFile
         delete dir
         dir.mkdirs()
-        def lock = new JsonSlurper().parse(file('upstream-inputs.json'))
         new ZipFile(configurations.originalMybatis.singleFile).withCloseable { zip ->
             def upstream = new java.util.jar.Manifest(zip.getInputStream(zip.getEntry('META-INF/MANIFEST.MF')))
             def retained = new java.util.jar.Manifest()
@@ -59,26 +88,27 @@ def provenance = tasks.register('generateCarrierProvenance') {
             }
             new File(dir, 'source-manifest.mf').withOutputStream { retained.write(it) }
         }
-        def records = (configurations.originalMybatis.resolvedConfiguration.resolvedArtifacts +
-            configurations.relocatedInputs.resolvedConfiguration.resolvedArtifacts).collect { artifact ->
+        (configurations.originalMybatis.resolvedConfiguration.resolvedArtifacts +
+            configurations.relocatedInputs.resolvedConfiguration.resolvedArtifacts).each { artifact ->
             new ZipFile(artifact.file).withCloseable { zip ->
                 zip.entries().each { entry ->
                     if (!entry.directory && entry.name.tokenize('/').last() ==~ /(?i)(LICENSE|NOTICE|COPYING).*/) {
-                        def target = new File(dir, "licenses/${artifact.name}-${artifact.moduleVersion.id.version}/${entry.name}")
+                        def base = new File(dir, "licenses/${artifact.name}-${artifact.moduleVersion.id.version}")
+                            .toPath().toAbsolutePath().normalize()
+                        def targetPath = base.resolve(entry.name).normalize()
+                        if (entry.name.contains('\\') || entry.name.startsWith('/')
+                                || entry.name ==~ /^[A-Za-z]:.*/ || !targetPath.startsWith(base)) {
+                            throw new GradleException('Carrier license entry escapes its reviewed input directory')
+                        }
+                        def target = targetPath.toFile()
                         target.parentFile.mkdirs()
                         target.bytes = zip.getInputStream(entry).bytes
                     }
                 }
             }
-            [coordinate: artifact.moduleVersion.id.toString(),
-             sha256: MessageDigest.getInstance('SHA-256').digest(artifact.file.bytes).encodeHex().toString()]
-        }.sort { it.coordinate }
-        if (records != lock.inputs) throw new GradleException('Carrier upstream input digest differs from reviewed source lock')
+        }
         lock.licenses.each { license ->
             def source = file("licenses/${license.path}")
-            if (MessageDigest.getInstance('SHA-256').digest(source.bytes).encodeHex().toString() != license.sha256) {
-                throw new GradleException('Carrier upstream license differs from reviewed source lock')
-            }
             def target = new File(dir, "licenses/${license.path}")
             target.parentFile.mkdirs()
             target.bytes = source.bytes
@@ -156,7 +186,28 @@ afterEvaluate {
     }
 }
 
+def inputSecurity = tasks.register('verifyCarrierBuildInputSecurity', Exec) {
+    dependsOn tasks.named('jar')
+    def script = rootProject.file('../scripts/ci/verify-carrier-build-inputs.py')
+    def conventions = rootProject.file('gradle/java-conventions.gradle')
+    def output = layout.buildDirectory.dir('input-security-verification')
+    inputs.files(script, conventions, 'build.gradle', 'gradle.lockfile', 'NOTICE.auraboot', 'upstream-inputs.json')
+    inputs.dir('licenses')
+    inputs.property('carrierVersion', project.version.toString())
+    inputs.file(tasks.named('jar').flatMap { it.archiveFile })
+    outputs.file(output.map { it.file('result.json') })
+    doFirst {
+        commandLine(System.getenv('AURA_TEST_PYTHON') ?: 'python3', script.absolutePath,
+            '--module', projectDir.absolutePath, '--conventions', conventions.absolutePath,
+            '--gradle', new File(gradle.gradleHomeDir, 'bin/gradle').absolutePath,
+            '--gradle-home', gradle.gradleUserHomeDir.absolutePath, '--version', project.version.toString(),
+            '--expected-jar', tasks.named('jar').get().archiveFile.get().asFile.absolutePath,
+            '--output', output.get().asFile.absolutePath)
+    }
+}
+
 tasks.named('test', Test) {
+    dependsOn inputSecurity
     dependsOn tasks.named('jar')
     doFirst {
         systemProperty 'carrier.original', configurations.originalMybatis.singleFile.absolutePath
