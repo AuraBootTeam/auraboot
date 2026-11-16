@@ -43,6 +43,29 @@ final class InstalledIntegrationCommandFingerprint {
         return result;
     }
 
+    static List<Map<String,String>> beforeProcessReadAdditions(ObjectMapper json,Map<String,String> configs,
+            String processCommand,java.util.Set<String> additions,Map<String,java.util.Set<String>> fieldAdditions,
+            boolean scopedSecretReadAdded) {
+        var candidates=new ArrayList<>(beforeProcessReadAdditions(json,configs,processCommand,additions,fieldAdditions));
+        if(!scopedSecretReadAdded || !configs.containsKey(processCommand))return List.copyOf(candidates);
+        var bases=new ArrayList<>(candidates);bases.add(configs);
+        for(var base:bases) {
+            var process=object(json,base.get(processCommand));
+            if(!(process.path("handlerParams") instanceof ObjectNode params) || !params.path("tenantSecretRead").isBoolean()
+                    || !params.path("tenantSecretRead").asBoolean() || !boundedSecretNames(params.path("tenantSecretFields"))
+                    || !boundedSecretNames(params.path("tenantSecretServiceTypes")))continue;
+            params.remove(java.util.List.of("tenantSecretRead","tenantSecretFields","tenantSecretServiceTypes"));
+            var previous=new LinkedHashMap<>(base);previous.put(processCommand,process.toString());candidates.add(Map.copyOf(previous));
+        }
+        return List.copyOf(candidates);
+    }
+    private static boolean boundedSecretNames(JsonNode values) {
+        if(!values.isArray() || values.isEmpty() || values.size()>32)return false;
+        var seen=new java.util.HashSet<String>();
+        for(var value:values)if(!value.isTextual() || !value.asText().matches("[A-Za-z][A-Za-z0-9_]{0,63}") || !seen.add(value.asText()))return false;
+        return true;
+    }
+
     /** Reconstruct only provider-declared process read additions. Every other command byte/field
      * remains part of the digest; callers may use these candidates only for completed receipts.
      */

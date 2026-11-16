@@ -151,4 +151,18 @@ class InstalledIntegrationRegistryTest {
         assertThrows(SecurityException.class,()->registry.completedReceiptProcessReadAdditions(registration,digest));
     }
 
+    @Test void scopedSecretReadCompatibilityRequiresExplicitCurrentArtifactOptIn() {
+        var provider=mock(ExternalEventIngressExtension.class);when(provider.registration()).thenReturn(registration);
+        when(plugins.getExtensionsOfType(ExternalEventIngressExtension.class)).thenReturn(List.of(provider));
+        String digest="sha256:"+"a".repeat(64);
+        when(plugins.observeLoadedArtifact(provider.getClass())).thenReturn(Optional.of(
+                new AuraPluginManager.LoadedPluginArtifact(registration.providerPluginId(),Path.of("provider.jar"),digest)));
+        var registry=new InstalledIntegrationRegistry(plugins);
+        assertFalse(registry.completedReceiptProcessSecretReadAddition(registration,digest));
+        when(provider.completedReceiptProcessSecretReadAddition()).thenReturn(true);
+        assertTrue(registry.completedReceiptProcessSecretReadAddition(registration,digest));
+        assertThrows(SecurityException.class,()->registry.completedReceiptProcessSecretReadAddition(registration,"sha256:"+"b".repeat(64)));
+        when(plugins.getExtensionsOfType(ExternalEventIngressExtension.class)).thenReturn(List.of(provider,provider));
+        assertThrows(SecurityException.class,()->registry.completedReceiptProcessSecretReadAddition(registration,digest));
+    }
 }

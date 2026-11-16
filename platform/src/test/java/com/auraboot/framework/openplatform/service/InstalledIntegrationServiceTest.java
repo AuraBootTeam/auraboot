@@ -838,4 +838,23 @@ class InstalledIntegrationServiceTest {
         assertThrows(SecurityException.class,()->reader.create("model",Map.of()));assertThrows(SecurityException.class,()->reader.update("model","pid",Map.of()));
         verify(delegate,never()).create(anyString(),anyMap());verify(delegate,never()).update(anyString(),anyString(),anyMap());
     }
+    @Test void scopedSecretReadAdditionKeepsOnlyTerminalHistoricalReceiptsCompatible() throws Exception {
+        service.accept(principal,source,event());var original=acceptedReceipt();
+        var completed=receiptWith(original,"completed","request-pid",original.bindingSha256(),original.commandSha256());
+        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(completed);when(receipts.claim(any())).thenReturn(0);
+        var processConfig=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(metadata.get(process).getExecutionConfig());
+        var params=(com.fasterxml.jackson.databind.node.ObjectNode)processConfig.get("handlerParams");
+        params.put("tenantSecretRead",true);params.putArray("tenantSecretFields").add("appSecret").add("password");params.putArray("tenantSecretServiceTypes").add("integration");
+        metadata.get(process).setExecutionConfig(processConfig.toString());upgradeProvider();clearInvocations(executor);
+        assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"));
+        when(registry.completedReceiptProcessSecretReadAddition(eq(registration),anyString())).thenReturn(true);
+        when(executor.execute(eq(result),any())).thenReturn(CommandExecuteResult.builder().phaseReached("completed").data(Map.of("recordPid","request-pid","state","completed")).build());
+        assertEquals("request-pid",service.result(principal,source,"evt-1").get("recordPid"));clearInvocations(executor);
+        assertTrue(service.accept(principal,source,event()).duplicate());service.consume(event());verifyNoInteractions(executor);
+        for(String state:List.of("accepted","failed","accepting")) {
+            when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(receiptWith(original,state,"request-pid",original.bindingSha256(),original.commandSha256()));
+            assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"),state);
+            assertThrows(SecurityException.class,()->service.consume(event()),state);
+        }
+    }
 }

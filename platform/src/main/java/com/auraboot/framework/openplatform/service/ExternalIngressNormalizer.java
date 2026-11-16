@@ -77,6 +77,12 @@ public class ExternalIngressNormalizer {
         return chosen;
     }
 
+    /** Distinguish a current normalized replay from a receipt accepted before provider defaults existed. */
+    public boolean hasStoredDefaults(long tenant, long installation, String source, String header, String eventId) {
+        return header != null && records.find(tenant, installation, source, "header", codec.sha256(header)) != null
+                || eventId != null && records.find(tenant, installation, source, "event", codec.sha256(eventId)) != null;
+    }
+
     /** Canonical object ordering; array order, explicit nulls, types and omitted fields remain significant. */
     public String canonical(Map<String, Object> value) { return encode(sorted(value)); }
     private Object sorted(Object value) {

@@ -76,6 +76,9 @@ class ExternalIngressDefaultsPostgresIT {
         String replay = accept("stable-key-001", "{ \"data\": {\"a\":1,\"b\":2} }");
         assertEquals(json.readTree(first), json.readTree(replay));
         assertNotNull(json.readTree(first).get("id")); assertNotNull(json.readTree(first).get("occurredAt")); assertEquals(1, count());
+        assertTrue(service().hasStoredDefaults(tenant, installation, SOURCE, "stable-key-001", null));
+        assertFalse(service().hasStoredDefaults(tenant + 1, installation, SOURCE, "stable-key-001", null));
+        assertFalse(service().hasStoredDefaults(tenant, installation, SOURCE, "not-yet-stored", null));
     }
     @Test void sameKeyChangedPayloadIsConflictAndDoesNotOverwrite() throws Exception {
         String first = accept("stable-key-002", "{\"data\":1}");

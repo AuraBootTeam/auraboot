@@ -64,6 +64,10 @@ public class ExternalEventIngressService {
         if (installation == null || !"active".equals(installation.getStatus())) {
             throw new InvalidExternalEventException("installation_not_active");
         }
+        if (installed && defaultsEnabled) {
+            var replay = retainedBusinessReplay(principal, installation.getId(), sourceCode, idempotencyKey, rawBody);
+            if (replay != null) return replay;
+        }
         String effectiveBody = defaultsEnabled
                 ? normalizer.normalize(principal.tenantId(), installation.getId(), sourceCode, idempotencyKey, rawBody) : rawBody;
         ExternalEvent event = installed ? parseInstalled(sourceCode,effectiveBody) : parse(effectiveBody);
@@ -111,30 +115,7 @@ public class ExternalEventIngressService {
                 return new IngressResult(event.id(), true);
         }
 
-        String durableEventId = "ext:" + principal.installationPid() + ":"
-                + (installedIntegrations != null && installedIntegrations.registered(sourceCode) ? sourceCode+":" : "") + event.id();
-        String publicEventType = "external." + sourceCode + "." + event.type() + ".v" + event.schemaVersion();
-        String requestId = MDC.get("requestId");
-        Map<String, String> traceHeaders = new LinkedHashMap<>(Map.of(
-                "applicationPid", principal.applicationPid(),
-                "installationPid", principal.installationPid(),
-                "sourceCode", sourceCode,
-                "externalEventId", event.id()));
-        if (installed) {
-            traceHeaders.put("externalSubjectType",event.subjectType());
-            traceHeaders.put("externalSubjectPid",event.subjectPid());
-            traceHeaders.put(InstalledIntegrationService.ORIGINAL_OCCURRED_AT_HEADER,event.occurredAt().toString());
-        }
-        if (requestId != null && !requestId.isBlank()) {
-            traceHeaders.put("requestId", requestId);
-        }
-        IntegrationEventEnvelope envelope = new IntegrationEventEnvelope(
-                "1.0", durableEventId, publicEventType,
-                "open-platform/" + principal.installationPid() + "/" + sourceCode,
-                event.subjectType() + "/" + event.subjectPid(), event.occurredAt(), principal.tenantId(),
-                requestId == null || requestId.isBlank() ? durableEventId : requestId,
-                null, event.subjectType() + "/" + event.subjectPid(),
-                event.sequence(), event.data(), traceHeaders);
+        IntegrationEventEnvelope envelope = envelope(principal, sourceCode, event, installed);
         InstalledIntegrationService.Acceptance acceptance = null;
         if (verifyStoredReplay) {
             acceptance = installedIntegrations.verifyAcceptedReplay(principal, sourceCode, envelope);
@@ -156,6 +137,60 @@ public class ExternalEventIngressService {
         }
         return new IngressResult(event.id(), acceptance != null && acceptance.duplicate(),
                 acceptance == null ? null : acceptance.recordPid(),event.businessRequest(),event.callerIdProvided());
+    }
+
+    private IntegrationEventEnvelope envelope(MachinePrincipal principal, String sourceCode, ExternalEvent event, boolean installed) {
+        String durableEventId = "ext:" + principal.installationPid() + ":"
+                + (installed ? sourceCode+":" : "") + event.id();
+        String publicEventType = "external." + sourceCode + "." + event.type() + ".v" + event.schemaVersion();
+        String requestId = MDC.get("requestId");
+        Map<String, String> traceHeaders = new LinkedHashMap<>(Map.of(
+                "applicationPid", principal.applicationPid(),
+                "installationPid", principal.installationPid(),
+                "sourceCode", sourceCode,
+                "externalEventId", event.id()));
+        if (installed) {
+            traceHeaders.put("externalSubjectType",event.subjectType());
+            traceHeaders.put("externalSubjectPid",event.subjectPid());
+            traceHeaders.put(InstalledIntegrationService.ORIGINAL_OCCURRED_AT_HEADER,event.occurredAt().toString());
+        }
+        if (requestId != null && !requestId.isBlank()) {
+            traceHeaders.put("requestId", requestId);
+        }
+        return new IntegrationEventEnvelope(
+                "1.0", durableEventId, publicEventType,
+                "open-platform/" + principal.installationPid() + "/" + sourceCode,
+                event.subjectType() + "/" + event.subjectPid(), event.occurredAt(), principal.tenantId(),
+                requestId == null || requestId.isBlank() ? durableEventId : requestId,
+                null, event.subjectType() + "/" + event.subjectPid(),
+                event.sequence(), event.data(), traceHeaders);
+    }
+
+    /** Read-only verification of an already accepted business receipt; never authorize a new legacy execution. */
+    private IngressResult retainedBusinessReplay(MachinePrincipal principal, long installationId,
+            String sourceCode, String header, String rawBody) {
+        try {
+            JsonNode root = objectMapper.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                    .with(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION).readTree(rawBody);
+            if (root == null || !root.isObject() || root.has("type")) return null;
+            String callerId = root.path("id").isTextual() ? root.path("id").asText() : null;
+            if (normalizer.hasStoredDefaults(principal.tenantId(), installationId, sourceCode, header, callerId)) return null;
+            String key = header;
+            if (key == null && root.path("id").isTextual()) key = "business:" + root.path("id").asText();
+            if (key == null) return null;
+            var stored = idempotencyMapper.findResponse(principal.tenantId(), installationId, "external-event:" + sourceCode, key);
+            String originalId = completedEventId(stored);
+            if (originalId == null) return null;
+            ExternalEvent original;
+            try { original = parseBusiness(sourceCode, root); }
+            catch (InvalidExternalEventException notLegacyBusiness) { return null; }
+            if (original.callerIdProvided() && !originalId.equals(original.id())) throw new IdempotencyConflictException();
+            var accepted = installedIntegrations.verifyAcceptedReplay(principal, sourceCode,
+                    envelope(principal, sourceCode, original.withId(originalId), true));
+            if (accepted == null || accepted.recordPid() == null || accepted.recordPid().isBlank())
+                throw new IllegalStateException("Business replay receipt missing");
+            return new IngressResult(originalId, true, accepted.recordPid(), true, original.callerIdProvided());
+        } catch (com.fasterxml.jackson.core.JsonProcessingException invalidJson) { return null; }
     }
 
     private String businessRequestHash(String rawBody) {

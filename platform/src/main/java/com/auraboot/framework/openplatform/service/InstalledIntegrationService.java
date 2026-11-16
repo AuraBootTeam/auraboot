@@ -147,7 +147,8 @@ public class InstalledIntegrationService {
         var readFieldAdditions=registry.completedReceiptProcessReadFieldAdditions(registration,entry.getValue());
         var declarations=new HashSet<>(previousRegistrations);declarations.add(registration);
         for(var previous:InstalledIntegrationCommandFingerprint.beforeProcessReadAdditions(
-                json,configs,registration.processCommand(),readAdditions,readFieldAdditions)) {
+                json,configs,registration.processCommand(),readAdditions,readFieldAdditions,
+                registry.completedReceiptProcessSecretReadAddition(registration,entry.getValue()))) {
             for(var declaration:declarations) {
                 previousReadHashes.add(commandHash(declaration,previous));
                 previousReadHashes.add(scopedCommandHash(declaration,previous,principal.installationPid()));

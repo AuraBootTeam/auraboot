@@ -43,6 +43,11 @@ public interface ExternalEventIngressExtension extends ExtensionPoint {
      */
     default Map<String,Set<String>> completedReceiptProcessReadFieldAdditions() { return Map.of(); }
 
+    /** Explicit opt-in for verifying terminal receipts from before this process gained scoped secret reads.
+     * Reconstructs only the missing secret-read declaration; never executes old or unfinished work.
+     */
+    default boolean completedReceiptProcessSecretReadAddition() { return false; }
+
     /** Opt-in request defaults owned by the provider, before durable acceptance. */
     default java.util.Optional<RequestNormalizer> requestNormalizer() { return java.util.Optional.empty(); }
 

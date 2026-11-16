@@ -97,6 +97,44 @@ class ExternalEventIngressServiceTest {
     }
 
     @Test
+    void retainedBusinessReplayIsReadOnlyBeforeCurrentNormalization() {
+        var installed = businessProvider();
+        var normalizer = mock(ExternalIngressNormalizer.class); service.setNormalizer(normalizer);
+        when(normalizer.supports("erp")).thenReturn(true);
+        String raw = businessBody().replace("{\"occurredAt\"", "{\"id\":\"retained-id\",\"occurredAt\"");
+        when(idempotencyMapper.findResponse(42L, 9L, "external-event:erp", "business:retained-id")).thenReturn(
+                new OpenApiIdempotencyMapper.StoredResponse(codec.sha256(raw), "completed", 202,
+                        "{\"eventId\":\"retained-id\",\"accepted\":true}", null, null, null, null));
+        when(installed.verifyAcceptedReplay(eq(principal), eq("erp"), any()))
+                .thenReturn(new InstalledIntegrationService.Acceptance("retained-pid", true));
+        assertEquals(java.util.Map.of("eventId", "retained-id", "recordPid", "retained-pid"),
+                service.accept(principal, "erp", null, raw).publicReceipt());
+        verify(normalizer, never()).normalize(anyLong(), anyLong(), anyString(), any(), anyString());
+        verify(idempotencyMapper, never()).claim(anyLong(), anyLong(), anyString(), anyString(), anyString(), any());
+        verify(installed, never()).accept(any(), anyString(), any());
+        verify(accessor, never()).enqueue(any());
+    }
+
+    @Test
+    void changedRetainedBusinessConflictsBeforeNormalization() {
+        var installed = businessProvider();
+        var normalizer = mock(ExternalIngressNormalizer.class); service.setNormalizer(normalizer);
+        when(normalizer.supports("erp")).thenReturn(true);
+        String raw = businessBody();
+        when(idempotencyMapper.findResponse(42L, 9L, "external-event:erp", "stable-header")).thenReturn(
+                new OpenApiIdempotencyMapper.StoredResponse("old-hash", "completed", 202,
+                        "{\"eventId\":\"retained-id\",\"accepted\":true}", null, null, null, null));
+        when(installed.verifyAcceptedReplay(eq(principal), eq("erp"), any()))
+                .thenThrow(new ExternalEventIngressService.IdempotencyConflictException());
+        when(normalizer.normalize(42L, 9L, "erp", "stable-header", raw))
+                .thenThrow(new ExternalEventIngressService.InvalidExternalEventException("invalid_business_request"));
+        assertThrows(ExternalEventIngressService.IdempotencyConflictException.class,
+                () -> service.accept(principal, "erp", "stable-header", raw));
+        verify(installed, never()).accept(any(), anyString(), any());
+        verify(accessor, never()).enqueue(any());
+    }
+
+    @Test
     void claimsIdempotencyAndEnqueuesTenantBoundReliableEnvelope() {
         assertEquals("invalid_source_code", assertThrows(ExternalEventIngressService.InvalidExternalEventException.class,
                 () -> service.accept(principal, "ERP", "idempotency-0001", body("evt-1"))).getMessage());

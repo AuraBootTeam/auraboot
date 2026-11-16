@@ -194,4 +194,19 @@ class InstalledIntegrationCommandFingerprintTest {
         }
     }
 
+    @Test void explicitScopedSecretReadPredecessorPinsAllOtherAuthority() throws Exception {
+        var original=commands(config("own"));var node=(ObjectNode)json.readTree(original.get("process"));
+        var params=(ObjectNode)node.get("handlerParams");params.put("tenantSecretRead",true);
+        params.putArray("tenantSecretFields").add("appSecret").add("password");params.putArray("tenantSecretServiceTypes").add("integration");
+        params.putObject("installedMachineData").putObject("native_order").putArray("update").add("quantity");
+        var current=new LinkedHashMap<>(original);current.put("process",node.toString());
+        assertTrue(InstalledIntegrationCommandFingerprint.beforeProcessReadAdditions(json,current,"process",java.util.Set.of(),Map.of(),false).isEmpty());
+        var candidates=InstalledIntegrationCommandFingerprint.beforeProcessReadAdditions(json,current,"process",java.util.Set.of(),Map.of(),true);
+        assertEquals(1,candidates.size());var previous=json.readTree(candidates.getFirst().get("process"));
+        assertFalse(previous.at("/handlerParams").has("tenantSecretRead"));
+        assertEquals(node.at("/handlerParams/installedMachineData"),previous.at("/handlerParams/installedMachineData"));
+        assertEquals(current.get("accept"),candidates.getFirst().get("accept"));assertEquals(current.get("result"),candidates.getFirst().get("result"));
+        params.put("tenantSecretFields","*");current.put("process",node.toString());
+        assertTrue(InstalledIntegrationCommandFingerprint.beforeProcessReadAdditions(json,current,"process",java.util.Set.of(),Map.of(),true).isEmpty());
+    }
 }
