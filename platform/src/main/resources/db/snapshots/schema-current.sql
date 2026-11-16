@@ -7320,7 +7320,7 @@ CREATE TABLE public.ab_command_definition (
     code text NOT NULL,
     display_name text,
     description text,
-    model_code text NOT NULL,
+    model_code text,
     input_schema jsonb DEFAULT '{}'::jsonb NOT NULL,
     target_models jsonb DEFAULT '[]'::jsonb NOT NULL,
     execution_config jsonb DEFAULT '{}'::jsonb NOT NULL,
@@ -7350,6 +7350,7 @@ CREATE TABLE public.ab_command_definition (
 -- Name: COLUMN ab_command_definition.plugin_pid; Type: COMMENT; Schema: public; Owner: -
 --
 
+COMMENT ON COLUMN public.ab_command_definition.model_code IS 'Target model; NULL for route-level commands (dynamic.*) that have no single-model owner — authorization validates the per-call target model';
 COMMENT ON COLUMN public.ab_command_definition.plugin_pid IS 'Reference to plugin that created this command';
 
 

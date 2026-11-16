@@ -45,6 +45,11 @@ public class DynamicWriteCommandSeedService {
         def.setDescription("Platform-seeded synthesized command routing the dynamic CRUD surface through the pipeline (aura.command.synthesized-dynamic-writes)");
         def.setInputSchema("{}");
         def.setTargetModels("[]");
+        def.setExtension(new com.auraboot.framework.meta.entity.payload.ExtensionBean());  // empty bean serializes to {}: INSERT passes the column explicitly, NULL would violate the NOT NULL default
+        // model_code intentionally stays NULL: route-level commands (dynamic.*) have no
+        // single-model owner — authorization validates the per-call target model instead.
+        // The column is NULL-able since V20261116090000; manifest-imported (record-level)
+        // commands keep their required modelCode via PluginManifestValidator.
         // executionConfig drives the pipeline: handler + handler-owned invocation authorization
         def.setExecutionConfig("{\"handler\":\"" + DynamicWriteCommandHandler.HANDLER_CODE
                 + "\",\"handlerParams\":{\"invocationAuthorization\":\"handler\"}}");
