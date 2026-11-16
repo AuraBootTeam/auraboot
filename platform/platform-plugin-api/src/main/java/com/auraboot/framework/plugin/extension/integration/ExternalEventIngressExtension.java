@@ -20,6 +20,18 @@ public interface ExternalEventIngressExtension extends ExtensionPoint {
         PreparedRequest normalize(java.util.Map<String, Object> request, RequestDefaults defaults);
     }
 
+    /** Safe provider field errors discovered while resolving the installed business binding. */
+    final class RequestValidationException extends RuntimeException {
+        private final java.util.List<FieldError> errors;
+        public RequestValidationException(java.util.List<FieldError> errors) {
+            super("Installed integration business request validation failed");
+            if (errors == null || errors.isEmpty() || errors.size() > 100)
+                throw new IllegalArgumentException("Provide 1 to 100 safe field errors");
+            this.errors = java.util.List.copyOf(errors);
+        }
+        public java.util.List<FieldError> errors() { return errors; }
+    }
+
     record RequestDefaults(String eventId, java.time.Instant receivedAt) { }
     record FieldError(String field, String code, String message) { }
     record PreparedRequest(java.util.Map<String, Object> envelope,

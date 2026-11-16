@@ -371,6 +371,19 @@ class InstalledIntegrationServiceTest {
         assertThrows(com.auraboot.framework.exception.BusinessException.class,()->service.accept(principal,source,event()));
     }
 
+    @Test void safeProviderBindingValidationRetainsFieldDetailsAndDoesNotAcceptReceipt() {
+        var field=new com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension.FieldError(
+                "data.context.accountId","conflict","The source account does not match the installed connection.");
+        var invalid=new com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension.RequestValidationException(List.of(field));
+        when(executor.execute(eq(accept),any())).thenThrow(new com.auraboot.framework.exception.BusinessException(
+                com.auraboot.framework.common.constant.ResponseCode.BadParam,"internal diagnostics must not be returned",invalid));
+        var rejected=assertThrows(ExternalEventIngressService.InvalidExternalEventException.class,()->service.accept(principal,source,event()));
+        assertEquals("invalid_business_request",rejected.code());assertEquals(List.of(field),rejected.errors());
+        assertFalse(rejected.explanation().contains("internal diagnostics"));
+        verify(receipts,never()).accepted(anyLong(),anyString(),anyString(),anyString(),anyString());
+        assertFalse(InstalledIntegrationExecution.active());
+    }
+
     @Test void contextCannotBeForgedOrInheritedByAnotherCommand() {
         var binding=new InstalledIntegrationBinding(42L,"app","inst",source,"evt-1","durable",1,Map.of());
         assertThrows(SecurityException.class,()->InstalledIntegrationExecution.verify(accept,42L,"config",Map.of("installedIntegration",Map.of())));

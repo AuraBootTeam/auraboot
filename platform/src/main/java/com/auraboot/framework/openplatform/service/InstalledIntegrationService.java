@@ -9,6 +9,7 @@ import com.auraboot.framework.meta.mapper.CommandDefinitionMapper;
 import com.auraboot.framework.meta.service.CommandExecutor;
 import com.auraboot.framework.openplatform.mapper.*;
 import com.auraboot.framework.plugin.extension.integration.*;
+import com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension;
 import com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension.Registration;
 import com.auraboot.framework.plugin.pf4j.AuraPluginManager;
 import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
@@ -253,6 +254,10 @@ public class InstalledIntegrationService {
                 CommandExecuteResult result;
                 try { result = executor.execute(code,request); }
                 catch (com.auraboot.framework.exception.BusinessException failure) {
+                    if (code.equals(resolved.registration().acceptCommand())
+                            && failure.getCause() instanceof ExternalEventIngressExtension.RequestValidationException invalid)
+                        throw new ExternalEventIngressService.InvalidExternalEventException("invalid_business_request",
+                                "The business request conflicts with this integration's configured source. Check the listed fields.", invalid.errors());
                     if (code.equals(resolved.registration().acceptCommand()) && resolved.conflictMessageKey() != null
                             && failure.getCause() instanceof com.auraboot.framework.plugin.extension.PluginCommandRejectionException rejection
                             && rejection.code() == com.auraboot.framework.plugin.extension.PluginCommandRejectionException.Code.BUSINESS_RULE_BLOCKED
