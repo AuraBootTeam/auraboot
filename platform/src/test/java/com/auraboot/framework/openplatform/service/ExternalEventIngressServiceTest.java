@@ -139,6 +139,20 @@ class ExternalEventIngressServiceTest {
     }
 
     @Test
+    void installedIngressPreservesExactCallerTimeInHostOwnedTransportMetadata() {
+        var installed=mock(InstalledIntegrationService.class);service.setInstalledIntegrations(installed);
+        when(installed.registered("erp")).thenReturn(true);
+        when(installed.accept(eq(principal),eq("erp"),any())).thenReturn(new InstalledIntegrationService.Acceptance("request-pid",false));
+        when(idempotencyMapper.claim(anyLong(),anyLong(),anyString(),anyString(),anyString(),any())).thenReturn(1);
+        when(idempotencyMapper.complete(anyLong(),anyLong(),anyString(),anyString(),anyString(),anyString())).thenReturn(1);
+        String original="2026-09-14T08:00:00.123456789Z";
+        service.accept(principal,"erp","time-precision-key",strictBody().replace("2026-09-14T08:00:00Z",original));
+        var envelope=ArgumentCaptor.forClass(IntegrationEventEnvelope.class);verify(accessor).enqueue(envelope.capture());
+        assertEquals(java.time.Instant.parse(original),envelope.getValue().occurredAt());
+        assertEquals(original,envelope.getValue().headers().get(InstalledIntegrationService.ORIGINAL_OCCURRED_AT_HEADER));
+    }
+
+    @Test
     void rejectedInstalledAcceptanceCannotEnqueueAndPermanentReplayDoesNotEnqueueAgain() {
         var installed=mock(InstalledIntegrationService.class);service.setInstalledIntegrations(installed);
         when(installed.registered("erp")).thenReturn(true);
