@@ -28,6 +28,7 @@ export const columnSchema = z
     align: z.enum(['left', 'center', 'right']).optional(),
     width: z.union([z.number(), z.string()]).optional(),
     ellipsis: z.boolean().optional(),
+    multiline: z.boolean().optional(),
     fixed: z.enum(['left', 'right']).optional(),
     format: z.string().optional(),
     readOnly: z.boolean().optional(),

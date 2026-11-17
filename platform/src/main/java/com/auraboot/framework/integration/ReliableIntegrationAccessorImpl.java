@@ -8,6 +8,7 @@ import com.auraboot.framework.plugin.extension.integration.ReliableIntegrationAc
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -25,16 +26,15 @@ public class ReliableIntegrationAccessorImpl implements ReliableIntegrationAcces
     private final ObjectMapper objectMapper;
     private final ReliableIntegrationMetrics metrics;
     private final InventoryReceiptEnqueueProvenance provenance;
+    private final ApplicationEventPublisher events;
 
-    public ReliableIntegrationAccessorImpl(OutboxEventMapper outboxEventMapper, ObjectMapper objectMapper,
-                                           ReliableIntegrationMetrics metrics) {
-        this(outboxEventMapper, objectMapper, metrics, null);
-    }
     @Autowired
     public ReliableIntegrationAccessorImpl(OutboxEventMapper outboxEventMapper, ObjectMapper objectMapper,
-                                           ReliableIntegrationMetrics metrics, InventoryReceiptEnqueueProvenance provenance) {
+                                           ReliableIntegrationMetrics metrics, InventoryReceiptEnqueueProvenance provenance,
+                                           ApplicationEventPublisher events) {
         this.outboxEventMapper = outboxEventMapper; this.objectMapper = objectMapper;
         this.metrics = metrics; this.provenance = provenance;
+        this.events = java.util.Objects.requireNonNull(events);
     }
 
 
@@ -47,6 +47,7 @@ public class ReliableIntegrationAccessorImpl implements ReliableIntegrationAcces
         OutboxEvent event = toEvent(envelope);
         outboxEventMapper.insertEnvelope(event);
         recordEnqueuedAfterCommit();
+        events.publishEvent(new ReliableOutboxReady());
     }
 
     @Override
@@ -59,6 +60,7 @@ public class ReliableIntegrationAccessorImpl implements ReliableIntegrationAcces
         int inserted = outboxEventMapper.insertEnvelopeIfAbsent(event);
         if (inserted == 1) {
             recordEnqueuedAfterCommit();
+            events.publishEvent(new ReliableOutboxReady());
             return true;
         }
         if (inserted != 0 || outboxEventMapper.countMatchingEnvelope(event) != 1) {

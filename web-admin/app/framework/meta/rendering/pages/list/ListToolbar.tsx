@@ -18,6 +18,7 @@ type QuickFilterKey = QuickFilterPresetKey;
 
 export interface ListToolbarProps {
   workspace?: boolean;
+  inlineFilters?: React.ReactNode;
   /** Current keyword search value */
   keyword: string;
   /** Localized search guidance supplied by the table configuration. */
@@ -81,6 +82,7 @@ export interface ListToolbarProps {
 
 export function ListToolbar({
   workspace = false,
+  inlineFilters,
   keyword,
   searchPlaceholder,
   onKeywordChange,
@@ -140,7 +142,7 @@ export function ListToolbar({
     <>
       {/* Main toolbar row */}
       <div
-        className={`print-hide border-border bg-panel flex flex-wrap items-center gap-2 border-b px-4 py-3 sm:px-6 ${workspace ? '[&>div:first-child]:sm:mr-auto' : ''}`}
+        className={`print-hide border-border bg-panel flex flex-wrap ${inlineFilters ? 'items-end' : 'items-center'} gap-2 border-b px-4 py-3 sm:px-6 ${workspace ? '[&>div:first-child]:sm:mr-auto' : ''}`}
         data-print="hide"
         data-testid="list-toolbar"
       >
@@ -169,6 +171,8 @@ export function ListToolbar({
             />
           </svg>
         </div>}
+
+        {inlineFilters}
 
         {/* Separator */}
         {!hideSearch && showInlineControls && !workspace && <div className="bg-border mx-1 hidden h-6 w-px sm:block" />}

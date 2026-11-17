@@ -17,10 +17,22 @@ final class NativeProcurementWorkspace {
 
     static String runtime(Map<String, String> environment) {
         String value = environment.getOrDefault("PROCUREMENT_NATIVE_RUNTIME", "procurement-web-stack-20261010");
-        if (!java.util.Set.of("procurement-web-stack-20261010", "procurement-main-validation").contains(value)) {
+        if (!java.util.Set.of("procurement-web-stack-20261010", "procurement-main-validation", "procurement-scope-gaps").contains(value)) {
             throw new IllegalStateException("PROCUREMENT_NATIVE_RUNTIME_NOT_OWNED");
         }
         return value;
+    }
+
+    record Profile(String database, int redisDatabase) {}
+
+    static Profile profile() { return profile(System.getenv()); }
+
+    static Profile profile(Map<String, String> environment) {
+        return switch (runtime(environment)) {
+            case "procurement-scope-gaps" -> new Profile("enterprise_1", 7);
+            case "procurement-web-stack-20261010", "procurement-main-validation" -> new Profile("enterprise_22", 13);
+            default -> throw new IllegalStateException("PROCUREMENT_NATIVE_RUNTIME_NOT_OWNED");
+        };
     }
 
     static Path root(Map<String, String> environment) {

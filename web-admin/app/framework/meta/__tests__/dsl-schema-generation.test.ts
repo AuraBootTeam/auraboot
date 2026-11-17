@@ -16,7 +16,7 @@ describe('DSL Generated Schema', () => {
     expect(schema.$ref).toBe('#/definitions/DslSchema');
   });
 
-  it('includes card, workspace presentation and rule types in the 62-definition combined contract', () => {
+  it('includes card, workspace presentation and rule types in the 63-definition combined contract', () => {
     expect(Object.keys(defs).sort()).toEqual([
       'ActionDef',
       'AuthoritativeSourceConfig',
@@ -59,6 +59,7 @@ describe('DSL Generated Schema', () => {
       'PaginationConfig',
       'PaginationRequestConfig',
       'ResolveViaConfig',
+      'RowExpansionConfig',
       'RowProjection',
       'RowProjectionDescriptor',
       'RuleAssert',

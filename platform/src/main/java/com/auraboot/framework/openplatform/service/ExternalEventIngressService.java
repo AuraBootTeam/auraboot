@@ -30,6 +30,7 @@ public class ExternalEventIngressService {
     private final ReliableIntegrationAccessor integrationAccessor;
     private final OpenPlatformSecretCodec secretCodec;
     private final ObjectMapper objectMapper;
+    private final OpenApiProtocolHash protocolHash;
 
     private InstalledIntegrationService installedIntegrations;
     private ExternalIngressNormalizer normalizer;
@@ -49,8 +50,9 @@ public class ExternalEventIngressService {
         if (!SOURCE_CODE.matcher(sourceCode).matches()) {
             throw new InvalidExternalEventException("invalid_source_code");
         }
+        boolean installed = installedIntegrations != null && installedIntegrations.registered(sourceCode);
         boolean defaultsEnabled = normalizer != null && normalizer.supports(sourceCode);
-        if ((!defaultsEnabled && idempotencyKey == null)
+        if ((!installed && idempotencyKey == null)
                 || idempotencyKey != null && !IDEMPOTENCY_KEY.matcher(idempotencyKey).matches()) {
             throw new InvalidExternalEventException("invalid_idempotency_key",
                     "Idempotency-Key must contain 8 to 255 printable ASCII characters when supplied.",
@@ -62,14 +64,21 @@ public class ExternalEventIngressService {
         if (installation == null || !"active".equals(installation.getStatus())) {
             throw new InvalidExternalEventException("installation_not_active");
         }
-        boolean installed = installedIntegrations != null && installedIntegrations.registered(sourceCode);
+        if (installed && defaultsEnabled) {
+            var replay = retainedBusinessReplay(principal, installation.getId(), sourceCode, idempotencyKey, rawBody);
+            if (replay != null) return replay;
+        }
         String effectiveBody = defaultsEnabled
                 ? normalizer.normalize(principal.tenantId(), installation.getId(), sourceCode, idempotencyKey, rawBody) : rawBody;
-        ExternalEvent event = installed ? parseInstalled(effectiveBody) : parse(effectiveBody);
-        // Generated event identity keeps the legacy transport persistence path valid without requiring a header.
-        if (idempotencyKey == null) idempotencyKey = "event:" + event.id();
+        ExternalEvent event = installed ? parseInstalled(sourceCode,effectiveBody) : parse(effectiveBody);
+        if(idempotencyKey==null) {
+            if(!defaultsEnabled && !event.businessRequest())throw new InvalidExternalEventException("invalid_idempotency_key");
+            idempotencyKey=(event.businessRequest()?"business:":"event:")+event.id();
+        }
         String routeCode = "external-event:" + sourceCode;
-        String requestHash = secretCodec.sha256(rawBody);
+        String requestHash = installed && event.businessRequest()
+                ? businessRequestHash(rawBody) : secretCodec.sha256(rawBody);
+        boolean verifyStoredReplay = false;
         if (defaultsEnabled) {
             try {
                 Map<String, Object> input = objectMapper.readValue(rawBody, new com.fasterxml.jackson.core.type.TypeReference<LinkedHashMap<String, Object>>() { });
@@ -85,15 +94,54 @@ public class ExternalEventIngressService {
         if (claimed == 0) {
             String existingHash = idempotencyMapper.findRequestHash(principal.tenantId(), installation.getId(),
                     routeCode, idempotencyKey);
+            var stored = installed && event.businessRequest()
+                    && (!event.callerIdProvided() || !requestHash.equals(existingHash))
+                    ? idempotencyMapper.findResponse(principal.tenantId(), installation.getId(), routeCode, idempotencyKey) : null;
+            if (event.businessRequest() && !event.callerIdProvided()) {
+                // A retry must use the identity committed by the first request, not a new UUID.
+                String originalId = completedEventId(stored);
+                if (originalId == null) throw new IdempotencyConflictException();
+                event = event.withId(originalId);
+                verifyStoredReplay = true;
+            }
             if (!requestHash.equals(existingHash)) {
-                throw new IdempotencyConflictException();
+                // Older accepted requests used the raw JSON bytes. Only their existing,
+                // event-bound receipt can authorize a formatting-only retry.
+                if (!installed || !event.businessRequest()
+                        || !event.id().equals(completedEventId(stored))) throw new IdempotencyConflictException();
+                verifyStoredReplay = true;
             }
             if (installedIntegrations == null || !installedIntegrations.registered(sourceCode))
                 return new IngressResult(event.id(), true);
         }
 
+        IntegrationEventEnvelope envelope = envelope(principal, sourceCode, event, installed);
+        InstalledIntegrationService.Acceptance acceptance = null;
+        if (verifyStoredReplay) {
+            acceptance = installedIntegrations.verifyAcceptedReplay(principal, sourceCode, envelope);
+            return new IngressResult(event.id(), true, acceptance.recordPid(), true, event.callerIdProvided());
+        }
+        if (installedIntegrations != null && installedIntegrations.registered(sourceCode)) {
+            acceptance = installedIntegrations.accept(principal,sourceCode,envelope);
+        }
+        if(event.businessRequest() && (acceptance==null || acceptance.recordPid()==null || acceptance.recordPid().isBlank()))
+            throw new IllegalStateException("Business acceptance receipt missing");
+        if (acceptance == null || !acceptance.duplicate()) integrationAccessor.enqueue(envelope);
+        try {
+            int completed = idempotencyMapper.complete(principal.tenantId(), installation.getId(), routeCode,
+                    idempotencyKey, requestHash,
+                    objectMapper.writeValueAsString(Map.of("eventId", event.id(), "accepted", true)));
+            if (acceptance != null && completed != 1) throw new IllegalStateException("External acceptance response was not persisted");
+        } catch (Exception exception) {
+            throw new IllegalStateException("Could not persist external event response", exception);
+        }
+        return new IngressResult(event.id(), acceptance != null && acceptance.duplicate(),
+                acceptance == null ? null : acceptance.recordPid(),event.businessRequest(),event.callerIdProvided());
+    }
+
+    private IntegrationEventEnvelope envelope(MachinePrincipal principal, String sourceCode, ExternalEvent event, boolean installed) {
         String durableEventId = "ext:" + principal.installationPid() + ":"
-                + (installedIntegrations != null && installedIntegrations.registered(sourceCode) ? sourceCode+":" : "") + event.id();
+                + (installed ? sourceCode+":" : "") + event.id();
         String publicEventType = "external." + sourceCode + "." + event.type() + ".v" + event.schemaVersion();
         String requestId = MDC.get("requestId");
         Map<String, String> traceHeaders = new LinkedHashMap<>(Map.of(
@@ -109,34 +157,68 @@ public class ExternalEventIngressService {
         if (requestId != null && !requestId.isBlank()) {
             traceHeaders.put("requestId", requestId);
         }
-        IntegrationEventEnvelope envelope = new IntegrationEventEnvelope(
+        return new IntegrationEventEnvelope(
                 "1.0", durableEventId, publicEventType,
                 "open-platform/" + principal.installationPid() + "/" + sourceCode,
                 event.subjectType() + "/" + event.subjectPid(), event.occurredAt(), principal.tenantId(),
                 requestId == null || requestId.isBlank() ? durableEventId : requestId,
                 null, event.subjectType() + "/" + event.subjectPid(),
                 event.sequence(), event.data(), traceHeaders);
-        InstalledIntegrationService.Acceptance acceptance = null;
-        if (installedIntegrations != null && installedIntegrations.registered(sourceCode)) {
-            acceptance = installedIntegrations.accept(principal,sourceCode,envelope);
-        }
-        if (acceptance == null || !acceptance.duplicate()) integrationAccessor.enqueue(envelope);
-        try {
-            int completed = idempotencyMapper.complete(principal.tenantId(), installation.getId(), routeCode,
-                    idempotencyKey, requestHash,
-                    objectMapper.writeValueAsString(Map.of("eventId", event.id(), "accepted", true)));
-            if (acceptance != null && completed != 1) throw new IllegalStateException("External acceptance response was not persisted");
-        } catch (Exception exception) {
-            throw new IllegalStateException("Could not persist external event response", exception);
-        }
-        return new IngressResult(event.id(), acceptance != null && acceptance.duplicate(),
-                acceptance == null ? null : acceptance.recordPid());
     }
 
-    private ExternalEvent parseInstalled(String rawBody) {
+    /** Read-only verification of an already accepted business receipt; never authorize a new legacy execution. */
+    private IngressResult retainedBusinessReplay(MachinePrincipal principal, long installationId,
+            String sourceCode, String header, String rawBody) {
         try {
             JsonNode root = objectMapper.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
                     .with(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION).readTree(rawBody);
+            if (root == null || !root.isObject() || root.has("type")) return null;
+            String callerId = root.path("id").isTextual() ? root.path("id").asText() : null;
+            if (normalizer.hasStoredDefaults(principal.tenantId(), installationId, sourceCode, header, callerId)) return null;
+            String key = header;
+            if (key == null && root.path("id").isTextual()) key = "business:" + root.path("id").asText();
+            if (key == null) return null;
+            var stored = idempotencyMapper.findResponse(principal.tenantId(), installationId, "external-event:" + sourceCode, key);
+            String originalId = completedEventId(stored);
+            if (originalId == null) return null;
+            ExternalEvent original;
+            try { original = parseBusiness(sourceCode, root); }
+            catch (InvalidExternalEventException notLegacyBusiness) { return null; }
+            if (original.callerIdProvided() && !originalId.equals(original.id())) throw new IdempotencyConflictException();
+            var accepted = installedIntegrations.verifyAcceptedReplay(principal, sourceCode,
+                    envelope(principal, sourceCode, original.withId(originalId), true));
+            if (accepted == null || accepted.recordPid() == null || accepted.recordPid().isBlank())
+                throw new IllegalStateException("Business replay receipt missing");
+            return new IngressResult(originalId, true, accepted.recordPid(), true, original.callerIdProvided());
+        } catch (com.fasterxml.jackson.core.JsonProcessingException invalidJson) { return null; }
+    }
+
+    private String businessRequestHash(String rawBody) {
+        try { return protocolHash.fingerprint(objectMapper.readTree(rawBody), false); }
+        catch (com.fasterxml.jackson.core.JsonProcessingException invalid) {
+            throw new InvalidExternalEventException("invalid_business_request");
+        }
+    }
+
+    private String completedEventId(OpenApiIdempotencyMapper.StoredResponse stored) {
+        if (stored == null || !"completed".equals(stored.status())
+                || !Integer.valueOf(202).equals(stored.responseStatus()) || stored.responseBody() == null) return null;
+        try {
+            JsonNode response = objectMapper.readTree(stored.responseBody());
+            if (response == null || !response.path("eventId").isTextual()
+                    || !response.path("eventId").asText().matches("[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}")
+                    || !response.path("accepted").isBoolean() || !response.path("accepted").booleanValue()) return null;
+            return response.path("eventId").asText();
+        } catch (com.fasterxml.jackson.core.JsonProcessingException invalid) {
+            throw new IllegalStateException("Invalid stored external event response", invalid);
+        }
+    }
+
+    private ExternalEvent parseInstalled(String sourceCode,String rawBody) {
+        try {
+            JsonNode root = objectMapper.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                    .with(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION).readTree(rawBody);
+            if(root!=null && root.isObject() && !root.has("type"))return parseBusiness(sourceCode,root);
             if (root == null || !root.isObject() || !keys(root).equals(java.util.Set.of(
                     "id","type","schemaVersion","occurredAt","subject","sequence","data")))
                 throw new InvalidExternalEventException("invalid_event_body");
@@ -156,6 +238,27 @@ public class ExternalEventIngressService {
         catch (com.fasterxml.jackson.core.JsonProcessingException failure) {
             throw new InvalidExternalEventException("invalid_event_body");
         }
+    }
+
+    private ExternalEvent parseBusiness(String sourceCode,JsonNode root) {
+        if(!java.util.Set.of("id","occurredAt","data").containsAll(keys(root))
+                || !root.has("occurredAt") || !root.path("occurredAt").isTextual()
+                || !root.path("occurredAt").asText().endsWith("Z") || !root.path("data").isObject()
+                || root.has("id") && (!root.path("id").isTextual() || !root.path("id").asText().matches("[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}")))
+            throw new InvalidExternalEventException("invalid_business_request");
+        try {
+            @SuppressWarnings("unchecked") Map<String,Object> input=objectMapper.convertValue(root,LinkedHashMap.class);
+            var prepared=installedIntegrations.prepareBusinessRequest(sourceCode,input)
+                    .orElseThrow(()->new InvalidExternalEventException("business_contract_not_registered"));
+            if(!Instant.parse(root.path("occurredAt").asText()).equals(prepared.occurredAt()))
+                throw new InvalidExternalEventException("invalid_business_request");
+            String prefix="external."+sourceCode+".";String type=prepared.eventType();
+            if(!type.startsWith(prefix))throw new SecurityException("Business event source denied");
+            int suffix=type.lastIndexOf(".v");
+            return new ExternalEvent(root.has("id")?root.path("id").asText():java.util.UUID.randomUUID().toString(),
+                    type.substring(prefix.length(),suffix),Integer.parseInt(type.substring(suffix+2)),prepared.occurredAt(),
+                    prepared.subjectType(),prepared.subjectPid(),0,prepared.payload(),true,root.has("id"));
+        } catch(DateTimeParseException | IllegalArgumentException invalid) {throw new InvalidExternalEventException("invalid_business_request");}
     }
 
     private java.util.Set<String> keys(JsonNode node) {
@@ -209,12 +312,30 @@ public class ExternalEventIngressService {
 
     private record ExternalEvent(String id, String type, int schemaVersion, Instant occurredAt,
                                  String subjectType, String subjectPid, long sequence,
-                                 Map<String, Object> data) {
+                                 Map<String, Object> data,boolean businessRequest,boolean callerIdProvided) {
+        ExternalEvent(String id,String type,int schemaVersion,Instant occurredAt,String subjectType,String subjectPid,
+                      long sequence,Map<String,Object> data) {
+            this(id,type,schemaVersion,occurredAt,subjectType,subjectPid,sequence,data,false,true);
+        }
+        ExternalEvent withId(String retainedId) {
+            return new ExternalEvent(retainedId,type,schemaVersion,occurredAt,subjectType,subjectPid,sequence,data,businessRequest,callerIdProvided);
+        }
     }
 
     @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
-    public record IngressResult(String eventId, boolean duplicate, String recordPid) {
+    public record IngressResult(String eventId, boolean duplicate, String recordPid,
+                                @com.fasterxml.jackson.annotation.JsonIgnore boolean businessRequest,
+                                @com.fasterxml.jackson.annotation.JsonIgnore boolean callerIdProvided) {
+        public IngressResult(String eventId,boolean duplicate,String recordPid){this(eventId,duplicate,recordPid,false,true);}
         public IngressResult(String eventId, boolean duplicate) { this(eventId,duplicate,null); }
+        public Map<String,Object> publicReceipt() {
+            var result=new LinkedHashMap<String,Object>();
+            if(!businessRequest || callerIdProvided)result.put("eventId",eventId);
+            if(recordPid!=null)result.put("recordPid",recordPid);
+            if(!businessRequest)result.put("duplicate",duplicate);
+            else if(recordPid==null || recordPid.isBlank())throw new IllegalStateException("Business acceptance receipt missing");
+            return java.util.Collections.unmodifiableMap(result);
+        }
     }
 
     public static class InvalidExternalEventException extends RuntimeException {

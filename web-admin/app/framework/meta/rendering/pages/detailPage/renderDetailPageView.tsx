@@ -24,6 +24,7 @@ import {
   resolveDetailReturnTarget,
   shouldRenderInlineDetailApproval,
   resolveDetailPdfFileName,
+  resolveDetailRelatedLinks,
 } from './detailLayoutValues';
 import { resolveTextFallback } from './detailFieldDisplay';
 import { prepareDetailRuntimeBlock } from './detailBlockValues';
@@ -215,10 +216,12 @@ export function renderDetailPageView({
               </button>
             ) : (
               <Link
-                to={`/p/${tableName}`}
+                to={recordAccessDenied ? '/home' : `/p/${tableName}`}
                 className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover mx-auto inline-flex border px-3 py-1.5 text-sm font-medium"
               >
-                {resolveTextFallback(t, 'action.back', 'Back')}
+                {recordAccessDenied
+                  ? getLocalizedText({ 'zh-CN': '返回首页', en: 'Go to home' }, locale, t)
+                  : resolveTextFallback(t, 'action.back', 'Back')}
               </Link>
             )}
           </div>
@@ -229,8 +232,13 @@ export function renderDetailPageView({
 
   const workspace = schema.extension?.presentation === 'workspace';
   const workspaceShell = workspace ? resolveWorkspaceShell(schema.extension?.workspaceShell) : null;
+  // Follow current scoped form facts without replacing the persisted record or body drafts.
+  const scopedForm = runtime?.getContext()?.form;
+  const currentHeaderForm = scopedForm && typeof scopedForm === 'object' && !Array.isArray(scopedForm)
+    && (!recordData?.pid || !scopedForm.pid || scopedForm.pid === recordData.pid) ? scopedForm : {};
+  const headerRecord = { ...recordData, ...currentHeaderForm };
   const headerTitleField = String(schema?.extension?.headerTitleField || '').trim();
-  const headerTitleValue = headerTitleField ? recordData?.[headerTitleField] : undefined;
+  const headerTitleValue = headerTitleField ? headerRecord[headerTitleField] : undefined;
   const headerTitle =
     headerTitleValue !== undefined && headerTitleValue !== null && headerTitleValue !== ''
       ? String(headerTitleValue)
@@ -242,11 +250,12 @@ export function renderDetailPageView({
     .map((field: unknown) => {
       const key = String(field || '').trim();
       if (!key) return '';
-      const value = recordData?.[`${key}_display`] ?? recordData?.[key];
+      const value = headerRecord[`${key}_display`] ?? headerRecord[key];
       return value === undefined || value === null || value === '' ? '' : String(value);
     })
     .filter(Boolean)
     .join(' · ');
+  const relatedLinks = resolveDetailRelatedLinks(schema.extension?.headerRelatedLinks, headerRecord);
   const preserveListContext = schema?.extension?.preserveListContext === true;
   const preservedReturnTarget = preserveListContext
     ? resolveDetailReturnTarget(location.search)
@@ -349,8 +358,8 @@ export function renderDetailPageView({
                         const field = enrichField({
                           field: schema.extension.headerStatusField,
                         } as FieldConfig);
-                        const item = (getDictItems(field.dictCode || '') || []).find(
-                          (item) => String(item.value) === String(recordData?.[field.field]),
+                        const item = (getDictItems(schema.extension?.headerStatusDictCode || field.dictCode || '') || []).find(
+                          (item) => String(item.value) === String(headerRecord[field.field]),
                         );
                         return item ? getLocalizedText(item.label as any, locale, t) : '—';
                       })()}
@@ -358,10 +367,16 @@ export function renderDetailPageView({
                   )}
                 </div>
                 {headerSubtitle ? (
-                  <p className="text-text-3 mt-1 truncate text-xs" title={headerSubtitle}>
+                  <p className="text-text-3 mt-2 break-words text-sm" title={headerSubtitle}>
                     {headerSubtitle}
                   </p>
                 ) : null}
+                {relatedLinks.length > 0 && (
+                  <div className="text-text-3 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm" data-testid="detail-related-links">
+                    <span>{getLocalizedText(schema.extension?.headerRelatedLinks?.label, locale, t)}</span>
+                    {relatedLinks.map(link => <Link key={link.pid} to={link.to} className="text-accent hover:underline">{link.label} ↗</Link>)}
+                  </div>
+                )}
               </div>
             </div>
 

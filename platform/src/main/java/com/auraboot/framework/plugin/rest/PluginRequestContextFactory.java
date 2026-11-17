@@ -6,6 +6,7 @@ import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.plugin.extension.DataAccessor;
 import com.auraboot.framework.plugin.extension.PluginRequestContext;
+import com.auraboot.framework.plugin.extension.IdentityDirectoryAccessor;
 import com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -24,6 +25,7 @@ public class PluginRequestContextFactory {
 
     private final TenantClock tenantClock;
     private final DynamicDataService dynamicDataService;
+    private final IdentityDirectoryAccessor identities;
 
     public PluginRequestContext current(boolean isPublic) {
         final Long tenantId = MetaContext.getCurrentTenantId();
@@ -37,6 +39,10 @@ public class PluginRequestContextFactory {
             @Override public String generateId() { return UniqueIdGenerator.generate(); }
             @Override public boolean isPublic() { return isPublic; }
             @Override public DataAccessor dataAccessor() { return dataAccessor; }
+            @Override public IdentityDirectoryAccessor.UserIdentity findActiveTenantUser(String userPid) {
+                if(isPublic || tenantId==null || userId==null || userId<=0 || userPid==null || userPid.isBlank()) return null;
+                return identities.findActiveTenantUser(tenantId,userPid);
+            }
         };
     }
 }

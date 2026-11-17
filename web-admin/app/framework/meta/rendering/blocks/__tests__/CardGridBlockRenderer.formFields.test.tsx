@@ -6,9 +6,9 @@ import { businessFunctions } from '../../../runtime/expression/business-function
 import { ScopedStateManager } from '../../../runtime/state/scoped-state';
 import { CardGridBlockRenderer } from '../CardGridBlockRenderer';
 
-const { handleAction } = vi.hoisted(() => ({ handleAction: vi.fn() }));
+const { handleAction, hasPermission } = vi.hoisted(() => ({ handleAction: vi.fn(), hasPermission: vi.fn<(code: string) => boolean>(() => true) }));
 vi.mock('~/framework/meta/hooks/useActionHandler', () => ({ useActionHandler: () => ({ handleAction }) }));
-vi.mock('~/contexts/AuthContext', () => ({ useAuth: () => ({ token: 'local' }), usePermission: () => true }));
+vi.mock('~/contexts/AuthContext', () => ({ useAuth: () => ({ token: 'local', hasPermission }), usePermission: () => true }));
 vi.mock('~/contexts/ToastContext', () => ({ useToastContext: () => ({
   showSuccessToast: vi.fn(), showErrorToast: vi.fn(), showWarningToast: vi.fn(), showInfoToast: vi.fn(),
 }) }));
@@ -21,10 +21,10 @@ vi.mock('../../components/ComponentLoader', () => ({ ComponentLoader: ({ props }
     readOnly={props.readOnly} onChange={(event) => props.onChange(event.target.value)} /></label>
 ) }));
 
-function setup(bind = true, grouped = false, computed = false, grid = false) {
+function setup(bind = true, grouped = false, computed = false, grid = false, reconcile = false, actions?: any[]) {
   const state = new ScopedStateManager({} as any);
   state.createScope('review');
-  let rows = [
+  let rows: any[] = [
     { pid: 'quote-a', supplierName: 'Supplier A', availableQty: '60', proposedQty: '60', score: '100', sourcePid: 'source-a', sourceLabel: 'Same material' },
     { pid: 'quote-b', supplierName: 'Supplier B', availableQty: '70', proposedQty: '40', score: '90', sourcePid: 'source-b', sourceLabel: 'Same material' },
   ];
@@ -42,6 +42,7 @@ function setup(bind = true, grouped = false, computed = false, grid = false) {
   } as any;
   render(<CardGridBlockRenderer runtime={runtime} block={{ id: 'offers', blockType: 'card-grid',
     dataSource: 'offers', titleField: 'supplierName', ...(bind ? { field: 'choices' } : {}),
+    ...(reconcile ? { draftRows: { identityFields: ['pid'], preserveFields: ['proposedQty'], preserveWhen: 'record.eligible !== false' } } : {}),
     ...(grid ? { fieldsLayout: { type: 'grid', cols: 12, rowGap: 12, colGap: 12 } } : {}),
     ...(grouped ? { groupByField: 'sourcePid', groupTitleField: 'sourceLabel' } : {}),
     fields: [
@@ -50,16 +51,51 @@ function setup(bind = true, grouped = false, computed = false, grid = false) {
       { field: 'score', label: 'Score', component: 'SmartInput', readOnly: true, ...(grid ? { layout: { colSpan: 12 } } : {}) },
       ...(computed ? [{ field: 'groupTotal', label: 'Group total', component: 'SmartInput', valueWhen: '${fn.DECIMAL_SUM_BY(form.choices, "proposedQty", "sourcePid", row.sourcePid)}' }] : []),
     ],
-    cardActions: [{ code: 'preview', label: 'Preview', action: { type: 'command', command: 'test:preview' } }],
+    cardActions: actions || [{ code: 'preview', label: 'Preview', action: { type: 'command', command: 'test:preview' } }],
   } as any} />);
-  return { state, refresh: () => {
-    rows = rows.map(row => ({ ...row, proposedQty: '999' }));
+  return { state, refresh: (replacement?: any[]) => {
+    rows = replacement || rows.map(row => ({ ...row, proposedQty: '999' }));
     listeners.forEach(listener => listener());
   } };
 }
 
 describe('Card-grid draft form fields', () => {
-  beforeEach(() => handleAction.mockClear());
+  beforeEach(() => {handleAction.mockReset(); hasPermission.mockReset().mockReturnValue(true);});
+
+  it('gates actions by current row and permissions and prevents concurrent duplicate actions', async () => {
+    hasPermission.mockImplementation(code => code !== 'denied');
+    let complete!: () => void;
+    handleAction.mockImplementation(() => new Promise<void>(resolve => {complete = resolve;}));
+    setup(true, false, false, false, false, [
+      {code: 'return', label: 'Return', permissionCode: 'allowed', visibleWhen: 'record.sourcePid === "source-a"', action: {type: 'command', command: 'test:return'}},
+      {code: 'denied', label: 'Denied action', permissionCode: 'denied', action: {type: 'command', command: 'test:denied'}},
+      {code: 'eligible', label: 'Eligible action', enableWhen: 'record.availableQty > 65', action: {type: 'command', command: 'test:eligible'}},
+    ]);
+    expect(screen.getAllByRole('button', {name: 'Return'})).toHaveLength(1);
+    expect(screen.queryByRole('button', {name: 'Denied action'})).toBeNull();
+    const available = screen.getAllByRole('button', {name: 'Eligible action'});
+    expect(available[0]).toBeDisabled(); expect(available[1]).toBeEnabled();
+    fireEvent.click(available[1]); fireEvent.click(available[1]);
+    expect(handleAction).toHaveBeenCalledTimes(1);
+    expect(handleAction.mock.calls[0][1]).toMatchObject({pid: 'quote-b', availableQty: '70'});
+    expect(screen.getByRole('button', {name: 'Return'})).toBeDisabled();
+    await act(async () => complete());
+    expect(screen.getByRole('button', {name: 'Return'})).toBeEnabled();
+  });
+
+  it('refreshes authoritative row facts while retaining only declared eligible draft inputs', () => {
+    const {state, refresh} = setup(true, false, false, false, true);
+    const first = () => within(screen.getByRole('group', {name: 'Supplier A'}));
+    fireEvent.change(first().getByRole('textbox', {name: 'Proposed quantity'}), {target: {value: '59.000001'}});
+    act(() => refresh([{pid: 'quote-a', supplierName: 'Supplier A', availableQty: '90', proposedQty: '70', score: '80', eligible: true, rowVersion: 7}]));
+    expect(first().getByRole('textbox', {name: 'Available capacity'})).toHaveValue('90');
+    expect(first().getByRole('textbox', {name: 'Proposed quantity'})).toHaveValue('59.000001');
+    expect(state.getFieldValue('review', 'choices')[0]).toMatchObject({rowVersion: 7, eligible: true});
+    expect(screen.queryByRole('group', {name: 'Supplier B'})).toBeNull();
+    act(() => refresh([{pid: 'quote-a', supplierName: 'Supplier A', availableQty: '90', proposedQty: '0', score: '80', eligible: false, rowVersion: 8}]));
+    expect(first().getByRole('textbox', {name: 'Proposed quantity'})).toHaveValue('0');
+    expect(state.getFieldValue('review', 'choices')[0]).toMatchObject({rowVersion: 8, eligible: false});
+  });
 
   it('uses opt-in field grid without changing read-only capacity or independent draft edits', () => {
     const { state } = setup(true, false, false, true);
@@ -153,5 +189,104 @@ describe('Card-grid draft form fields', () => {
     expect(groups).toHaveLength(2);
     expect(groups.every(group => group.querySelectorAll('[data-testid="card-grid-card"]').length === 1)).toBe(true);
     expect(screen.queryByRole('group', { name: 'Supplier C' })).toBeNull();
+  });
+});
+
+function setupJoinedGroups(duplicate = false, pendingParents = false, compact = false, formOnly = false) {
+  let parentsReady = !pendingParents;
+  const state = new ScopedStateManager({} as any);state.createScope('joined', { form: pendingParents ? { demands: [] } : {} });
+  const parents = [
+    { sourcePid: 's-a', sourceLabel: 'Same material', remainingQty: '100', quantity: '100' },
+    { sourcePid: duplicate ? 's-a' : 's-b', sourceLabel: 'Same material', remainingQty: '80', quantity: '80' },
+    { sourcePid: 's-new', sourceLabel: 'New material', remainingQty: '50', quantity: '50' },
+  ];
+  let offers = [
+    { pid: 'offer-a', sourcePid: 's-a', supplierName: 'Alpha', proposedQty: '60' },
+    { pid: 'offer-b', sourcePid: 's-a', supplierName: 'Beta', proposedQty: '40' },
+    { pid: 'offer-c', sourcePid: 's-b', supplierName: 'Alpha', proposedQty: '80' },
+  ];
+  const listeners = new Set<() => void>();
+  const reads: string[] = [];
+  if (formOnly) state.updateField('joined', 'demands', parents);
+  const manager = {
+    getData: (id: string) => { reads.push(id); return id === 'parents' ? (parentsReady ? parents : null) : offers; },
+    getState: (id: string) => ({ data: id === 'parents' ? (parentsReady ? parents : null) : offers, loading: id === 'parents' && !parentsReady }),
+    subscribe: (_id: string, listener: () => void) => {listeners.add(listener);return () => listeners.delete(listener);},
+  };
+  const runtime = {
+    getContext: () => ({ fn: businessFunctions, locale: 'en', t: (key: string) => key, ...state.getScope('joined') }),
+    getEvaluator: () => new ExpressionEvaluator(),getStateManager: () => state,getScopeId: () => 'joined',
+    getSchema: () => ({ id: 'joined' }),getDataSourceManager: () => manager,triggerFieldLinkage: vi.fn(),
+  } as any;
+  render(<CardGridBlockRenderer runtime={runtime} block={{
+    id: 'joined',blockType: 'card-grid',dataSource: 'offers',field: 'allocations',titleField: 'supplierName',
+    groupByField: 'sourcePid',groupTitleField: 'sourceLabel',collapsibleGroups: true,groupsDefaultOpen: true,compact,groupDescriptionField: 'remainingQty',
+    searchFields: ['supplierName'],searchPlaceholder: 'Search suppliers',
+    groupRows: { ...(formOnly ? {} : {dataSource: 'parents'}),field: 'demands',identityField: 'sourcePid',titleField: 'sourceLabel',
+      summaryFields: [{ field: 'remainingQty',label: 'Remaining',component: 'SmartInput',readOnly: true }],
+      fields: [{ field: 'quantity',label: 'Purchase target',component: 'SmartInput', readOnly: pendingParents || formOnly }],emptyText: 'Not dispatched',
+    },fields: [{field:'proposedQty',label:'Proposed quantity',component:'SmartInput'}],
+  } as any} />);
+  return { state, reads, loadParents: () => { parentsReady = true; listeners.forEach(fn => fn()); }, refresh: () => { offers = offers.map(row => ({...row,proposedQty:'999'}));listeners.forEach(fn => fn()); } };
+}
+
+describe('Joined card groups keep source and offer drafts independent', () => {
+  it('groups an explicit form-only preview without fetching or overwriting its parent snapshot', () => {
+    const {state,reads,refresh} = setupJoinedGroups(false,false,true,true);
+    expect(reads).not.toContain('parents');
+    expect(screen.queryByTestId('card-grid-loading')).not.toBeInTheDocument();
+    const groups = screen.getAllByTestId('card-grid-group');
+    expect(groups).toHaveLength(3);
+    expect(groups[2]).toHaveTextContent('Not dispatched');
+    expect(within(groups[0]).getByRole('textbox',{name:'Purchase target'})).toHaveProperty('readOnly',true);
+    const original=state.getFieldValue('joined','demands');
+    act(refresh);
+    expect(state.getFieldValue('joined','demands')).toBe(original);
+    expect(within(groups[0]).getByRole('textbox',{name:'Remaining'})).toHaveValue('100');
+    expect(reads).not.toContain('parents');
+  });
+
+  it('separates compact material context from immutable summary without redirecting draft edits', () => {
+    const {state} = setupJoinedGroups(false, false, true);
+    const first: HTMLElement = screen.getAllByTestId('card-grid-group')[0];
+    expect(first.querySelector('[data-testid="card-group-description"]')).toHaveClass('block');
+    expect(first.querySelector<HTMLElement>('[data-testid="card-group-heading"]')!.style.gridTemplateColumns).toContain('24rem');
+    expect(first.querySelector<HTMLElement>('[data-testid="card-group-summary"]')!.style.gridTemplateColumns).toContain('6rem');
+    expect(within(first).getByRole('textbox', {name: 'Remaining'})).toHaveProperty('readOnly',true);
+    const quantity = within(within(first).getByRole('group',{name:'Beta'})).getByRole('textbox',{name:'Proposed quantity'});
+    fireEvent.change(quantity,{target:{value:'30.000001'}});
+    fireEvent.click(first.querySelector('summary')!);fireEvent.click(first.querySelector('summary')!);
+    expect(quantity).toHaveValue('30.000001');
+    expect(state.getFieldValue('joined','allocations').map((row:any)=>row.proposedQty)).toEqual(['60','30.000001','80']);
+  });
+
+  it('waits for parent data when offers arrive first and then joins every source', () => {
+    const { state, loadParents } = setupJoinedGroups(false, true);
+    expect(screen.getByTestId('card-grid-loading')).toBeInTheDocument();
+    expect(state.getFieldValue('joined', 'demands')).toEqual([]);
+    act(loadParents);
+    expect(screen.getAllByTestId('card-grid-group')).toHaveLength(3);
+    expect(screen.getAllByTestId('card-grid-card')).toHaveLength(3);
+  });
+
+  it('retains empty parent groups and does not lose or redirect edited rows through search and collapse', () => {
+    const { state,refresh } = setupJoinedGroups();
+    const groups = screen.getAllByTestId('card-grid-group');expect(groups).toHaveLength(3);
+    expect(groups[2]).toHaveTextContent('Not dispatched');
+    const first=within(groups[0]);
+    fireEvent.change(first.getByRole('textbox',{name:'Purchase target'}),{target:{value:'90.000001'}});
+    fireEvent.change(within(first.getByRole('group',{name:'Beta'})).getByRole('textbox',{name:'Proposed quantity'}),{target:{value:'30.000001'}});
+    fireEvent.change(first.getByRole('searchbox',{name:'Search suppliers'}),{target:{value:'Alpha'}});
+    expect(Array.from(groups[0].querySelectorAll('fieldset')).some(el=>(el as Element).getAttribute('aria-label')==='Beta')).toBe(false);
+    fireEvent.change(first.getByRole('searchbox',{name:'Search suppliers'}),{target:{value:''}});
+    expect(within(first.getByRole('group',{name:'Beta'})).getByRole('textbox',{name:'Proposed quantity'})).toHaveValue('30.000001');
+    fireEvent.click(groups[0].querySelector('summary')!);fireEvent.click(groups[0].querySelector('summary')!);
+    act(refresh);
+    expect(state.getFieldValue('joined','demands')[0].quantity).toBe('90.000001');
+    expect(state.getFieldValue('joined','demands')[1].quantity).toBe('80');
+    expect(state.getFieldValue('joined','allocations').map((row:any)=>row.proposedQty)).toEqual(['60','30.000001','80']);
+  });
+  it('rejects duplicate parent identities instead of joining different material rows by label', () => {
+    expect(() => setupJoinedGroups(true)).toThrow(/group identity/i);
   });
 });

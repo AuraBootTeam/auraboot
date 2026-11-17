@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, useSearchParams, useLocation, useNavigate } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { ProfileProvider } from '@auraboot/runtime-kernel';
 import { adminProfile } from '~/framework/meta/profiles/admin';
@@ -22,7 +22,7 @@ vi.mock('~/contexts/AuthContext', async () => ({
   ...(await vi.importActual<any>('~/contexts/AuthContext')),
   useAuth: () => ({
     token: 'fixture',
-    user: { id: '7' },
+    user: { id: '7', pid: 'fixture-buyer', tenantId: 1 },
     hasPermission: (code: string) => ['qo.srm.use', 'page.page.read'].includes(code),
   }),
   usePermission: () => true,
@@ -226,7 +226,7 @@ describe('Actual ListPageContent→BlockRenderer external custom-only table', ()
   });
 });
 
-function mountQueryContract(source?: Record<string, unknown>, failFirst = false) {
+function mountQueryContract(source?: Record<string, unknown>, failFirst = false, rowExpansion?: any) {
   prepareRuntime();
   const dynamicSchema = {
     ...schema,
@@ -235,7 +235,7 @@ function mountQueryContract(source?: Record<string, unknown>, failFirst = false)
     dataSource: source,
     extension: { ...schema.extension, customOnly: false, skipListData: false },
     dataSources: {},
-    blocks: [{ ...table, dataSource: undefined }],
+    blocks: [{ ...table, table: { ...table.table, rowExpansion }, dataSource: undefined }],
   };
   owned.runtime.getSchema = () => dynamicSchema;
   const success = {
@@ -264,6 +264,18 @@ async function submitOwnedKeyword() {
 }
 
 describe('Actual ListPageContent ordinary query and retry contract', () => {
+  it('carries DSL row expansion into the actual ordinary list without eager child loading', async () => {
+    mountQueryContract({ type: 'api', endpoint: '/api/owned-orders' }, false, {
+      endpoint: '/api/owned-orders/${row.pid}/lines', titleField: 'title',
+      columns: [{ field: 'material', label: 'Material' }],
+    });
+    await screen.findByText('Owned row');
+    expect(owned.transport.mock.calls.some(([endpoint]) => String(endpoint).endsWith('/lines'))).toBe(false);
+    owned.transport.mockResolvedValue({ code: '0', data: { records: [{ pid: 'line-a', material: 'Exact owned material' }], total: 1 } });
+    fireEvent.click(screen.getByRole('button', { name: 'Expand details: Owned row' }));
+    await screen.findByText('Exact owned material');
+    expect(owned.transport).toHaveBeenCalledWith('/api/owned-orders/owned-row/lines', { method: 'get', params: { page: 0, size: 10 } });
+  });
   it('forwards the submitted keyword on an ordinary dynamic list request', async () => {
     mountQueryContract();
     await submitOwnedKeyword();
@@ -371,5 +383,117 @@ describe('Actual generic list selection to DSL runtime seam', () => {
     expect(
       screen.queryByRole('button', { name: 'Inspect selected source' }),
     ).not.toBeInTheDocument();
+  });
+});
+
+
+describe("Actual list hydration on an explicit second page", () => {
+  it("waits for URL filter metadata before loading and keeps the requested page", async () => {
+    const router =
+      await vi.importActual<typeof import("react-router")>("react-router");
+    const prior = [
+      vi.mocked(useSearchParams).getMockImplementation(),
+      vi.mocked(useLocation).getMockImplementation(),
+      vi.mocked(useNavigate).getMockImplementation(),
+    ] as const;
+    vi.mocked(useSearchParams).mockImplementation(router.useSearchParams);
+    vi.mocked(useLocation).mockImplementation(router.useLocation);
+    vi.mocked(useNavigate).mockImplementation(router.useNavigate);
+    try {
+      prepareRuntime();
+      let releaseFields!: (value: any) => void;
+      const fields = new Promise((resolve) => {
+        releaseFields = resolve;
+      });
+      const dynamicSchema = {
+        ...schema,
+        pageKey: "owned_rows_list",
+        modelCode: "owned_rows",
+        dataSource: { type: "api", endpoint: "/api/owned-list", method: "get" },
+        extension: {
+          customOnly: false,
+          skipListData: false,
+          hideSavedViews: true,
+        },
+        dataSources: {},
+        blocks: [{ ...table, dataSource: undefined }],
+      };
+      owned.runtime.getSchema = () => dynamicSchema;
+      owned.transport.mockImplementation(async (endpoint: string) => {
+        if (endpoint.endsWith("/field-meta")) return fields;
+        if (endpoint === "/api/owned-list")
+          return {
+            code: "0",
+            data: {
+              records: [
+                { pid: "owned-second-page", title: "Exact second-page record" },
+              ],
+              total: 21,
+              current: 2,
+              size: 20,
+            },
+          };
+        return { code: "0", data: { pid: "owned-model" } };
+      });
+      function Location() {
+        return (
+          <output data-testid="hydration-url">
+            {router.useLocation().search}
+          </output>
+        );
+      }
+      render(
+        <MemoryRouter
+          initialEntries={[
+            "/p/owned_rows?filter_task=owned&pageNum=2&pageSize=20",
+          ]}
+        >
+          <ProfileProvider value={adminProfile}>
+            <Location />
+            <ListPageContent
+              schema={dynamicSchema}
+              tableName="owned_rows"
+              token="fixture"
+            />
+          </ProfileProvider>
+        </MemoryRouter>,
+      );
+      await waitFor(() =>
+        expect(
+          owned.transport.mock.calls.some(([endpoint]) =>
+            String(endpoint).endsWith("/field-meta"),
+          ),
+        ).toBe(true),
+      );
+      expect(
+        owned.transport.mock.calls.filter(
+          ([endpoint]) => endpoint === "/api/owned-list",
+        ),
+      ).toHaveLength(0);
+      await act(async () => {
+        releaseFields({ code: "0", data: [] });
+      });
+      await screen.findByText("Exact second-page record");
+      await waitFor(() =>
+        expect(screen.getByTestId("dynamic-list")).toHaveAttribute(
+          "data-ready",
+          "true",
+        ),
+      );
+      const reads = owned.transport.mock.calls.filter(
+        ([endpoint]) => endpoint === "/api/owned-list",
+      );
+      expect(reads).toHaveLength(1);
+      expect(reads[0][1].params).toEqual(
+        expect.objectContaining({ page: 1, size: 20, task: "owned" }),
+      );
+      expect(screen.getByTestId("hydration-url")).toHaveTextContent(
+        "pageNum=2",
+      );
+    } finally {
+      vi.mocked(useSearchParams).mockImplementation(prior[0]!);
+      vi.mocked(useLocation).mockImplementation(prior[1]!);
+      vi.mocked(useNavigate).mockImplementation(prior[2]!);
+    }
   });
 });

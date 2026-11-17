@@ -1,3 +1,4 @@
+import type { FieldConfig } from '~/framework/meta/schemas/types';
 import { completeListReadRequest } from './listReadRequest';
 import { resolveListReadErrorMessage } from '~/framework/meta/utils/listReadErrors';
 import React, { useCallback, useEffect } from 'react';
@@ -13,7 +14,7 @@ import { isImplicitSavedView } from '~/framework/smart/utils/savedViewPersistenc
 import { buildApiEndpoint } from '~/routes/_shared/dynamic-route-utils';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
-import { type ListQueryFilterCondition } from './listFilterConditions';
+import { applyApiUserFilters, applyApiTabCondition, type ListQueryFilterCondition } from './listFilterConditions';
 import {
   type ListApiReadRequest,
   type useListApiReadRetry,
@@ -120,7 +121,7 @@ export function useListDataLoader({
   setSearchParams,
   listSchemaFieldNameSet,
   pendingSavedViewFiltersRef,
-}: ListDataLoaderInput) {
+}: ListDataLoaderInput, late: { filterBlock?: { fields?: FieldConfig[] } }) {
   // Load data from API - P2-1 fix: use destructured pagination
   const loadData = useCallback(
     async (params?: ListLoadDataParams) => {
@@ -201,18 +202,8 @@ export function useListDataLoader({
 
           if (isApiDatasource) {
             // For API datasources, pass filter values as individual query params
-            if (submittedFilters) {
-              for (const [key, value] of Object.entries(submittedFilters)) {
-                if (value == null || value === '') continue;
-                // Handle date range objects { start, end }
-                if (typeof value === 'object' && ('start' in value || 'end' in value)) {
-                  if (value.start) queryParams[`${key}_start`] = String(value.start);
-                  if (value.end) queryParams[`${key}_end`] = String(value.end);
-                } else {
-                  queryParams[key] = String(value);
-                }
-              }
-            }
+            applyApiUserFilters(queryParams, submittedFilters || {}, late.filterBlock?.fields);
+            applyApiTabCondition(queryParams, getTabFilter());
             if (requestedSorts.length === 1) {
               queryParams.sortField = requestedSorts[0].fieldCode;
               queryParams.sortOrder = requestedSorts[0].direction;

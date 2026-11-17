@@ -1,0 +1,42 @@
+{
+  "province": {
+    "zh-CN": "省份",
+    "en-US": "Province"
+  },
+  "city": {
+    "zh-CN": "城市",
+    "en-US": "City"
+  },
+  "district": {
+    "zh-CN": "区县",
+    "en-US": "District"
+  },
+  "detail": {
+    "zh-CN": "详细地址",
+    "en-US": "Street address"
+  },
+  "chooseProvince": {
+    "zh-CN": "请选择省份",
+    "en-US": "Choose a province"
+  },
+  "chooseCity": {
+    "zh-CN": "请选择城市",
+    "en-US": "Choose a city"
+  },
+  "chooseDistrict": {
+    "zh-CN": "请选择区县",
+    "en-US": "Choose a district"
+  },
+  "detailPlaceholder": {
+    "zh-CN": "填写街道、楼栋、楼层或收货位置",
+    "en-US": "Enter the street, building, floor or receiving location"
+  },
+  "manual": {
+    "zh-CN": "手动填写地区",
+    "en-US": "Enter region names manually"
+  },
+  "manualHelp": {
+    "zh-CN": "列表未包含所需地区时，可手动填写实际省、市、区县名称。",
+    "en-US": "If your region is not listed, enter its actual province, city and district names."
+  }
+}

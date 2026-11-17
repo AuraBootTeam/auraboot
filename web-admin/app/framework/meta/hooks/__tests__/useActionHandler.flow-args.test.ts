@@ -138,6 +138,28 @@ describe('useActionHandler - action.type=flow handler preserves args', () => {
 
 
 describe('useActionHandler flow refresh scope', () => {
+  it('does not reload the parent form when a runtime flow explicitly owns refresh', async () => {
+    const runtime = makeRuntime(vi.fn());
+    const run = vi.fn().mockResolvedValue(undefined);
+    runtime.getFlowRunner = () => ({ run }) as any;
+    const loadData = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useActionHandler(baseOptions(runtime, { context: { loadData } })));
+    await act(async () => { await result.current.handleAction({ code: 'saveDraftAware', action: {
+      type: 'flow', refresh: false, steps: [{ action: 'form.set', args: { status: 'current' } }],
+    } } as any, { pid: 'ROW-1' }); });
+    expect(run).toHaveBeenCalledOnce();
+    expect(loadData).not.toHaveBeenCalled();
+  });
+
+  it('does not reload the parent form when a fallback flow explicitly owns refresh', async () => {
+    const loadData = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useActionHandler(baseOptions(makeRuntime(vi.fn()), { context: { loadData } })));
+    await act(async () => { await result.current.handleAction({ code: 'saveDraftAware', action: {
+      type: 'flow', refresh: false, steps: [],
+    } } as any, { pid: 'ROW-1' }); });
+    expect(loadData).not.toHaveBeenCalled();
+  });
+
   it('stops a cancelled flow without reporting an error or refreshing data', async () => {
     const runtime = makeRuntime(vi.fn());
     runtime.getFlowRunner = () => ({ run: vi.fn().mockRejectedValue(new ActionCancelledError()) }) as any;

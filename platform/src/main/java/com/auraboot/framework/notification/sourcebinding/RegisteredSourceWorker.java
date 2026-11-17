@@ -2,6 +2,7 @@ package com.auraboot.framework.notification.sourcebinding;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.notification.service.impl.PluginNotificationDeliveryAccessorImpl;
+import com.auraboot.framework.notification.wechat.WechatSubscriptionReservationProperties;
 import com.auraboot.framework.plugin.extension.DataPage;
 import com.auraboot.framework.plugin.extension.NotificationDeliveryAccessor;
 import java.util.ArrayList;
@@ -15,36 +16,69 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** No automatic schedule or recipient policy. Only server-registered sources can be processed. */
+/** Only host-registered sources and explicitly enabled channels; recipients remain owned by source policy. */
 @Component
 public final class RegisteredSourceWorker {
     private final RegisteredSourcePlanResolver planner;
     private final SourceBindingReader reader;
     private final NotificationDeliveryAccessor delivery;
     private final TransactionTemplate transaction;
+    private final Set<String> wechatSourceTypes;
     @Autowired
-    RegisteredSourceWorker(RegisteredSourcePlanResolver planner, ImportedNotificationMetadataReader reader, PluginNotificationDeliveryAccessorImpl delivery, PlatformTransactionManager manager) {
-        this(planner,(SourceBindingReader) reader,(NotificationDeliveryAccessor) delivery, manager);
+    RegisteredSourceWorker(RegisteredSourcePlanResolver planner, ImportedNotificationMetadataReader reader,
+            PluginNotificationDeliveryAccessorImpl delivery, PlatformTransactionManager manager,
+            HostSourceBindingProperties properties, WechatSubscriptionReservationProperties reservations) {
+        this(planner,(SourceBindingReader) reader,(NotificationDeliveryAccessor) delivery, manager, properties, reservations);
     }
     RegisteredSourceWorker(RegisteredSourcePlanResolver planner, SourceBindingReader reader, NotificationDeliveryAccessor delivery, PlatformTransactionManager manager) {
+        this(planner, reader, delivery, manager, new HostSourceBindingProperties(), new WechatSubscriptionReservationProperties());
+    }
+    RegisteredSourceWorker(RegisteredSourcePlanResolver planner, SourceBindingReader reader, NotificationDeliveryAccessor delivery,
+            PlatformTransactionManager manager, HostSourceBindingProperties properties, WechatSubscriptionReservationProperties reservations) {
         this.planner = planner;
         this.reader = reader;
         this.delivery = delivery;
         transaction = new TransactionTemplate(manager);
         transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         transaction.setIsolationLevel(TransactionDefinition.ISOLATION_SERIALIZABLE);
+        if (properties.getWorker().isWechatSubscriptionEnabled()) {
+            SourceBindingTypes.require(properties.isEnabled() && reservations.isEnabled() && !reservations.getSourceTypes().isEmpty());
+            Set<String> registered = planner.registeredBindings().stream().map(SourceBindingTypes.Binding::code)
+                    .collect(java.util.stream.Collectors.toSet());
+            SourceBindingTypes.require(registered.containsAll(reservations.getSourceTypes()));
+            wechatSourceTypes = Set.copyOf(reservations.getSourceTypes());
+        } else {
+            wechatSourceTypes = Set.of();
+        }
     }
-    /** One immutable source/all explicit users: any validation or enqueue failure rolls back every enqueue. */
+    /** Returns source-plan count, not message count. A blocked optional channel is reported after commit. */
     public int process(long tenant, String bindingCode, String sourcePid) {
+        var result = processChannels(tenant, bindingCode, sourcePid);
+        if (!result.failures().isEmpty()) throw new IllegalStateException("NOTIFICATION_SOURCE_WECHAT_DELIVERY_BLOCKED");
+        return result.processedPlans();
+    }
+    record ProcessResult(int processedPlans, List<SourceFailure> failures) {
+        ProcessResult { failures = List.copyOf(failures); }
+    }
+    /** All validated users share one transaction. Missing WeChat consent must not discard valid in-app delivery. */
+    ProcessResult processChannels(long tenant, String bindingCode, String sourcePid) {
         var b = planner.bindings(tenant).stream().filter(x -> x.code().equals(bindingCode)).findFirst();
-        if (b.isEmpty()) return 0;
+        if (b.isEmpty()) return new ProcessResult(0, List.of());
         return scoped(tenant,() -> transaction.execute(status -> {
             var plans = planner.plan(b.get(), sourcePid);
             for (var p : plans) {
                 var result = delivery.enqueue(new NotificationDeliveryAccessor.Request(tenant, p.reference(), NotificationDeliveryAccessor.Channel.IN_APP));
                 if (result.status() == NotificationDeliveryAccessor.Status.BLOCKED) throw new IllegalStateException("NOTIFICATION_SOURCE_DELIVERY_BLOCKED");
             }
-            return plans.size();
+            boolean blocked = false;
+            if (wechatSourceTypes.contains(bindingCode)) {
+                for (var p : plans) {
+                    var result = delivery.enqueue(new NotificationDeliveryAccessor.Request(tenant, p.reference(), NotificationDeliveryAccessor.Channel.WECHAT_SUBSCRIPTION));
+                    blocked |= result.status() == NotificationDeliveryAccessor.Status.BLOCKED;
+                }
+            }
+            return new ProcessResult(plans.size(), blocked
+                    ? List.of(new SourceFailure(sourcePid, null, SourceFailureCode.WECHAT_DELIVERY_BLOCKED)) : List.of());
         }));
     }
     /** Bounded complete scans, stable PID ordering and drift rejection. No broad tenant discovery. */
@@ -77,7 +111,9 @@ public final class RegisteredSourceWorker {
         List<SourceFailure> failures = new ArrayList<>();
         for (String pid : selection.pids()) {
             try {
-                plans += process(tenant, code, pid);
+                var result = processChannels(tenant, code, pid);
+                plans += result.processedPlans();
+                failures.addAll(result.failures());
             } catch (RuntimeException failure) {
                 failures.add(new SourceFailure(pid, failure.getClass().getName(), SourceFailureCode.classify(failure)));
             }

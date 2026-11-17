@@ -1,5 +1,6 @@
 import { resolveRowActionModel } from './rowActionModel';
 import { hasButtonPermissions } from '~/framework/meta/utils/buttonPermissions';
+import { WorkspaceCell } from '~/framework/meta/runtime/renderers/WorkspaceCells';
 import { Pagination } from '~/ui/Pagination';
 import { readServerTablePage, ServerTablePageError, type ServerTablePage } from './serverTablePage';
 import { internalRequest } from '~/shared/services/http-client/internal-api';
@@ -903,6 +904,8 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       );
     }
 
+    if (column.presentation) return <WorkspaceCell value={value} record={row} column={{ ...column, label: getLocalizedText(column.label, locale, t), timezone }} locale={locale} t={t} />;
+
     // 自定义 render 表达式
     if (typeof column.render === 'string') {
       try {
@@ -1594,7 +1597,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
                       key={column.field}
                       className={`${bodyCellClass} text-text text-sm ${
                         colIdx === 0 ? 'font-medium' : ''
-                      } ${column.ellipsis ? 'truncate' : ''} ${column.valueType === 'datetime' || column.valueType === 'date' ? 'whitespace-nowrap' : ''} text-${column.align || 'left'}`}
+                      } ${column.multiline ? '[overflow-wrap:anywhere] whitespace-pre-line' : column.ellipsis ? 'truncate' : column.ellipsis === false && column.valueType !== 'datetime' && column.valueType !== 'date' ? '[overflow-wrap:anywhere] whitespace-normal' : ''} ${column.valueType === 'datetime' || column.valueType === 'date' ? 'whitespace-nowrap' : ''} text-${column.align || 'left'}`}
                       title={getCellTitle(column, row)}
                       style={{
                         maxWidth: column.ellipsis ? column.width : undefined,

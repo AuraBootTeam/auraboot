@@ -152,7 +152,7 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
           <span
             {...attributes}
             {...listeners}
-            className={`${compact ? 'absolute left-0.5 top-1/2 -translate-y-1/2' : 'flex-shrink-0'} cursor-grab opacity-0 transition-opacity group-hover/th:opacity-60 hover:opacity-100 active:cursor-grabbing`}
+            className={`${compact ? 'absolute top-1/2 left-0.5 -translate-y-1/2' : 'flex-shrink-0'} cursor-grab opacity-0 transition-opacity group-hover/th:opacity-60 hover:opacity-100 active:cursor-grabbing`}
             aria-label={t('table.reorderColumn')}
             onClick={(e) => e.stopPropagation()}
           >
@@ -179,10 +179,18 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
           onClick={handleSortClick}
           data-testid={`table-header-sort-${column.field}`}
         >
-          <span className={compact ? 'whitespace-normal leading-4 tracking-normal' : 'truncate'}>{label}</span>
+          <span
+            className={
+              compact || column.ellipsis === false
+                ? 'leading-4 tracking-normal whitespace-normal'
+                : 'truncate'
+            }
+          >
+            {label}
+          </span>
           {sortable && (
             <span
-              className={`${compact && !sortInfo ? 'absolute right-5 top-1/2 -translate-y-1/2' : ''} transition-opacity ${sortInfo ? 'opacity-100' : 'opacity-0 group-hover/th:opacity-40'}`}
+              className={`${compact && !sortInfo ? 'absolute top-1/2 right-5 -translate-y-1/2' : ''} transition-opacity ${sortInfo ? 'opacity-100' : 'opacity-0 group-hover/th:opacity-40'}`}
             >
               <SortIndicator direction={sortInfo?.direction} priority={sortInfo?.priority} />
             </span>

@@ -27,6 +27,8 @@ class InstalledIntegrationTimePrecisionPostgresIT {
     private final InstalledIntegrationServiceTest fixture = new InstalledIntegrationServiceTest();
     private DataSource datasource;
     private TransactionTemplate tx;
+    private DataSourceTransactionManager transactions;
+    private org.springframework.transaction.TransactionStatus testTransaction;
     private InstalledIntegrationReceiptMapper receipts;
     private ReliableIntegrationAccessorImpl outbox;
     private InstalledIntegrationService service;
@@ -34,18 +36,25 @@ class InstalledIntegrationTimePrecisionPostgresIT {
     @BeforeEach void setup() throws Exception {
         fixture.setup();
         String url=System.getenv("TEST_DATABASE_URL");assertNotNull(url);
-        var address=java.net.URI.create(url.substring(5));assertEquals("127.0.0.1",address.getHost());assertEquals("/auraboot_5",address.getPath());
+        var address=java.net.URI.create(url.substring(5));assertEquals("127.0.0.1",address.getHost());assertEquals("/enterprise_1",address.getPath());
         datasource=new DriverManagerDataSource(url,System.getenv("TEST_DATABASE_USERNAME"),System.getenv("TEST_DATABASE_PASSWORD"));
         Configuration config=new Configuration(new Environment("owned-time-precision",new SpringManagedTransactionFactory(),datasource));
         config.setMapUnderscoreToCamelCase(true);config.addMapper(InstalledIntegrationReceiptMapper.class);config.addMapper(OutboxEventMapper.class);
         var session=new SqlSessionTemplate(new SqlSessionFactoryBuilder().build(config));
         receipts=session.getMapper(InstalledIntegrationReceiptMapper.class);
-        outbox=new ReliableIntegrationAccessorImpl(session.getMapper(OutboxEventMapper.class),fixture.json,mock(ReliableIntegrationMetrics.class));
-        tx=new TransactionTemplate(new DataSourceTransactionManager(datasource));
+        outbox=new ReliableIntegrationAccessorImpl(session.getMapper(OutboxEventMapper.class),fixture.json,mock(ReliableIntegrationMetrics.class),null,mock(org.springframework.context.ApplicationEventPublisher.class));
+        transactions=new DataSourceTransactionManager(datasource);
+        tx=new TransactionTemplate(transactions);
         service=new InstalledIntegrationService(fixture.registry,fixture.handlers,fixture.plugins,fixture.installations,fixture.scopes,
                 fixture.commands,fixture.owners,receipts,fixture.executor,fixture.users,fixture.members,fixture.json,new OpenPlatformSecretCodec());
+        // Timestamp round-trips use real PostgreSQL inside one rollback-only fixture transaction.
+        // Never expose synthetic mock-installed events to the live runtime dispatcher.
+        testTransaction=transactions.getTransaction(new org.springframework.transaction.support.DefaultTransactionDefinition());
     }
-    @AfterEach void clear() { fixture.clear(); }
+    @AfterEach void clear() {
+        try { if(testTransaction!=null && !testTransaction.isCompleted()) transactions.rollback(testTransaction); }
+        finally { fixture.clear(); }
+    }
 
     @Test void preservesNanosecondsAcrossBothPostgresRoundingDirectionsAndSecondCarry() throws Exception {
         for(String time:List.of("2026-11-16T09:00:00.123456233Z","2026-11-16T09:00:00.123456789Z","2026-11-16T09:00:59.999999789Z")) {
@@ -93,14 +102,15 @@ class InstalledIntegrationTimePrecisionPostgresIT {
         return event;
     }
     private IntegrationEventEnvelope read(IntegrationEventEnvelope original) throws Exception {
-        try(var connection=datasource.getConnection();var query=connection.prepareStatement("SELECT occurred_at,headers::text FROM ab_outbox WHERE tenant_id=? AND event_id=?")) {
+        var connection=DataSourceUtils.getConnection(datasource);
+        try(var query=connection.prepareStatement("SELECT occurred_at,headers::text FROM ab_outbox WHERE tenant_id=? AND event_id=?")) {
             query.setLong(1,original.tenantId());query.setString(2,original.eventId());
             try(var row=query.executeQuery()) {
                 assertTrue(row.next());Instant time=row.getTimestamp(1).toInstant();
                 Map<String,String> headers=fixture.json.readValue(row.getString(2),new com.fasterxml.jackson.core.type.TypeReference<>(){});
                 assertFalse(row.next());return copy(original,time,headers);
             }
-        }
+        } finally { DataSourceUtils.releaseConnection(connection,datasource); }
     }
     private String state(IntegrationEventEnvelope event) {
         return tx.execute(status->receipts.find(event.tenantId(),"inst",fixture.source,event.headers().get("externalEventId")).state());

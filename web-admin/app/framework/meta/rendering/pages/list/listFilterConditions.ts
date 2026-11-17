@@ -174,6 +174,20 @@ export interface ListQueryFilterCondition {
   values?: unknown[];
 }
 
+function normalizeUserFilterValue(value: unknown, fieldConfig?: FieldConfig): unknown {
+  // ControlledFieldRenderer serializes DateRange objects for the field wire contract.
+  if (typeof value === 'string' && fieldConfig?.component?.toLowerCase() === 'daterange') {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        && ('start' in parsed || 'end' in parsed)) value = parsed;
+    } catch {
+      // Keep malformed values intact so query validation can report them.
+    }
+  }
+  return value;
+}
+
 /**
  * Convert one user filter (key -> raw value, sourced from URL filter_* params,
  * drill-down bare params or the quick filter bar) into its query conditions.
@@ -193,16 +207,7 @@ export function resolveUserFilterCondition(
 ): ListQueryFilterCondition[] {
   if (value == null || value === '') return [];
   const fieldConfig = (filterFields || []).find((field) => field.field === key);
-  // ControlledFieldRenderer serializes DateRange objects for the field wire contract.
-  if (typeof value === 'string' && fieldConfig?.component?.toLowerCase() === 'daterange') {
-    try {
-      const parsed = JSON.parse(value);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-        && ('start' in parsed || 'end' in parsed)) value = parsed;
-    } catch (error) {
-      // Keep malformed values intact so query validation can report them.
- console.warn('[listFilterConditions] previously-silent catch', error);    }
-  }
+  value = normalizeUserFilterValue(value, fieldConfig);
   // Date range objects { start, end }
   if (value !== null && typeof value === 'object' && ('start' in value || 'end' in value)) {
     const range = value as { start?: unknown; end?: unknown };
@@ -283,4 +288,57 @@ export function queryConditionToExportCondition(condition: ListQueryFilterCondit
     operator: condition.operator,
     value: condition.values ?? condition.value ?? null,
   };
+}
+
+/** Selected API queue wins over a stale filter-form value for the same field. */
+export function applyApiTabCondition(query: Record<string, unknown>, condition: ListQueryFilterCondition | null): void {
+  if (!condition) return;
+  if (!condition.fieldName.trim() || condition.operator.toUpperCase() !== 'EQ' ||
+      condition.value === undefined || condition.value === null || typeof condition.value === 'object') {
+    throw new Error('API list tabs require a scalar equality filter');
+  }
+  query[condition.fieldName] = String(condition.value);
+}
+
+
+/** API tab fields may describe queues rather than response properties; the server owns them. */
+export function filterListTabDisplayData<T extends Record<string, any>>(
+  records: T[],
+  condition: ListQueryFilterCondition | null,
+  apiDatasource: boolean,
+): T[] {
+  if (apiDatasource || !condition) return records;
+  const operator = String(condition.operator || 'EQ').toUpperCase();
+  const expected = String(condition.value ?? '');
+  const candidates = (condition.values ?? (Array.isArray(condition.value) ? condition.value : [condition.value]))
+    .filter(value => value != null).map(String);
+  return records.filter(record => {
+    const actual = String(record[condition.fieldName] ?? '');
+    switch (operator) {
+      case 'EQ': return actual === expected;
+      case 'NE':
+      case 'NEQ': return actual !== expected;
+      case 'IN': return candidates.includes(actual);
+      case 'NOT_IN':
+      case 'NOTIN': return !candidates.includes(actual);
+      default: return true;
+    }
+  });
+}
+
+/** Serialize submitted API filters using the same wire contract as the list read. */
+export function applyApiUserFilters(
+  query: Record<string, unknown>,
+  filters: Record<string, any>,
+  filterFields?: FieldConfig[],
+): void {
+  for (const [key, rawValue] of Object.entries(filters)) {
+    const value = normalizeUserFilterValue(rawValue, filterFields?.find((field) => field.field === key));
+    if (value == null || value === '') continue;
+    if (typeof value === 'object' && ('start' in value || 'end' in value)) {
+      const range = value as { start?: unknown; end?: unknown };
+      if (range.start) query[`${key}_start`] = String(range.start);
+      if (range.end) query[`${key}_end`] = String(range.end);
+    } else query[key] = String(value);
+  }
 }

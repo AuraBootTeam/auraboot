@@ -33,7 +33,7 @@ class ExternalIngressDefaultsPostgresIT {
 
     @BeforeEach void setup() throws Exception {
         String url = System.getenv("TEST_DATABASE_URL"); assertNotNull(url);
-        var uri = java.net.URI.create(url.substring(5)); assertEquals("127.0.0.1", uri.getHost()); assertEquals("/auraboot_5", uri.getPath());
+        var uri = java.net.URI.create(url.substring(5)); assertEquals("127.0.0.1", uri.getHost()); assertEquals("/enterprise_1", uri.getPath());
         var ds = new DriverManagerDataSource(url, System.getenv("TEST_DATABASE_USERNAME"), System.getenv("TEST_DATABASE_PASSWORD"));
         datasource = ds;
         // Fixture setup only: business persistence below always uses the production mapper/service.
@@ -76,6 +76,9 @@ class ExternalIngressDefaultsPostgresIT {
         String replay = accept("stable-key-001", "{ \"data\": {\"a\":1,\"b\":2} }");
         assertEquals(json.readTree(first), json.readTree(replay));
         assertNotNull(json.readTree(first).get("id")); assertNotNull(json.readTree(first).get("occurredAt")); assertEquals(1, count());
+        assertTrue(service().hasStoredDefaults(tenant, installation, SOURCE, "stable-key-001", null));
+        assertFalse(service().hasStoredDefaults(tenant + 1, installation, SOURCE, "stable-key-001", null));
+        assertFalse(service().hasStoredDefaults(tenant, installation, SOURCE, "not-yet-stored", null));
     }
     @Test void sameKeyChangedPayloadIsConflictAndDoesNotOverwrite() throws Exception {
         String first = accept("stable-key-002", "{\"data\":1}");

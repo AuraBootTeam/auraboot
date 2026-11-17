@@ -60,7 +60,9 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
         ...context,
         record: initialRecord,
         row: initialRecord,
-        form: initialRecord,
+        // Keep locally edited arrays/preview state while fresh parent facts own
+        // identity and availability. Binding a record must not discard drafts.
+        form: { ...context.form, ...initialRecord },
       }
     : context;
   const showToast = React.useCallback(

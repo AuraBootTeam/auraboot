@@ -17,12 +17,16 @@ public class HostSourceBindingProperties {
     public void setWorker(Polling worker) {
         this.worker = java.util.Objects.requireNonNull(worker);
     }
-    /** Technical polling bounds only; no reminder timing or recipient policy. */
+    /** Polling bounds and explicit channel opt-in; no reminder timing or recipient policy. */
     public static final class Polling {
         private boolean enabled;
+        private boolean wechatSubscriptionEnabled;
         private Long pollIntervalMs;
         private Integer maxSourcesPerBinding;
         private Integer maxBindings;
+
+        public boolean isWechatSubscriptionEnabled() { return wechatSubscriptionEnabled; }
+        public void setWechatSubscriptionEnabled(boolean value) { wechatSubscriptionEnabled = value; }
 
         public boolean isEnabled() {
             return enabled;

@@ -16,7 +16,8 @@ public class ReliableIntegrationMetrics {
 
     private static final Set<String> OUTCOMES = Set.of(
             "enqueued", "claimed", "delivered", "lease_fence_lost", "dead_lettered", "retry_scheduled",
-            "replayed", "quarantined", "lease_recovered", "duplicate_suppressed", "receipt_applied", "other");
+            "replayed", "quarantined", "lease_recovered", "duplicate_suppressed", "receipt_applied", "other",
+            "commit_dispatch_started", "commit_dispatch_failed", "commit_dispatch_deferred");
 
     private final MeterRegistry registry;
     private final ConcurrentMap<String, Counter> counters = new ConcurrentHashMap<>();

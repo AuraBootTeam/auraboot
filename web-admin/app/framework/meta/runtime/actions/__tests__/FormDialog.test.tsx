@@ -18,6 +18,82 @@ function renderDialog(detail: Record<string, any>) {
 }
 
 describe('FormDialog choice fields', () => {
+  it('commits the first field error before focusing and revealing its caption', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView');
+    const scrolled: HTMLElement[] = [];
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: function (this: HTMLElement) {
+        expect(this.isConnected).toBe(true);
+        scrolled.push(this);
+      },
+    });
+    try {
+      renderDialog({
+        fields: [{ field: 'code', label: 'Code', type: 'text', required: true }],
+        onSubmit: vi.fn(),
+      });
+      fireEvent.click(screen.getByTestId('form-dialog-submit'));
+      const input = screen.getByTestId('form-dialog-field-code');
+      expect(input).toHaveFocus();
+      expect(input).toHaveAttribute('aria-invalid', 'true');
+      expect(scrolled.at(-1)).toBe(
+        document.getElementById(input.getAttribute('aria-describedby')!),
+      );
+      expect(scrolled.at(-1)?.textContent).toContain('Code');
+    } finally {
+      if (descriptor) Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', descriptor);
+      else delete (HTMLElement.prototype as any).scrollIntoView;
+    }
+  });
+
+  it('keeps a patterned text draft editable until corrected, before submitting once', () => {
+    const onSubmit = vi.fn();
+    renderDialog({
+      fields: [
+        {
+          field: 'code',
+          type: 'text',
+          label: 'Code',
+          required: true,
+          props: {
+            pattern: '[A-Z]{2}[0-9]{2}',
+            invalidMessage: {
+              'zh-CN': '请填写两位字母和两位数字',
+              en: 'Use two letters and two digits',
+            },
+          },
+        },
+      ],
+      defaults: { code: 'bad' },
+      onSubmit,
+    });
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByText('请填写两位字母和两位数字')).toBeVisible();
+    expect(screen.getByTestId('form-dialog-field-code')).toHaveValue('bad');
+    fireEvent.change(screen.getByTestId('form-dialog-field-code'), {
+      target: { value: '  AB12  ' },
+    });
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).toHaveBeenCalledExactlyOnceWith({ code: '  AB12  ' });
+  });
+
+  it('rejects partial pattern matches and malformed configured patterns without submitting', () => {
+    const onSubmit = vi.fn();
+    renderDialog({
+      fields: [
+        { field: 'code', type: 'text', props: { pattern: '[A-Z]{2}' } },
+        { field: 'broken', type: 'text', props: { pattern: '[' } },
+      ],
+      defaults: { code: 'xABy', broken: 'anything' },
+      onSubmit,
+    });
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByTestId('form-dialog-field-code')).toHaveValue('xABy');
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
@@ -127,24 +203,40 @@ describe('FormDialog choice fields', () => {
     expect(onSubmit).toHaveBeenCalledWith({ crm_lpi_claimed_by: 'user-sales-1' });
   });
 
-  it.each(['select', 'segmented'])('accepts an optional null %s choice when no workflow is configured', (type) => {
-    const onSubmit = vi.fn();
-    renderDialog({ fields: [{ field: 'workflow', label: '审批流程', type }],
-      fieldOptions: { workflow: [] }, defaults: { workflow: null }, onSubmit });
-    fireEvent.click(screen.getByTestId('form-dialog-submit'));
-    expect(onSubmit).toHaveBeenCalledWith({ workflow: null });
-  });
-
-  it.each([['select', null], ['segmented', null], ['select', 'missing'], ['segmented', 'missing']])(
-    'rejects a required or unknown %s choice: %s', (type, value) => {
+  it.each(['select', 'segmented'])(
+    'accepts an optional null %s choice when no workflow is configured',
+    (type) => {
       const onSubmit = vi.fn();
-      renderDialog({ fields: [{ field: 'workflow', label: '审批流程', type, required: true }],
-        fieldOptions: { workflow: [{ value: 'known', label: '可用流程' }] }, defaults: { workflow: value }, onSubmit });
+      renderDialog({
+        fields: [{ field: 'workflow', label: '审批流程', type }],
+        fieldOptions: { workflow: [] },
+        defaults: { workflow: null },
+        onSubmit,
+      });
       fireEvent.click(screen.getByTestId('form-dialog-submit'));
-      expect(onSubmit).not.toHaveBeenCalled();
-      expect(screen.getByText(type === 'segmented' ? '请填写审批流程' : '请选择审批流程', { exact: true })).toBeInTheDocument();
+      expect(onSubmit).toHaveBeenCalledWith({ workflow: null });
     },
   );
+
+  it.each([
+    ['select', null],
+    ['segmented', null],
+    ['select', 'missing'],
+    ['segmented', 'missing'],
+  ])('rejects a required or unknown %s choice: %s', (type, value) => {
+    const onSubmit = vi.fn();
+    renderDialog({
+      fields: [{ field: 'workflow', label: '审批流程', type, required: true }],
+      fieldOptions: { workflow: [{ value: 'known', label: '可用流程' }] },
+      defaults: { workflow: value },
+      onSubmit,
+    });
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(type === 'segmented' ? '请填写审批流程' : '请选择审批流程', { exact: true }),
+    ).toBeInTheDocument();
+  });
 
   it('uses localized fallbacks instead of leaking missing i18n keys', () => {
     renderDialog({
@@ -660,6 +752,25 @@ describe('FormDialog grouped choices', () => {
     required: true,
     props: { groupField: 'category', valuesField: 'supplierPids' },
   };
+  it('opt-in partial groups require at least one explicit selection and preserve empty groups', () => {
+    const onSubmit = vi.fn();
+    renderDialog({
+      fields: [{ ...field, props: { ...field.props, allowEmptyGroups: true } }],
+      fieldOptions: { categorySuppliers: groups },
+      defaults: {},
+      onSubmit,
+    });
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).not.toHaveBeenCalled();
+    fireEvent.click(screen.getAllByRole('checkbox', { name: '供应商甲' })[0]);
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(onSubmit).toHaveBeenCalledWith({
+      categorySuppliers: [
+        { category: 'resistors', supplierPids: ['supplier-a'] },
+        { category: 'capacitors', supplierPids: [] },
+      ],
+    });
+  });
   it('requires explicit selection in every group and submits independent multi selections', () => {
     const onSubmit = vi.fn();
     renderDialog({

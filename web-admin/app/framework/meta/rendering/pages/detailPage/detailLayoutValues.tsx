@@ -17,6 +17,25 @@ import type { RecordData } from './detailPageTypes';
 import { resolveTextFallback } from './detailFieldDisplay';
 import { readDetailRecordField } from './detailRecordRequests';
 
+/** Declared related records may navigate only to an internal detail route. */
+export function resolveDetailRelatedLinks(config: unknown, record: Record<string, unknown>) {
+  if (config == null) return [];
+  const value = config as {field?: unknown; labelField?: unknown; to?: unknown};
+  if (typeof value.field !== 'string' || typeof value.labelField !== 'string' || typeof value.to !== 'string'
+      || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(value.field) || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(value.labelField)
+      || !/^\/p\/[A-Za-z0-9_-]+\/view\/\{pid\}$/.test(value.to)) throw new Error('Invalid related-record link configuration');
+  const rows = Object.hasOwn(record, value.field) ? record[value.field] : undefined;
+  if (!Array.isArray(rows)) throw new Error('Related records must be an explicit array');
+  const seen = new Set<string>();
+  return rows.map(row => {
+    if (!row || typeof row !== 'object' || typeof row.pid !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(row.pid)
+        || typeof row[value.labelField as string] !== 'string' || !row[value.labelField as string].trim() || seen.has(row.pid))
+      throw new Error('Invalid or duplicate related record');
+    seen.add(row.pid);
+    return {pid: row.pid as string, label: row[value.labelField as string] as string, to: (value.to as string).replace('{pid}', encodeURIComponent(row.pid))};
+  });
+}
+
 export function resolveDetailMissingRecordTitle(
   locale: string,
   t: (key: string) => string,

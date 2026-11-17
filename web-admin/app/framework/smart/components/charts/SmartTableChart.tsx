@@ -166,7 +166,7 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
   const [modelRows, setModelRows] = useState<Record<string, unknown>[]>([]);
   const [modelLoading, setModelLoading] = useState(false);
   const [modelError, setModelError] = useState<Error | null>(null);
-  const useModelBranch = !useChartBranch && !!modelCode && !!tableColumns?.length;
+  const useModelBranch = !dataSource && !!modelCode && !!tableColumns?.length;
   const [apiRows, setApiRows] = useState<Record<string, unknown>[]>([]);
   const [apiLoading, setApiLoading] = useState(false);
   const [apiError, setApiError] = useState<Error | null>(null);
@@ -338,7 +338,7 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
   // never builds a QueryMeta, hence resolving straight from the column fields.
   const columnFields = useMemo(() => columns.map((c) => c.field), [columns]);
   const cellLabels = useDimensionLabels(
-    modelCode ? { type: 'aggregate', modelCode } : dataSource,
+    useModelBranch && modelCode ? { type: 'aggregate', modelCode } : dataSource,
     columnFields,
   );
 

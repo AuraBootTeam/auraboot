@@ -16,7 +16,10 @@ import {
 } from '~/framework/meta/utils/commandDownload';
 import { resolveCommandErrorMessage } from '~/framework/meta/utils/commandResponseErrors';
 import { ActionCancelledError } from './ActionCancelledError';
+import { completedCommandOptions } from '../data-pipeline/completed-command-array';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import { ExpressionParser } from '../expression/parser';
+import { createExpressionContext } from '../expression/context';
 /**
  * ActionRegistry - 动作注册中心
  *
@@ -75,6 +78,7 @@ export interface ActionContext {
 
   // 筛选器状态 (可选 - 列表页使用)
   filters?: Record<string, any>;
+  setKeyword?: (keyword: string) => void;
   setFilters?: (
     filters: Record<string, any> | ((prev: Record<string, any>) => Record<string, any>),
   ) => void;
@@ -483,11 +487,13 @@ actionRegistry.register('search', ({ loadData, filters, setPagination }) => {
 /**
  * 重置筛选器 - 清空筛选条件并重新加载数据
  */
-actionRegistry.register('reset', ({ setFilters, loadData, setPagination }) => {
+actionRegistry.register('reset', ({ setFilters, setKeyword, loadData, setPagination }) => {
   if (!setFilters || !loadData || !setPagination) {
     console.error('[ActionRegistry] reset: missing setFilters, loadData or setPagination');
     return;
   }
+  // Update the list's synchronous keyword ref before issuing the reset read.
+  setKeyword?.('');
   setFilters({});
   setPagination((prev) => ({ ...prev, current: 1 }));
   loadData({ page: 0, filters: {} });
@@ -722,11 +728,21 @@ actionRegistry.register('toast.error', ({ args, showToast, locale, t }) => {
 /**
  * dialog.confirm - 确认对话框
  */
-actionRegistry.register('dialog.confirm', async ({ args, confirm: ctxConfirm }) => {
-  let message: any = args?.message || args?.content || 'Are you sure you want to proceed?';
-  if (message && typeof message === 'object') {
-    message =
-      (message as any)['zh-CN'] || (message as any)['en-US'] || 'Are you sure you want to proceed?';
+actionRegistry.register('dialog.confirm', async ({ args, confirm: ctxConfirm, expressionContext, locale, t }) => {
+  const configured = getLocalizedText(args?.message || args?.content, locale, t) || 'Are you sure you want to proceed?';
+  let message: unknown = configured;
+  if (configured.includes('${')) {
+    try {
+      if (!expressionContext) throw new Error('Missing confirmation context');
+      // Resolve configured expressions once. Never parse values returned by business data.
+      message = ExpressionParser.parse(configured, createExpressionContext(expressionContext));
+      if (typeof message !== 'string' || !message.trim()) throw new Error('Invalid confirmation text');
+    } catch {
+      throw new Error(getLocalizedText({
+        'zh-CN': '无法生成确认内容，请刷新后重新核对。',
+        en: 'Unable to prepare the confirmation. Refresh and review your selections.',
+      }, locale, t));
+    }
   }
   const doConfirm = ctxConfirm ?? confirmDialog;
   const confirmed = await doConfirm({ content: message as string });
@@ -920,6 +936,28 @@ export async function promptInputForm(
     }
     if (field.dictCode && fetchResult) {
       fieldOptions[field.field] = await loadDictionary(String(field.dictCode));
+    } else if (field.dataSource?.type === 'command') {
+      // Choice commands use the governed command boundary; incomplete collections
+      // must not open an empty form or continue to its mutation command.
+      const fallback = translateOrFallback(feedback.t, 'error.data_load_failed', 'Could not load choices. Try again.');
+      const code = field.dataSource.commandCode;
+      const payload = field.dataSource.payload ?? {};
+      if (!fetchResult || typeof code !== 'string' || !/^[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+$/.test(code)
+        || typeof payload !== 'object' || Array.isArray(payload)) throw new Error(fallback);
+      const endpoint = `/api/meta/commands/execute/${encodeURIComponent(code)}`;
+      const result = await fetchPromptChoices(fetchResult, endpoint,
+        { method: 'post', params: { payload } }, feedback);
+      try {
+        fieldOptions[field.field] = completedCommandOptions(result.data, {
+          type: 'api', endpoint, adaptor: 'commandOptions', dataPath: 'items',
+          valueField: field.dataSource.valueField ?? 'value',
+          labelField: field.dataSource.labelField ?? 'label',
+        });
+      } catch {
+        // CATCH: public schema-validation boundary; never expose returned data or
+        // treat failed validation as a successful empty options collection.
+        throw new Error(fallback);
+      }
     } else if (field.dataSource?.type === 'api' && field.dataSource.endpoint && fetchResult) {
       const endpoint = options.bindingsResolved
         ? String(field.dataSource.endpoint)

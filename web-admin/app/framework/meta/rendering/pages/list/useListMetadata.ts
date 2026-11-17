@@ -19,6 +19,7 @@ import { savedViewService } from '~/shared/services/savedViewService';
 import { type User, ResultHelper } from '~/utils/type';
 
 import {
+  filterListTabDisplayData,
   resolveSavedViewFilterExpressions,
   resolveUserFilterCondition,
   tabFilterToQueryCondition,
@@ -361,35 +362,10 @@ export function useListMetadata(
     return tabFilterToQueryCondition(currentTab.filter, user?.pid);
   }, [schema, activeTab, user?.pid]);
 
-  const displayData = useMemo(() => {
-    const tabCondition = getTabFilter();
-    if (!tabCondition) return data;
-    const operator = String(tabCondition.operator || 'EQ').toUpperCase();
-    const expected = String(tabCondition.value ?? '');
-    const expectedValues = (
-      tabCondition.values ??
-      (Array.isArray(tabCondition.value) ? tabCondition.value : [tabCondition.value])
-    )
-      .filter((value) => value != null)
-      .map(String);
-    return data.filter((record) => {
-      const actual = String((record as Record<string, any>)[tabCondition.fieldName] ?? '');
-      switch (operator) {
-        case 'EQ':
-          return actual === expected;
-        case 'NE':
-        case 'NEQ':
-          return actual !== expected;
-        case 'IN':
-          return expectedValues.includes(actual);
-        case 'NOT_IN':
-        case 'NOTIN':
-          return !expectedValues.includes(actual);
-        default:
-          return true;
-      }
-    });
-  }, [data, getTabFilter]);
+  const displayData = useMemo(
+    () => filterListTabDisplayData(data, getTabFilter(), schema?.dataSource?.type === 'api'),
+    [data, getTabFilter, schema?.dataSource?.type],
+  );
 
   // Build filters JSON array from tab filter + user filters
   const buildFiltersParam = useCallback(

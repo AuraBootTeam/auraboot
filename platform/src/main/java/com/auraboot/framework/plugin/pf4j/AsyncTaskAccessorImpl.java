@@ -59,7 +59,10 @@ public class AsyncTaskAccessorImpl implements AsyncTaskAccessor {
         input.put("recordPid", recordPid);
         input.put("payload", payload != null ? payload : Map.of());
         input.put("handlerParams", Map.of("async", true));
-        if (resumable) input.put("resumeOnRestart", true);
+        if (resumable) {
+            input.put("resumeOnRestart", true);
+            input.put("dispatchThroughPipeline", true);
+        }
 
         // Carry only a verdict applicable to this model. Cross-model follow-ups
         // must obtain their own authorization; never widen a caller's row scope.
@@ -67,7 +70,7 @@ public class AsyncTaskAccessorImpl implements AsyncTaskAccessor {
                 && java.util.Objects.equals(tenantId, MetaContext.getCurrentTenantId())
                 && java.util.Objects.equals(userId, MetaContext.getCurrentUserId());
         String permit = sameIdentity ? MetaContext.getCommandPermitScopeFor(modelCode) : null;
-        if (permit != null) {
+        if (permit != null && !resumable) {
             input.put("commandPermitScope", permit);
             String authority = MetaContext.getCommandAuthority();
             if (authority != null) input.put("commandAuthority", authority);

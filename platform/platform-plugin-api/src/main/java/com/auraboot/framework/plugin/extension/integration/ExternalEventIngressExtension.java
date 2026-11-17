@@ -2,15 +2,51 @@ package com.auraboot.framework.plugin.extension.integration;
 
 import org.pf4j.ExtensionPoint;
 import java.util.Set;
+import java.util.Map;
 
 /** Declares a fixed installed-integration command surface. No client-selected commands. */
 public interface ExternalEventIngressExtension extends ExtensionPoint {
     Registration registration();
 
+    /** Optional pure adapter for this provider's fixed business contract. No IO or side effects. */
+    default java.util.Optional<BusinessRequest> prepareBusinessRequest(java.util.Map<String,Object> input) {
+        return java.util.Optional.empty();
+    }
+
+    /** Internal normalized event; no routing fields are added to the public request. */
+    record BusinessRequest(String eventType, String subjectType, String subjectPid,
+                           java.time.Instant occurredAt, java.util.Map<String,Object> payload) {
+        public BusinessRequest {
+            if(eventType==null || !eventType.matches("external\\.[a-z0-9.-]+\\.v[1-9][0-9]*")
+                    || subjectType==null || !subjectType.matches("[a-z][a-z0-9-]{1,63}")
+                    || subjectPid==null || !subjectPid.matches("[A-Za-z0-9_.:-]{1,128}")
+                    || occurredAt==null || payload==null)
+                throw new IllegalArgumentException("Invalid business request identity");
+            payload=java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(payload));
+        }
+    }
+
     /** Explicit historical event sets allowed only for terminal receipt queries/replays.
      * No command, binding, permission or provider identity compatibility is implied. */
     default Set<Set<String>> completedReceiptEventTypeSets() { return Set.of(); }
 
+
+    /** Explicit process-only model read grants added since an earlier completed receipt.
+     * The host may remove only entire read-only grants when proving the old full command digest.
+     * Accept/result commands, writes and binding identity remain pinned. Never applies to pending work.
+     */
+    default Set<String> completedReceiptProcessReadAdditions() { return Set.of(); }
+
+    /** Exact fields added only to an existing process read grant. The host may reconstruct
+     * its predecessor for completed receipt reads/replays, retaining all existing write grants
+     * and every other command/binding field in the original digest. Never migrates pending work.
+     */
+    default Map<String,Set<String>> completedReceiptProcessReadFieldAdditions() { return Map.of(); }
+
+    /** Explicit opt-in for verifying terminal receipts from before this process gained scoped secret reads.
+     * Reconstructs only the missing secret-read declaration; never executes old or unfinished work.
+     */
+    default boolean completedReceiptProcessSecretReadAddition() { return false; }
 
     /** Opt-in request defaults owned by the provider, before durable acceptance. */
     default java.util.Optional<RequestNormalizer> requestNormalizer() { return java.util.Optional.empty(); }

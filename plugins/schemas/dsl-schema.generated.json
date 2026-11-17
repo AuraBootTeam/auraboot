@@ -1249,13 +1249,13 @@
         "pagination": {
           "type": "boolean"
         },
-        "adaptor": {
-          "type": "string",
-          "description": "Defaults to optionList. Use raw to retain an API object's explicit paging or business metadata."
-        },
         "paginationRequest": {
           "$ref": "#/definitions/PaginationRequestConfig",
           "description": "Explicit placement of runtime pageNum/pageSize, without changing other request inputs."
+        },
+        "adaptor": {
+          "type": "string",
+          "description": "Defaults to optionList. Use raw to retain an API object's explicit paging or business metadata."
         },
         "dataPath": {
           "type": "string",
@@ -2363,6 +2363,9 @@
           "$ref": "#/definitions/TreeConfig",
           "description": "Tree configuration — enables hierarchical expandable rows"
         },
+        "rowExpansion": {
+          "$ref": "#/definitions/RowExpansionConfig"
+        },
         "showSummaryRow": {
           "type": "boolean",
           "description": "Show the column summary/footer row (T10). Defaults to showing the footer automatically when any column declares an `aggregate`; set explicitly to `false` to suppress it, or `true` to force it. The footer aggregates the current page's rows only (see ColumnConfig.aggregate)."
@@ -2691,6 +2694,10 @@
         "ellipsis": {
           "type": "boolean"
         },
+        "multiline": {
+          "type": "boolean",
+          "description": "Text renderer: preserve line breaks and wrap long identifiers without HTML interpretation."
+        },
         "fixed": {
           "type": "string",
           "enum": [
@@ -2922,6 +2929,10 @@
     "TreeConfig": {
       "type": "object",
       "properties": {
+        "childrenField": {
+          "type": "string",
+          "description": "Optional nested children array; pagination counts root records."
+        },
         "parentField": {
           "type": "string",
           "description": "Self-referencing field (e.g., 'parent_id')"
@@ -2939,6 +2950,84 @@
         "parentField"
       ],
       "additionalProperties": false
+    },
+    "RowExpansionConfig": {
+      "type": "object",
+      "properties": {
+        "endpoint": {
+          "type": "string"
+        },
+        "titleField": {
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/LocalizedText"
+            }
+          ]
+        },
+        "rowKey": {
+          "type": "string"
+        },
+        "pageParam": {
+          "type": "string"
+        },
+        "sizeParam": {
+          "type": "string"
+        },
+        "pageIndexBase": {
+          "type": "number",
+          "enum": [
+            0,
+            1
+          ]
+        },
+        "pageSize": {
+          "type": "number"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string"
+              },
+              "label": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "$ref": "#/definitions/LocalizedText"
+                  }
+                ]
+              },
+              "multiline": {
+                "type": "boolean"
+              },
+              "width": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "field",
+              "label"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "endpoint",
+        "columns"
+      ],
+      "additionalProperties": false,
+      "description": "Lazy, read-only child records; the parent list and its navigation remain independent."
     },
     "BusinessActivityDataSource": {
       "type": "object",

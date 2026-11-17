@@ -2,7 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const { execFileSync } = require("node:child_process");
-const { createServer } = require("node:net");
+const { createConnection } = require("node:net");
 const { target } = require("../runtime/environment");
 const { redact } = require("../runtime/logger");
 const MARKER = ".aura-mini-project.json";
@@ -279,14 +279,23 @@ function readProject(project, { expected = {}, mode } = {}) {
   validateProjectTarget(manifest.config, manifest.mode);
   return manifest;
 }
-function portBusy(port) {
+function portBusy(port, { connect = createConnection, timeoutMs = 2000 } = {}) {
   return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.once("error", (error) =>
-      error.code === "EADDRINUSE" ? resolve(true) : reject(error),
+    // A successful bind does not prove absence of a reusable dual-stack listener.
+    const socket = connect({ host: "127.0.0.1", port });
+    let finished = false;
+    const finish = (error, busy) => {
+      if (finished) return;
+      finished = true;
+      socket.destroy();
+      if (error) reject(error);
+      else resolve(busy);
+    };
+    socket.once("connect", () => finish(null, true));
+    socket.once("error", (error) =>
+      error.code === "ECONNREFUSED" ? finish(null, false) : finish(error),
     );
-    server.once("listening", () => server.close(() => resolve(false)));
-    server.listen(port, "127.0.0.1");
+    socket.setTimeout(timeoutMs, () => finish(new Error("DevTools port probe timed out")));
   });
 }
 async function openDevTools({
@@ -429,6 +438,7 @@ async function openDevTools({
   };
 }
 module.exports = {
+  portBusy,
   prepareProject,
   preflight,
   verifyBridge,

@@ -123,25 +123,34 @@ export function StatusDot({
   label,
   icon,
   className = '',
+  multiline = false,
 }: {
   tone: StatusTone;
   label: React.ReactNode;
   icon?: string | null;
   className?: string;
+  multiline?: boolean;
 }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 ${className}`}>
+    <span
+      className={`inline-flex gap-1.5 ${multiline ? 'max-w-full min-w-0 items-start' : 'items-center'} ${className}`}
+    >
       {icon ? (
-        <span className="text-text-3 inline-flex shrink-0 items-center" aria-hidden="true">
+        <span
+          className={`text-text-3 inline-flex shrink-0 items-center ${multiline ? 'mt-0.5' : ''}`}
+          aria-hidden="true"
+        >
           {resolveIcon(icon, '', 14)}
         </span>
       ) : (
         <span
-          className={`rounded-pill h-2 w-2 shrink-0 ${STATUS_TONE_DOT[tone]}`}
+          className={`rounded-pill h-2 w-2 shrink-0 ${STATUS_TONE_DOT[tone]} ${multiline ? 'mt-1.5' : ''}`}
           aria-hidden="true"
         />
       )}
-      <span className="text-text">{label}</span>
+      <span className={multiline ? 'text-text min-w-0 break-words whitespace-normal' : 'text-text'}>
+        {label}
+      </span>
     </span>
   );
 }

@@ -488,18 +488,29 @@ describe('ListTable expandable tree rows (T10)', () => {
   });
 });
 
-
 it('uses the same compact widths and spacing for headers, rows and aggregates', async () => {
   const descriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
-  Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => 480 });
+  Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+    configurable: true,
+    get: () => 480,
+  });
   try {
-    const { container } = renderListTable({ columns: [
-      { field: 'name', label: 'Project', presentation: { kind: 'object' } },
-      { field: 'amount', label: 'Budget', valueType: 'currency', aggregate: 'sum' },
-      { field: 'status', label: 'Status', valueType: 'tag' },
-    ], data: [{ pid: 'one', name: 'Delivery', amount: 680000, status: 'Active' }] });
-    await waitFor(() => expect(Number.parseFloat(container.querySelector('table')!.style.width)).toBeLessThanOrEqual(480));
-    const widths = Array.from(container.querySelectorAll('col')).map(col => Number.parseFloat((col as HTMLTableColElement).style.width));
+    const { container } = renderListTable({
+      columns: [
+        { field: 'name', label: 'Project', presentation: { kind: 'object' } },
+        { field: 'amount', label: 'Budget', valueType: 'currency', aggregate: 'sum' },
+        { field: 'status', label: 'Status', valueType: 'tag' },
+      ],
+      data: [{ pid: 'one', name: 'Delivery', amount: 680000, status: 'Active' }],
+    });
+    await waitFor(() =>
+      expect(Number.parseFloat(container.querySelector('table')!.style.width)).toBeLessThanOrEqual(
+        480,
+      ),
+    );
+    const widths = Array.from(container.querySelectorAll('col')).map((col) =>
+      Number.parseFloat((col as HTMLTableColElement).style.width),
+    );
     expect(widths.reduce((sum, width) => sum + width, 0)).toBeLessThanOrEqual(480);
     for (const field of ['name', 'amount', 'status']) {
       expect(screen.getByTestId(`table-header-${field}`)).toHaveClass('px-3');
@@ -510,4 +521,28 @@ it('uses the same compact widths and spacing for headers, rows and aggregates', 
     if (descriptor) Object.defineProperty(HTMLElement.prototype, 'clientWidth', descriptor);
     else delete (HTMLElement.prototype as any).clientWidth;
   }
+});
+
+describe('list header label overflow contract', () => {
+  it('wraps a full label when the authored column explicitly disables ellipsis', () => {
+    renderListTable({
+      columns: [
+        {
+          field: 'submitted',
+          label: 'Cumulative submitted shipment quantity',
+          width: 130,
+          ellipsis: false,
+        },
+      ],
+    });
+    expect(screen.getByText('Cumulative submitted shipment quantity')).toHaveClass(
+      'whitespace-normal',
+    );
+    expect(screen.getByText('Cumulative submitted shipment quantity')).not.toHaveClass('truncate');
+  });
+
+  it('retains default compact labels for columns without an overflow override', () => {
+    renderListTable({ columns: [{ field: 'submitted', label: 'Submitted quantity', width: 130 }] });
+    expect(screen.getByText('Submitted quantity')).toHaveClass('truncate');
+  });
 });

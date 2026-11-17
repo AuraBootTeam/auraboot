@@ -531,8 +531,8 @@ final class ProductQuoteReminderNativeFacet {
         assertThat(sha(file)).isEqualTo(required("S06_NATIVE_PRODUCT_INPUT_SHA256"));
         JsonNode input = s.json.readTree(file.toFile());
         assertThat(input.path("runtime").asText()).isEqualTo(NativeProcurementWorkspace.runtime());
-        assertThat(input.path("database").asText()).isEqualTo("enterprise_22");
-        assertThat(input.path("redisDatabase").asInt()).isEqualTo(13);
+        assertThat(input.path("database").asText()).isEqualTo(NativeProcurementWorkspace.profile().database());
+        assertThat(input.path("redisDatabase").asInt()).isEqualTo(NativeProcurementWorkspace.profile().redisDatabase());
         assertThat(input.path("orderedImportDirectories").isArray()).isTrue();
         assertThat(input.path("orderedImportDirectories").size()).isEqualTo(23);
         JsonNode identities = input.path("verifiedSourceIdentities");

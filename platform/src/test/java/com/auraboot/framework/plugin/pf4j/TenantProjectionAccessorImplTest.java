@@ -45,4 +45,40 @@ class TenantProjectionAccessorImplTest {
         verify(delegate).query(41L, "xy_classroom", Map.of("status", "active"));
         verify(delegate).queryIn(41L, "xy_student", "pid", List.of("STU-1"));
     }
+    @Test
+    void unavailableRecordUsesCodedDenialAndRetainsInternalCause() {
+        var delegate=mock(BackgroundDataAccessor.class);
+        var missing=new com.auraboot.framework.meta.exception.MetaRecordNotFoundException("private_model","foreign-record");
+        when(delegate.getById(41L,"private_model","foreign-record")).thenThrow(missing);
+        var accessor=new TenantProjectionAccessorImpl(41L,delegate);
+        var denied=org.junit.jupiter.api.Assertions.assertThrows(
+                com.auraboot.framework.plugin.extension.DataAccessorException.class,
+                ()->accessor.getById("private_model","foreign-record"));
+        assertThat(denied.code()).isEqualTo(com.auraboot.framework.plugin.extension.DataAccessErrorCode.PERMISSION_DENIED);
+        assertThat(denied.getCause()).isSameAs(missing);
+        assertThat(denied.getMessage()).doesNotContain("private_model","foreign-record","Record not found:");
+        verify(delegate).getById(41L,"private_model","foreign-record");
+        org.mockito.Mockito.verifyNoMoreInteractions(delegate);
+    }
+
+    @Test
+    void unrelatedMetadataFailureKeepsItsTypeAndIdentity() {
+        var delegate=mock(BackgroundDataAccessor.class);
+        var failure=new com.auraboot.framework.meta.exception.MetaServiceException("Record not found: diagnostic text is not a type contract");
+        when(delegate.getById(41L,"private_model","record")).thenThrow(failure);
+        var accessor=new TenantProjectionAccessorImpl(41L,delegate);
+        assertThat(org.junit.jupiter.api.Assertions.assertThrows(
+                com.auraboot.framework.meta.exception.MetaServiceException.class,
+                ()->accessor.getById("private_model","record"))).isSameAs(failure);
+    }
+
+    @Test
+    void nullProjectionIsNotTurnedIntoAnInventedRecordOrRetry() {
+        var delegate=mock(BackgroundDataAccessor.class);
+        when(delegate.getById(41L,"private_model","record")).thenReturn(null);
+        assertThat(new TenantProjectionAccessorImpl(41L,delegate).getById("private_model","record")).isNull();
+        verify(delegate).getById(41L,"private_model","record");
+        org.mockito.Mockito.verifyNoMoreInteractions(delegate);
+    }
+
 }

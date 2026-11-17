@@ -1451,7 +1451,17 @@
       "options": {
         "detailNavigation": "navigate",
         "detailUrl": "/organization/members/{pid}"
-      }
+      },
+      "contributionSlots": [
+        {
+          "id": "member-row-actions",
+          "kind": "action",
+          "anchor": {
+            "target": "table-row-actions",
+            "blockId": "table"
+          }
+        }
+      ]
     }
   },
   {

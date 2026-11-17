@@ -209,7 +209,15 @@ cellRendererRegistry.register('default', ({ value }) => {
 /**
  * 文本渲染器 - 带 URL/email 自动检测
  */
-cellRendererRegistry.register('text', ({ value }) => {
+cellRendererRegistry.register('text', ({ value, column }) => {
+  if (column.multiline === true) {
+    const text = value == null ? '' : ['string', 'number', 'boolean'].includes(typeof value) ? String(value) : '-';
+    return (
+      <span className="block whitespace-pre-wrap break-words" style={{ overflowWrap: 'anywhere', maxWidth: column.width }}>
+        {text}
+      </span>
+    );
+  }
   return renderSmartText(value);
 });
 

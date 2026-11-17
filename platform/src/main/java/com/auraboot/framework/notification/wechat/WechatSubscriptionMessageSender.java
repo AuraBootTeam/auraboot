@@ -73,13 +73,14 @@ public class WechatSubscriptionMessageSender {
         if (resolved.isEmpty()) return preparationBlocked(Reason.GRANT_UNAVAILABLE);
         var grant=resolved.get();
         if (grant.tenantId()!=request.tenantId() || !request.resolutionReference().equals(grant.resolutionReference())
-                || !mini.getAppId().equals(grant.appId()) || !configuration.getTemplateId().equals(grant.templateId())
+                || !mini.getAppId().equals(grant.appId()) || !configuration.templateContracts().containsKey(grant.templateId())
                 || blank(grant.userPid()) || blank(grant.identityPid()) || blank(grant.openid())
                 || blank(grant.grantReference()) || blank(grant.reservationReference())
                 || grant.expiresAt()==null || !grant.expiresAt().isAfter(clock.instant())) return preparationBlocked(Reason.GRANT_INVALID);
-        if (!grant.values().keySet().equals(configuration.getFieldMaxLengths().keySet())
+        var fields = configuration.templateContracts().get(grant.templateId());
+        if (!grant.values().keySet().equals(fields.keySet())
                 || grant.values().entrySet().stream().anyMatch(e -> blank(e.getValue())
-                    || e.getValue().codePointCount(0,e.getValue().length())>configuration.getFieldMaxLengths().get(e.getKey())))
+                    || e.getValue().codePointCount(0,e.getValue().length())>fields.get(e.getKey())))
             return preparationBlocked(Reason.FIELDS_INVALID);
         Long userId=recipients.findActiveRecipient(request.tenantId(),grant.userPid());
         if (userId==null) return preparationBlocked(Reason.RECIPIENT_UNAVAILABLE);
@@ -89,21 +90,23 @@ public class WechatSubscriptionMessageSender {
                 || !grant.openid().equals(bound.getFirst().getOpenid()) || !Objects.equals(userId,bound.getFirst().getUserId())
                 || !"wechat_mini".equals(bound.getFirst().getProvider()) || !mini.getAppId().equals(bound.getFirst().getAppId()))
             return preparationBlocked(Reason.IDENTITY_UNAVAILABLE);
-        return new Preparation(null,new Prepared(grant,configurationHash(),configuration.getMiniprogramState(),base.toString()));
+        return new Preparation(null,new Prepared(grant,configurationHash(grant.templateId()),configuration.getMiniprogramState(),base.toString()));
     }
     Result verifyPrepared(Prepared prepared) {
-        if (!readyForDispatch()) return blocked(Reason.CONFIGURATION_INCOMPLETE);
+        if (!readyForDispatch() || !configuration.templateContracts().containsKey(prepared.grant().templateId()))
+            return blocked(Reason.CONFIGURATION_INCOMPLETE);
+        var fields = configuration.templateContracts().get(prepared.grant().templateId());
         var expected=grants.getFirst().verifyReserved(prepared.grant().tenantId(),prepared.grant().resolutionReference(),
                 prepared.grant().reservationReference());
         if (expected.isEmpty()) return blocked(Reason.GRANT_UNAVAILABLE);
-        if (!new Prepared(expected.get(),configurationHash(),configuration.getMiniprogramState(),configuredBase().toString()).equals(prepared))
+        if (!new Prepared(expected.get(),configurationHash(prepared.grant().templateId()),configuration.getMiniprogramState(),configuredBase().toString()).equals(prepared))
             return blocked(Reason.GRANT_INVALID);
         if (!Objects.equals(MetaContext.getCurrentTenantId(),prepared.grant().tenantId())
                 || !prepared.grant().expiresAt().isAfter(clock.instant())) return blocked(Reason.GRANT_INVALID);
-        if(!prepared.grant().appId().equals(mini.getAppId()) || !prepared.grant().templateId().equals(configuration.getTemplateId())
-                || !prepared.grant().values().keySet().equals(configuration.getFieldMaxLengths().keySet())
+        if(!prepared.grant().appId().equals(mini.getAppId()) || !configuration.templateContracts().containsKey(prepared.grant().templateId())
+                || !prepared.grant().values().keySet().equals(fields.keySet())
                 || prepared.grant().values().entrySet().stream().anyMatch(e->blank(e.getValue())
-                    || e.getValue().codePointCount(0,e.getValue().length())>configuration.getFieldMaxLengths().get(e.getKey())))
+                    || e.getValue().codePointCount(0,e.getValue().length())>fields.get(e.getKey())))
             return blocked(Reason.GRANT_INVALID);
         Long userId=recipients.findActiveRecipient(prepared.grant().tenantId(),prepared.grant().userPid());
         if(userId==null)return blocked(Reason.RECIPIENT_UNAVAILABLE);
@@ -117,11 +120,11 @@ public class WechatSubscriptionMessageSender {
         return configuration.isEnabled() && configuredBase()!=null && configuredTemplate() && grants.size()==1
                 && grants.getFirst().getClass().getClassLoader()==getClass().getClassLoader();
     }
-    private String configurationHash() {
+    private String configurationHash(String templateId) {
         try {
             String value=new ObjectMapper().writeValueAsString(new TreeMap<>(Map.of("appId",mini.getAppId(),
-                    "base",configuredBase().toString(),"templateId",configuration.getTemplateId(),
-                    "state",configuration.getMiniprogramState(),"fields",new TreeMap<>(configuration.getFieldMaxLengths()))));
+                    "base",configuredBase().toString(),"templateId",templateId,
+                    "state",configuration.getMiniprogramState(),"fields",new TreeMap<>(configuration.templateContracts().get(templateId)))));
             return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
                     .digest(value.getBytes(StandardCharsets.UTF_8)));
         } catch(java.security.NoSuchAlgorithmException | com.fasterxml.jackson.core.JsonProcessingException failure) {
@@ -130,7 +133,8 @@ public class WechatSubscriptionMessageSender {
     }
     Result sendPrepared(Prepared prepared) {
         // Journal is the only production caller; it commits a persistent attempt fence before entering here.
-        if (!readyForDispatch() || !prepared.configurationHash().equals(configurationHash())
+        if (!readyForDispatch() || !configuration.templateContracts().containsKey(prepared.grant().templateId())
+                || !prepared.configurationHash().equals(configurationHash(prepared.grant().templateId()))
                 || !prepared.apiBase().equals(configuredBase().toString())
                 || !prepared.miniprogramState().equals(configuration.getMiniprogramState()))
             return blocked(Reason.CONFIGURATION_INCOMPLETE);
@@ -161,13 +165,10 @@ public class WechatSubscriptionMessageSender {
         }
     }
     private boolean configuredTemplate() {
-        var fields=configuration.getFieldMaxLengths();
-        return !blank(mini.getAppId()) && !blank(mini.getAppSecret()) && !blank(configuration.getTemplateId())
+        return !blank(mini.getAppId()) && !blank(mini.getAppSecret()) && !configuration.templateContracts().isEmpty()
                 && Set.of("developer","trial","formal").contains(configuration.getMiniprogramState()==null?"":configuration.getMiniprogramState())
                 && configuration.getConnectTimeoutMs()>0 && configuration.getReadTimeoutMs()>0
-                && configuration.getConnectTimeoutMs()<=60_000 && configuration.getReadTimeoutMs()<=60_000
-                && fields!=null && !fields.isEmpty() && fields.entrySet().stream().allMatch(e ->
-                        e.getKey()!=null && e.getKey().matches("[A-Za-z][A-Za-z0-9]*") && e.getValue()!=null && e.getValue()>0);
+                && configuration.getConnectTimeoutMs()<=60_000 && configuration.getReadTimeoutMs()<=60_000;
     }
     private URI configuredBase() {
         try {
