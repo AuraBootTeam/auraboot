@@ -110,7 +110,7 @@ public class MybatisPlusConfig {
         "ab_user_social_link",
         "ab_verification_code",             // pre-auth OTP
         "ab_auth_identity",                 // WeChat identity lookup before tenant context
-        // V20261026010000: provider consent is global per app/openid/template, not multiplied by tenant membership.
+        // V20261117010000: provider consent is global per app/openid/template, not multiplied by tenant membership.
         "ab_wechat_subscription_event",
         "ab_wechat_subscription_state",
         "ab_wechat_subscription_grant",
