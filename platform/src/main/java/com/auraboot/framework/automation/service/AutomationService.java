@@ -36,6 +36,13 @@ public interface AutomationService {
     AutomationDTO findByPid(String pid);
 
     /**
+     * Loads the automation entity by exact pid with the tenant filter
+     * suppressed — for external webhook entry points that arrive before any
+     * tenant context exists. Callers must validate the record before acting.
+     */
+    com.auraboot.framework.automation.entity.Automation findEntityByPidWithoutTenantFilter(String pid);
+
+    /**
      * Update an existing automation
      */
     AutomationDTO update(String pid, AutomationUpdateRequest request);

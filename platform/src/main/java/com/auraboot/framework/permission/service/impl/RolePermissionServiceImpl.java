@@ -32,7 +32,7 @@ import com.auraboot.framework.common.constant.StatusConstants;
  *
  * <ul>
  *   <li><b>§P4 wrap-and-rethrow</b> on mutation methods (assignPermission,
- *       removePermission, removeAll, syncPermissions, copyPermissions): any
+ *       removePermission, removeAll, syncPermissions): any
  *       failure is logged with the cause and re-thrown as
  *       {@link BusinessException} so the surrounding {@code @Transactional}
  *       rolls back and {@code GlobalExceptionHandler} surfaces a clean
@@ -58,16 +58,61 @@ import com.auraboot.framework.common.constant.StatusConstants;
 @Service
 @RequiredArgsConstructor
 public class RolePermissionServiceImpl implements RolePermissionService {
+    private final com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
+
     
     private final RolePermissionMapper rolePermissionMapper;
     private final PermissionMapper permissionMapper;
     private final ApplicationEventPublisher eventPublisher;
     private final RoleMapper roleMapper;
     private final DataScopeService dataScopeService;
+    private final com.auraboot.framework.permission.service.RoleAuthorizationCopyService authorizationCopies;
     
+    @Override
+    public void validateCapabilityChanges(Long roleId, List<Long> added, List<Long> removed) {
+        if (added == null || removed == null || added.size() > 5000 || removed.size() > 5000
+                || java.util.stream.Stream.concat(added.stream(), removed.stream()).anyMatch(id -> id == null || id <= 0))
+            throw capabilityReview();
+        if (added.isEmpty() && removed.isEmpty()) return;
+        Long tenant = MetaContext.getCurrentTenantId();
+        Role role = roleId == null ? null : roleMapper.selectById(roleId);
+        if (tenant == null || tenant <= 0 || role == null || !Objects.equals(tenant, role.getTenantId()))
+            throw new org.springframework.security.access.AccessDeniedException("Duty changes require a role in the current tenant");
+        var targets = new HashSet<>(added); targets.addAll(removed);
+        var definitions = permissionMapper.findByIds(new ArrayList<>(targets));
+        if (definitions.size() != targets.size() || definitions.stream().anyMatch(definition ->
+                definition.getTenantId() != null && !tenant.equals(definition.getTenantId()))) throw capabilityReview();
+        var bindings = rolePermissionMapper.findAllForCapabilityAuthoring(roleId, tenant);
+        if (bindings.stream().anyMatch(binding -> !Objects.equals(roleId, binding.getRoleId())
+                || !Objects.equals(tenant, binding.getTenantId()))) throw capabilityReview();
+        for (Long id : added) {
+            var existing = bindings.stream().filter(binding -> id.equals(binding.getPermissionId())).toList();
+            // A separate grant/deny or managed tombstone is not permission to replace its owner.
+            if (existing.stream().anyMatch(binding -> !Boolean.TRUE.equals(binding.getDeletedFlag()) || !directSource(binding)))
+                throw capabilityReview();
+        }
+        for (Long id : removed) {
+            var existing = bindings.stream().filter(binding -> id.equals(binding.getPermissionId())).toList();
+            if (existing.stream().noneMatch(binding -> !Boolean.TRUE.equals(binding.getDeletedFlag()))
+                    || existing.stream().anyMatch(binding -> !"grant".equalsIgnoreCase(binding.getGrantType()) || !directSource(binding)))
+                throw capabilityReview();
+        }
+    }
+
+    private static boolean directSource(RolePermission binding) {
+        var source = com.auraboot.framework.permission.service.RoleGrantSourceOwnership.of(binding);
+        return source == com.auraboot.framework.permission.service.RoleGrantSourceOwnership.DIRECT
+                || source == com.auraboot.framework.permission.service.RoleGrantSourceOwnership.DETACHED_COPY;
+    }
+
+    private static BusinessException capabilityReview() {
+        return BusinessException.i18n("permission.capability_binding_review");
+    }
+
     @Override
     @Transactional
     public boolean assignPermissionsToRole(Long roleId, List<Long> permissionIds) {
+        authorizationWriteLock.mutate();
         log.info("分配Permission到角色: roleId={}, permissionCount={}", roleId, permissionIds.size());
         
         try {
@@ -136,6 +181,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
     @Override
     @Transactional
     public boolean inheritDefaultDataScope(Long roleId, List<Long> permissionIds) {
+        authorizationWriteLock.mutate();
         if (permissionIds == null || permissionIds.isEmpty()) {
             return true;
         }
@@ -172,6 +218,8 @@ public class RolePermissionServiceImpl implements RolePermissionService {
             if (p.getResourceCode() == null || p.getAction() == null) {
                 continue;
             }
+            // Registration fallback is entry metadata, not a record-scope consumer.
+            if ("view".equals(p.getAction()) && p.getResourceCode().equals(p.getCode())) continue;
             String key = p.getResourceCode() + ":" + p.getAction();
             if (existing.contains(key)) {
                 continue; // keep explicit overrides / already-inherited rows
@@ -184,6 +232,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
     @Override
     @Transactional
     public boolean removePermission(Long roleId, Long permissionId) {
+        authorizationWriteLock.mutate();
         log.info("从角色移除Permission: roleId={}, permissionId={}", roleId, permissionId);
         
         try {
@@ -212,6 +261,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
     @Override
     @Transactional
     public boolean removeAllPermissionsByRoleId(Long roleId) {
+        authorizationWriteLock.mutate();
         log.info("移除角色的所有Permission: roleId={}", roleId);
         
         try {
@@ -291,6 +341,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
     @Override
     @Transactional
     public boolean syncRolePermissionsByPids(Long roleId, List<String> permissionPids, String grantType) {
+        authorizationWriteLock.mutate();
         List<Permission> permissions = resolveRequestedPermissions(permissionPids);
         log.info("Sync role permissions: roleId={}, permissionCount={}", roleId, permissions.size());
         
@@ -322,6 +373,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
     @Override
     @Transactional
     public boolean removePermissionsFromRoleByPids(Long roleId, List<String> permissionPids) {
+        authorizationWriteLock.mutate();
         List<Permission> permissions = resolveRequestedPermissions(permissionPids);
         log.info("Remove role permissions: roleId={}, permissionCount={}", roleId, permissions.size());
         
@@ -414,24 +466,15 @@ public class RolePermissionServiceImpl implements RolePermissionService {
     @Override
     @Transactional
     public boolean copyRolePermissions(Long sourceRoleId, Long targetRoleId) {
+        authorizationWriteLock.mutate();
         log.info("复制角色Permission: sourceRoleId={}, targetRoleId={}", sourceRoleId, targetRoleId);
-        
-        try {
-            // 获取源角色的所有Permission IDs
-            Set<Long> permissionIds = getPermissionIdsByRoleId(sourceRoleId);
-            
-            if (permissionIds.isEmpty()) {
-                log.info("源角色没有Permission,跳过复制: sourceRoleId={}", sourceRoleId);
-                return true;
+        for (Long roleId : java.util.Arrays.asList(sourceRoleId, targetRoleId)) {
+            Role role = roleId == null ? null : roleMapper.selectById(roleId);
+            if (role == null || !java.util.Objects.equals(role.getTenantId(), MetaContext.getCurrentTenantId())) {
+                throw new org.springframework.security.access.AccessDeniedException("Permission copy roles must belong to the current tenant");
             }
-            
-            // 分配到目标角色
-            return assignPermissionsToRole(targetRoleId, new ArrayList<>(permissionIds));
-            
-        } catch (Exception e) {
-            log.error("复制角色Permission失败: sourceRoleId={}, targetRoleId={}", 
-                sourceRoleId, targetRoleId, e);
-            throw BusinessException.i18nWrap(e, "permission.copy_failed");
         }
+
+        return authorizationCopies.copy(sourceRoleId,targetRoleId);
     }
 }

@@ -458,7 +458,7 @@
       ]
     },
     "capabilityBrowser": {
-      "purpose": "Three generated capability operations through the Roles menu with exact owned atomic-grant persistence; partial, read-only and cross-tenant branches remain pending",
+      "purpose": "Three generated role draft operations through the Roles menu with exact owned atomic-grant persistence; record/field policy, partial, read-only and cross-tenant branches require separate acceptance",
       "spec": "web-admin/tests/e2e/model/internal-api-capabilities.spec.ts",
       "tests": [
         "generated capabilities preserve menu preview apply reload and revoke with persisted atomic grants"
@@ -466,15 +466,15 @@
       "operations": [
         {
           "method": "get",
-          "path": "/api/permission/capabilities"
+          "path": "/api/permission/roles/{rolePid}/draft"
         },
         {
           "method": "post",
-          "path": "/api/permission/capabilities/preview"
+          "path": "/api/permission/roles/{rolePid}/draft/preview"
         },
         {
           "method": "put",
-          "path": "/api/permission/capabilities"
+          "path": "/api/permission/roles/{rolePid}/draft"
         }
       ],
       "capabilityFixture": {

@@ -6,7 +6,6 @@ import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.plugin.config.PlatformProperties;
 import com.auraboot.framework.plugin.entity.PluginRecord;
-import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
 import com.auraboot.framework.plugin.service.PlatformVersionChecker;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,10 +28,10 @@ import java.util.stream.Collectors;
 @Tag(name = "Plugin Management", description = "Manage installed configuration plugins")
 public class PluginController {
 
-    private final PluginRecordMapper pluginRecordMapper;
     private final PlatformVersionChecker platformVersionChecker;
     private final PlatformProperties platformProperties;
     private final com.auraboot.framework.plugin.pf4j.AuraPluginManager auraPluginManager;
+    private final com.auraboot.framework.plugin.service.PluginRecordStateService pluginRecordStateService;
 
     /**
      * List all installed plugins for the current tenant.
@@ -46,7 +45,7 @@ public class PluginController {
             return ApiResponse.success(List.of());
         }
 
-        List<PluginRecord> plugins = pluginRecordMapper.findByTenant();
+        List<PluginRecord> plugins = catalogPlugins(tenantId);
         List<PluginDTO> dtos = plugins.stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
@@ -61,7 +60,7 @@ public class PluginController {
     @Operation(summary = "Get plugin details", description = "Get plugin details by PID")
     @RequirePermission(MetaPermission.PLUGIN_READ)
     public ApiResponse<PluginDTO> getPlugin(@PathVariable String pid) {
-        PluginRecord plugin = pluginRecordMapper.findByPid(pid);
+        PluginRecord plugin = pluginRecordStateService.findByPid(pid);
         if (plugin == null) {
             return ApiResponse.error("Plugin not found");
         }
@@ -81,18 +80,12 @@ public class PluginController {
     @Operation(summary = "Enable plugin", description = "Enable an installed plugin")
     @RequirePermission(MetaPermission.PLUGIN_MANAGE)
     public ApiResponse<PluginDTO> enablePlugin(@PathVariable String pid) {
-        PluginRecord plugin = pluginRecordMapper.findByPid(pid);
-        if (plugin == null) {
+        PluginRecord plugin;
+        try {
+            plugin = pluginRecordStateService.setEnabled(pid, true);
+        } catch (IllegalArgumentException notFound) {
             return ApiResponse.error("Plugin not found");
         }
-
-        Long tenantId = MetaContext.getCurrentTenantId();
-        if (tenantId != null && !tenantId.equals(plugin.getTenantId())) {
-            return ApiResponse.error("Plugin not found");
-        }
-
-        pluginRecordMapper.markAsEnabled(pid);
-        plugin = pluginRecordMapper.findByPid(pid);
 
         log.info("Plugin enabled: {} ({})", plugin.getPluginId(), pid);
         return ApiResponse.success(toDTO(plugin));
@@ -105,19 +98,12 @@ public class PluginController {
     @Operation(summary = "Disable plugin", description = "Disable an installed plugin")
     @RequirePermission(MetaPermission.PLUGIN_MANAGE)
     public ApiResponse<PluginDTO> disablePlugin(@PathVariable String pid) {
-        PluginRecord plugin = pluginRecordMapper.findByPid(pid);
-        if (plugin == null) {
+        PluginRecord plugin;
+        try {
+            plugin = pluginRecordStateService.setEnabled(pid, false);
+        } catch (IllegalArgumentException notFound) {
             return ApiResponse.error("Plugin not found");
         }
-
-        Long tenantId = MetaContext.getCurrentTenantId();
-        if (tenantId != null && !tenantId.equals(plugin.getTenantId())) {
-            return ApiResponse.error("Plugin not found");
-        }
-
-        auraPluginManager.requireTenantLifecycleChange(plugin);
-        pluginRecordMapper.markAsDisabled(pid);
-        plugin = pluginRecordMapper.findByPid(pid);
 
         log.info("Plugin disabled: {} ({})", plugin.getPluginId(), pid);
         return ApiResponse.success(toDTO(plugin));
@@ -134,7 +120,7 @@ public class PluginController {
     @RequirePermission(MetaPermission.PLUGIN_READ)
     public ApiResponse<VersionCheckResult> checkVersionCompatibility() {
         Long tenantId = MetaContext.getCurrentTenantId();
-        List<PluginRecord> plugins = tenantId == null ? List.of() : pluginRecordMapper.findByTenant();
+        List<PluginRecord> plugins = tenantId == null ? List.of() : catalogPlugins(tenantId);
 
         String platformVersion = platformProperties.getVersion();
         List<PluginCompatibilityDTO> results = plugins.stream()
@@ -155,6 +141,10 @@ public class PluginController {
                 .collect(Collectors.toList());
 
         return ApiResponse.success(new VersionCheckResult(platformVersion, results));
+    }
+
+    private List<PluginRecord> catalogPlugins(Long tenant) {
+        return pluginRecordStateService.listCatalog(tenant);
     }
 
     private PluginDTO toDTO(PluginRecord plugin) {

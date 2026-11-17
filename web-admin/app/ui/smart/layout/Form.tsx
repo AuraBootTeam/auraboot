@@ -14,7 +14,7 @@ import type {
   FormProps,
   FormFieldConfig,
   FormActionConfig,
-} from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+} from '~/framework/smart/schema/smart-components';
 
 /**
  * Form 智能表单组件

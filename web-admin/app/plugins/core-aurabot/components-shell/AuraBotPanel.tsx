@@ -83,9 +83,9 @@ export function AuraBotPanel() {
         const json = await res.json();
         const records: AgentDefinitionRecord[] = json?.data?.records || [];
         setAgents([AURABOT_DEFAULT, ...normalizeAgentOptions(records)]);
-      } catch {
+      } catch (error) {
         // Silently ignore — keep default AuraBot only
-      }
+ console.warn('[AuraBotPanel] previously-silent catch', error);      }
     };
     loadAgents();
   }, [state.panelState]);

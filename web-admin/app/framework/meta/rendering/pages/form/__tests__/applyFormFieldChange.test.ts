@@ -48,6 +48,43 @@ function makeRuntime(enabled = true) {
 }
 
 describe('controlled form linkage', () => {
+  it('clears declared dependent choices transitively without explicit linkage rules', () => {
+    const runtime = makeRuntime(false);
+    runtime.getSchema().blocks = [{ id: 'dependencies', blockType: 'form-section', fields: [
+      { field: 'zone', dependsOn: 'warehouse' },
+      { field: 'location', dependsOn: ['form.zone'] },
+      { field: 'warehouse', dependsOn: 'location' },
+    ] }] as any;
+    try {
+      expect(applyFormFieldChange(runtime, 'warehouse', 'new-warehouse')).toEqual({
+        warehouse: 'new-warehouse', zone: null, location: null,
+      });
+      expect(runtime.getContext().form?.description).toBe('keep this draft');
+    } finally { runtime.destroy(); }
+  });
+
+  it('preserves an existing dependent selection when the same parent is reselected', () => {
+    const runtime = makeRuntime(false);
+    runtime.getSchema().blocks = [{ id: 'dependencies', fields: [
+      { field: 'zone', dependsOn: 'warehouse' },
+    ] }] as any;
+    try {
+      expect(applyFormFieldChange(runtime, 'warehouse', 'old-warehouse')).toEqual({ warehouse: 'old-warehouse' });
+      expect(runtime.getContext().form?.zone).toBe('old-zone');
+    } finally { runtime.destroy(); }
+  });
+
+  it('clears multi-value dependents to an empty array when the parent is removed', () => {
+    const runtime = makeRuntime(false);
+    runtime.getSchema().blocks = [{ id: 'dependencies', fields: [
+      { field: 'zone', dependsOn: 'warehouse' },
+    ] }] as any;
+    runtime.getStateManager().updateField(runtime.getScopeId(), 'zone', ['old-zone']);
+    try {
+      expect(applyFormFieldChange(runtime, 'warehouse', '')).toEqual({ warehouse: '', zone: [] });
+    } finally { runtime.destroy(); }
+  });
+
   it('uses the new parent for conditions, cascades clears and preserves unrelated draft fields', () => {
     const runtime = makeRuntime();
     try {

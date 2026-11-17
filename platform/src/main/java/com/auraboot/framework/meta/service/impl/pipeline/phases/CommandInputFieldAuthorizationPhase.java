@@ -1,0 +1,165 @@
+package com.auraboot.framework.meta.service.impl.pipeline.phases;
+
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.meta.service.DataPermissionEngine;
+import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.service.impl.FieldWriteAuthorizationSupport;
+import com.auraboot.framework.permission.service.FieldPermissionService;
+import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
+import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
+import lombok.RequiredArgsConstructor;
+import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+
+import java.util.*;
+
+/** User-supplied fields must be authorized before command permits or cached outcomes are used. */
+@Component
+@Order(280)
+@RequiredArgsConstructor
+public class CommandInputFieldAuthorizationPhase implements CommandPhase {
+    private final DataPermissionEngine policies;
+    private final MetaModelService metadata;
+    private final FieldPermissionService fields;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.plugin.pf4j.ExtensionRegistry extensions;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.meta.service.FieldMaskService masks;
+
+    @Override public String name() { return "input_field_authorization"; }
+
+    @Override public void execute(CommandPipelineContext context) {
+        if (authorizeControlInputs(context)) return;
+        if (context.getCommand() == null || submittedKeys(context).isEmpty()) {
+            com.auraboot.framework.meta.service.impl.NativeHumanActor.requireCompleteIdentity();
+            return;
+        }
+        String rootModel = context.getCommand().getModelCode();
+        var complete = context.getBusinessGrantDecision();
+        if (context.getBusinessTargetAuthorization() != null && complete == null) deny();
+        if (complete != null && (!complete.result().granted()
+                || !Objects.equals(complete.tenantId(), MetaContext.getCurrentTenantId())
+                || !Objects.equals(complete.userId(), MetaContext.getCurrentUserId())
+                || !Objects.equals(complete.memberId(), MetaContext.getCurrentMemberId())
+                || !Objects.equals(complete.modelCode(), rootModel)
+                || !Objects.equals(complete.recordPid(), context.getRequest().getTargetRecordId()))) deny();
+        com.auraboot.framework.meta.service.impl.NativeHumanActor.requireCompleteIdentity();
+        // Machine and installed invocations use their separately verified writable-field contracts.
+        if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
+                || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
+                || MetaContext.getCurrentMemberId() == null || MetaContext.getCurrentUserId() == null) return;
+        if (StringUtils.hasText(rootModel)) {
+            var restricted = policies.getNonWritableFields(MetaContext.getCurrentTenantId(),
+                    rootModel, MetaContext.getCurrentUserId());
+            if (restricted != null && submittedKeys(context).stream().anyMatch(restricted::contains)) deny();
+        }
+        var writes = mappedInputs(context);
+        if (complete != null && complete.grants().stream().noneMatch(grant -> grant.fields().unrestricted())
+                && writes.isEmpty()) deny();
+        var authorization = new FieldWriteAuthorizationSupport(metadata, fields, policies);
+        for (var write : writes.entrySet()) {
+            if (!authorization.nonWritableInputKeys(write.getKey(), write.getValue()).isEmpty()) deny();
+            if (complete != null && rootModel.equals(write.getKey())) {
+                var definitions = metadata.getModelFields(rootModel);
+                if (definitions == null) deny();
+                for (String input : write.getValue()) {
+                    String canonical = definitions.stream().filter(field -> input.equals(field.getCode())
+                                    || input.equals(field.getColumnName()))
+                            .map(field -> field.getCode()).findFirst().orElse(input);
+                    if (!complete.canWrite(canonical)) deny();
+                }
+            }
+        }
+    }
+
+    private boolean authorizeControlInputs(CommandPipelineContext context) {
+        if (extensions == null || context.getCommand() == null) return false;
+        var handler = extensions.getBusinessResourceOwner(context.getCommandCode()).orElse(null);
+        if (!(handler instanceof com.auraboot.framework.plugin.extension.BusinessResourceAuthorization owner)
+                || owner.businessInputContract() == null) return false;
+        com.auraboot.framework.plugin.pf4j.BusinessResourcePermissionContract.require(context, owner);
+        com.auraboot.framework.meta.service.impl.NativeHumanActor.requireCompleteIdentity();
+        var input = owner.businessInputContract();
+        var submitted = submittedKeys(context);
+        if (!input.allowedParameters().containsAll(submitted) || !submitted.containsAll(input.requiredParameters())) deny();
+        for (String key : input.requiredParameters()) {
+            Object value = context.getPayload() == null ? null : context.getPayload().get(key);
+            if (value == null || value instanceof String text && text.isBlank()) deny();
+        }
+        var complete = context.getBusinessGrantDecision();
+        String model = context.getCommand().getModelCode();
+        if (complete == null || !complete.result().granted()
+                || !Objects.equals(complete.tenantId(), MetaContext.getCurrentTenantId())
+                || !Objects.equals(complete.userId(), MetaContext.getCurrentUserId())
+                || !Objects.equals(complete.memberId(), MetaContext.getCurrentMemberId())
+                || !Objects.equals(complete.modelCode(), model)
+                || !Objects.equals(complete.recordPid(), context.getRequest().getTargetRecordId())
+                || input.writableRootFields().stream().anyMatch(field -> !complete.canWrite(field))) deny();
+        var definitions = metadata.getModelFields(model);
+        if (definitions == null || masks == null) deny();
+        var canonical = definitions.stream().map(com.auraboot.framework.meta.dto.FieldDefinition::getCode).collect(java.util.stream.Collectors.toSet());
+        if (!canonical.containsAll(input.readableRootFields()) || !canonical.containsAll(input.writableRootFields())) deny();
+        if (!new FieldWriteAuthorizationSupport(metadata, fields, policies)
+                .nonWritablePolicyInputKeys(model, input.writableRootFields()).isEmpty()) deny();
+        var definition = com.auraboot.framework.meta.dto.ModelDefinition.builder().code(model).fields(definitions).build();
+        new com.auraboot.framework.meta.service.impl.FieldPredicateAuthorizationSupport(fields, policies, masks)
+                .requireBusinessReadable(definition, input.readableRootFields(), complete);
+        return true;
+    }
+
+    private Map<String, Set<String>> mappedInputs(CommandPipelineContext context) {
+        Map<String, Set<String>> result = new LinkedHashMap<>();
+        Set<String> submitted = submittedKeys(context);
+        var mappings = context.getRulesByType().getOrDefault("field_map", List.of());
+        if (!mappings.isEmpty()) {
+            for (var rule : mappings) {
+                if (StringUtils.hasText(rule.getTargetModel()) && StringUtils.hasText(rule.getTargetField())
+                        && StringUtils.hasText(rule.getSourceField()) && submitted.contains(rule.getSourceField()))
+                    result.computeIfAbsent(rule.getTargetModel(), ignored -> new LinkedHashSet<>()).add(rule.getTargetField());
+            }
+            return result;
+        }
+        String model = context.getCommand().getModelCode();
+        if (!StringUtils.hasText(model)) return result;
+        Object type = context.getExecConfig().get("type");
+        String operation = type instanceof String value ? value.toLowerCase(Locale.ROOT) : "";
+        Object input = context.getExecConfig().get("inputFields");
+        boolean directWrite = Set.of("create", "update").contains(operation);
+        boolean transition = "state_transition".equals(operation);
+        boolean legacyWrite = operation.isEmpty() && context.getRequest() != null
+                && Set.of("create", "update").contains(Objects.toString(context.getRequest().getOperationType(), "").toLowerCase(Locale.ROOT));
+        if (!directWrite && !transition && !legacyWrite) return result;
+        Set<String> keys = new LinkedHashSet<>();
+        if (input != null) {
+            if (!(input instanceof List<?> inputs))
+                throw new BusinessException(ResponseCode.BadParam, "Command inputFields must be a field list");
+            for (Object key : inputs) {
+                if (!(key instanceof String field) || field.isBlank())
+                    throw new BusinessException(ResponseCode.BadParam, "Command inputFields contains an invalid field");
+                if (submitted.contains(field)) keys.add(field);
+            }
+        }
+        if (directWrite && (input == null || ((List<?>) input).isEmpty())) keys.addAll(submitted);
+        Object autoSet = context.getExecConfig().get("autoSetFields");
+        if (autoSet instanceof Map<?, ?> defaults) {
+            for (Object key : defaults.keySet()) {
+                if (key instanceof String field && submitted.contains(field)) keys.add(field);
+            }
+        }
+        if (!keys.isEmpty()) result.put(model, keys);
+        return result;
+    }
+
+    private void deny() {
+        throw new BusinessException(ResponseCode.FORBIDDEN, "Command input contains a non-writable field");
+    }
+
+    private Set<String> submittedKeys(CommandPipelineContext context) {
+        if (context.submittedInputKeys() != null) return context.submittedInputKeys();
+        return context.getPayload() == null ? Set.of() : context.getPayload().keySet();
+    }
+}

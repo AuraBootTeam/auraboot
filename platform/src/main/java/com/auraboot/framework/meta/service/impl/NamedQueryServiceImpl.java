@@ -7,6 +7,7 @@ import com.auraboot.framework.common.util.UlidGenerator;
 import com.auraboot.framework.connector.service.ApiConnectorService;
 import com.auraboot.framework.decision.service.DecisionUsageIndexService;
 import com.auraboot.framework.meta.dto.*;
+import com.auraboot.framework.meta.util.NamedQueryQueryParseUtils;
 import com.auraboot.framework.meta.entity.NamedQuery;
 import com.auraboot.framework.meta.entity.NamedQueryField;
 import com.auraboot.framework.meta.entity.NamedQueryPolicy;
@@ -58,34 +59,21 @@ import com.auraboot.framework.common.constant.StatusConstants;
 @RequiredArgsConstructor
 public class NamedQueryServiceImpl extends BaseMetaService implements NamedQueryService {
 
+    /** Definition reads go through the shared store (runtime-release bound defs or live table). */
     @org.springframework.beans.factory.annotation.Autowired
-    private com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog applicationRuntimeDefinitionCatalog;
-    @org.springframework.beans.factory.annotation.Value("${aura.application.default-code:}")
-    private String defaultApplicationCode;
-    @org.springframework.beans.factory.annotation.Value("${aura.application.definition-read.runtime-primary-enabled:false}")
-    private boolean applicationRuntimePrimaryEnabled;
+    private NamedQueryDefinitionStore definitionStore;
 
     public boolean releaseReadsEnabled() {
-        return applicationRuntimePrimaryEnabled && MetaContext.exists()
-                && MetaContext.getCurrentTenantId() != null
-                && org.springframework.util.StringUtils.hasText(defaultApplicationCode);
+        return definitionStore.releaseReadsEnabled();
     }
 
     private com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.BoundNamedQuery readDefinition(String code) {
-        Long tenantId = getCurrentTenantId();
-        if (releaseReadsEnabled()) {
-            var bound = applicationRuntimeDefinitionCatalog.findNamedQuery(tenantId, defaultApplicationCode.trim(), code);
-            if (bound.isPresent()) return bound.get();
-        }
-        NamedQuery query = namedQueryMapper.findByCode(code);
-        return query == null ? null : new com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.BoundNamedQuery(
-                query, null);
+        return definitionStore.readDefinition(code);
     }
 
     private List<NamedQueryField> readFields(
             com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.BoundNamedQuery definition) {
-        return definition.fields() != null ? definition.fields()
-                : namedQueryFieldMapper.findByQueryCode(definition.query().getTenantId(), definition.query().getCode());
+        return definitionStore.readFields(definition);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -112,15 +100,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
 
     // DANGEROUS_SQL_PATTERN removed — replaced by SqlSafetyUtils.validateSelectOnlySql()
 
-    private static final Set<String> ALLOWED_OPERATORS = Set.of(
-            "eq", "ne", "gt", "gte", "lt", "lte", "like", "ilike",
-            "in", "not_in", "is_null", "is_not_null", "between",
-            "starts_with", "ends_with", "contains"
-    );
 
-    private static final Set<String> PUBLIC_FORBIDDEN_OUTPUT_ALIASES = Set.of(
-            "id", "record_id", "tenant_id", "created_by", "updated_by"
-    );
 
     // ==================== CRUD ====================
 
@@ -151,8 +131,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                 isConnector ? null : request.getFromSql());
         entity.setPid(UlidGenerator.generate());
         entity.setDescription(request.getDescription());
-        entity.setResourceCode(trimToNull(request.getResourceCode()));
-        entity.setActionCode(trimToNull(request.getActionCode()));
+        entity.setResourceCode(NamedQueryQueryParseUtils.trimToNull(request.getResourceCode()));
+        entity.setActionCode(NamedQueryQueryParseUtils.trimToNull(request.getActionCode()));
         entity.setBaseWhere(request.getBaseWhere());
         entity.setDefaultOrder(request.getDefaultOrder());
         if (request.getPolicy() != null) {
@@ -198,10 +178,10 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             entity.setDescription(request.getDescription());
         }
         if (request.getResourceCode() != null) {
-            entity.setResourceCode(trimToNull(request.getResourceCode()));
+            entity.setResourceCode(NamedQueryQueryParseUtils.trimToNull(request.getResourceCode()));
         }
         if (request.getActionCode() != null) {
-            entity.setActionCode(trimToNull(request.getActionCode()));
+            entity.setActionCode(NamedQueryQueryParseUtils.trimToNull(request.getActionCode()));
         }
 
         // Enforce frozen state: from_sql, baseWhere, defaultOrder are read-only when frozen
@@ -210,7 +190,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             if (frozen) {
                 throw new MetaServiceException("Cannot modify FROM SQL: query is " + entity.getStatus() + " (frozen)");
             }
-            if (trimToNull(request.getConnectorPid()) != null) {
+            if (NamedQueryQueryParseUtils.trimToNull(request.getConnectorPid()) != null) {
                 throw new MetaServiceException("fromSql and connectorPid are mutually exclusive");
             }
             validateFromSql(request.getFromSql());
@@ -224,11 +204,11 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                         + entity.getStatus() + " (frozen)");
             }
             String connectorPid = request.getConnectorPid() != null
-                    ? trimToNull(request.getConnectorPid())
-                    : trimToNull(entity.getConnectorPid());
+                    ? NamedQueryQueryParseUtils.trimToNull(request.getConnectorPid())
+                    : NamedQueryQueryParseUtils.trimToNull(entity.getConnectorPid());
             String endpointCode = request.getConnectorEndpointCode() != null
-                    ? trimToNull(request.getConnectorEndpointCode())
-                    : trimToNull(entity.getConnectorEndpointCode());
+                    ? NamedQueryQueryParseUtils.trimToNull(request.getConnectorEndpointCode())
+                    : NamedQueryQueryParseUtils.trimToNull(entity.getConnectorEndpointCode());
             if (connectorPid == null) {
                 entity.setConnectorPid(null);
                 entity.setConnectorEndpointCode(null);
@@ -363,7 +343,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
 
         // Apply sort
         String sortBy = request.getSortBy() != null ? request.getSortBy() : "created_at";
-        String sortColumn = mapSortColumn(sortBy);
+        String sortColumn = NamedQueryQueryParseUtils.mapSortColumn(sortBy);
         if ("asc".equalsIgnoreCase(request.getSortDirection())) {
             wrapper.orderByAsc(sortColumn);
         } else {
@@ -468,12 +448,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
 
     @Override
     public List<NamedQueryFieldDTO> getFields(String queryCode) {
-        Long tenantId = getCurrentTenantId();
-        if (releaseReadsEnabled()) {
-            var bound = applicationRuntimeDefinitionCatalog.findNamedQuery(tenantId, defaultApplicationCode.trim(), queryCode);
-            if (bound.isPresent()) return bound.get().fields().stream().map(this::toFieldDTO).toList();
-        }
-        List<NamedQueryField> fields = namedQueryFieldMapper.findByQueryCode(tenantId, queryCode);
+        List<NamedQueryField> fields = readFields(readDefinition(queryCode));
         return fields.stream()
                 .map(this::toFieldDTO)
                 .collect(Collectors.toList());
@@ -518,7 +493,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         if (entity == null) {
             throw new MetaServiceException("Field not found: " + queryCode + "." + fieldCode);
         }
-        validatePublicOutputAlias(entity.getFieldCode());
+        NamedQueryQueryParseUtils.validatePublicOutputAlias(entity.getFieldCode());
 
         // Apply updates
         if (request.getColumnExpr() != null) {
@@ -615,7 +590,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
 
         for (NamedQueryFieldRequest fieldReq : request.getFields()) {
             try {
-                validatePublicOutputAlias(fieldReq.getFieldCode());
+                NamedQueryQueryParseUtils.validatePublicOutputAlias(fieldReq.getFieldCode());
                 NamedQueryField existing = namedQueryFieldMapper.findByQueryAndField(
                         tenantId, queryCode, fieldReq.getFieldCode());
 
@@ -741,7 +716,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         }
 
         // 3. Get field whitelist
-        validatePublicOutputAliases(fields);
+        NamedQueryQueryParseUtils.validatePublicOutputAliases(fields);
         Map<String, NamedQueryField> fieldMap = fields.stream()
                 .collect(Collectors.toMap(NamedQueryField::getFieldCode, f -> f));
 
@@ -757,7 +732,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                 .map(f -> {
                     SqlSafetyUtils.validateSqlFragment(f.getColumnExpr());
                     SqlSafetyUtils.validateIdentifier(f.getFieldCode(), "NQ field code");
-                    return f.getColumnExpr() + " AS " + quotedIdentifier(f.getFieldCode());
+                    return f.getColumnExpr() + " AS " + NamedQueryQueryParseUtils.quotedIdentifier(f.getFieldCode());
                 })
                 .collect(Collectors.toList());
 
@@ -786,12 +761,12 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
 
         // 6. Add baseWhere conditions
         if (query.hasBaseWhere()) {
-            parseBaseWhere(query.getBaseWhere(), whereClauses, params);
+            NamedQueryQueryParseUtils.parseBaseWhere(query.getBaseWhere(), whereClauses, params);
         }
 
         // 7. Add user conditions (validated against whitelist)
         if (request.getWhereConditions() != null) {
-            parseUserConditions(request.getWhereConditions(), fieldMap, whereClauses, params);
+            NamedQueryQueryParseUtils.parseUserConditions(request.getWhereConditions(), fieldMap, whereClauses, params);
         }
 
         appendResourceBoundaries(request, fieldMap, whereClauses, params);
@@ -831,12 +806,12 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
 
         // 9. Add ORDER BY
         if (request.getOrderConditions() != null) {
-            String orderClause = parseOrderConditions(request.getOrderConditions(), fieldMap);
+            String orderClause = NamedQueryQueryParseUtils.parseOrderConditions(request.getOrderConditions(), fieldMap);
             if (!orderClause.isEmpty()) {
                 sql.append(" ORDER BY ").append(orderClause);
             }
         } else if (query.hasDefaultOrder()) {
-            String defaultOrderClause = parseDefaultOrder(query.getDefaultOrder(), fieldMap);
+            String defaultOrderClause = NamedQueryQueryParseUtils.parseDefaultOrder(query.getDefaultOrder(), fieldMap);
             if (!defaultOrderClause.isEmpty()) {
                 sql.append(" ORDER BY ").append(defaultOrderClause);
             }
@@ -875,7 +850,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
 
         // 11. Execute (bypass tenant interceptor — tenant isolation is in the NQ SQL itself)
         applyExecutionDeadline(request);
-        List<Map<String, Object>> records = dropEmptyRowNullEntries(
+        List<Map<String, Object>> records = NamedQueryQueryParseUtils.dropEmptyRowNullEntries(
                 dynamicDataMapper.selectByQueryWithoutTenant(sql.toString(), params));
 
         records = fieldProtection.apply(protection, records);
@@ -974,9 +949,6 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
      * null entries before row processing instead of failing with a NullPointerException.
      * Mirrors the guard in {@link AggregateQueryServiceImpl}.
      */
-    private static List<Map<String, Object>> dropEmptyRowNullEntries(List<Map<String, Object>> rows) {
-        return rows == null ? List.of() : rows.stream().filter(Objects::nonNull).collect(Collectors.toList());
-    }
 
     /**
      * A declared resource/action is an authorization boundary, not only a row-scope hint.
@@ -987,8 +959,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             NamedQuery query,
             NamedQueryPolicy policy,
             Map<String, Object> params) {
-        String resourceCode = trimToNull(query.getResourceCode());
-        String actionCode = trimToNull(query.getActionCode());
+        String resourceCode = NamedQueryQueryParseUtils.trimToNull(query.getResourceCode());
+        String actionCode = NamedQueryQueryParseUtils.trimToNull(query.getActionCode());
         if (MachineDataAccessContext.isActive()) {
             if (resourceCode == null || actionCode == null) throw new AccessDeniedException("Machine query source authority required");
             MachineDataAccessContext.requireDecision(resourceCode).requireAction(actionCode);
@@ -1028,8 +1000,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         if (MachineDataAccessContext.isActive()) return false;
         NamedQueryPolicy.RootAccess root = policy == null ? null : policy.getRootAccess();
         if (root == null || !Boolean.TRUE.equals(root.getAllowCollaborator())) return false;
-        String modelCode = trimToNull(root.getModelCode());
-        String pidParam = trimToNull(root.getPidParam());
+        String modelCode = NamedQueryQueryParseUtils.trimToNull(root.getModelCode());
+        String pidParam = NamedQueryQueryParseUtils.trimToNull(root.getPidParam());
         if (modelCode == null || pidParam == null) return false;
         Object rawPid = params.get(pidParam);
         String recordPid = rawPid == null ? null : String.valueOf(rawPid).trim();
@@ -1053,8 +1025,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             return false;
         }
 
-        String modelCode = trimToNull(rootAccess.getModelCode());
-        String pidParam = trimToNull(rootAccess.getPidParam());
+        String modelCode = NamedQueryQueryParseUtils.trimToNull(rootAccess.getModelCode());
+        String pidParam = NamedQueryQueryParseUtils.trimToNull(rootAccess.getPidParam());
         if (modelCode == null || pidParam == null) {
             throw new MetaServiceException(
                     "Named query root access requires modelCode and pidParam: " + query.getCode());
@@ -1078,7 +1050,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         if (memberId == null) {
             memberId = getCurrentUserId();
         }
-        String action = trimToNull(rootAccess.getActionCode());
+        String action = NamedQueryQueryParseUtils.trimToNull(rootAccess.getActionCode());
         if (action == null) {
             action = "read";
         }
@@ -1107,7 +1079,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
     private ExportProjection executeAuthorizedProjection(NamedQuery query, List<NamedQueryField> allFields, String code,
             NamedQueryDataExportRequest request) {
         Long tenantId = getCurrentTenantId();
-        validatePublicOutputAliases(allFields);
+        NamedQueryQueryParseUtils.validatePublicOutputAliases(allFields);
         Map<String, NamedQueryField> fieldMap = allFields.stream()
                 .collect(Collectors.toMap(NamedQueryField::getFieldCode, f -> f));
 
@@ -1129,7 +1101,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                 .map(fc -> {
                     SqlSafetyUtils.validateSqlFragment(fieldMap.get(fc).getColumnExpr());
                     SqlSafetyUtils.validateIdentifier(fc, "NQ export field code");
-                    return fieldMap.get(fc).getColumnExpr() + " AS " + quotedIdentifier(fc);
+                    return fieldMap.get(fc).getColumnExpr() + " AS " + NamedQueryQueryParseUtils.quotedIdentifier(fc);
                 })
                 .collect(Collectors.toList());
 
@@ -1151,11 +1123,11 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         List<String> whereClauses = new ArrayList<>();
 
         if (query.hasBaseWhere()) {
-            parseBaseWhere(query.getBaseWhere(), whereClauses, params);
+            NamedQueryQueryParseUtils.parseBaseWhere(query.getBaseWhere(), whereClauses, params);
         }
 
         if (request.getWhereConditions() != null) {
-            parseUserConditions(request.getWhereConditions(), fieldMap, whereClauses, params);
+            NamedQueryQueryParseUtils.parseUserConditions(request.getWhereConditions(), fieldMap, whereClauses, params);
         }
 
         params.put("tenantId", tenantId);
@@ -1181,12 +1153,12 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         }
 
         if (request.getOrderConditions() != null) {
-            String orderClause = parseOrderConditions(request.getOrderConditions(), fieldMap);
+            String orderClause = NamedQueryQueryParseUtils.parseOrderConditions(request.getOrderConditions(), fieldMap);
             if (!orderClause.isEmpty()) {
                 sql.append(" ORDER BY ").append(orderClause);
             }
         } else if (query.hasDefaultOrder()) {
-            String defaultOrderClause = parseDefaultOrder(query.getDefaultOrder(), fieldMap);
+            String defaultOrderClause = NamedQueryQueryParseUtils.parseDefaultOrder(query.getDefaultOrder(), fieldMap);
             if (!defaultOrderClause.isEmpty()) {
                 sql.append(" ORDER BY ").append(defaultOrderClause);
             }
@@ -1198,7 +1170,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         sql.append(" LIMIT ").append(limit);
 
         // Physical source scopes already enforce tenant isolation, including CTE bodies.
-        List<Map<String, Object>> data = dropEmptyRowNullEntries(dynamicDataMapper.selectByQueryWithoutTenant(
+        List<Map<String, Object>> data = NamedQueryQueryParseUtils.dropEmptyRowNullEntries(dynamicDataMapper.selectByQueryWithoutTenant(
                 fieldProtection.rewrite(protection, sql.toString()), params));
         data = fieldProtection.apply(protection, data);
         return new ExportProjection(allFields, exportFieldCodes, exportScope, protection, data);
@@ -1436,7 +1408,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             for (NamedQueryFieldRequest field : request.getFields()) {
                 if (field.getOperators() != null) {
                     for (String op : field.getOperators()) {
-                        if (!ALLOWED_OPERATORS.contains(op.toLowerCase())) {
+                        if (!NamedQueryQueryParseUtils.ALLOWED_OPERATORS.contains(op.toLowerCase())) {
                             result.addError("invalid_operator",
                                     "Unsupported operator: " + op,
                                     field.getFieldCode() + ".operators");
@@ -1563,8 +1535,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             throw new MetaServiceException("Unknown named query policy.rowScope: " + scope);
         }
         if (NamedQueryPolicy.ROW_SCOPE_REQUIRE_ROW_FILTER.equals(scope)
-                && (trimToNull(entity.getResourceCode()) == null
-                        || trimToNull(entity.getActionCode()) == null)) {
+                && (NamedQueryQueryParseUtils.trimToNull(entity.getResourceCode()) == null
+                        || NamedQueryQueryParseUtils.trimToNull(entity.getActionCode()) == null)) {
             throw new MetaServiceException(
                     "named query policy.rowScope=require_row_filter requires resourceCode and actionCode: "
                             + entity.getCode());
@@ -1611,13 +1583,6 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         }
     }
 
-    private String trimToNull(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
 
     private void appendDeclaredDataScopeClause(
             NamedQuery query,
@@ -1625,11 +1590,11 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             Long userId,
             List<String> whereClauses,
             NamedQueryFieldProtection.Plan protection) {
-        String resourceCode = trimToNull(query.getResourceCode());
+        String resourceCode = NamedQueryQueryParseUtils.trimToNull(query.getResourceCode());
         // Physical sources already apply this exact model/read scope before projection.
         // Reapplying it outside the projection can reference columns that are not selected.
         if (protection != null && resourceCode != null
-                && protection.coversDeclaredScope(resourceCode, trimToNull(query.getActionCode()))) return;
+                && protection.coversDeclaredScope(resourceCode, NamedQueryQueryParseUtils.trimToNull(query.getActionCode()))) return;
         String permitFilter = CommandPermitDataAccess.rowFilter(resourceCode, userId);
         if (permitFilter != null) {
             if (!permitFilter.isBlank()) {
@@ -1641,7 +1606,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             }
             return;
         }
-        String actionCode = trimToNull(query.getActionCode());
+        String actionCode = NamedQueryQueryParseUtils.trimToNull(query.getActionCode());
         if (resourceCode == null || actionCode == null) {
             return;
         }
@@ -1669,7 +1634,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
     }
 
     private NamedQueryField createFieldEntity(Long tenantId, String queryCode, NamedQueryFieldRequest request, String source) {
-        validatePublicOutputAlias(request.getFieldCode());
+        NamedQueryQueryParseUtils.validatePublicOutputAlias(request.getFieldCode());
         NamedQueryField entity = new NamedQueryField(tenantId, queryCode,
                 request.getFieldCode(), request.getColumnExpr(), request.getDataType());
 
@@ -1698,54 +1663,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         return entity;
     }
 
-    private void validatePublicOutputAliases(List<NamedQueryField> fields) {
-        if (fields == null || fields.isEmpty()) {
-            return;
-        }
-        for (NamedQueryField field : fields) {
-            validatePublicOutputAlias(field.getFieldCode());
-        }
-    }
 
-    private void validatePublicOutputAlias(String fieldCode) {
-        if (fieldCode == null) {
-            return;
-        }
-        String normalized = fieldCode.trim().toLowerCase(Locale.ROOT);
-        if (PUBLIC_FORBIDDEN_OUTPUT_ALIASES.contains(normalized)) {
-            throw new MetaServiceException("NamedQuery public output field alias is reserved for internal identity: " + fieldCode);
-        }
-    }
 
-    private void parseBaseWhere(JsonNode baseWhere, List<String> whereClauses, Map<String, Object> params) {
-        if (baseWhere == null || !baseWhere.isArray()) {
-            return;
-        }
-        int idx = 0;
-        for (JsonNode condition : baseWhere) {
-            String field = condition.has("field") ? condition.get("field").asText() : null;
-            String operator = condition.has("operator") ? condition.get("operator").asText() : "eq";
-            JsonNode valueNode = condition.has("value") ? condition.get("value") : null;
-
-            if (field == null || valueNode == null) {
-                continue;
-            }
-
-            // Validate field name to prevent SQL injection via baseWhere config
-            SqlSafetyUtils.validateIdentifier(field, "baseWhere field");
-
-            if (!ALLOWED_OPERATORS.contains(operator.toLowerCase())) {
-                throw new MetaServiceException("Unsupported operator in baseWhere: " + operator);
-            }
-
-            String paramKey = "bw_" + idx;
-            String clause = buildWhereClause(field, operator, paramKey, valueNode, params);
-            if (clause != null) {
-                whereClauses.add(clause);
-            }
-            idx++;
-        }
-    }
 
     /**
      * Quote a validated NQ field code as a SQL identifier so PostgreSQL keeps its
@@ -1755,200 +1674,12 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
      * Callers must run {@link SqlSafetyUtils#validateIdentifier} first; the pattern
      * forbids embedded quotes, so the quoting itself is injection-safe.
      */
-    private String quotedIdentifier(String fieldCode) {
-        return "\"" + fieldCode + "\"";
-    }
 
-    private void parseUserConditions(JsonNode conditions, Map<String, NamedQueryField> fieldMap,
-                                     List<String> whereClauses, Map<String, Object> params) {
-        if (conditions == null || !conditions.isArray()) {
-            return;
-        }
-        int idx = 0;
-        for (JsonNode condition : conditions) {
-            String fieldCode = condition.has("field") ? condition.get("field").asText() : null;
-            String operator = condition.has("operator") ? condition.get("operator").asText() : "eq";
-            JsonNode valueNode = condition.has("value") ? condition.get("value") : null;
 
-            if (fieldCode == null) {
-                continue;
-            }
 
-            // Validate field is in whitelist
-            NamedQueryField fieldDef = fieldMap.get(fieldCode);
-            if (fieldDef == null) {
-                throw new MetaServiceException("Field not allowed: " + fieldCode);
-            }
 
-            // Validate operator is allowed
-            if (fieldDef.hasOperators() && !fieldDef.supportsOperator(operator)) {
-                throw new MetaServiceException("Operator not allowed for field " + fieldCode + ": " + operator);
-            }
 
-            String columnExpr = fieldDef.getColumnExpr();
-            // Validate columnExpr to prevent SQL injection via admin-configured field definitions
-            SqlSafetyUtils.validateSqlFragment(columnExpr);
-            String paramKey = "uc_" + idx;
-            String clause = buildWhereClause(columnExpr, operator, paramKey, valueNode, params);
-            if (clause != null) {
-                whereClauses.add(clause);
-            }
-            idx++;
-        }
-    }
 
-    private String buildWhereClause(String column, String operator, String paramKey,
-                                    JsonNode valueNode, Map<String, Object> params) {
-        String op = operator.toLowerCase();
-        switch (op) {
-            case "eq":
-                params.put(paramKey, extractValue(valueNode));
-                return column + " = #{params." + paramKey + "}";
-            case "ne":
-                params.put(paramKey, extractValue(valueNode));
-                return column + " != #{params." + paramKey + "}";
-            case "gt":
-                params.put(paramKey, extractValue(valueNode));
-                return column + " > #{params." + paramKey + "}";
-            case "gte":
-                params.put(paramKey, extractValue(valueNode));
-                return column + " >= #{params." + paramKey + "}";
-            case "lt":
-                params.put(paramKey, extractValue(valueNode));
-                return column + " < #{params." + paramKey + "}";
-            case "lte":
-                params.put(paramKey, extractValue(valueNode));
-                return column + " <= #{params." + paramKey + "}";
-            case "like":
-            case "contains":
-                params.put(paramKey, "%" + extractValue(valueNode) + "%");
-                return column + " LIKE #{params." + paramKey + "}";
-            case "ilike":
-                params.put(paramKey, "%" + extractValue(valueNode) + "%");
-                return column + " ILIKE #{params." + paramKey + "}";
-            case "starts_with":
-                params.put(paramKey, extractValue(valueNode) + "%");
-                return column + " LIKE #{params." + paramKey + "}";
-            case "ends_with":
-                params.put(paramKey, "%" + extractValue(valueNode));
-                return column + " LIKE #{params." + paramKey + "}";
-            case "is_null":
-                return column + " IS NULL";
-            case "is_not_null":
-                return column + " IS NOT NULL";
-            case "in":
-                if (valueNode.isArray()) {
-                    List<Object> values = new ArrayList<>();
-                    for (JsonNode v : valueNode) {
-                        values.add(extractValue(v));
-                    }
-                    params.put(paramKey, values);
-                    // Build IN clause with indexed params
-                    StringBuilder inClause = new StringBuilder(column + " IN (");
-                    for (int i = 0; i < values.size(); i++) {
-                        String indexedKey = paramKey + "_" + i;
-                        params.put(indexedKey, values.get(i));
-                        if (i > 0) inClause.append(", ");
-                        inClause.append("#{params.").append(indexedKey).append("}");
-                    }
-                    inClause.append(")");
-                    return inClause.toString();
-                }
-                return null;
-            case "not_in":
-                if (valueNode.isArray()) {
-                    List<Object> values = new ArrayList<>();
-                    for (JsonNode v : valueNode) {
-                        values.add(extractValue(v));
-                    }
-                    StringBuilder notInClause = new StringBuilder(column + " NOT IN (");
-                    for (int i = 0; i < values.size(); i++) {
-                        String indexedKey = paramKey + "_" + i;
-                        params.put(indexedKey, values.get(i));
-                        if (i > 0) notInClause.append(", ");
-                        notInClause.append("#{params.").append(indexedKey).append("}");
-                    }
-                    notInClause.append(")");
-                    return notInClause.toString();
-                }
-                return null;
-            case "between":
-                if (valueNode.isArray() && valueNode.size() >= 2) {
-                    params.put(paramKey + "_from", extractValue(valueNode.get(0)));
-                    params.put(paramKey + "_to", extractValue(valueNode.get(1)));
-                    return column + " BETWEEN #{params." + paramKey + "_from} AND #{params." + paramKey + "_to}";
-                }
-                return null;
-            default:
-                throw new MetaServiceException("Unsupported operator: " + operator);
-        }
-    }
-
-    private Object extractValue(JsonNode node) {
-        if (node == null || node.isNull()) {
-            return null;
-        }
-        if (node.isNumber()) {
-            if (node.isInt()) return node.intValue();
-            if (node.isLong()) return node.longValue();
-            return node.doubleValue();
-        }
-        if (node.isBoolean()) {
-            return node.booleanValue();
-        }
-        return node.asText();
-    }
-
-    private String parseOrderConditions(JsonNode orderConditions, Map<String, NamedQueryField> fieldMap) {
-        if (orderConditions == null || !orderConditions.isArray()) {
-            return "";
-        }
-        List<String> orderParts = new ArrayList<>();
-        for (JsonNode order : orderConditions) {
-            String fieldCode = order.has("field") ? order.get("field").asText() : null;
-            String direction = order.has("direction") ? order.get("direction").asText() : "asc";
-
-            if (fieldCode == null) continue;
-
-            NamedQueryField fieldDef = fieldMap.get(fieldCode);
-            if (fieldDef == null || !fieldDef.checkSortable()) {
-                continue; // Skip non-sortable fields silently
-            }
-
-            String dir = "desc".equalsIgnoreCase(direction) ? "desc" : "asc";
-            orderParts.add(fieldDef.getColumnExpr() + " " + dir);
-        }
-        return String.join(", ", orderParts);
-    }
-
-    private String parseDefaultOrder(JsonNode defaultOrder, Map<String, NamedQueryField> fieldMap) {
-        // defaultOrder can be array format: [{"field":"name","direction":"asc"}]
-        if (defaultOrder.isArray()) {
-            return parseOrderConditions(defaultOrder, fieldMap);
-        }
-        // Or object format: {"field":"created_at","direction":"desc"}
-        if (defaultOrder.isObject() && defaultOrder.has("field")) {
-            String fieldCode = defaultOrder.get("field").asText();
-            String direction = defaultOrder.has("direction") ? defaultOrder.get("direction").asText() : "asc";
-            NamedQueryField fieldDef = fieldMap.get(fieldCode);
-            if (fieldDef != null && fieldDef.checkSortable()) {
-                String dir = "desc".equalsIgnoreCase(direction) ? "desc" : "asc";
-                return fieldDef.getColumnExpr() + " " + dir;
-            }
-        }
-        return "";
-    }
-
-    private String mapSortColumn(String sortBy) {
-        switch (sortBy) {
-            case "createdAt": return "created_at";
-            case "updatedAt": return "updated_at";
-            case "code": return "code";
-            case "title": return "title";
-            case "status": return "status";
-            default: return "created_at";
-        }
-    }
 
     private NamedQueryDTO toDTO(NamedQuery entity, boolean includeFields) {
         NamedQueryDTO dto = new NamedQueryDTO();

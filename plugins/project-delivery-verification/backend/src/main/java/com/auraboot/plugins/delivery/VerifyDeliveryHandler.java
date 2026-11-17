@@ -1,6 +1,7 @@
 package com.auraboot.plugins.delivery;
 
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
+import com.auraboot.framework.plugin.extension.BusinessResourceAuthorization;
 import com.auraboot.framework.plugin.extension.DataAccessor;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,6 +21,10 @@ public final class VerifyDeliveryHandler implements CommandHandlerExtension {
     VerifyDeliveryHandler(Clock clock) { this.clock = Objects.requireNonNull(clock); }
     @Override public String getCommandType() { return "tdv:verify_delivery"; }
     @Override public boolean supportsDryRun() { return true; }
+    // Source rows and field grants must share the command's physical MVCC snapshot.
+    @Override public BusinessResourceAuthorization.ReadIsolation commandReadIsolation() {
+        return BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ;
+    }
 
     @Override public Object execute(CommandContext context) {
         if (context == null || context.tenantId() == null || context.dataAccessor() == null

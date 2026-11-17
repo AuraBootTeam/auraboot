@@ -118,4 +118,10 @@ public class EmailRecordLinkService {
         link.setCreatedAt(Instant.now());
         return link;
     }
+
+    /** Messages linked to a business record (moved from the controller for ArchUnit rule 2). */
+    public java.util.List<com.auraboot.framework.email.model.EmailMessage> findMessagesByRecord(
+            Long tenantId, String modelCode, String recordPid, int offset, int limit) {
+        return emailRecordLinkMapper.findMessagesByRecord(tenantId, modelCode, recordPid, offset, limit);
+    }
 }

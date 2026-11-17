@@ -9,6 +9,10 @@ checkstyle {
     maxWarnings = Integer.MAX_VALUE
 }
 
+tasks.withType(Checkstyle).configureEach {
+    maxHeapSize = '1g'
+}
+
 // ========== PMD (warn-only) ==========
 pmd {
     toolVersion = '7.10.0'

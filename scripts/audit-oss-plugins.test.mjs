@@ -199,6 +199,7 @@ describe('OSS plugin config audit', () => {
     assert.match(wrapper, /has_help=0/);
     assert.match(wrapper, /if \[ "\$has_help" -eq 1 \]/);
     assert.deepEqual(Object.keys(profiles).sort(), [
+      'bom-quote',
       'core',
       'default',
       'demo',

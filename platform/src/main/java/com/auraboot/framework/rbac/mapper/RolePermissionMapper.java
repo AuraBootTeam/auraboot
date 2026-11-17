@@ -26,6 +26,16 @@ import java.util.Set;
 @Mapper
 public interface RolePermissionMapper extends BaseMapper<RolePermission> {
 
+    @Update("""
+        UPDATE ab_role_permission SET field_scope=CAST(#{scopeJson} AS jsonb), updated_at=CURRENT_TIMESTAMP, updated_by=#{actorId}
+        WHERE tenant_id=#{tenantId} AND role_id=#{roleId} AND pid=#{bindingPid}
+          AND deleted_flag=FALSE AND snapshot_id IS NULL
+          AND source_ref IS NOT DISTINCT FROM #{expectedSourceRef,jdbcType=VARCHAR}
+          AND UPPER(grant_type)='GRANT'
+        """)
+    int updateDirectFieldScope(@Param("tenantId") Long tenantId, @Param("roleId") Long roleId,
+            @Param("bindingPid") String bindingPid, @Param("scopeJson") String scopeJson, @Param("actorId") Long actorId, @Param("expectedSourceRef") String expectedSourceRef);
+
     /**
      * Roles holding the tenant bootstrap "*" wildcard grant. Plugin imports register
      * permission codes after the bootstrap, and list/join consumers (sidebar menus,
@@ -41,6 +51,49 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
            AND (r.deleted_flag = false OR r.deleted_flag IS NULL)
         """)
     List<Role> findWildcardRoles(@Param("tenantId") Long tenantId);
+
+    /** Active bindings for one declared business permission, including its explicit wildcard owner. */
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    @Select("""
+        SELECT DISTINCT rp.id, rp.role_id, p.code AS permission_code, rp.grant_type,
+               rp.data_scope_ast::text AS data_scope_ast_json, rp.field_scope::text AS field_scope_json,
+               p.id AS permission_id, rp.condition_ast::text AS condition_ast_json,
+               rp.conditions::text AS conditions_json, TRUE AS condition_loaded
+        FROM ab_role_permission rp
+        JOIN ab_permission p ON p.id=rp.permission_id
+        JOIN ab_role r ON r.id=rp.role_id
+        JOIN ab_user_role ur ON ur.role_id=r.id AND ur.tenant_id=rp.tenant_id
+        JOIN ab_tenant_member m ON m.id=ur.member_id AND m.tenant_id=ur.tenant_id
+        JOIN ab_user u ON u.id=m.user_id
+        WHERE rp.tenant_id=#{tenantId} AND ur.member_id=#{memberId} AND m.user_id=#{userId}
+          AND (p.code=#{permissionCode} OR p.code='*')
+          AND (p.tenant_id=#{tenantId} OR p.tenant_id IS NULL) AND p.status='active' AND p.deleted_flag=FALSE
+          AND (r.tenant_id=#{tenantId} OR r.tenant_id IS NULL) AND r.status='active' AND r.deleted_flag=FALSE
+          AND rp.status='active' AND rp.deleted_flag=FALSE
+          AND (rp.effective_date IS NULL OR rp.effective_date<=CURRENT_DATE)
+          AND (rp.expiry_date IS NULL OR rp.expiry_date>=CURRENT_DATE)
+          AND ur.status='active' AND ur.deleted_flag=FALSE
+          AND (ur.effective_date IS NULL OR ur.effective_date<=CURRENT_DATE)
+          AND (ur.expiry_date IS NULL OR ur.expiry_date>=CURRENT_DATE)
+          AND m.status='active' AND m.deleted_flag=FALSE AND u.is_enabled=TRUE AND u.deleted_flag=FALSE
+        ORDER BY rp.id
+        """)
+    List<BusinessGrantRow> findBusinessGrants(@Param("tenantId") Long tenantId, @Param("userId") Long userId,
+            @Param("memberId") Long memberId, @Param("permissionCode") String permissionCode);
+
+    @lombok.Data
+    class BusinessGrantRow {
+        private Long id;
+        private Long roleId;
+        private String permissionCode;
+        private String grantType;
+        private String dataScopeAstJson;
+        private String fieldScopeJson;
+        private Long permissionId;
+        private String conditionAstJson;
+        private String conditionsJson;
+        private Boolean conditionLoaded;
+    }
 
     /**
      * Find all permission bindings for a role
@@ -105,16 +158,39 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
      * @return Set of permission IDs
      */
     @Select("""
-        SELECT DISTINCT permission_id
-        FROM ab_role_permission
-        WHERE role_id = #{roleId}
-          AND grant_type = 'grant'
-          AND deleted_flag = false
-          AND status = 'active'
-          AND (effective_date IS NULL OR effective_date <= CURRENT_DATE)
-          AND (expiry_date IS NULL OR expiry_date >= CURRENT_DATE)
+        SELECT DISTINCT rp.permission_id
+        FROM ab_role_permission rp
+        JOIN ab_role r ON r.id = rp.role_id
+        JOIN ab_permission p ON p.id = rp.permission_id
+        WHERE rp.role_id = #{roleId}
+          AND (r.tenant_id = rp.tenant_id OR r.tenant_id IS NULL)
+          AND (p.tenant_id = rp.tenant_id OR p.tenant_id IS NULL)
+          AND r.status = 'active' AND r.deleted_flag = false
+          AND p.status = 'active' AND p.deleted_flag = false
+          AND rp.grant_type = 'grant'
+          AND rp.deleted_flag = false
+          AND rp.status = 'active'
+          AND (rp.effective_date IS NULL OR rp.effective_date <= CURRENT_DATE)
+          AND (rp.expiry_date IS NULL OR rp.expiry_date >= CURRENT_DATE)
         """)
     Set<Long> findPermissionIdsByRole(@Param("roleId") Long roleId);
+
+    /** Configuration membership only: dates and status still apply in the runtime query above. */
+    @Select("""
+        SELECT DISTINCT rp.permission_id FROM ab_role_permission rp
+        JOIN ab_role r ON r.id=rp.role_id AND r.tenant_id=rp.tenant_id
+        JOIN ab_permission p ON p.id=rp.permission_id
+        WHERE rp.tenant_id=#{tenantId} AND rp.role_id=#{roleId}
+          AND (p.tenant_id=rp.tenant_id OR p.tenant_id IS NULL)
+          AND r.deleted_flag=FALSE AND p.deleted_flag=FALSE AND p.status='active'
+          AND LOWER(rp.grant_type)='grant' AND rp.deleted_flag=FALSE
+        """)
+    Set<Long> findConfiguredGrantIdsByRole(@Param("roleId") Long roleId, @Param("tenantId") Long tenantId);
+
+    /** Include tombstones so authoring cannot revive a managed projection through an upsert. */
+    @Select("SELECT * FROM ab_role_permission WHERE role_id=#{roleId} AND tenant_id=#{tenantId}")
+    @ResultMap("mybatis-plus_RolePermission")
+    List<RolePermission> findAllForCapabilityAuthoring(@Param("roleId") Long roleId, @Param("tenantId") Long tenantId);
 
     /**
      * Find permission IDs for multiple roles

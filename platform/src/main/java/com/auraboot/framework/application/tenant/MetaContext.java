@@ -752,6 +752,13 @@ public class MetaContext {
         return getCommandPermitScopeFor(modelCode) != null;
     }
 
+    /** Exact model binding; the legacy global permit does not qualify. */
+    public static boolean isCommandPermitBoundTo(String modelCode) {
+        CommandPermitExecution permit = COMMAND_PERMIT.get();
+        return modelCode != null && permit != null && modelCode.equals(permit.targetModel)
+                && getCommandPermitScopeFor(modelCode) != null;
+    }
+
     /**
      * Return the public record PID pinned by the current permit plan for this model.
      * A mismatched model never inherits another model's target.

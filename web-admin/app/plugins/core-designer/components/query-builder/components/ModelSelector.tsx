@@ -34,9 +34,9 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ value, onChange, s
       ) {
         setModels(resp.data);
       }
-    } catch {
+    } catch (error) {
       /* ignore */
-    } finally {
+ console.warn('[ModelSelector] previously-silent catch', error);    } finally {
       if (!cancelled && requestSeq === requestSeqRef.current) {
         setLoading(false);
       }

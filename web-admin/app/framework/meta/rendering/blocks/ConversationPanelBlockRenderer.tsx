@@ -173,9 +173,9 @@ export function ConversationPanelBlockRenderer({ block, runtime }: ConversationP
             },
           ]),
         );
-      } catch {
+      } catch (error) {
         // A frame we cannot parse is a frame we drop. It is not worth tearing the panel down for.
-      }
+ console.warn('[ConversationPanelBlockRenderer] previously-silent catch', error);      }
     };
 
     source.addEventListener('message', onMessage as EventListener);
@@ -185,9 +185,9 @@ export function ConversationPanelBlockRenderer({ block, runtime }: ConversationP
       try {
         const payload = JSON.parse(event.data);
         stateManager.updateState(scopeId, 'selectedState', payload.state);
-      } catch {
+      } catch (error) {
         /* ignore */
-      }
+ console.warn('[ConversationPanelBlockRenderer] previously-silent catch', error);      }
     }) as EventListener);
 
     return () => source.close();

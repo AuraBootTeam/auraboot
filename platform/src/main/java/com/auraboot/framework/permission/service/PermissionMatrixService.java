@@ -58,4 +58,10 @@ public interface PermissionMatrixService {
      * @param scopeType Data-scope tier (all/dept_and_sub/dept/self/none)
      */
     void applyDefaultScopeToCurrentGrants(Long tenantId, Long roleId, String scopeType);
+
+    /** Administrative action-scope boundary; internal metadata writers do not use this entry. */
+    void setRoleScope(Long tenantId, Long roleId, com.auraboot.framework.permission.dto.DataScopeUpdateRequest request);
+
+    /** Atomically change the future default and materialize it on the role's current grants. */
+    void setDefaultRoleScope(Long tenantId, Long roleId, String scopeType);
 }

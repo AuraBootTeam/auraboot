@@ -48,9 +48,9 @@ export async function fetchRecentVisits(limit = 10): Promise<RecentVisit[]> {
   // Update localStorage cache with API data
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(visits));
-  } catch {
+  } catch (error) {
     // localStorage unavailable — ignore
-  }
+ console.warn('[useRecentVisits] previously-silent catch', error);  }
 
   return visits;
 }
@@ -69,9 +69,9 @@ export function recordVisit(visit: Omit<RecentVisit, 'visitedAt'>) {
       ...filtered,
     ].slice(0, MAX_ITEMS);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch {
+  } catch (error) {
     // localStorage unavailable — ignore
-  }
+ console.warn('[useRecentVisits] previously-silent catch', error);  }
 
   // Fire-and-forget API call
   recordRecentVisit({

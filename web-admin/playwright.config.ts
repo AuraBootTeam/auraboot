@@ -73,6 +73,7 @@ const reportDir = process.env.PW_REPORT_DIR || './test-results/html-report';
 const resultsJson = process.env.PW_RESULTS_JSON || './test-results/results.json';
 const deepSpecPattern = /.*-deep\.spec\.ts$/;
 const quoteOpsCurrentSpecNames = [
+  'quote-bom-domain-levels',
   'enterprise-info-profile',
   'quote-bom-focused-menu-and-permissions',
   'quote-bom-operations-dashboard',
@@ -262,10 +263,11 @@ export default defineConfig({
   // Shared settings for all projects
   use: {
     baseURL,
+    ...(process.env.PW_LOCALE ? { locale: process.env.PW_LOCALE } : {}),
     headless: true,
     // OSS gates have zero retries; retain the original failing attempt's trace.
     trace: runProfile === 'oss' ? 'retain-on-failure' : 'on-first-retry',
-    screenshot: 'only-on-failure',
+    screenshot: process.env.PW_SCREENSHOT === 'on' ? 'on' : 'only-on-failure',
     video: process.env.CI ? 'on-first-retry' : 'off',
     actionTimeout: 5000,
     navigationTimeout: 15000,

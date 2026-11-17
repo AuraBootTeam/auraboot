@@ -113,5 +113,10 @@ test.describe('X01 session real-entry', () => {
     await page.goto('/');
     await page.waitForURL(/login/, { timeout: 20_000 }).catch(() => {});
     expect(page.url(), 'the app lands on the login flow after revocation').toMatch(/login/);
+    await expect(page.getByRole('button', { name: '立即登录', exact: true })).toBeVisible();
+    await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
+    await expect(page.locator('#identifier')).toBeVisible();
+    await expect(page.locator('#password')).toBeVisible();
+    await page.screenshot({ path: test.info().outputPath('revoked-session-login-ready.png'), fullPage: true });
   });
 });

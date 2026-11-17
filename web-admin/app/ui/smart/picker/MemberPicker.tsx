@@ -129,9 +129,9 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
           },
         ];
       });
-    } catch {
+    } catch (error) {
       // CATCH: non-transactional HTTP call, safe to handle
-    } finally {
+ console.warn('[MemberPicker] previously-silent catch', error);    } finally {
       if (requestId === searchRequestIdRef.current) {
         // Fail closed: an error or unsuccessful response must not leave stale
         // member candidates visible for a different keyword.
@@ -179,9 +179,9 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
                 continue;
               }
             }
-          } catch {
+          } catch (error) {
             // CATCH: non-transactional HTTP call; raw-value fallback is appended below.
-          }
+ console.warn('[MemberPicker] previously-silent catch', error);          }
           // Preserve the persisted value when a stale/deleted user cannot be resolved.
           members.push({ id, name: id });
         }

@@ -76,6 +76,19 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
     @Override
     public void execute(CommandPipelineContext ctx) {
         CommandExecuteRequest request = ctx.getRequest();
+        Object rawParams = ctx.getExecConfig() == null ? null : ctx.getExecConfig().get("handlerParams");
+        if (rawParams instanceof java.util.Map<?, ?> params
+                && "business".equals(params.get("targetRecordAuthorization"))
+                && !com.auraboot.framework.meta.security.NativeBusinessCommandContract.declaresCreation(ctx)
+                && !hasAuthorizedTarget(ctx)) {
+            ctx.recordPhaseDecision(CommandPermitPlan.PhaseDecision.deny("business_target_decision_missing", name()));
+            throw new org.springframework.security.access.AccessDeniedException("A completed business target decision is required");
+        }
+
+        if (com.auraboot.framework.meta.security.NativeBusinessCommandContract.declaresCreation(ctx)
+                && (ctx.getNativeCreationContract() == null || ctx.getRequest().getTargetRecordId() != null))
+            throw new org.springframework.security.access.AccessDeniedException("Native creation contract is missing");
+
         // The aggregate root is the master document the request named — the same id HandlerPhase pins
         // the handler stage to. Derived writes inherit authorization from it (D4). Null when the
         // command names no target (e.g. a create).
@@ -128,9 +141,16 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
      * authority.</p>
      */
     private ScopeGrade resolveScope(CommandPipelineContext ctx) {
+        // A fresh delivery may lend only the target actually checked now, never a model-wide stored grade.
+        if (ctx.isDeferredHandlerAuthorization()) {
+            return ctx.getRequest() != null && StringUtils.hasText(ctx.getRequest().getTargetRecordId())
+                    && Boolean.TRUE.equals(ctx.getTargetRecordReadable()) ? ScopeGrade.TARGET : null;
+        }
+        // A new root is checked inside its insert transaction; never publish model-wide authority.
+        if (com.auraboot.framework.meta.security.NativeBusinessCommandContract.declaresCreation(ctx)) return null;
         // A trusted handler checked this exact target at the boundary. Keep that decision
         // resource-scoped even when the actor's generic row policy would resolve to ALL.
-        if (hasAuthorizedHandlerTarget(ctx)) {
+        if (hasAuthorizedTarget(ctx)) {
             return ScopeGrade.TARGET;
         }
         String externalPermission = MetaContext.getExternalCommandPermission();
@@ -186,7 +206,7 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
         return !Boolean.TRUE.equals(async) && !"true".equalsIgnoreCase(String.valueOf(async));
     }
 
-    private boolean hasAuthorizedHandlerTarget(CommandPipelineContext ctx) {
+    private boolean hasAuthorizedTarget(CommandPipelineContext ctx) {
         if (ctx == null || ctx.getCommand() == null || ctx.getRequest() == null
                 || !StringUtils.hasText(ctx.getCommand().getModelCode())
                 || !StringUtils.hasText(ctx.getRequest().getTargetRecordId())
@@ -196,8 +216,21 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
         Object params = ctx.getExecConfig() == null ? null : ctx.getExecConfig().get("handlerParams");
         if (!(params instanceof java.util.Map<?, ?> values)) return false;
         Object action = values.get("targetRecordAction");
-        if (!"update".equals(action) && !"delete".equals(action)) return false;
+        boolean businessPolicy = "business".equals(values.get("targetRecordAuthorization"));
+        if (!"update".equals(action) && !"delete".equals(action) && !(businessPolicy && "read".equals(action))) return false;
         if ("handler".equals(values.get("targetRecordAuthorization"))) return true;
+        if ("business".equals(values.get("targetRecordAuthorization"))) {
+            var business = ctx.getBusinessTargetAuthorization();
+            return business != null && java.util.Objects.equals(business.commandCode(), ctx.getCommandCode())
+                    && java.util.Objects.equals(business.modelCode(), ctx.getCommand().getModelCode())
+                    && java.util.Objects.equals(business.targetRecordId(), ctx.getRequest().getTargetRecordId())
+                    && java.util.Objects.equals(business.action(), action)
+                    && java.util.Objects.equals(business.tenantId(), ctx.getTenantId())
+                    && java.util.Objects.equals(business.userId(), ctx.getUserId())
+                    && business.memberId() != null && business.memberId() > 0
+                    && ctx.getTargetRecordVersion() != null && ctx.getTargetRecordVersion() >= 0;
+        }
+
         // A declaration alone is not a completed callback. Bind its host-only witness to
         // the exact current root/action; generic READ SQL must not replace this decision.
         var invocation = ctx.getHandlerInvocationAuthorization();

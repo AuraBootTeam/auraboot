@@ -34,6 +34,9 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("RolePermissionServiceImpl cache-eviction events")
 class RolePermissionServiceImplEvictEventTest {
+    @org.mockito.Mock
+    private com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
+
 
     @Mock private RolePermissionMapper rolePermissionMapper;
     @Mock private PermissionMapper permissionMapper;
@@ -46,7 +49,7 @@ class RolePermissionServiceImplEvictEventTest {
     @BeforeEach
     void setUp() {
         service = new RolePermissionServiceImpl(
-            rolePermissionMapper, permissionMapper, eventPublisher, roleMapper, dataScopeService);
+            authorizationWriteLock, rolePermissionMapper, permissionMapper, eventPublisher, roleMapper, dataScopeService, org.mockito.Mockito.mock(com.auraboot.framework.permission.service.RoleAuthorizationCopyService.class));
         MetaContext.setCurrentTenantId(1L);
     }
 

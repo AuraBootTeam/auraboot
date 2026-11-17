@@ -69,9 +69,9 @@ function send(payload: Record<string, unknown>): void {
     }).catch(() => {
       /* fire-and-forget: reporting must never surface its own failure */
     });
-  } catch {
+  } catch (error) {
     /* ignore */
-  }
+ console.warn('[clientErrorReporter] previously-silent catch', error);  }
 }
 
 /**

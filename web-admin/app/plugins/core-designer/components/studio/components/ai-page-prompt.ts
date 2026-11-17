@@ -8,7 +8,7 @@
  */
 
 import { CURRENT_SCHEMA_VERSION } from '~/framework/meta/migration';
-import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type { UnifiedPageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
 /**
  * Options for building a context-aware prompt (multi-turn).
@@ -124,9 +124,9 @@ ${fieldContext}${canvasContext}
 export type MergeMode = 'replace' | 'append';
 
 export interface ParsedPageDsl {
-  kind: PageSchema['kind'];
-  blocks: PageSchema['blocks'];
-  layout: PageSchema['layout'];
+  kind: UnifiedPageSchema['kind'];
+  blocks: UnifiedPageSchema['blocks'];
+  layout: UnifiedPageSchema['layout'];
   schemaVersion: 2;
   mergeMode: MergeMode;
 }
@@ -164,9 +164,9 @@ export function parsePageDslResponse(response: string): ParsedPageDsl {
   const mergeMode: MergeMode = parsed._mergeMode === 'append' ? 'append' : 'replace';
 
   return {
-    kind: parsed.kind as PageSchema['kind'],
-    blocks: parsed.blocks as PageSchema['blocks'],
-    layout: (parsed.layout || { type: 'grid', cols: 12 }) as PageSchema['layout'],
+    kind: parsed.kind as UnifiedPageSchema['kind'],
+    blocks: parsed.blocks as UnifiedPageSchema['blocks'],
+    layout: (parsed.layout || { type: 'grid', cols: 12 }) as UnifiedPageSchema['layout'],
     schemaVersion: CURRENT_SCHEMA_VERSION as 2,
     mergeMode,
   };

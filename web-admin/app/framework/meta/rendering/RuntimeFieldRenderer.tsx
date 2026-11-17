@@ -21,6 +21,7 @@ import { ComponentLoader } from '~/framework/meta/rendering/components/Component
 import { usePermission } from '~/contexts/AuthContext';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import { ReferenceCreateDialog } from '~/framework/meta/runtime/reference-create/ReferenceCreateDialog';
+import { tryParseJsonText } from '~/framework/meta/rendering/pages/formPage/formRecordValues';
 import { hasMissingFieldDependency } from '~/framework/meta/rendering/fieldDependencies';
 
 export interface RuntimeFieldRendererProps {
@@ -91,7 +92,12 @@ function shouldInferJsonEditor(component?: string): boolean {
  * - 自动处理表单验证和错误收集
  * - 支持复杂的 ActionFlow 流程
  */
-export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ field, runtime, value: controlledValue, onChange }) => {
+export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({
+  field,
+  runtime,
+  value: controlledValue,
+  onChange,
+}) => {
   // 从 runtime 获取 context
   const context = runtime.getContext();
   const locale = context.locale || 'zh-CN';
@@ -100,6 +106,15 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
   // Get fieldMeta from state manager (linkage-driven overrides)
   const stateManager = runtime.getStateManager();
   const scopeId = runtime.getScopeId();
+  const [, refreshField] = useState(0);
+  useEffect(() => {
+    if (onChange || !stateManager.subscribe) return;
+    return stateManager.subscribe(
+      scopeId,
+      (state) => state.form?.[field.field],
+      () => refreshField((version) => version + 1),
+    );
+  }, [field.field, onChange, scopeId, stateManager]);
   const fieldMeta = stateManager.getFieldMeta(scopeId, field.field);
   const dependencyMissing = hasMissingFieldDependency(field, context);
 
@@ -111,7 +126,26 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
   }, [fieldMeta?.hidden, field.visibleWhen, context]);
 
   // 从 SchemaRuntime 获取字段值
-  const value = onChange ? controlledValue : stateManager.getFieldValue(scopeId, field.field);
+  const rawValue = onChange ? controlledValue : stateManager.getFieldValue(scopeId, field.field);
+  const value = useMemo(() => {
+    const component = String(field.component || '')
+      .replace(/^smart/i, '')
+      .toLowerCase();
+    const structuredControls = [
+      'cascadeselect',
+      'multiselect',
+      'treeselect',
+      'daterange',
+      'timerangepicker',
+      'upload',
+      'fileattachment',
+      'addressfield',
+      'memberpicker',
+    ];
+    return typeof rawValue === 'string' && structuredControls.includes(component)
+      ? tryParseJsonText(rawValue)
+      : rawValue;
+  }, [rawValue, field.component]);
 
   // 字段更新函数 — also triggers linkage
   const handleChange = (newValue: any) => {

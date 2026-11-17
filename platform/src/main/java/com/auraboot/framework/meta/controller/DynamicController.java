@@ -93,6 +93,18 @@ public class DynamicController {
     private RecordCapabilityService recordCapabilityService;
 
     @Autowired
+    private com.auraboot.framework.meta.service.impl.CommandEffectExecutor commandEffectExecutor;
+
+    @Autowired(required = false)
+    private com.auraboot.framework.meta.service.CommandExecutor synthesizedCommandExecutor;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.meta.synthesized.DynamicWriteCommandSeedService dynamicWriteCommandSeedService;
+
+    @org.springframework.beans.factory.annotation.Value("${aura.command.synthesized-dynamic-writes:true}")
+    private boolean synthesizedDynamicWrites;
+
+    @Autowired
     private OrganizationService organizationService;
 
     @Autowired
@@ -518,6 +530,7 @@ public class DynamicController {
     @GetMapping("/{pageKey}/{recordPid}")
     @Operation(summary = "获取单条数据", description = "根据记录 PID 获取单条数据")
     @RequirePermission("model.{pageKey}.read")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<Map<String, Object>> getById(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "记录 PID") @PathVariable String recordPid) {
@@ -553,18 +566,129 @@ public class DynamicController {
     }
 
     /**
+     * Records a direct (non-command-pipeline) write into ab_command_audit_log.
+     * The dynamic CRUD REST surface predates the command pipeline and still
+     * bypasses its stages (SoD, idempotency, state guards); until it is
+     * migrated to synthesized commands, this wrapper keeps the write surface
+     * auditable — who wrote what to which model, and whether it succeeded.
+     * {@code phaseReached="direct"} marks the legacy path in the audit row.
+     */
+    private <T> T auditedDirectWrite(String operation, String pageKey, Object payloadSummary,
+                                      java.util.function.Supplier<T> write) {
+        if (synthesizedDynamicWrites && synthesizedCommandExecutor != null && dynamicWriteCommandSeedService != null) {
+            return executeAsSynthesizedCommand(operation, pageKey, (Map<String, Object>) payloadSummary);
+        }
+        long start = System.currentTimeMillis();
+        // Audited payload stays bounded: batch lists are summarized to a count.
+        Map<String, Object> requestPayload = auditViewOf(payloadSummary);
+        try {
+            T result = write.get();
+            recordDirectWriteAudit(operation, requestPayload, true, null, start);
+            return result;
+        } catch (RuntimeException e) {
+            recordDirectWriteAudit(operation, requestPayload, false, String.valueOf(e.getMessage()), start);
+            throw e;
+        }
+    }
+
+    /**
+     * Flag-on path: route the write through the command pipeline as a
+     * model-bound {@code dynamic.operation.model} command (seeded per tenant on first use).
+     * The pipeline then owns permissions (handler-owned invocation
+     * authorization re-derives model.{pageKey}.{op} server-side), SoD,
+     * idempotency, state guards, events and auditing. Payload must carry
+     * pageKey/modelCode plus the operation-specific inputs the handler reads.
+     */
+    @SuppressWarnings("unchecked")
+    private <T> T executeAsSynthesizedCommand(String operation, String pageKey, Map<String, Object> synthPayload) {
+        String commandCode = dynamicWriteCommandSeedService.ensureSeeded(operation, (String) synthPayload.get("modelCode"));
+        com.auraboot.framework.meta.dto.CommandExecuteRequest request =
+                new com.auraboot.framework.meta.dto.CommandExecuteRequest();
+        request.setPayload(synthPayload);
+        request.setOperationType(operation.contains("create") ? "CREATE" : operation.contains("update") ? "UPDATE" : "DELETE");
+        Object recordPid = synthPayload.get("recordPid");
+        if (recordIdCarryingOperations().contains(operation)) {
+            request.setTargetRecordId(recordPid instanceof String rp ? rp : null);
+        }
+        Object result = synthesizedCommandExecutor.execute(commandCode, request);
+        // The pipeline returns CommandExecuteResult; unwrap the payload so each
+        // endpoint's declared return type holds (Map for single-record writes,
+        // DynamicBatchResponse for batches, Void for deletes).
+        if (result instanceof com.auraboot.framework.meta.dto.CommandExecuteResult cer) {
+            if (!"completed".equals(cer.getPhaseReached())) {
+                throw new com.auraboot.framework.exception.BusinessException("Dynamic write did not complete: " + operation);
+            }
+            Object data = cer.getData();
+            if (operation.equals("dynamic.delete") || operation.equals("dynamic.batch_delete")) return null;
+            if (operation.equals("dynamic.batch_create") || operation.equals("dynamic.batch_update")) {
+                Object batch = cer.getData() == null ? null : cer.getData().get("pluginResult");
+                if (batch instanceof DynamicBatchResponse response) return (T) response;
+                if (batch instanceof Map<?, ?>) return (T) filterMapper.convertValue(batch, DynamicBatchResponse.class);
+                throw new com.auraboot.framework.exception.BusinessException("Dynamic batch result is unavailable");
+            }
+            return data == null ? null : (T) data;
+        }
+        return (T) result;
+    }
+
+    private static java.util.Set<String> recordIdCarryingOperations() {
+        return java.util.Set.of("dynamic.update", "dynamic.delete");
+    }
+
+    private static Map<String, Object> auditViewOf(Object payloadSummary) {
+        if (!(payloadSummary instanceof Map<?, ?> raw)) {
+            return Map.of("summary", String.valueOf(payloadSummary));
+        }
+        Map<String, Object> view = new java.util.LinkedHashMap<>();
+        for (Map.Entry<?, ?> e : raw.entrySet()) {
+            if (e.getValue() instanceof List<?> list) {
+                view.put(String.valueOf(e.getKey()), Map.of("count", list.size()));
+            } else if (e.getValue() != null) {
+                view.put(String.valueOf(e.getKey()), e.getValue());
+            }
+        }
+        return view;
+    }
+
+    /**
+     * Best-effort: audit recording must never break the write it observes
+     * (same philosophy as {@code CommandEffectExecutor.saveAuditLog}'s own
+     * failure handling, and safe in contexts without an initialized
+     * MetaContext, e.g. unit tests).
+     */
+    private void recordDirectWriteAudit(String operation, Map<String, Object> requestPayload,
+                                        boolean success, String errorMessage, long start) {
+        try {
+            commandEffectExecutor.saveAuditLog(
+                    com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId(),
+                    operation, null,
+                    com.auraboot.framework.application.tenant.MetaContext.getCurrentUserId(),
+                    requestPayload, success ? Map.of("success", true) : null, success, errorMessage,
+                    System.currentTimeMillis() - start, "direct", null);
+        } catch (Exception auditFailure) {
+            log.warn("Direct-write audit recording failed for {}: {}", operation, auditFailure.getMessage());
+        }
+    }
+
+    /**
      * 创建数据
      */
     @com.auraboot.framework.openplatform.service.OpenApiEndpointCandidate(code = "dynamic.create", adapter = com.auraboot.framework.openplatform.service.OpenApiEndpointKind.RESOURCE_CREATE, version = "1", name = "Create record", chineseName = "创建记录")
     @PostMapping("/{pageKey}/create")
     @Operation(summary = "创建数据", description = "根据页面定义创建新数据")
     @RequirePermission("model.{pageKey}.create")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<Object> create(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody Map<String, Object> data) {
         log.info("创建数据: {}", logSafe(pageKey));
         String modelCode = resolveModelCode(pageKey);
-        Map<String, Object> result = dynamicDataService.create(modelCode, data);
+        Map<String, Object> synthPayload = new java.util.HashMap<>();
+        synthPayload.put("data", new java.util.HashMap<>(data));
+        synthPayload.put("pageKey", pageKey);
+        synthPayload.put("modelCode", modelCode);
+        Map<String, Object> result = auditedDirectWrite("dynamic.create", pageKey, synthPayload,
+                () -> dynamicDataService.create(modelCode, data));
         return ApiResponse.success(PublicRecordSanitizer.sanitizeRecord(result));
     }
 
@@ -575,6 +699,7 @@ public class DynamicController {
     @PostMapping("/{pageKey}")
     @Operation(summary = "创建数据（兼容）", description = "根据页面定义创建新数据（兼容旧DSL格式）")
     @RequirePermission("model.{pageKey}.create")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<Object> createCompat(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody Map<String, Object> data) {
@@ -588,6 +713,7 @@ public class DynamicController {
     @PutMapping("/{pageKey}/{recordPid}")
     @Operation(summary = "更新数据", description = "根据页面定义更新数据")
     @RequirePermission("model.{pageKey}.update")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<Map<String, Object>> update(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "记录 PID") @PathVariable String recordPid,
@@ -602,7 +728,13 @@ public class DynamicController {
             data.put("_expectedVersion", baseRecordVersion);
         }
         String modelCode = resolveModelCode(pageKey);
-        Map<String, Object> result = dynamicDataService.update(modelCode, recordPid, data);
+        Map<String, Object> synthPayload = new java.util.HashMap<>();
+        synthPayload.put("data", new java.util.HashMap<>(data));
+        synthPayload.put("pageKey", pageKey);
+        synthPayload.put("modelCode", modelCode);
+        synthPayload.put("recordPid", recordPid);
+        Map<String, Object> result = auditedDirectWrite("dynamic.update", pageKey, synthPayload,
+                () -> dynamicDataService.update(modelCode, recordPid, data));
         return ApiResponse.success(PublicRecordSanitizer.sanitizeRecord(result));
     }
 
@@ -613,12 +745,18 @@ public class DynamicController {
     @DeleteMapping("/{pageKey}/{recordPid}")
     @Operation(summary = "删除数据", description = "根据页面定义删除数据")
     @RequirePermission("model.{pageKey}.delete")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<Void> delete(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "记录 PID") @PathVariable String recordPid) {
         log.info("删除数据: pageKey={}, recordPid={}", logSafe(pageKey), logSafe(recordPid));
         String modelCode = resolveModelCode(pageKey);
-        dynamicDataService.delete(modelCode, recordPid);
+        auditedDirectWrite("dynamic.delete", pageKey,
+                Map.of("pageKey", pageKey, "modelCode", modelCode, "recordPid", recordPid),
+                () -> {
+                    dynamicDataService.delete(modelCode, recordPid);
+                    return null;
+                });
         return ApiResponse.success(null);
     }
 
@@ -628,6 +766,7 @@ public class DynamicController {
     @PostMapping("/{pageKey}/batch")
     @Operation(summary = "批量创建数据", description = "根据页面定义批量创建数据")
     @RequirePermission("model.{pageKey}.create")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<DynamicBatchResponse> batchCreate(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody List<Map<String, Object>> dataList) {
@@ -636,7 +775,9 @@ public class DynamicController {
         }
         log.info("批量创建数据: {}, 数量: {}", logSafe(pageKey), dataList.size());
         String modelCode = resolveModelCode(pageKey);
-        DynamicBatchResponse result = dynamicDataService.batchCreate(modelCode, dataList);
+        DynamicBatchResponse result = auditedDirectWrite("dynamic.batch_create", pageKey,
+                Map.of("pageKey", pageKey, "modelCode", modelCode, "dataList", dataList),
+                () -> dynamicDataService.batchCreate(modelCode, dataList));
         return ApiResponse.success(PublicRecordSanitizer.sanitizeBatch(result));
     }
 
@@ -646,6 +787,7 @@ public class DynamicController {
     @PutMapping("/{pageKey}/batch")
     @Operation(summary = "批量更新数据", description = "根据页面定义批量更新数据")
     @RequirePermission("model.{pageKey}.update")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<DynamicBatchResponse> batchUpdate(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody List<Map<String, Object>> dataList) {
@@ -654,7 +796,9 @@ public class DynamicController {
         }
         log.info("批量更新数据: {}, 数量: {}", logSafe(pageKey), dataList.size());
         String modelCode = resolveModelCode(pageKey);
-        DynamicBatchResponse result = dynamicDataService.batchUpdate(modelCode, dataList);
+        DynamicBatchResponse result = auditedDirectWrite("dynamic.batch_update", pageKey,
+                Map.of("pageKey", pageKey, "modelCode", modelCode, "dataList", dataList),
+                () -> dynamicDataService.batchUpdate(modelCode, dataList));
         return ApiResponse.success(PublicRecordSanitizer.sanitizeBatch(result));
     }
 
@@ -664,6 +808,7 @@ public class DynamicController {
     @DeleteMapping("/{pageKey}/batch")
     @Operation(summary = "批量删除数据", description = "根据页面定义批量删除数据")
     @RequirePermission("model.{pageKey}.delete")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<Void> batchDelete(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody List<String> recordPids) {
@@ -672,7 +817,12 @@ public class DynamicController {
         }
         log.info("批量删除数据: pageKey={}, count={}", logSafe(pageKey), recordPids.size());
         String modelCode = resolveModelCode(pageKey);
-        dynamicDataService.batchDelete(modelCode, recordPids);
+        auditedDirectWrite("dynamic.batch_delete", pageKey,
+                Map.of("pageKey", pageKey, "modelCode", modelCode, "recordPids", recordPids),
+                () -> {
+                    dynamicDataService.batchDelete(modelCode, recordPids);
+                    return null;
+                });
         return ApiResponse.success(null);
     }
 
@@ -682,6 +832,7 @@ public class DynamicController {
     @PostMapping("/{pageKey}/validate")
     @Operation(summary = "验证数据", description = "根据页面定义验证数据")
     @RequirePermission("model.{pageKey}.read")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<Map<String, Object>> validate(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody Map<String, Object> data) {
@@ -708,6 +859,7 @@ public class DynamicController {
     @GetMapping("/{pageKey}/field-options/{fieldName}")
     @Operation(summary = "获取字段选项", description = "获取指定字段的选项列表")
     @RequirePermission("model.{pageKey}.read")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<List<Map<String, Object>>> getFieldOptions(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "字段名称") @PathVariable String fieldName,
@@ -741,6 +893,7 @@ public class DynamicController {
     @PostMapping("/{pageKey}/query/{queryName}")
     @Operation(summary = "执行自定义查询", description = "执行页面定义的自定义查询")
     @RequirePermission("model.{pageKey}.read")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<List<Map<String, Object>>> executeCustomQuery(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "查询名称") @PathVariable String queryName,
@@ -757,6 +910,7 @@ public class DynamicController {
     @PostMapping("/{pageKey}/action/{actionName}")
     @Operation(summary = "执行自定义操作", description = "执行页面定义的自定义操作")
     @RequirePermission("model.{pageKey}.update")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<Map<String, Object>> executeCustomAction(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "操作名称") @PathVariable String actionName,
@@ -789,6 +943,7 @@ public class DynamicController {
     // it here 403s for every real model while the UI shows the export button — an
     // endpoint-vs-metadata inconsistency. Align to read.
     @RequirePermission("model.{pageKey}.read")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<Map<String, Object>> exportData(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Valid @RequestBody DynamicDataExportRequest exportParams) {
@@ -917,6 +1072,7 @@ public class DynamicController {
     @Operation(summary = "下载导出文件", description = "下载当前用户仍有权限领取的导出产物")
     // Gated by read — see exportData above (export = packaging readable data).
     @RequirePermission("model.{pageKey}.read")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public void downloadExport(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "任务PID") @PathVariable String taskPid,
@@ -966,6 +1122,7 @@ public class DynamicController {
     @PostMapping("/{pageKey}/import")
     @Operation(summary = "导入数据", description = "根据页面定义导入数据")
     @RequirePermission("model.{pageKey}.import")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<Map<String, Object>> importData(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody(required = false) Map<String, Object> importParams) {
@@ -979,6 +1136,7 @@ public class DynamicController {
     @PostMapping("/{pageKey}/stats")
     @Operation(summary = "获取统计信息", description = "获取页面数据的统计信息")
     @RequirePermission("model.{pageKey}.read")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<Map<String, Object>> getStats(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody(required = false) Map<String, Object> statsParams) {
@@ -996,6 +1154,7 @@ public class DynamicController {
     @GetMapping("/{pageKey}/{recordPid}/relations/{relationName}")
     @Operation(summary = "获取关联数据", description = "获取指定记录的关联数据")
     @RequirePermission("model.{pageKey}.read")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<List<Map<String, Object>>> getRelationData(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @Parameter(description = "记录 PID") @PathVariable String recordPid,
@@ -1427,6 +1586,7 @@ public class DynamicController {
     @PostMapping("/{pageKey}/joint-save")
     @Operation(summary = "联合保存主表和子表", description = "在单个事务中保存主表及其关联的子表数据")
     @RequirePermission("model.{pageKey}.update")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<JointSubTableSaveResponse> saveWithRelations(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
             @RequestBody JointSubTableSaveRequest request) {

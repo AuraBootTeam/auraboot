@@ -18,9 +18,9 @@ import {
   readEnableMultiView,
   parseImportedPageSchema,
 } from '~/plugins/core-designer/components/studio/workbench/PageDesignerEditorImpl';
-import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type { UnifiedPageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
-function baseSchema(overrides: Partial<PageSchema> = {}): PageSchema {
+function baseSchema(overrides: Partial<UnifiedPageSchema> = {}): UnifiedPageSchema {
   return {
     schemaVersion: 2,
     kind: 'list',
@@ -29,7 +29,7 @@ function baseSchema(overrides: Partial<PageSchema> = {}): PageSchema {
     layout: { type: 'stack' },
     profile: 'admin',
     ...overrides,
-  } as unknown as PageSchema;
+  } as unknown as UnifiedPageSchema;
 }
 
 describe('PageDesignerEditorImpl — enableMultiView DSL contract (GAP-261)', () => {
@@ -64,7 +64,7 @@ describe('PageDesignerEditorImpl — enableMultiView DSL contract (GAP-261)', ()
           customApi: { list: '/api/foo' },
           someOtherFlag: 42,
         },
-      } as unknown as Partial<PageSchema>);
+      } as unknown as Partial<UnifiedPageSchema>);
       const next = applySettingsToSchema(input, { page: { enableMultiView: true } });
       const ext = next.extension as Record<string, unknown>;
       expect(ext.customApi).toEqual({ list: '/api/foo' });
@@ -75,7 +75,7 @@ describe('PageDesignerEditorImpl — enableMultiView DSL contract (GAP-261)', ()
     it('overwrites an existing flat enableMultiView value', () => {
       const input = baseSchema({
         extension: { enableMultiView: true },
-      } as unknown as Partial<PageSchema>);
+      } as unknown as Partial<UnifiedPageSchema>);
       const next = applySettingsToSchema(input, { page: { enableMultiView: false } });
       expect(next.extension?.enableMultiView).toBe(false);
     });
@@ -93,14 +93,14 @@ describe('PageDesignerEditorImpl — enableMultiView DSL contract (GAP-261)', ()
     it('reads flat extension.enableMultiView = true correctly', () => {
       const schema = baseSchema({
         extension: { enableMultiView: true },
-      } as unknown as Partial<PageSchema>);
+      } as unknown as Partial<UnifiedPageSchema>);
       expect(readEnableMultiView(schema)).toBe(true);
     });
 
     it('reads flat extension.enableMultiView = false correctly', () => {
       const schema = baseSchema({
         extension: { enableMultiView: false },
-      } as unknown as Partial<PageSchema>);
+      } as unknown as Partial<UnifiedPageSchema>);
       expect(readEnableMultiView(schema)).toBe(false);
     });
 
@@ -112,7 +112,7 @@ describe('PageDesignerEditorImpl — enableMultiView DSL contract (GAP-261)', ()
     it('returns false when flag is absent from extension', () => {
       const schema = baseSchema({
         extension: { customApi: { list: '/api/x' } },
-      } as unknown as Partial<PageSchema>);
+      } as unknown as Partial<UnifiedPageSchema>);
       expect(readEnableMultiView(schema)).toBe(false);
     });
 
@@ -128,7 +128,7 @@ describe('PageDesignerEditorImpl — enableMultiView DSL contract (GAP-261)', ()
       // to the correct flat location via applySettingsToSchema).
       const schema = baseSchema({
         extension: { render: { enableMultiView: true } } as unknown,
-      } as unknown as Partial<PageSchema>);
+      } as unknown as Partial<UnifiedPageSchema>);
       expect(readEnableMultiView(schema)).toBe(false);
     });
   });

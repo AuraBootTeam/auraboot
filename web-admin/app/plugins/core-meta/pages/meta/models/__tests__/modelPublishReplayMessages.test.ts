@@ -1,8 +1,7 @@
 import { getMigrationPlanMessage, getHistoricalPolicyMessage, getPolicyHeading } from '../modelPublishPolicyMessages';
-import type { ModelPublishGovernance } from '~/shared/services/modelService';
+import type { ModelPublishGovernance, ModelPublishReplayResult } from '~/shared/services/modelService';
 import { describe, expect, it } from 'vitest';
 import { getReplayResultMessage, getReplayStatusLabel, getReplayErrorMessage } from '../modelPublishReplayMessages';
-import type { ModelPublishReplayResult } from '~/shared/services/modelService';
 
 function decision(patch: Partial<ModelPublishReplayResult> = {}): ModelPublishReplayResult {
   return { step: { consumerType: 'DECISION_VERSION' }, status: 'EXECUTED', executed: true, message: 'Decision replay executed with status NOT_MATCHED.', matched: false, outputs: {}, errors: [], ...patch };

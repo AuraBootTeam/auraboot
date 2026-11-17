@@ -9,9 +9,7 @@ vi.mock('~/contexts/TimezoneContext', () => ({
   useTimezone: vi.fn(() => ({ timezone: 'Asia/Shanghai' })),
 }));
 
-import { useNumberFormat } from '../useFormatters';
-import { useDateFormat } from '../useFormatters';
-import { useCurrencyFormat } from '../useFormatters';
+import { useNumberFormat, useDateFormat, useCurrencyFormat } from '../useFormatters';
 
 describe('useNumberFormat', () => {
   it('returns em-dash for null', () => {

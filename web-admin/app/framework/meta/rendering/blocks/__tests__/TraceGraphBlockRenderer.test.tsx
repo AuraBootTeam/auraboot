@@ -23,8 +23,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
-import { buildTraceGraph } from '../TraceGraphBlockRenderer';
-import { TraceGraphBlockRenderer } from '../TraceGraphBlockRenderer';
+import { buildTraceGraph, TraceGraphBlockRenderer } from '../TraceGraphBlockRenderer';
 
 // ---------------------------------------------------------------------------
 // @xyflow/react mock — jsdom has no layout engine; mock the provider + ReactFlow

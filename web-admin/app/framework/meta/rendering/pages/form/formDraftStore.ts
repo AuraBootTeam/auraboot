@@ -145,7 +145,7 @@ export function clearDraft(storage: Storage | null | undefined, key: string): vo
   if (!storage) return;
   try {
     storage.removeItem(key);
-  } catch {
+  } catch (error) {
     // ignore
-  }
+ console.warn('[formDraftStore] previously-silent catch', error);  }
 }

@@ -67,9 +67,9 @@ function parseFilters(json?: string): FilterRow[] {
   try {
     const arr = JSON.parse(json);
     if (Array.isArray(arr)) return arr as FilterRow[];
-  } catch {
+  } catch (error) {
     // ignore
-  }
+ console.warn('[NotificationRuleBuilder] previously-silent catch', error);  }
   return [];
 }
 

@@ -134,9 +134,9 @@ export default function PromotionManagement() {
       if (result.success && result.data) {
         setEnvironments(result.data);
       }
-    } catch {
+    } catch (error) {
       // soft-fail; create form will be empty
-    }
+ console.warn('[promotions] previously-silent catch', error);    }
   }, []);
 
   // Fetch promotions

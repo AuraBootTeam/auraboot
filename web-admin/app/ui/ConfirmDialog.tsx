@@ -8,6 +8,9 @@ export interface ConfirmDialogProps {
   confirmText?: string;
   cancelText?: string;
   variant?: 'default' | 'danger';
+  size?: 'default' | 'wide';
+  confirmDisabled?: boolean;
+  cancelDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -19,6 +22,9 @@ export default function ConfirmDialog({
   confirmText,
   cancelText,
   variant = 'default',
+  size = 'default',
+  confirmDisabled = false,
+  cancelDisabled = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -33,13 +39,13 @@ export default function ConfirmDialog({
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onCancel();
+        if (!cancelDisabled) onCancel();
         return;
       }
 
       if (e.key === 'Tab' && dialogRef.current) {
         const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
-          'button, summary, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+          'button:not(:disabled), summary, [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
         );
         if (focusable.length === 0) return;
 
@@ -59,7 +65,7 @@ export default function ConfirmDialog({
         }
       }
     },
-    [onCancel],
+    [onCancel, cancelDisabled],
   );
 
   useEffect(() => {
@@ -97,7 +103,9 @@ export default function ConfirmDialog({
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 transition-opacity duration-200"
-        onClick={onCancel}
+        onClick={() => {
+          if (!cancelDisabled) onCancel();
+        }}
       />
       {/* Dialog — ARIA attributes added (22.2 fix) */}
       <div
@@ -106,7 +114,7 @@ export default function ConfirmDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descId}
-        className="rounded-card bg-panel relative mx-4 flex max-h-[calc(100dvh-2rem)] w-full max-w-md scale-100 transform flex-col opacity-100 shadow-xl transition-all duration-200 dark:bg-gray-800"
+        className={`rounded-card bg-panel relative mx-4 flex max-h-[calc(100dvh-2rem)] w-full ${size === 'wide' ? 'max-w-3xl' : 'max-w-md'} scale-100 transform flex-col opacity-100 shadow-xl transition-all duration-200 dark:bg-gray-800`}
       >
         <div className="flex min-h-0 flex-col p-6">
           <h3
@@ -125,6 +133,7 @@ export default function ConfirmDialog({
         <div className="flex shrink-0 justify-end gap-3 px-6 pb-6">
           <button
             data-testid="confirm-cancel"
+            disabled={cancelDisabled}
             onClick={onCancel}
             className="rounded-card border-border-strong bg-panel text-text-2 hover:bg-subtle border px-4 py-2 text-sm font-medium transition-colors focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
           >
@@ -133,6 +142,7 @@ export default function ConfirmDialog({
           <button
             ref={confirmBtnRef}
             data-testid="confirm-ok"
+            disabled={confirmDisabled}
             onClick={onConfirm}
             className={`rounded-card px-4 py-2 text-sm font-medium transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none ${confirmBtnClass}`}
           >

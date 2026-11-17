@@ -8,6 +8,20 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class DataPageQueryTest {
+    @Test void exactNullIsAnImmutableDimensionRatherThanAnOmittedFilter() {
+        var filters = new HashMap<String, Object>();
+        filters.put("owner_id", null);
+        var query = new DataPageQuery(filters, Map.of(), List.of(), 1, 20);
+        filters.put("owner_id", "another-owner");
+        assertThat(query.exactFilters()).containsEntry("owner_id", null);
+        assertThatThrownBy(() -> query.exactFilters().put("owner_id", "another-owner"))
+                .isInstanceOf(UnsupportedOperationException.class);
+        var invalid = new HashMap<String, Object>();
+        invalid.put(null, null);
+        assertThatThrownBy(() -> new DataPageQuery(invalid, Map.of(), List.of(), 1, 20))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     @Test void keywordIsOptionalAndFrozenWithTheBoundedRequest() {
         assertThat(new DataPageQuery(Map.of(),Map.of(),List.of(),1,20).keyword()).isEmpty();
         assertThat(new DataPageQuery(Map.of(),Map.of(),List.of(),1,20,null).keyword()).isEmpty();

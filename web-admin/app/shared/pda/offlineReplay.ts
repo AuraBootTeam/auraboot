@@ -200,9 +200,9 @@ async function drainOutbox(): Promise<number> {
       // durably rejected). Delete either way so a broken capture cannot loop.
       await cache.delete(key);
       if (outcome) drained += 1;
-    } catch {
+    } catch (error) {
       // Still offline — keep the entry for the next online transition.
-    }
+ console.warn('[offlineReplay] previously-silent catch', error);    }
   }
   return drained;
 }

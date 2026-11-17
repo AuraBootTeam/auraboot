@@ -164,6 +164,9 @@ class CommandExecutorFailureAuditTest {
     @Mock
     private CommandPipeline commandPipeline;
 
+    @Mock
+    private CommandExecutionTransaction executionTransaction;
+
     @InjectMocks
     private CommandExecutorImpl commandExecutor;
 
@@ -173,6 +176,9 @@ class CommandExecutorFailureAuditTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(commandExecutor, "commandPipeline", commandPipeline);
+        ReflectionTestUtils.setField(commandExecutor, "executionTransaction", executionTransaction);
+        org.mockito.Mockito.lenient().when(executionTransaction.execute(any(), org.mockito.ArgumentMatchers.anyBoolean(), any()))
+                .thenAnswer(call -> ((java.util.function.Supplier<?>) call.getArgument(2)).get());
     }
 
     @AfterEach
@@ -307,4 +313,21 @@ class CommandExecutorFailureAuditTest {
                 eq(77L), eq("qr:pause"), isNull(), eq(42L), any(), isNull(),
                 eq(false), contains("record ownership required"), anyLong(), any(), any());
     }
+    @Test
+    void inaccessibleTargetsKeepTheSafeNotFoundResponseInsteadOfBecomingServerErrors() {
+        MetaContext.setContext(77L, 42L, "user_42", "Operator");
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setPayload(new LinkedHashMap<>(Map.of("name", "denied")));
+        var failure = new com.auraboot.framework.meta.exception.MetaRecordNotFoundException(
+                "private_model", "foreign-record");
+        org.mockito.Mockito.doThrow(failure).when(commandPipeline)
+                .executePreGuardPhases(any(CommandPipelineContext.class));
+        assertThatThrownBy(() -> commandExecutor.execute("test.update", request)).isSameAs(failure);
+        var response = new com.auraboot.framework.meta.exception.MetaApiExceptionHandler()
+                .handleMetaRecordNotFoundException(failure);
+        assertThat(response.getStatusCode().value()).isEqualTo(404);
+        assertThat(response.getBody().getMessage()).isEqualTo("Record not found");
+        assertThat(response.getBody().getData()).isNull();
+    }
+
 }

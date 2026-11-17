@@ -11,7 +11,7 @@ import { DebugLogPanel } from './DebugLogPanel';
 import { useDebugSession } from '../hooks/useDebugSession';
 import { useDebugEvents } from '../hooks/useDebugEvents';
 import { ACTION_TYPE_I18N_KEYS } from '../../components/automationTypeLabels';
-import { humanizeType } from '~/plugins/core-designer/components/flow-designer-sdk/utils';
+import { humanizeType } from '~/framework/smart/flows/sdk/utils';
 import { cn } from '~/utils/cn';
 import type { ActionResult } from '../../services/automationService';
 

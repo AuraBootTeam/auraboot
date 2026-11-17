@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { closeSync, fstatSync, openSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, mkdirSync, writeFileSync, existsSync, symlinkSync, cpSync } from 'node:fs';
+import { closeSync, fstatSync, openSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, mkdirSync, writeFileSync, existsSync, symlinkSync, unlinkSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path, { join, resolve } from 'node:path';
 import {createHash} from 'node:crypto';
@@ -24,6 +24,56 @@ const audit = readFileSync(resolve(root, 'scripts/application/audit-core-only-sc
 const oci = readFileSync(resolve(root, 'scripts/application/oci-layout.mjs'), 'utf8');
 const productImageGate = readFileSync(resolve(root, 'scripts/application/run-product-release-image-gate.sh'), 'utf8');
 
+test('application version guard accepts the library adapter without accepting drift or a hardcoded substitute', t => {
+  const fixture = mkdtempSync(join(tmpdir(), 'application-version-'));
+  t.after(() => rmSync(fixture, { recursive: true, force: true }));
+  for (const dir of ['scripts', 'platform/gradle', 'platform/platform-app/src/main/resources']) {
+    mkdirSync(join(fixture, dir), { recursive: true });
+  }
+  cpSync(join(root, 'scripts/check-version-sync.sh'), join(fixture, 'scripts/check-version-sync.sh'));
+  writeFileSync(join(fixture, 'VERSION'), '1.0.0\n');
+  writeFileSync(join(fixture, 'LIBRARY_VERSION'), '1.0.1-rc.3\n');
+  const config = join(fixture, 'platform/platform-app/src/main/resources/application.yml');
+  writeFileSync(config, 'auraboot:\n  platform:\n    version: 1.0.0\n');
+  writeFileSync(join(fixture, 'platform/build.gradle'), "apply from: 'gradle/library-version.gradle'\n");
+  const adapter = join(fixture, 'platform/gradle/library-version.gradle');
+  cpSync(join(root, 'platform/gradle/library-version.gradle'), adapter);
+  const run = () => spawnSync('bash', [join(fixture, 'scripts/check-version-sync.sh')], { encoding: 'utf8' });
+  assert.equal(run().status, 0);
+  writeFileSync(config, 'auraboot:\n  platform:\n    version: 1.0.1\n');
+  const drift = run();
+  assert.notEqual(drift.status, 0);
+  assert.match(drift.stderr, /DRIFT/);
+  writeFileSync(config, 'auraboot:\n  platform:\n    version: 1.0.0\n');
+  writeFileSync(adapter, "allprojects { version = '1.0.0' }\n");
+  assert.notEqual(run().status, 0);
+  writeFileSync(join(fixture, 'platform/build.gradle'), "version = file('../VERSION').text.trim()\n");
+  assert.equal(run().status, 0);
+});
+
+test('unpublished RC metadata binds the actual product version and leaves library versions independent', () => {
+  const candidate = JSON.parse(readFileSync(join(root, 'distribution/application/examples/core-only/release-candidate.json')));
+  const version = readFileSync(join(root, 'VERSION'), 'utf8').trim();
+  const manifest = readStructuredFile(join(root, 'distribution/application/examples/core-only/app.yaml'));
+  assert.equal(candidate.version, version);
+  assert.equal(manifest.app.version, version);
+  assert.ok(candidate.id.startsWith(`v${version}-rc.`));
+  assert.match(candidate.id.slice(`v${version}-rc.`.length), /^[1-9]\d*$/);
+  assert.equal(candidate.status, 'unpublished');
+  assert.equal(candidate.phase, 'release-candidate');
+  assert.equal(candidate.targetPlatform, 'linux-amd64');
+  assert.equal(candidate.licenseFile, 'LICENSE.txt');
+  assert.equal(candidate.noticeFile, 'NOTICE');
+});
+
+test('native and OCI SMS budget probes reject missing, premature and non-OTP controls', () => {
+  execFileSync('python3', ['-B', join(root, 'scripts/ci/oss-security-probes.test.py')], { encoding: 'utf8' });
+  const native = readFileSync(join(root, 'scripts/ci/oss-native-install.py'), 'utf8');
+  const probes = readFileSync(join(root, 'scripts/ci/oss-security-probes.py'), 'utf8');
+  assert.match(native, /security_module\.verify_sms_mobile_window\(request, check, require, 'oci'\)/);
+  assert.match(probes, /verify_sms_mobile_window\(request, check, require, 'native'\)/);
+});
+
 test('product image reentry preserves the existing work root and refuses implicit replacement', t => {
   const directory = mkdtempSync(join(tmpdir(), 'product-work-root-'));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
@@ -38,7 +88,7 @@ test('product image reentry preserves the existing work root and refuses implici
   rmSync(existing, { recursive: true });
   symlinkSync(directory, existing, 'dir');
   assert.equal(run().status, 2);
-  rmSync(existing);
+  unlinkSync(existing);
   assert.equal(run().status, 0);
   assert.ok(statSync(existing).isDirectory());
 });
@@ -285,12 +335,9 @@ test('core schema audit keeps provider-neutral automation storage in core', () =
 });
 
 test('release OCI is built on a pinned Linux JRE and requires a real image builder', () => {
-  assert.match(oci, /eclipse-temurin:21-jre-noble@sha256:0eda5830ed7b669abc246a8dc520ea8a23cab06f9a8d4b6964109e2f2394e46f/);
-  assert.match(oci, /apt=2\.8\.4ubuntu0\.1 libapt-pkg6\.0t64=2\.8\.4ubuntu0\.1/);
-  assert.match(oci, /Acquire::Retries=0/);
-  assert.match(oci, /libpcre2-8-0=10\.42-4ubuntu2\.2/);
-  assert.match(oci, /update --error-on=any/);
-  assert.doesNotMatch(oci, /--allow-unauthenticated|trusted=yes/);
+  assert.match(oci, /eclipse-temurin:21-jre-alpine@sha256:b6ea71e690a72ba240b3d1b5c477410014862f9ea2cc73ab40e41ff21b03ba1c/);
+  assert.match(oci, /apk add --no-cache zlib=1\.4-r0 && apk info -v zlib/);
+  assert.doesNotMatch(oci, /--allow-unauthenticated|--allow-untrusted|trusted=yes/);
   assert.doesNotMatch(oci, /execFileSync\('container'/);
   assert.match(oci, /self-hosted Linux CI Docker builder \(linux\/amd64\)/);
   assert.match(oci, /AURA_OCI_BUILDER must be docker/);

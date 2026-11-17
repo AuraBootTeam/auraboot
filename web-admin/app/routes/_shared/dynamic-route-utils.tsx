@@ -40,9 +40,9 @@ function parseMemberPickerValue(value: unknown, multiple: boolean): string | str
           const ids = parsed.map((item) => String(item ?? '').trim()).filter(Boolean);
           return multiple ? ids : ids[0];
         }
-      } catch {
+      } catch (error) {
         // Ignore malformed persisted payloads and fall back to raw string display.
-      }
+ console.warn('[dynamic-route-utils] previously-silent catch', error);      }
     }
 
     return multiple ? [trimmed] : trimmed;
@@ -676,9 +676,9 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
         let files: Array<{ name: string; url: string; size?: number }> = [];
         try {
           files = typeof value === 'string' ? JSON.parse(value) : Array.isArray(value) ? value : [];
-        } catch {
+        } catch (error) {
           /* ignore parse errors */
-        }
+ console.warn('[dynamic-route-utils] previously-silent catch', error);        }
         if (files.length === 0) {
           return <span className="py-1 text-sm text-gray-400">&mdash;</span>;
         }

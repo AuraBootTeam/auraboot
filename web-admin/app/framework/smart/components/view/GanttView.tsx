@@ -288,9 +288,9 @@ export const GanttView: React.FC<GanttViewProps> = ({
       if (result.code === '0' && result.data?.criticalPathNodeIds) {
         setCriticalPathIds(new Set(result.data.criticalPathNodeIds));
       }
-    } catch {
+    } catch (error) {
       // CPM is non-critical — silently degrade to no highlighting
-    }
+ console.warn('[GanttView] previously-silent catch', error);    }
   }, [modelCode, dependencyField]);
 
   useEffect(() => {

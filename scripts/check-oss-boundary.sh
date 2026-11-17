@@ -110,6 +110,37 @@ if [ -n "$PLUGIN_HITS" ]; then
   FAIL=1
 fi
 
+# --- 5. Every tracked plugins/ directory must be classified in oss-scope.json ---
+echo "--> Checking oss-scope.json plugin reconciliation..."
+SCOPE_LISTED=$(node -e '
+  const d = require("./oss-scope.json");
+  const all = [...(d.plugins||[]), ...(d.core_plugins||[]), ...(d.example_plugins||[]),
+               ...(d.internal_test_plugins||[]), ...(d.tooling_dirs||[])];
+  console.log(all.join("\n"));
+' 2>/dev/null || true)
+
+if [ -n "$SCOPE_LISTED" ]; then
+  TRACKED_DIRS=$(git ls-files 'plugins/*' | cut -d/ -f2 | sort -u)
+  UNLISTED=""
+  while IFS= read -r dir; do
+    [ -z "$dir" ] && continue
+    if ! printf '%s\n' "$SCOPE_LISTED" | grep -qxF "$dir"; then
+      UNLISTED="$UNLISTED\n  plugins/$dir"
+    fi
+  done <<< "$TRACKED_DIRS"
+  if [ -n "$UNLISTED" ]; then
+    echo "ERROR: tracked plugins/ directories missing from oss-scope.json"
+    echo "(plugins[] / core_plugins[] / example_plugins[] / internal_test_plugins[] / tooling_dirs[]):"
+    echo -e "$UNLISTED"
+    echo ""
+    echo "Classify each plugin in oss-scope.json (it is the declared single source of truth)"
+    echo "or stop tracking it."
+    FAIL=1
+  fi
+else
+  echo "WARNING: could not read oss-scope.json; reconciliation skipped"
+fi
+
 if [ $FAIL -ne 0 ]; then
   echo ""
   echo "❌ OSS boundary check FAILED."

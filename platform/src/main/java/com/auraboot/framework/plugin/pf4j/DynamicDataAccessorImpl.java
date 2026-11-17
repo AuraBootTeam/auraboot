@@ -54,6 +54,11 @@ public class DynamicDataAccessorImpl implements DataAccessor {
     }
 
     @Override
+    public Map<String,Object> getByIdForProcessing(String modelCode, String recordId) {
+        return withReadCommandAuthority(modelCode,recordId,false);
+    }
+
+    @Override
     public Map<String, Object> getByIdOrNull(String modelCode, String recordId) {
         log.debug("Plugin DataAccessor: getByIdOrNull({}, {})", modelCode, recordId);
         try {
@@ -75,7 +80,7 @@ public class DynamicDataAccessorImpl implements DataAccessor {
             for (Map.Entry<String, Object> entry : filters.entrySet()) {
                 conditions.add(QueryCondition.builder()
                         .fieldName(entry.getKey())
-                        .operator(QueryCondition.Operator.EQ)
+                        .operator(entry.getValue()==null?QueryCondition.Operator.IS_NULL:QueryCondition.Operator.EQ)
                         .value(entry.getValue())
                         .build());
             }
@@ -89,7 +94,7 @@ public class DynamicDataAccessorImpl implements DataAccessor {
         java.util.Objects.requireNonNull(query, "query");
         List<QueryCondition> conditions = new ArrayList<>();
         query.exactFilters().forEach((field, value) -> conditions.add(QueryCondition.builder()
-                .fieldName(field).operator(QueryCondition.Operator.EQ).value(value).build()));
+                .fieldName(field).operator(value == null ? QueryCondition.Operator.IS_NULL : QueryCondition.Operator.EQ).value(value).build()));
         query.anyOfFilters().forEach((field, values) -> conditions.add(QueryCondition.builder()
                 .fieldName(field).operator(QueryCondition.Operator.IN).values(values).build()));
         List<SortField> sorts = new ArrayList<>();
@@ -174,6 +179,14 @@ public class DynamicDataAccessorImpl implements DataAccessor {
     }
 
     @Override
+    public void createWithoutResult(String modelCode, Map<String, Object> data) {
+        withCommandAuthority(() -> {
+            dynamicDataService.createWithoutResult(modelCode, mutableCopy(data));
+            return null;
+        });
+    }
+
+    @Override
     public Optional<Map<String, Object>> tryCreate(String modelCode, Map<String, Object> data) {
         log.debug("Plugin DataAccessor: tryCreate({}, {} fields)", modelCode, data != null ? data.size() : 0);
         try {
@@ -236,6 +249,11 @@ public class DynamicDataAccessorImpl implements DataAccessor {
     }
 
     @Override
+    public List<Map<String,Object>> bulkCreateForProcessing(String modelCode,List<Map<String,Object>> rows) {
+        return withCommandAuthority(() -> dynamicDataService.bulkCreateForProcessing(modelCode,mutableCopies(rows)));
+    }
+
+    @Override
     public List<Map<String, Object>> bulkCreate(String modelCode, List<Map<String, Object>> dataList) {
         log.debug("Plugin DataAccessor: bulkCreate({}, {} records)", modelCode, dataList != null ? dataList.size() : 0);
         return withCommandAuthority(() -> dynamicDataService.bulkCreate(modelCode, mutableCopies(dataList)));
@@ -279,15 +297,20 @@ public class DynamicDataAccessorImpl implements DataAccessor {
     }
 
     private Map<String, Object> withReadCommandAuthority(String modelCode, String recordId) {
+        return withReadCommandAuthority(modelCode,recordId,true);
+    }
+
+    private Map<String,Object> withReadCommandAuthority(String modelCode,String recordId,boolean enrichDisplay) {
         String root = MetaContext.getCommandPermitTargetFor(modelCode);
         boolean relatedRead = !MachineDataAccessContext.isActive()
                 && "TARGET".equals(MetaContext.getCommandPermitScopeFor(modelCode)) && root != null && !root.isBlank()
                 && recordId != null && !recordId.isBlank() && !root.equals(recordId);
         // Another record never inherits the root's mutation permit. Reuse the actor's
         // ordinary read path, including current function/TEAM/required-reference checks.
-        return withCommandAuthority(() -> relatedRead
-                ? MetaContext.runWithoutCommandPermit(() -> dynamicDataService.getById(modelCode, recordId))
-                : dynamicDataService.getById(modelCode, recordId));
+        java.util.function.Supplier<Map<String,Object>> reader=() -> enrichDisplay
+                ? dynamicDataService.getById(modelCode,recordId)
+                : dynamicDataService.getByIdForProcessing(modelCode,recordId);
+        return withCommandAuthority(() -> relatedRead ? MetaContext.runWithoutCommandPermit(reader) : reader.get());
     }
 
     /** The authoritative permit context is installed outside this adapter. */
@@ -297,6 +320,9 @@ public class DynamicDataAccessorImpl implements DataAccessor {
         } catch (AccessDeniedException | com.auraboot.framework.exception.PermissionDeniedException denied) {
             // CATCH: public plugin boundary — translate host authorization types
             // into the stable, transport-neutral DataAccessor contract.
+            log.warn("Plugin data authorization rejected command={} tenant={} user={}",
+                    MetaContext.getAuthorizedCommandCode(), MetaContext.exists() ? MetaContext.getCurrentTenantId() : null,
+                    MetaContext.exists() ? MetaContext.getCurrentUserId() : null, denied);
             throw new DataAccessorException(DataAccessErrorCode.PERMISSION_DENIED, denied);
         }
     }

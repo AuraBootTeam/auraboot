@@ -176,9 +176,9 @@ export default function CommandWorkbenchPage() {
       if (ResultHelper.isSuccess(data) && data.data.records?.length > 0) {
         setAuditLog(data.data.records[0]);
       }
-    } catch {
+    } catch (error) {
       // ignore
-    }
+ console.warn('[workbench] previously-silent catch', error);    }
   }, []);
 
   const handleRun = async () => {

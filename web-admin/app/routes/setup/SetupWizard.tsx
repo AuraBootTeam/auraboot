@@ -50,9 +50,9 @@ export default function SetupWizard() {
         if (result.code === '0' && result.data) {
           setProgress(result.data);
         }
-      } catch {
+      } catch (error) {
         // ignore polling errors
-      }
+ console.warn('[SetupWizard] previously-silent catch', error);      }
     }, 1000);
     return () => clearInterval(interval);
   }, [phase]);

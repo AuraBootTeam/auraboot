@@ -25,4 +25,14 @@ if [ -n "$leaks" ]; then
   echo "the file to the team's private documentation repo."
   exit 1
 fi
+# AI-session residue (tool-specific fingerprints) must not land in tracked docs.
+ai_residue="$(git grep -InE '<mcfile |^SOLO Builder' -- '*.md' 2>/dev/null || true)"
+if [ -n "$ai_residue" ]; then
+  echo "ERROR: tracked docs contain AI-session tool residue (<mcfile> tags / SOLO Builder headers):"
+  echo "$ai_residue" | sed 's/^/  /'
+  echo ""
+  echo "Strip the session artifacts and keep only the distilled content."
+  exit 1
+fi
+
 echo "OK: no internal-process docs tracked in OSS."

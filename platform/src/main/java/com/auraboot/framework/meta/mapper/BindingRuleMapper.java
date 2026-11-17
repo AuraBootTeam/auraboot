@@ -36,6 +36,15 @@ public interface BindingRuleMapper extends BaseMapper<BindingRule> {
     @Select("SELECT * FROM ab_binding_rule WHERE command_id = #{commandId} AND deleted_flag = false ORDER BY sequence")
     List<BindingRule> findByCommandId(@Param("commandId") Long commandId);
 
+    @Select("""
+        <script>
+        SELECT * FROM ab_binding_rule WHERE deleted_flag = FALSE AND command_id IN
+        <foreach collection="commandIds" item="commandId" open="(" separator="," close=")">#{commandId}</foreach>
+        ORDER BY command_id, sequence, id
+        </script>
+        """)
+    List<BindingRule> findByCommandIds(@Param("commandIds") List<Long> commandIds);
+
     @Select("SELECT * FROM ab_binding_rule WHERE command_id = #{commandId} AND rule_type = #{ruleType} AND enabled = TRUE AND deleted_flag = false ORDER BY sequence")
     List<BindingRule> findByCommandIdAndType(@Param("commandId") Long commandId, @Param("ruleType") String ruleType);
 

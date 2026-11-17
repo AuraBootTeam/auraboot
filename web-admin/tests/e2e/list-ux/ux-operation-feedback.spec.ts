@@ -91,11 +91,11 @@ async function fillAndSubmitCrmLeadForm(page: Page, title: string, customerName:
   const customerTrigger = page.getByTestId('select-trigger-e2et_order_customer');
   await expect(customerTrigger).toBeEnabled();
   await customerTrigger.click();
-  await page.getByTestId('select-search-e2et_order_customer').fill(customerName);
+  await page.getByTestId('select-trigger-e2et_order_customer').fill(customerName);
   const customerOption = page.getByRole('option').filter({ hasText: customerName });
   await expect(customerOption).toHaveCount(1);
   await customerOption.click();
-  await expect(customerTrigger).toContainText(customerName);
+  await expect(customerTrigger).toHaveValue(customerName);
   await expect(page.locator('input[type="hidden"][name="e2et_order_customer"]')).toHaveValue(customerPid);
 
   // Submit

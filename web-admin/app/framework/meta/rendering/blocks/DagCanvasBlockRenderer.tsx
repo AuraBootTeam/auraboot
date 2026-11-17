@@ -8,7 +8,7 @@ import {
   NodeRuntimeStatusProvider,
   useFlowStore,
   type NodeStatusMap,
-} from '~/plugins/core-designer/components/flow-designer-sdk'
+} from '~/framework/smart/flows/sdk'
 
 export interface DagCanvasBlockRendererProps {
   block: BlockConfig
@@ -189,11 +189,16 @@ function FlowCanvasCard({
   edges,
   statusMap,
   className,
+  style,
 }: {
   nodes: unknown[]
   edges: unknown[]
   statusMap: NodeStatusMap
   className?: string
+  /** Explicit canvas height. Tailwind v4 content detection does not reliably emit the
+   * spacing scale this block used before (h-44 was absent from the built CSS), so the
+   * delivery canvas passes an inline height instead of trusting a generated class. */
+  style?: React.CSSProperties
 }) {
   const importData = useFlowStore((store) => store.importData)
   useEffect(() => {
@@ -201,7 +206,7 @@ function FlowCanvasCard({
   }, [importData, nodes, edges])
   return (
     <NodeRuntimeStatusProvider statuses={statusMap}>
-      <div className={`flex flex-col ${className || ''}`}>
+      <div className={`flex flex-col ${className || ''}`} style={style}>
         <FlowCanvas readOnly showMinimap={false} showControls={false} fitExistingGraph className="flex-1 min-h-0" />
       </div>
     </NodeRuntimeStatusProvider>
@@ -254,7 +259,7 @@ function NodeDetailPanel({
   ]
   return (
     <aside
-      className="rounded-card border-border bg-panel border lg:w-80 lg:shrink-0"
+      className="rounded-card border-border bg-panel border w-80 shrink-0"
       data-testid="dag-node-panel"
     >
       <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
@@ -346,13 +351,14 @@ export const DagCanvasBlockRenderer: React.FC<DagCanvasBlockRendererProps> = ({ 
           </span>
         ) : null}
       </div>
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
-        <div className="min-w-0 lg:flex-1" onClick={onCanvasClick}>
+      <div className="flex flex-row gap-3 items-stretch">
+        <div className="min-w-0 flex-1" onClick={onCanvasClick}>
           <FlowCanvasCard
             nodes={flowNodes}
             edges={flowEdges}
             statusMap={statusMap}
-            className="h-44 rounded-control border-border border"
+            className="rounded-control border-border border"
+            style={{ height: '11rem' }}
           />
         </div>
         {selectedNode ? (
@@ -367,7 +373,7 @@ export const DagCanvasBlockRenderer: React.FC<DagCanvasBlockRendererProps> = ({ 
           />
         ) : (
           <aside
-            className="rounded-card border-border bg-panel text-text-2 flex items-center border border-dashed p-4 text-xs leading-5 lg:w-80 lg:shrink-0"
+            className="rounded-card border-border bg-panel text-text-2 flex w-80 shrink-0 items-center border border-dashed p-4 text-xs leading-5"
             data-testid="dag-node-panel-empty"
           >
             {getLocalizedText(

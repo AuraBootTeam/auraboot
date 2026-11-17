@@ -9,7 +9,7 @@ import type {
   ExportRequest,
   ImportRequest,
   EntityStats,
-  PageSchema,
+  UnifiedPageSchema,
   FieldOption,
   UseDynamicApiReturn,
   DynamicBatchResult,
@@ -183,7 +183,7 @@ export function useDynamicApi(): UseDynamicApiReturn {
    * 获取页面Schema
    */
   const getPageSchema = useCallback(
-    async (entityCode: string): Promise<PageSchema> => {
+    async (entityCode: string): Promise<UnifiedPageSchema> => {
       return wrapApiCall(() => dynamicService.getPageMetadata(entityCode));
     },
     [wrapApiCall],
@@ -225,7 +225,7 @@ export function useDynamicApi(): UseDynamicApiReturn {
 export function useDynamicForm(entityCode: string, id?: string) {
   const api = useDynamicApi();
   const [formData, setFormData] = useState<DynamicEntity | null>(null);
-  const [schema, setSchema] = useState<PageSchema | null>(null);
+  const [schema, setSchema] = useState<UnifiedPageSchema | null>(null);
   const [initializing, setInitializing] = useState(true);
 
   /**
@@ -293,7 +293,7 @@ export function useDynamicForm(entityCode: string, id?: string) {
 export function useDynamicList(entityCode: string) {
   const api = useDynamicApi();
   const [data, setData] = useState<DynamicEntity[]>([]);
-  const [schema, setSchema] = useState<PageSchema | null>(null);
+  const [schema, setSchema] = useState<UnifiedPageSchema | null>(null);
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 20,

@@ -255,7 +255,7 @@ export interface PageEvent {
 }
 
 // 页面 Schema 主结构
-export interface PageSchema {
+export interface UnifiedPageSchema {
   meta: PageMeta;
   props?: PageProps;
   endpoint?: ApiEndpoint;
@@ -273,7 +273,7 @@ export interface PageSchema {
 
 // 页面容器属性
 export interface PageContainerProps {
-  schema: PageSchema;
+  schema: UnifiedPageSchema;
   context?: LowCodeContext;
   onEvent?: (eventName: string, payload?: any) => void;
   className?: string;

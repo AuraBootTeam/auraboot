@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import type { ColumnConfig } from '~/framework/meta/schemas/types';
 import { useDictCache } from '~/framework/meta/rendering/pages/hooks/useDictCache';
-import type { DataSourceConfig as SelectDataSourceConfig } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+import type { DataSourceConfig as SelectDataSourceConfig } from '~/framework/smart/schema/smart-components';
 import type { EnrichedColumnConfig, ResolvedSubTableViewerProps } from './subTableTypes';
 import {
   getFieldMetaExtension,

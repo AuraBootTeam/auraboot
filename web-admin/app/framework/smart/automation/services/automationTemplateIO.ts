@@ -1,4 +1,4 @@
-import type { FlowData } from '~/plugins/core-designer/components/flow-designer-sdk';
+import type { FlowData } from '~/framework/smart/flows/sdk';
 
 export const AUTOMATION_TEMPLATE_MAX_BYTES = 2 * 1024 * 1024;
 export const AUTOMATION_TEMPLATE_MAX_NODES = 500;

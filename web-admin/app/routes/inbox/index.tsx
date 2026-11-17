@@ -372,9 +372,9 @@ export default function UnifiedInboxPage() {
     try {
       const result = await getUnreadSummary();
       setSummary(result);
-    } catch {
+    } catch (error) {
       // Secondary data.
-    }
+ console.warn('[index] previously-silent catch', error);    }
   }, []);
 
   const fetchData = useCallback(

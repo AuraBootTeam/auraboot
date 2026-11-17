@@ -6,8 +6,6 @@ import com.auraboot.framework.meta.dto.InvariantDefinitionCreateRequest;
 import com.auraboot.framework.meta.entity.DecisionAlarm;
 import com.auraboot.framework.meta.entity.InvariantDefinition;
 import com.auraboot.framework.meta.entity.InvariantEvaluationLog;
-import com.auraboot.framework.meta.mapper.DecisionAlarmMapper;
-import com.auraboot.framework.meta.mapper.InvariantEvaluationLogMapper;
 import com.auraboot.framework.meta.service.InvariantDefinitionService;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
@@ -35,8 +33,8 @@ import java.util.Map;
 public class InvariantController {
 
     private final InvariantDefinitionService invariantService;
-    private final InvariantEvaluationLogMapper evaluationLogMapper;
-    private final DecisionAlarmMapper alarmMapper;
+    private final com.auraboot.framework.meta.service.InvariantInspectionService inspectionService;
+    private final com.auraboot.framework.meta.service.DecisionAlarmService alarmService;
 
     /**
      * Create a new invariant definition.
@@ -120,7 +118,7 @@ public class InvariantController {
             @RequestParam(defaultValue = "24") int hoursBack) {
         Long tenantId = MetaContext.getCurrentTenantId();
         Instant since = Instant.now().minus(hoursBack, ChronoUnit.HOURS);
-        List<Map<String, Object>> stats = evaluationLogMapper.getViolationStats(tenantId, since);
+        List<Map<String, Object>> stats = inspectionService.getViolationStats(tenantId, since);
         return ApiResponse.success(stats);
     }
 
@@ -134,7 +132,7 @@ public class InvariantController {
             @RequestParam(defaultValue = "24") int hoursBack) {
         Long tenantId = MetaContext.getCurrentTenantId();
         Instant since = Instant.now().minus(hoursBack, ChronoUnit.HOURS);
-        List<Map<String, Object>> trend = evaluationLogMapper.getViolationTrend(tenantId, code, since);
+        List<Map<String, Object>> trend = inspectionService.getViolationTrend(tenantId, code, since);
         return ApiResponse.success(trend);
     }
 
@@ -146,7 +144,7 @@ public class InvariantController {
     public ApiResponse<List<InvariantEvaluationLog>> getRecentViolations(
             @RequestParam(defaultValue = "50") int limit) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        List<InvariantEvaluationLog> violations = evaluationLogMapper.findRecentViolations(tenantId, limit);
+        List<InvariantEvaluationLog> violations = inspectionService.findRecentViolations(tenantId, limit);
         return ApiResponse.success(violations);
     }
 
@@ -158,7 +156,7 @@ public class InvariantController {
     public ApiResponse<List<DecisionAlarm>> getInvariantAlarms(
             @RequestParam(defaultValue = "50") int limit) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        List<DecisionAlarm> alarms = alarmMapper.findOpenAlarmsByType(tenantId, "invariant_violation", limit);
+        List<DecisionAlarm> alarms = alarmService.findOpenAlarmsByType(tenantId, "invariant_violation", limit);
         return ApiResponse.success(alarms);
     }
 }

@@ -15,9 +15,9 @@ export default function WorkbenchSettingsPage() {
     async function loadWorkbench() {
       try {
         await dashboardService.getWorkbench();
-      } catch {
+      } catch (error) {
         // Ignore — this page only shows availability state.
-      } finally {
+ console.warn('[settings] previously-silent catch', error);      } finally {
         setLoading(false);
       }
     }

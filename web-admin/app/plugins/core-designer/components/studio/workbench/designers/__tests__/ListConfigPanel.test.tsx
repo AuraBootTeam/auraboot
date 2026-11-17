@@ -16,7 +16,7 @@ import { ListConfigPanel } from '../ListConfigPanel';
 import { SampleDataLoader } from '../preview/SampleDataLoader';
 import { StructuralPreview } from '../preview/StructuralPreview';
 import { blocksToViewModel } from '../list-config/mapper';
-import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type { UnifiedPageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import type {
   ModelCapabilities,
   UseModelCapabilitiesResult,
@@ -65,7 +65,7 @@ vi.mock('~/shared/hooks/useModelCapabilities', () => ({
   useModelCapabilities: () => mockedCapabilitiesResult,
 }));
 
-function baseSchema(): PageSchema {
+function baseSchema(): UnifiedPageSchema {
   return {
     schemaVersion: 2,
     kind: 'list',
@@ -74,7 +74,7 @@ function baseSchema(): PageSchema {
     layout: { type: 'stack' },
     profile: 'admin',
     title: { zh: 'test' },
-  } as unknown as PageSchema;
+  } as unknown as UnifiedPageSchema;
 }
 
 describe('ListConfigPanel', () => {
@@ -430,7 +430,7 @@ describe('ListConfigPanel', () => {
             config: { marker: 'preserve' },
           },
         ],
-      } as unknown as PageSchema;
+      } as unknown as UnifiedPageSchema;
       const original = JSON.stringify(schema);
       render(
         <React.StrictMode>
@@ -613,7 +613,7 @@ describe('ListConfigPanel', () => {
           props: { defaultSortField: 'createdAt' },
         },
       ],
-    } as unknown as PageSchema;
+    } as unknown as UnifiedPageSchema;
 
     render(<ListConfigPanel schema={schema} onSchemaChange={() => {}} />);
 

@@ -1,3 +1,4 @@
+import { assignRoleNavigation } from '../../helpers/role-navigation';
 import { loginDeliveryMember } from '../../helpers/delivery-session';
 import { requireRuntimeUrl } from '../../helpers/environments';
 /** Owner-reviewed showcase. API fixture/maintenance steps are recorded separately from UI actions. */
@@ -117,6 +118,7 @@ test('SC12 actual failed automation is diagnosed, repaired and rerun without los
       }),
     );
   await setManage(false);
+  await assignRoleNavigation(page, role.pid, ['automation_menu','tpm_tasks','tpm_projects']);
   const email = roleCode + '@e2e.local';
   await data(
     await page.request.post('/api/admin/users', {

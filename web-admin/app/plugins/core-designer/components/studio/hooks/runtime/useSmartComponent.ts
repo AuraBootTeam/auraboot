@@ -3,7 +3,7 @@
  * 提供Smart组件的通用功能，包括状态管理、验证、数据源、表达式解析等
  */
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   expressionEvaluator,
   bind as bindExpression,
@@ -148,6 +148,16 @@ export const useSmartField = <T>(props: UseSmartFieldProps<T>) => {
     required,
     context,
   });
+
+  // Inline creation and other controlled updates bypass the local change handler.
+  // Revalidate touched fields only when their value changes, not when rule/context
+  // identities change during rendering.
+  const previousValue = useRef(value);
+  useEffect(() => {
+    if (Object.is(previousValue.current, value)) return;
+    previousValue.current = value;
+    if (touched) void validation.validate(value);
+  }, [value, touched, validation.validate]);
 
   const handleChange = useCallback(
     (nextValue: T) => {

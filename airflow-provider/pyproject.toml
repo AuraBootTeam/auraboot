@@ -14,6 +14,8 @@ python = ">=3.11,!=3.15,<4.0"
 apache-airflow = ">=3.3.0,<4.0"
 requests = "^2.31"
 dnspython = ">=2.9.0,<3.0"
+# Security floor for bounded W3C trace-context parsing.
+opentelemetry-api = ">=1.45.2,<2.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.3"

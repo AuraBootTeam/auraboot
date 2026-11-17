@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BoltIcon, DocumentTextIcon, RectangleGroupIcon } from '@heroicons/react/24/outline';
-import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type { UnifiedPageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { useModelCapabilities } from '~/shared/hooks/useModelCapabilities';
 import { fetchResult } from '~/shared/services/http-client';
 import { cn } from '~/utils/cn';
@@ -15,9 +15,9 @@ import {
 } from './validation/capabilityValidator';
 
 export interface DetailConfigPanelProps {
-  schema: PageSchema;
-  onSchemaChange: (schema: PageSchema) => void;
-  onSave?: (schema: PageSchema) => Promise<void>;
+  schema: UnifiedPageSchema;
+  onSchemaChange: (schema: UnifiedPageSchema) => void;
+  onSave?: (schema: UnifiedPageSchema) => Promise<void>;
   modelCode?: string;
   readonly?: boolean;
   previewMode?: boolean;

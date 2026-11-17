@@ -31,6 +31,11 @@ import java.util.Set;
 @Configuration
 public class MybatisPlusConfig {
 
+    @Bean
+    static org.springframework.beans.factory.config.BeanFactoryPostProcessor verifyMybatisCarrier() {
+        return beanFactory -> MybatisCarrierIntegrity.verify(MybatisPlusConfig.class.getClassLoader());
+    }
+
     @Value("${aura.persistence.tenant-bypass-table-prefixes:}")
     private String tenantBypassTablePrefixes = "";
 

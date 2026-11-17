@@ -575,9 +575,9 @@ function MetadataDisplay({ metadata, locale }: { metadata: string; locale: strin
         </div>
       );
     }
-  } catch {
+  } catch (error) {
     // Invalid JSON — skip
-  }
+ console.warn('[ActivityTimeline] previously-silent catch', error);  }
   return null;
 }
 

@@ -9,7 +9,7 @@
 // fetch boilerplate.
 
 import { useEffect, useState } from 'react';
-import type { NodeStatusMap, NodeRuntimeStatus } from '~/plugins/core-designer/components/flow-designer-sdk';
+import type { NodeStatusMap, NodeRuntimeStatus } from '~/framework/smart/flows/sdk';
 
 interface NodeExecutionWire {
   nodeId: string;

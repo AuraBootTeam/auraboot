@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.*;
  *
  * <p>Runs against the real {@code aura_boot} test database.
  * The quota migration (2026-06-10-billing-quota.sql) must be applied before running:
- * {@code psql -h localhost -d aura_boot -f platform/src/main/resources/database/migrations/2026-06-10-billing-quota.sql}
+ * {@code psql -h localhost -d aura_boot -f platform/src/testFixtures/resources/database/migrations/2026-06-10-billing-quota.sql}
  *
  * <p>These tests do NOT extend @Transactional at class level — bucket operations use
  * optimistic locking and the concurrent test needs real committed rows.

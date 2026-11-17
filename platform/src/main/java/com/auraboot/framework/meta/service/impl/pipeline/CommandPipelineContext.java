@@ -12,6 +12,9 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 
 /**
  * Shared mutable state that flows through every phase.
@@ -32,6 +35,9 @@ public class CommandPipelineContext {
     private final Long userId;
     private final long startTime;
 
+    /** Host-only delivery evaluation; task JSON cannot select authorization policy. */
+    private boolean deferredHandlerAuthorization;
+
     // ==================== Populated during pipeline ====================
 
     /** Loaded command definition (set by LoadPhase) */
@@ -40,6 +46,27 @@ public class CommandPipelineContext {
     /** Request payload — may be mutated by normalize/autoSet/computed phases */
     @Builder.Default
     private Map<String, Object> payload = new HashMap<>();
+
+    @lombok.Getter(lombok.AccessLevel.NONE)
+    @lombok.Setter(lombok.AccessLevel.NONE)
+    private SubmittedInputOrigin submittedInputOrigin;
+
+    private record SubmittedInputOrigin(Set<String> keys) {
+        private SubmittedInputOrigin {
+            keys = Collections.unmodifiableSet(new LinkedHashSet<>(keys));
+        }
+    }
+
+    /** Capture top-level source keys once, before normalization or owner derivation. */
+    public void captureSubmittedInput(Map<String, Object> input) {
+        if (submittedInputOrigin != null) throw new IllegalStateException("Command input origin is already captured");
+        submittedInputOrigin = new SubmittedInputOrigin(input == null ? Set.of() : input.keySet());
+    }
+
+    /** Null means unknown origin; consumers must then treat every input as user supplied. */
+    public Set<String> submittedInputKeys() {
+        return submittedInputOrigin == null ? null : submittedInputOrigin.keys();
+    }
 
     /** Immutable canonical request intent claimed by the idempotency phase. */
     private Map<String, Object> idempotencyIntent;
@@ -102,6 +129,29 @@ public class CommandPipelineContext {
      * named target.</p>
      */
     private Boolean targetRecordReadable;
+
+    /** Host-only completed business-target decision; never parsed from command payload/settings. */
+    private BusinessTargetAuthorization businessTargetAuthorization;
+
+    /** Complete grant alternatives captured by the host target authorization snapshot. */
+    private com.auraboot.framework.permission.engine.model.BusinessGrantDecision businessGrantDecision;
+
+    /** Validated server-owned native creation contract; not an insert permit. */
+    private com.auraboot.framework.meta.security.NativeBusinessCommandContract nativeCreationContract;
+
+    /** Immutable public projection captured by the host authorization snapshot, not a request flag. */
+    private com.auraboot.framework.meta.service.impl.BusinessResultProjectionPlan businessResultProjection;
+
+    /** Host-captured current public field view for explicitly declared artifact sources. */
+    private com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionPlan publicOutputProjection;
+
+    /** Host-captured relationship/state hashes fenced before artifact idempotency lookup. */
+    @lombok.Builder.Default
+    private Map<String, String> artifactRootBinding = Map.of();
+
+    public record BusinessTargetAuthorization(String commandCode, String modelCode, String targetRecordId,
+                                               String action, Long tenantId, Long userId, Long memberId) {}
+
 
     /** Host-only evidence from a completed domain invocation callback; never a request flag. */
     private HandlerInvocationAuthorization handlerInvocationAuthorization;

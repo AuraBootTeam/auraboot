@@ -47,6 +47,26 @@ test('Allure generates a real report containing the fixture result', { timeout: 
     'Generated report must contain the actual supplied business result, not just an HTML shell');
 });
 
+test('Allure XML reader preserves passed and failed cases after parser security update', { timeout: 40000 }, () => {
+  const input = path.join(output, 'junit-xml-results');
+  write(path.join(input, 'delivery.xml'), '<testsuites><testsuite name="Delivery XML" tests="2" failures="1">'
+    + '<testcase classname="Delivery" name="Customer amount readback" time="0.01"/>'
+    + '<testcase classname="Delivery" name="Readonly write rejected" time="0.02">'
+    + '<failure message="Permission &amp; tenant boundary">Expected denial evidence</failure>'
+    + '</testcase></testsuite></testsuites>');
+  const report = path.join(output, 'junit-xml-report');
+  const result = run('allure', ['generate', input, '--output', report, '--report-name', 'XML compatibility'], output);
+  assert.equal(result.status, 0, result.stderr || result.error?.message);
+  assert.ok(fs.existsSync(path.join(report, 'index.html')));
+  const data = files(report).filter(file => /\.(json|jsonl)$/.test(file))
+    .map(file => fs.readFileSync(file, 'utf8')).join('\n');
+  assert.match(data, /Customer amount readback/);
+  assert.match(data, /Readonly write rejected/);
+  assert.match(data, /Expected denial evidence/);
+  assert.match(data, /"status":"failed"/);
+  assert.match(data, /"status":"passed"/);
+});
+
 test('nyc executes and measures the actual fixture statements', { timeout: 40000 }, () => {
   // NYC intentionally ignores hidden source trees, including evidence under .workspace.
   const cwd = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'aura-npm-coverage-')));

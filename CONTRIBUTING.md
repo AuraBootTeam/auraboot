@@ -201,9 +201,11 @@ Use the [Feature Request template](https://github.com/AuraBootTeam/auraboot/issu
 AuraBoot's plugin system lets you extend the platform through declarative JSON configuration.
 
 ```bash
-npx @auraboot/cli create my-plugin
+# The CLI is not published to npm yet — run it from this repository.
+cd plugins/cli && pnpm install
+npx tsx src/index.ts plugin init my-plugin
 # Edit config files — add models, fields, commands, pages
-npx @auraboot/cli import ./my-plugin
+npx tsx src/index.ts plugin import ./my-plugin --target http://localhost:6443
 ```
 
 See the [plugin development guide](https://docs.auraboot.com) for details.

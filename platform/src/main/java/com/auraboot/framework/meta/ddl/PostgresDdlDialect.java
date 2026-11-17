@@ -83,21 +83,55 @@ public class PostgresDdlDialect implements DdlDialect {
                 || "file".equalsIgnoreCase(dataType)
                 || "image".equalsIgnoreCase(dataType)
                 || "json".equalsIgnoreCase(dataType) || "jsonb".equalsIgnoreCase(dataType)) {
-            return "'" + value.replace("'", "''") + "'";
+            return quoteLiteral(value);
         }
 
         if ("date".equalsIgnoreCase(dataType) || "datetime".equalsIgnoreCase(dataType) || "timestamp".equalsIgnoreCase(dataType)) {
             if ("NOW()".equalsIgnoreCase(value) || "current_timestamp".equalsIgnoreCase(value)) {
                 return "current_timestamp";
             }
-            return "'" + value + "'";
+            return quoteLiteral(value);
+        }
+
+        if ("time".equalsIgnoreCase(dataType)) {
+            return quoteLiteral(value);
         }
 
         if ("boolean".equalsIgnoreCase(dataType)) {
             return Boolean.parseBoolean(value) ? "true" : "false";
         }
 
-        return value;
+        if ("integer".equalsIgnoreCase(dataType) || "long".equalsIgnoreCase(dataType)) {
+            try {
+                return Long.toString(Long.parseLong(value.trim()));
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException(
+                        "Invalid integer default value for PostgreSQL data type '" + dataType + "': " + value, e);
+            }
+        }
+
+        if ("decimal".equalsIgnoreCase(dataType) || "money".equalsIgnoreCase(dataType)) {
+            try {
+                return new java.math.BigDecimal(value.trim()).toPlainString();
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException(
+                        "Invalid numeric default value for PostgreSQL data type '" + dataType + "': " + value, e);
+            }
+        }
+
+        // Everything else (including array defaults, which have no safe literal
+        // form here) is rejected rather than spliced into DDL verbatim.
+        throw new IllegalArgumentException(
+                "Unsupported default value for PostgreSQL data type '" + dataType + "': " + value);
+    }
+
+    /**
+     * Quotes a value as a single SQL string literal. Doubling embedded single
+     * quotes makes it impossible for the value to escape the literal, so the
+     * result can be safely embedded in generated DDL.
+     */
+    private static String quoteLiteral(String value) {
+        return "'" + value.replace("'", "''") + "'";
     }
 
     @Override

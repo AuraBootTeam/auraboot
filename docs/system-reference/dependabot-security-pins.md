@@ -55,3 +55,94 @@ This repo pins known-vulnerable transitive dependencies with `overrides` and exp
 5. Audit the lock diffs so only the intended packages moved.
 6. Run the validation battery (match the surface you touched): `pnpm install --frozen-lockfile`; `web-admin` `pnpm test:unit` (plus the full production build when the vite/build chain moved); `plugins/cli` `npm ci --ignore-scripts --no-audit --no-fund && npm run build && npm test`; `airflow-provider` `poetry install && poetry run pytest` (install the project itself first or pytest dies at collection with `No module named airflow_provider_auraboot`).
 7. Open the PR. After merge, the next push refreshes the graph, Dependabot re-sweeps (its security-update jobs should all succeed), alerts close, and superseded Dependabot PRs close automatically. Confirm all three before declaring the incident closed.
+
+## Native OCI security baseline
+
+The native OCI builder (`scripts/application/oci-layout.mjs`) and the public
+Compose backend (`platform/Dockerfile`) use the official Temurin Java 21 Alpine
+runtime. Native OCI pins its linux/amd64 manifest; Compose pins the corresponding
+multi-architecture index to preserve its existing platform selection. The native image runs the
+Java application directly; it does not require Ubuntu's package manager, mount,
+login, SASL or GnuTLS tools. Signed APK installation pins zlib to `1.4-r0`, the
+repair for CVE-2026-4738 in the selected upstream image. Missing packages or
+signature failures must fail the build; no scanner ignore entries are allowed.
+
+Changing from glibc to musl is a compatibility change, not just a scanner
+configuration change. A new candidate must pass the original real OCI startup,
+native installation, upgrade, backup/restore and public cold-install protocols.
+An isolated base-image scan is preliminary evidence only. Keep the former RC
+archive and its findings immutable; attach new scans to the new candidate bytes.
+Extensions that provide native JNI libraries must supply musl-compatible builds
+for this OCI runtime; host-native distribution retains the host JVM contract.
+
+### Embedded OGNL is a carrier dependency
+
+MyBatis 3.5.19 embeds OGNL 3.4.4 under `org.apache.ibatis.ognl`. An ordinary
+`ognl:ognl` override cannot replace those classes. CVE-2026-113730 is fixed in
+upstream OGNL 3.4.13 and later, but the MyBatis-Plus 3.5.18.1 dependency declaration
+still selects MyBatis 3.5.19. MyBatis 3.6.0 removes the `addMappedStatement`
+descriptor used by that family; prior real database Mapper tests fail with
+`NoSuchMethodError`. Do not conceal the remaining finding or introduce a broken
+major upgrade. A compatible upstream carrier or a reproducible, separately
+qualified security backport is required before claiming remediation.
+
+Until that carrier is qualified, only trusted maintainers may author SQL/Mapper
+expressions and plugin code. That boundary limits exposure; it is not a patched
+OGNL version or proof that the vulnerability cannot be reached. Keep its finding
+and ownership in the candidate risk ledger.
+
+
+### Reproducible compatible carrier
+
+`platform/platform-mybatis-compat` builds `com.auraboot:mybatis-compat` at the
+selected platform/library version. It preserves every non-OGNL/non-Javassist
+MyBatis 3.5.19 class byte-for-byte and replaces only the embedded dependencies
+with OGNL 3.4.17 and Javassist 3.33.0-GA under MyBatis's original relocated
+namespaces. This is an AuraBoot vendor build, not an official MyBatis release.
+The module README defines input hashes, provenance, licensing and verification.
+
+Core exports the carrier through its API and BOM; Core and Enterprise exclude
+`org.mybatis:mybatis` from consumer configurations. The carrier's isolated
+upstream input configuration is the sole exception. Lightweight consumers that
+do not depend on Core must select the carrier explicitly. Never ship both JARs
+or overlay selected classes in the application. Application startup and PF4J
+loading verify one colocated implementation and marker, including duplicate
+resources in plugin JARs and directory loaders; verification failure blocks
+startup/loading instead of relying on classpath order.
+
+Core `:test` always includes the carrier security suite, including filtered Core
+regression invocations. Carrier archives normalize file/directory modes to
+0644/0755 so private CI umasks do not change their identity.
+
+Carrier tests compare original implementation bytes, demonstrate the advisory's
+harmless reflection PoC against old and repaired inputs, and reject changed
+input hashes before opening input archives. Extraction also rejects paths outside
+the per-input license directory. The ordinary test task runs three real Gradle
+fixture builds covering early rejection, path containment even with a matching
+digest, and byte-identical reconstruction. Real PostgreSQL and published-artifact Enterprise consumption
+are separate checks. Every new release candidate must still run the original
+native/OCI security, installation, upgrade, recovery and public-install gates.
+A standalone clean carrier scan is not a release qualification. RC8 evidence
+remains immutable; subsequent candidates must earn their own results.
+
+The stricter invocation list is secondary protection, not a sandbox for
+untrusted SQL, Mapper expressions or plugin code. Keep existing authoring and
+execution permissions. Once upstream MyBatis-Plus supports a compatible repaired
+upstream carrier, remove the vendor replacement only after the same API,
+plugin, database and distribution checks pass; do not silently mix implementations.
+
+
+### Cold builder repository transport
+
+The backend Docker builder accepts `AURA_GRADLE_REPOSITORY_POLICY=mirror` and an
+HTTPS `AURA_GRADLE_MIRROR_URL` build argument. The default `project` policy is
+unchanged. Mirror policy uses settings-level repositories so child modules that
+declare Maven Central alone also use the selected transport; local publications
+remain first, with Maven Central as fallback. Credentials, query strings,
+fragments and non-HTTPS mirror URLs are rejected without echoing their values.
+Repository endpoints belong to explicit build configuration, not tracked locks.
+
+This changes download transport only. Keep pinned versions, upstream carrier
+input digests and original verification gates. Do not remove native classifiers,
+raise deadlines or suppress findings to make a cold build green. Preserve failed
+network rounds and qualify the frozen new source independently.

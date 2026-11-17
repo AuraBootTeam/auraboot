@@ -44,9 +44,9 @@ export function NotificationHeaderWidget({ streamCount }: { streamCount?: number
         && typeof count === 'number' && Number.isSafeInteger(count) && count >= 0) {
         setUnreadCount(count);
       }
-    } catch {
+    } catch (error) {
       // A badge must never take the header down.
-    }
+ console.warn('[NotificationHeaderWidget] previously-silent catch', error);    }
   }, []);
 
   useEffect(() => {

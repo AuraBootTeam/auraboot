@@ -28,6 +28,10 @@ public class RolePermissionEvaluator {
     private static final String NAME = "RolePermission";
 
     private final UserPermissionService userPermissionService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.permission.service.impl.PermissionSnapshotCache snapshots;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.permission.service.DomainCommandAuthorization domains;
 
     /**
      * Evaluate whether the member has the action permission via RBAC.
@@ -39,8 +43,11 @@ public class RolePermissionEvaluator {
      */
     public EvaluationStep evaluate(Long memberId, String resource, String action) {
         Long userId = currentUserIdOr(memberId);
-        for (String permissionCode : PermissionCodeCandidates.forResourceAction(resource, action)) {
-            boolean hasPermission = userPermissionService.hasPermission(userId, permissionCode);
+        var candidates = snapshots == null ? PermissionCodeCandidates.forResourceAction(resource, action)
+                : snapshots.resourcePermissionCodes(MetaContext.getCurrentTenantId(), resource, action);
+        for (String permissionCode : candidates) {
+            Boolean domain = domains == null ? null : domains.authorize(permissionCode);
+            boolean hasPermission = domain != null ? domain : userPermissionService.hasPermission(userId, permissionCode);
             if (hasPermission) {
                 log.debug("RBAC ALLOW: memberId={}, userId={}, permissionCode={}", memberId, userId, permissionCode);
                 return new EvaluationStep(NAME, EvaluationVerdict.ALLOW,
@@ -48,7 +55,7 @@ public class RolePermissionEvaluator {
             }
         }
 
-        String attempted = String.join(", ", PermissionCodeCandidates.forResourceAction(resource, action));
+        String attempted = String.join(", ", candidates);
         log.debug("RBAC DENY: memberId={}, userId={}, candidates={}", memberId, userId, attempted);
         return new EvaluationStep(NAME, EvaluationVerdict.DENY,
                 "User lacks permission: " + attempted);

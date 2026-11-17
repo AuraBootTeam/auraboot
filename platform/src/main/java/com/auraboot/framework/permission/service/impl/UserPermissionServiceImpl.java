@@ -260,6 +260,18 @@ public class UserPermissionServiceImpl implements UserPermissionService {
             return false;
         }
 
+        if (permissionCode.startsWith("model.") && permissionCode.lastIndexOf('.') > 6) {
+            int separator = permissionCode.lastIndexOf('.');
+            String model = permissionCode.substring(6, separator), action = permissionCode.substring(separator + 1);
+            var candidates = permissionSnapshotCache.hasDomainModel(tenantId, model)
+                    ? permissionSnapshotCache.resourcePermissionCodes(tenantId, model, action) : null;
+            var ordinary = com.auraboot.framework.permission.engine.evaluator.PermissionCodeCandidates.forResourceAction(model, action);
+            if (candidates != null && !candidates.equals(ordinary)) {
+                // Published domain ownership is authoritative: retained model grants are policy references only.
+                return candidates.stream().anyMatch(code -> hasPermission(tenantId, userId, memberId, code));
+            }
+        }
+
         log.debug("Checking permission by explicit member context: tenantId={}, userId={}, memberId={}, permissionCode={}",
                 tenantId, userId, memberId, permissionCode);
 
@@ -275,6 +287,15 @@ public class UserPermissionServiceImpl implements UserPermissionService {
                             tenantId, defaultApplicationCode.trim()).contains(permissionCode))) {
                 return true;
             }
+        }
+        var declared = permissionSnapshotCache.resolvePermissionDefinition(tenantId, permissionCode);
+        if (declared != null && declared.getExtension() instanceof Map<?,?> extension
+                && extension.containsKey("retiredDomainOperation")) return false;
+        var alternatives = permissionSnapshotCache.domainPermissionAlternatives(tenantId, permissionCode);
+        if (alternatives != null && alternatives.size() > 1) {
+            var effectiveDomainIds = permissionSnapshotCache.getEffectivePermissionIds(tenantId, userId, memberId);
+            return alternatives.stream().map(code -> permissionSnapshotCache.resolvePermissionId(tenantId, code))
+                    .filter(Objects::nonNull).anyMatch(effectiveDomainIds::contains);
         }
         Long permissionId = permissionSnapshotCache.resolvePermissionId(tenantId, permissionCode);
         if (permissionId == null) {

@@ -26,7 +26,7 @@ public record DataPageQuery(Map<String, Object> exactFilters,
                 || (long) (page - 1) * size > Integer.MAX_VALUE) {
             throw new IllegalArgumentException("Invalid bounded page");
         }
-        Map<String, Object> exact = Map.copyOf(Objects.requireNonNull(exactFilters, "exactFilters"));
+        Map<String, Object> exact = java.util.Collections.unmodifiableMap(new LinkedHashMap<>(Objects.requireNonNull(exactFilters, "exactFilters")));
         Map<String, List<Object>> candidates = new LinkedHashMap<>();
         Objects.requireNonNull(anyOfFilters, "anyOfFilters").forEach((field, values) -> {
             List<Object> copy = List.copyOf(values);

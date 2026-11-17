@@ -20,7 +20,7 @@ public class DataPermissionPolicyCreateRequest {
     private String modelCode;
 
     /**
-     * ROW or COLUMN.
+     * row, column or field_write (case-insensitive).
      */
     @NotBlank
     private String policyType;

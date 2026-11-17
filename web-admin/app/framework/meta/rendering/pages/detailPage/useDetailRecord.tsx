@@ -221,9 +221,9 @@ export function useDetailRecord({
   const reloadRecord = useCallback(async (): Promise<void> => {
     try {
       await reloadRecordStrict();
-    } catch {
+    } catch (error) {
       /* Preserve the current snapshot; a later explicit refresh can recover. */
-    }
+ console.warn('[useDetailRecord] previously-silent catch', error);    }
   }, [reloadRecordStrict]);
   return { reloadRecordStrict, reloadRecord };
 }

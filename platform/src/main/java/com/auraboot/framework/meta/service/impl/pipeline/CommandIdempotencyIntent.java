@@ -14,8 +14,9 @@ import java.util.Map;
 /**
  * Builds the immutable, canonical command intent fenced by an idempotency key.
  *
- * <p>The authenticated actor and command payload are intentionally captured before any
- * normalize/auto-set/computed phase can mutate state. Claim and completion then hash the exact same
+ * <p>The authenticated actor and normalized command payload are captured at the idempotency
+ * claim, before owner auto-set/computed phases can mutate state. Original submitted keys are
+ * separately captured by {@link CommandPipelineContext#captureSubmittedInput(Map)}. Claim and completion then hash the exact same
  * object, so successful execution can never write an outcome under a different actor or intent than
  * the one that entered the handler.</p>
  */
@@ -38,6 +39,13 @@ public final class CommandIdempotencyIntent {
         intent.put("expectedVersion", request == null ? null : request.getExpectedVersion());
         intent.put("payload", immutableValue(ctx.getPayload()));
         intent.put("dryRun", request != null && request.isDryRun());
+        if (com.auraboot.framework.meta.security.NativeBusinessCommandContract.declaresTransition(ctx))
+            intent.put("nativeTransitionDefinition", immutableValue(ctx.getExecConfig()));
+        if (ctx.getPublicOutputProjection() != null && !ctx.getPublicOutputProjection().models().isEmpty()) {
+            intent.put("publicOutputPolicy", ctx.getPublicOutputProjection().fingerprint());
+            if (ctx.getArtifactRootBinding() != null && !ctx.getArtifactRootBinding().isEmpty())
+                intent.put("artifactRootBinding", immutableValue(ctx.getArtifactRootBinding()));
+        }
         return Collections.unmodifiableMap(intent);
     }
 

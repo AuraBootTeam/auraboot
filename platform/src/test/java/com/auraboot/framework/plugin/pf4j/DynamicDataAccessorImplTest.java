@@ -196,6 +196,21 @@ class DynamicDataAccessorImplTest {
     }
 
     @Test
+    void exactNullDimensionUsesIsNullRatherThanSqlNullEquality() {
+        when(dynamicDataService.list(eq("m"), any(DynamicQueryRequest.class)))
+                .thenReturn(PaginationResult.of(List.of(), 0L, 1, 1000));
+        var filters = new java.util.HashMap<String, Object>();
+        filters.put("lot_id", null);
+        accessor.query("m", filters);
+        ArgumentCaptor<DynamicQueryRequest> request = ArgumentCaptor.forClass(DynamicQueryRequest.class);
+        verify(dynamicDataService).list(eq("m"), request.capture());
+        assertThat(request.getValue().getConditions()).singleElement().satisfies(condition -> {
+            assertThat(condition.getFieldName()).isEqualTo("lot_id");
+            assertThat(condition.getOperator()).isEqualTo(QueryCondition.Operator.IS_NULL);
+        });
+    }
+
+    @Test
     void query_with_null_filters_uses_empty_conditions() {
         when(dynamicDataService.list(eq("m"), any(DynamicQueryRequest.class)))
             .thenReturn(PaginationResult.of(List.of(), 0L, 1, 1000));

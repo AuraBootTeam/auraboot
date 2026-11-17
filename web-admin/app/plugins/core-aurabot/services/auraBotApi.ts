@@ -696,9 +696,9 @@ async function processSSEStream(
                 }
                 break;
             }
-          } catch {
+          } catch (error) {
             // Non-JSON data line, ignore
-          }
+ console.warn('[auraBotApi] previously-silent catch', error);          }
 
           // Reset event after processing its data line
           currentEvent = '';

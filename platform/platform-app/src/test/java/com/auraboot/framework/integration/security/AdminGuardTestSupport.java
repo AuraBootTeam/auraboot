@@ -73,14 +73,6 @@ public final class AdminGuardTestSupport {
     }
 
     /**
-     * Inserts ab_tenant + ab_role(platform_admin) + ab_tenant_member + ab_user_role rows.
-     * Uses the same schema shape as {@link #grantTenantAdmin}; the role code differs.
-     */
-    public static long grantPlatformAdmin(JdbcTemplate jdbc, Long tenantId, Long userId) {
-        return grantRole(jdbc, tenantId, userId, "platform_admin");
-    }
-
-    /**
      * Core seeding helper: ensures the tenant row exists then binds {@code userId}
      * to a fresh role with the given {@code roleCode}.
      *

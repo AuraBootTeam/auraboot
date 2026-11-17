@@ -20,10 +20,49 @@ class AuraPluginManagerStartupTest {
     public static class GoodPlugin extends Plugin {
         public GoodPlugin(PluginWrapper wrapper) { super(wrapper); }
         public String marker() { return "loaded-from-jar"; }
+        public Object evaluateBusinessExpression() {
+            return org.apache.ibatis.scripting.xmltags.OgnlCache.getValue("amount + 1", java.util.Map.of("amount", 12));
+        }
     }
     public static class BrokenPlugin extends Plugin {
         public BrokenPlugin(PluginWrapper wrapper) { super(wrapper); }
         @Override public void start() { throw new IllegalStateException("fixture start failure"); }
+    }
+
+    @Test void packagedPluginUsesTheSingleHostCarrierForActualExpressionEvaluation() throws Exception {
+        jar(GoodPlugin.class, null);
+        var manager = new AuraPluginManager(directory.toString());
+        try {
+            manager.init();
+            var wrapper = manager.getPlugin("startup-fixture");
+            assertEquals(PluginState.STARTED, wrapper.getPluginState());
+            assertNotSame(getClass().getClassLoader(), wrapper.getPluginClassLoader());
+            Object value = wrapper.getPlugin().getClass().getMethod("evaluateBusinessExpression").invoke(wrapper.getPlugin());
+            assertEquals(13, value);
+            assertSame(org.apache.ibatis.ognl.Ognl.class,
+                    wrapper.getPluginClassLoader().loadClass("org.apache.ibatis.ognl.Ognl"));
+        } finally { manager.cleanup(); }
+    }
+
+    @Test void pluginBundlingAnotherMybatisImplementationIsRejectedBeforeRegistration() throws Exception {
+        jar(GoodPlugin.class, null);
+        String resource = "org/apache/ibatis/ognl/Ognl.class";
+        try (var zip = java.nio.file.FileSystems.newFileSystem(directory.resolve("fixture.jar"))) {
+            var target = zip.getPath("/" + resource);
+            Files.createDirectories(target.getParent());
+            try (var input = getClass().getClassLoader().getResourceAsStream(resource)) {
+                assertNotNull(input);
+                Files.copy(input, target);
+            }
+        }
+        var manager = new AuraPluginManager(directory.toString());
+        try {
+            var failure = assertThrows(RuntimeException.class, () -> manager.loadPlugin(directory.resolve("fixture.jar")));
+            String causes = failure.toString();
+            for (Throwable cause = failure.getCause(); cause != null; cause = cause.getCause()) causes += cause;
+            assertTrue(causes.contains("Expected one compatible MyBatis resource"), causes);
+            assertTrue(manager.getPlugins().isEmpty(), "A rejected implementation must not be registered");
+        } finally { manager.cleanup(); }
     }
 
     public static class SharedApplicationModule implements com.auraboot.framework.plugin.extension.ApplicationModuleExtension {

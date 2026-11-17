@@ -42,6 +42,17 @@ import static org.mockito.Mockito.verifyNoInteractions;
 @ExtendWith(MockitoExtension.class)
 class FieldMapPhaseTest {
 
+    @Test void productionPhasePassesTheCapturedInputKeysToImplicitPersistence() {
+        var command = new CommandDefinition(); command.setCode("test:origin"); command.setModelCode("test_model");
+        var request = new CommandExecuteRequest(); request.setOperationType("create");
+        var context = CommandPipelineContext.builder().commandCode(command.getCode()).command(command).request(request)
+                .tenantId(1L).execConfig(Map.of("type","create")).payload(new HashMap<>(Map.of("name","original"))).build();
+        context.captureSubmittedInput(context.getPayload()); context.getPayload().put("derived_status","approved");
+        phase().execute(context);
+        verify(fieldMapExecutor).executeImplicitFieldMapPhase(context.getExecConfig(),context.getPayload(),1L,request,command,
+                java.util.Set.of("name"));
+    }
+
     @Mock
     private CommandFieldMapExecutor fieldMapExecutor;
 

@@ -218,9 +218,9 @@ function safeUrl(value: unknown, field: keyof DeploymentBrandingDocument): strin
   try {
     const parsed = new URL(url);
     if (parsed.protocol === 'https:' && parsed.hostname) return url;
-  } catch {
+  } catch (error) {
     // Fall through to the stable configuration error below.
-  }
+ console.warn('[branding] previously-silent catch', error);  }
   throw new Error(
     `Deployment branding field "${field}" must be a same-origin path or an HTTPS URL.`,
   );

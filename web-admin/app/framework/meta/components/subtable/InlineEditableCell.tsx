@@ -13,7 +13,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import { Select } from '~/ui/smart/form/Select';
-import type { DataSourceConfig } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+import type { DataSourceConfig } from '~/framework/smart/schema/smart-components';
 import type { ColumnConfig } from '~/framework/meta/schemas/types';
 
 export interface InlineEditableCellProps {

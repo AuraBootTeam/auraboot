@@ -7,15 +7,7 @@
  */
 
 import React from 'react';
-import { InboxWidget } from '~/plugins/core-dashboard/widgets/workbench/InboxWidget';
-import { RecentWidget } from '~/plugins/core-dashboard/widgets/workbench/RecentWidget';
-import { ShortcutsWidget } from '~/plugins/core-dashboard/widgets/workbench/ShortcutsWidget';
-import { StatsRowWidget } from '~/plugins/core-dashboard/widgets/workbench/StatsRowWidget';
 import { LazyContributedComponent } from '~/framework/extensions/contributed-components';
-import { CalendarWidget } from '~/plugins/core-dashboard/widgets/workbench/CalendarWidget';
-import { AnnouncementWidget } from '~/plugins/core-dashboard/widgets/workbench/AnnouncementWidget';
-import { QuickNoteWidget } from '~/plugins/core-dashboard/widgets/workbench/QuickNoteWidget';
-import { StatsCardWidget } from '~/plugins/core-dashboard/widgets/workbench/StatsCardWidget';
 
 type LazyComponent = React.LazyExoticComponent<React.ComponentType<any>>;
 
@@ -35,6 +27,15 @@ const CHART_REGISTRY = new Map<string, LazyComponent>();
 // Register all 23 chart types (lazy imports with named export resolution)
 function reg(type: string, loader: () => Promise<{ default: React.ComponentType<any> }>) {
   CHART_REGISTRY.set(type, React.lazy(loader));
+}
+
+/**
+ * Registers a plugin-owned widget under a chart/widget type. Plugins own
+ * their workbench widgets; the framework factory must not import them
+ * (2026-11-14 boundary cleanup). Same wrapping semantics as the built-ins.
+ */
+export function registerChartComponent(type: string, component: React.ComponentType<any>) {
+  regSync(type, component);
 }
 
 function regSync(type: string, component: React.ComponentType<any>) {
@@ -164,19 +165,11 @@ reg('kanban', () =>
 );
 
 // Workbench widgets
-regSync('inbox', InboxWidget);
-regSync('recent', RecentWidget);
-regSync('shortcuts', ShortcutsWidget);
-regSync('stats-row', StatsRowWidget);
 regSync('my-process', MyProcessWidget);
 regSync('process-stats', ProcessStatsWidget);
 regSync('pipeline', PipelineWidget);
 regSync('leads', LeadsWidget);
 regSync('activities', ActivitiesWidget);
-regSync('calendar', CalendarWidget);
-regSync('announcement', AnnouncementWidget);
-regSync('quick-note', QuickNoteWidget);
-regSync('stats-card', StatsCardWidget);
 
 /**
  * Get a lazy-loaded chart component by type.

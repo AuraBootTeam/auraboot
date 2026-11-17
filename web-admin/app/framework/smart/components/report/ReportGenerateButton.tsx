@@ -63,9 +63,9 @@ export const ReportGenerateButton: React.FC<ReportGenerateButtonProps> = ({
         const filtered = resp.data.filter((t) => !t.category || t.category === modelCode);
         setTemplates(filtered.length > 0 ? filtered : resp.data);
       }
-    } catch {
+    } catch (error) {
       // silently fail — dropdown will show empty
-    } finally {
+ console.warn('[ReportGenerateButton] previously-silent catch', error);    } finally {
       setLoading(false);
     }
   }, [modelCode]);

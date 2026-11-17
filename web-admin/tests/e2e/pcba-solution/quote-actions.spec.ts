@@ -1,3 +1,4 @@
+import { createControlledQuoteProvider } from './quote-controlled-provider';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -6,6 +7,8 @@ import { test, expect } from '../../fixtures';
 import { uniqueId } from '../helpers';
 import {
   makeQuoteRoleUser,
+  seedQuoteScaffold,
+  cleanupRows,
   ensureQuoteRoleUser,
   openQuoteRolePage,
   readDynamicRecord,
@@ -287,6 +290,11 @@ test.describe('Quote actions deep — upload/process-fee/gerber/deepseek/source-
         if (r.status === 200) ok++;
       }
       expect(ok, 'QO-03: every attachment type recorded').toBe(3);
+      await page.goto(`/p/qo_quote_common/view/${quoteId}`);
+      await page.getByRole('tab', { name: '资料上传', exact: true }).click();
+      const materials = page.getByRole('table').filter({ hasText: '资料类型' }).first();
+      for (const [, , name] of types) await expect(materials).toContainText(name);
+      await page.screenshot({ path: test.info().outputPath('three-source-attachments.png'), fullPage: true });
     } finally {
       await context.close();
     }
@@ -295,13 +303,16 @@ test.describe('Quote actions deep — upload/process-fee/gerber/deepseek/source-
   test('QO-05 compute process fee', async ({ browser }) => {
     const { context, page } = await openQuoteRolePage(browser, users['sales']);
     try {
-      const r = await post(
+      const results = await Promise.all([0, 1].map(() => post(
         page,
         'qo_quote_common:compute_process_fee',
         { count_hole_mode: 'none' },
         'update',
         quoteId,
-      );
+      )));
+      for (const result of results) expect(result.resultData.status).toBe('completed');
+      expect(results[1].resultData.totalPoints).toBe(results[0].resultData.totalPoints);
+      const r = results[0];
       test.info().annotations.push({
         type: 'note',
         description: `QO-05 status=${r.status} body=${JSON.stringify(r.body?.data).slice(0, 160)}`,
@@ -360,79 +371,53 @@ test.describe('Quote actions deep — upload/process-fee/gerber/deepseek/source-
       );
       expect(saved.qo_rsa_type).toBe('gerber_package');
       expect(saved.qo_rsa_file_id).toBe(fid);
+      await page.goto(`/p/qo_quote_common/view/${quoteId}`);
+      await page.getByRole('tab', { name: '资料上传', exact: true }).click();
+      await expect(page.getByRole('table').filter({ hasText: '资料类型' }).first()).toContainText(path.basename(S.gerber!));
+      await page.screenshot({ path: test.info().outputPath('gerber-source-attachment.png'), fullPage: true });
     } finally {
       await context.close();
     }
   });
 
-  test('QO-08 deepseek price suggestions async terminal (provider boundary)', async ({
-    browser,
-  }) => {
-    const { context, page } = await openQuoteRolePage(browser, users['sales']);
+  test('QO-08 deepseek price suggestions async terminal (provider boundary)', async ({ page }) => {
+    const provider = await createControlledQuoteProvider(page);
     try {
-      const r = await post(
-        page,
-        'qo_quote_common:deepseek_price_suggestions',
-        {},
-        'update',
-        quoteId,
-      );
-      const lines = await queryDynamicRecords(
-        page,
-        'qo_quote_line_common',
-        [{ fieldName: 'qo_ql_quote_id', operator: 'EQ', value: quoteId }],
-        { pageSize: 500 },
-      );
-      const missing = lines.filter((line) => Number(line.qo_ql_unit_cost || 0) <= 0);
-      expect(missing.length, 'fixture must exercise missing-price suggestions').toBeGreaterThan(0);
-      expect(Number(r.resultData.candidateCount)).toBe(missing.length);
-      let suggested = 0;
-      let failed = 0;
-      for (const line of missing) {
-        const evidence = await queryDynamicRecords(
-          page,
-          'qo_price_evidence_common',
-          [
-            { fieldName: 'qo_pe_quote_line_id', operator: 'EQ', value: line.pid },
+      for (const phase of ['failed', 'suggested'] as const) {
+        provider.outcome = phase;
+        const created = await seedQuoteScaffold(page, `Q07-${phase}`, [{ sourceRef: 'R1', sourceRowNo: 2,
+          description: 'Controlled missing-price resistor', refdes: 'R1', mpn: `Q07-${uid}-${phase}`,
+          packageName: '0402', qty: 10, unitCost: 0, lineCost: 0, linePrice: 0, smtPoints: 1, thtPoints: 0 }]);
+        try {
+          const beforeRequests = provider.requests;
+          const r = await post(page, 'qo_quote_common:deepseek_price_suggestions', {}, 'update', created.quoteId);
+          expect(provider.requests, 'the actual provider call stays on the controlled loopback server').toBeGreaterThan(beforeRequests);
+          expect(Number(r.resultData.candidateCount)).toBe(1);
+          expect(Number(r.resultData.suggestedCount)).toBe(phase === 'suggested' ? 1 : 0);
+          const lines = await queryDynamicRecords(page, 'qo_quote_line_common', [
+            { fieldName: 'qo_ql_quote_id', operator: 'EQ', value: created.quoteId },
+          ]);
+          expect(lines).toHaveLength(1);
+          const evidence = await queryDynamicRecords(page, 'qo_price_evidence_common', [
+            { fieldName: 'qo_pe_quote_line_id', operator: 'EQ', value: lines[0].pid },
             { fieldName: 'qo_pe_source', operator: 'EQ', value: 'deepseek_llm' },
-          ],
-          { pageSize: 100 },
-        );
-        expect(evidence, `one terminal result for ${line.pid}`).toHaveLength(1);
-        const row = evidence[0];
-        expect(['suggested', 'failed']).toContain(row.qo_pe_status);
-        if (row.qo_pe_status === 'suggested') {
-          suggested++;
-          expect(Number(row.qo_pe_unit_price)).toBeGreaterThan(0);
-        } else {
-          failed++;
-          const snapshot =
-            typeof row.qo_pe_snapshot === 'string'
-              ? JSON.parse(row.qo_pe_snapshot)
-              : row.qo_pe_snapshot;
-          expect(['source_unavailable', 'llm_timeout', 'llm_request_failed']).toContain(
-            snapshot.failureCode,
-          );
-          expect(String(row.qo_pe_override_reason)).toBeTruthy();
-          expect(Number(row.qo_pe_unit_price || 0)).toBe(0);
-        }
-        expect(Number(line.qo_ql_unit_cost || 0), 'suggestion must not adopt a price').toBe(0);
+          ]);
+          for (const row of evidence) created.rows.push({ model: 'qo_price_evidence_common', pid: String(row.pid) });
+          expect(evidence, 'one terminal fact for each missing-price line').toHaveLength(1);
+          expect(evidence[0].qo_pe_status).toBe(phase);
+          expect(Number(evidence[0].qo_pe_unit_price ?? 0)).toBe(phase === 'suggested' ? 1.25 : 0);
+          expect(Number(lines[0].qo_ql_unit_cost ?? 0), 'neither outcome auto-adopts a price').toBe(0);
+          expect(String(lines[0].qo_ql_price_decision_id ?? ''), 'suggestion still needs a human decision').toBe('');
+          if (phase === 'failed') {
+            const snapshot = typeof evidence[0].qo_pe_snapshot === 'string'
+              ? JSON.parse(evidence[0].qo_pe_snapshot) : evidence[0].qo_pe_snapshot as any;
+            expect(snapshot.failureCode).toBe('llm_request_failed');
+            expect(String(evidence[0].qo_pe_override_reason)).toMatch(/不可用|失败|稍后/);
+          }
+        } finally { await cleanupRows(page, created); }
       }
-      expect(Number(r.resultData.suggestedCount)).toBe(suggested);
-      expect(suggested + failed).toBe(missing.length);
-      test.info().annotations.push({
-        type: 'provider-outcome',
-        description: JSON.stringify({
-          suggested,
-          failed,
-          authority:
-            suggested === 0
-              ? 'unavailable-provider boundary only'
-              : 'persisted suggestions; provider quality not assessed',
-        }),
-      });
     } finally {
-      await context.close();
+      await provider.close();
     }
   });
 

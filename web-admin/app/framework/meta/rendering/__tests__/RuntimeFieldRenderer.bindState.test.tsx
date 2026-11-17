@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, waitFor } from '@testing-library/react';
+import { act, render, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 
 /**
@@ -28,6 +28,61 @@ describe('RuntimeFieldRenderer bindState', () => {
       triggerFieldLinkage: vi.fn(),
     } as any;
   };
+
+  it('updates nested field controls from scoped state changes and resets', async () => {
+    let captured: any;
+    let fieldValue: unknown = null;
+    let subscriber: (() => void) | undefined;
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: (props: any) => {
+        captured = props;
+        return <div />;
+      },
+    }));
+    const runtime = buildRuntime({
+      updateField: vi.fn(),
+      updateState: vi.fn(),
+      notifyStateChanged: vi.fn(),
+    });
+    const state = {
+      ...runtime.getStateManager(),
+      getFieldValue: () => fieldValue,
+      updateField: (_scope: string, _field: string, next: unknown) => {
+        fieldValue = next;
+        subscriber?.();
+      },
+      subscribe: vi.fn((_scope: string, _selector: unknown, callback: () => void) => {
+        subscriber = callback;
+        return () => {
+          subscriber = undefined;
+        };
+      }),
+    };
+    runtime.getStateManager = () => state;
+    const { RuntimeFieldRenderer } = await import('../RuntimeFieldRenderer');
+    const view = render(
+      <RuntimeFieldRenderer
+        field={{ field: 'delivery_region', component: 'cascadeselect' } as any}
+        runtime={runtime}
+      />,
+    );
+    expect(captured.props.value).toBeNull();
+    act(() => captured.props.onChange(['East']));
+    expect(captured.props.value).toEqual(['East']);
+    act(() => {
+      fieldValue = null;
+      subscriber?.();
+    });
+    expect(captured.props.value).toBeNull();
+    act(() => {
+      fieldValue = '["East","Suzhou"]';
+      subscriber?.();
+    });
+    expect(captured.props.value).toEqual(['East', 'Suzhou']);
+    view.unmount();
+    expect(subscriber).toBeUndefined();
+  });
 
   it('writes state.<bindState> and refreshes data sources on change', async () => {
     let captured: any;
@@ -109,12 +164,14 @@ describe('RuntimeFieldRenderer bindState', () => {
 
     render(
       <RuntimeFieldRenderer
-        field={{
-          field: 'qtr_case_title',
-          component: 'SmartInput',
-          placeholder: { 'zh-CN': '搜索调查编号', en: 'Search investigations' },
-          helpText: { 'zh-CN': '输入业务编号', en: 'Enter a business key' },
-        } as any}
+        field={
+          {
+            field: 'qtr_case_title',
+            component: 'SmartInput',
+            placeholder: { 'zh-CN': '搜索调查编号', en: 'Search investigations' },
+            helpText: { 'zh-CN': '输入业务编号', en: 'Enter a business key' },
+          } as any
+        }
         runtime={runtime}
       />,
     );

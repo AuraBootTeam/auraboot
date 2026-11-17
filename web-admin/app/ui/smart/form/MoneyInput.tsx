@@ -18,7 +18,7 @@
  */
 
 import React, { useRef, useCallback, useMemo, useState, useEffect } from 'react';
-import type { FormFieldProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+import type { FormFieldProps } from '~/framework/smart/schema/smart-components';
 import { useSmartField } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
 import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
 import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';

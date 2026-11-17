@@ -28,7 +28,7 @@ import type { UseDslFormReturn } from '~/framework/meta/hooks/useDslForm';
 
 // Ensure built-in profiles are registered before resolution
 import '~/framework/meta/profiles/admin';
-import '~/framework/meta/profiles/report';
+// report RenderProfile is registered by the core-designer plugin at boot
 
 // ---------------------------------------------------------------------------
 // Types
@@ -88,9 +88,9 @@ export function DslFormRenderer({
     try {
       const profile = profileRegistry.resolve(null);
       Skeleton = profile?.skeletons?.get('form');
-    } catch {
+    } catch (error) {
       // Profile resolution may fail if no profiles are registered yet — ignore.
-    }
+ console.warn('[DslFormRenderer] previously-silent catch', error);    }
 
     return (
       <div className={className} data-testid="dsl-form-renderer-loading">
@@ -119,8 +119,9 @@ export function DslFormRenderer({
   let profile;
   try {
     profile = profileRegistry.resolve(schema);
-  } catch {
+  } catch (error) {
     // If the profile named in the schema is not registered, fall back to "admin"
+    console.warn('[DslFormRenderer] profile resolution failed; falling back to admin profile', error);
     profile = profileRegistry.get('admin');
   }
 

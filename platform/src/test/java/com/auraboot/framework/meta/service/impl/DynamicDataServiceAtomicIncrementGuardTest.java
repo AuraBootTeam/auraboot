@@ -71,16 +71,24 @@ class DynamicDataServiceAtomicIncrementGuardTest {
 
     @BeforeEach
     void setUp() {
-        // DynamicDataServiceImpl is @RequiredArgsConstructor over 22 private final fields.
-        // Pass one null per constructor parameter — 22 nulls.
+        // Dependencies outside the atomic-increment boundary are replaced below as needed.
         service = new DynamicDataServiceImpl(
                 null, null, null, null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null, null, null,
-                new com.auraboot.framework.event.context.ThreadContextScopes(List.of()));
+                null, new com.auraboot.framework.event.context.ThreadContextScopes(List.of()));
         ReflectionTestUtils.setField(service, "metadataService", metadataService);
+        ReflectionTestUtils.setField(service, "fieldMaskService", mock(com.auraboot.framework.meta.service.FieldMaskService.class));
+        var fieldPermissions = mock(com.auraboot.framework.permission.service.FieldPermissionService.class);
+        ReflectionTestUtils.setField(service, "fieldPermissionService", fieldPermissions);
+        lenient().when(fieldPermissions.getFieldPermissions(nullable(Long.class), eq("cr_cj_profile")))
+                .thenAnswer(invocation -> com.auraboot.framework.permission.engine.model.FieldPermissionSet.allAllowed(
+                        testModel.getFields().stream().map(FieldDefinition::getCode)
+                                .collect(java.util.stream.Collectors.toSet())));
         ReflectionTestUtils.setField(service, "dynamicDataMapper", mapper);
         ReflectionTestUtils.setField(service, "virtualFieldEngine", virtualFields);
         ReflectionTestUtils.setField(service, "applicationContext", applicationContext);
+        lenient().when(applicationContext.getBean(NativeRecordFieldAuthorization.class))
+                .thenReturn(mock(NativeRecordFieldAuthorization.class));
         ReflectionTestUtils.setField(service, "dataPermissionEngine", mock(com.auraboot.framework.meta.service.DataPermissionEngine.class));
         ReflectionTestUtils.setField(service, "dataDomainService", mock(com.auraboot.framework.meta.service.DataDomainService.class));
 

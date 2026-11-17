@@ -140,8 +140,21 @@ async function expectFourCharts(page: Page, path: string): Promise<void> {
     }, samples), { message: `${path} trend ${index} must draw every line segment, not only symbols` }).toBe(samples.length);
     // locator.hover 先把图表滚入视口再派发悬停；数据多的租户首页图表常在
     // 折叠线以下，page.mouse.move(boundingBox) 会悬到视口外导致 tooltip 不出现。
-    const last = rendered.points[11];
-    await chart.hover({ position: { x: last[0], y: last[1] } });
+    // Axis tooltips use the week band, not the height of its data point. Zero
+    // and exact-axis-maximum values lie on opposite plot boundaries.
+    const hover = await chart.evaluate((element) => {
+      const fiberKey = Object.keys(element).find((key) => key.startsWith('__reactFiber'));
+      let fiber = (element as any)[fiberKey!];
+      while (fiber && !fiber.stateNode?.getEchartsInstance) fiber = fiber.return;
+      if (!fiber) throw new Error('Trend chart instance missing');
+      const instance = fiber.stateNode.getEchartsInstance();
+      const rect = instance.getModel().getComponent('grid', 0).coordinateSystem.getRect();
+      const currentWeekX = instance.convertToPixel({ xAxisIndex: 0 }, 11);
+      const point = [currentWeekX - 2, rect.y + rect.height / 2];
+      if (!instance.containPixel({ gridIndex: 0 }, point)) throw new Error('Tooltip target must be inside the plot');
+      return { x: point[0], y: point[1] };
+    });
+    await chart.hover({ position: hover });
     await expect(chart).toContainText(`创建数量`);
     await expect(chart).toContainText(String(expectedSeries[index][11]));
     await page.mouse.move(0, 0);
@@ -174,6 +187,33 @@ async function createOrdinaryRole(page: Page, roleCode: string): Promise<void> {
     { data: [PLATFORM_BASE_CAPABILITY] },
   );
   expect(grantResponse.ok()).toBe(true);
+  // Fresh roles start with an explicit empty menu selection. Assign only Home;
+  // business capability grants must not implicitly grant navigation.
+  const menusResponse = await page.request.get('/api/menu/user');
+  expect(menusResponse.ok()).toBe(true);
+  const menusBody = await menusResponse.json();
+  const homeMenus: any[] = [];
+  const visit = (menus: any[]) => {
+    for (const menu of menus) {
+      if (menu.path === HOME_PATH) homeMenus.push(menu);
+      visit(menu.children ?? []);
+    }
+  };
+  visit(menusBody.data);
+  expect(homeMenus).toHaveLength(1);
+  expect(homeMenus[0].pid).toBeTruthy();
+  const navigationUrl = `/api/navigation/roles/${rolePid}`;
+  const selectionResponse = await page.request.get(navigationUrl);
+  expect(selectionResponse.ok()).toBe(true);
+  const selection = (await selectionResponse.json()).data;
+  const navigationResponse = await page.request.put(navigationUrl, { data: {
+    expectedRevision: selection.revision,
+    selectedMenuPids: [homeMenus[0].pid],
+  } });
+  expect(navigationResponse.ok()).toBe(true);
+  const saved = await navigationResponse.json();
+  expect(String(saved.code)).toBe('0');
+  expect(saved.data.selectedMenuPids).toEqual([homeMenus[0].pid]);
 }
 
 async function withUserPage(

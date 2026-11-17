@@ -11,9 +11,8 @@ Requires Node.js 20 or newer. This minimum includes the patched HTTP transport d
 cd plugins/cli && pnpm install
 npx tsx src/index.ts plugin <command>
 
-# Or install globally
-npm install -g @auraboot/cli
-aura plugin <command>
+# The package is not published to npm yet; run from source
+# (an `aura plugin` alias will become available once published).
 ```
 
 ## Commands

@@ -6503,5 +6503,295 @@
     "en-US": "Valid currency and exchange-rate configuration is unavailable. Ask an administrator to check it and try again.",
     "ja-JP": "有効な通貨・為替レート設定を読み込めません。管理者に設定の確認を依頼してください。",
     "ko-KR": "유효한 통화 및 환율 설정을 읽을 수 없습니다. 관리자에게 설정 확인을 요청하세요."
+  },
+  {
+    "key": "admin.permission.scope.draftNote",
+    "zh-CN": "暂存角色默认范围，新授权将继承此范围。所有变更统一预览并保存。",
+    "en-US": "Stage the role default for new grants. Review and save all role changes together."
+  },
+  {
+    "key": "admin.permission.scope.applyCurrentDraft",
+    "zh-CN": "同时应用到当前授权",
+    "en-US": "Also apply to current grants"
+  },
+  {
+    "key": "admin.permission.scope.stageDraft",
+    "zh-CN": "加入草稿",
+    "en-US": "Add to draft"
+  },
+  {
+    "key": "admin.permission.scope.draftActions",
+    "zh-CN": "草稿中的动作范围",
+    "en-US": "Draft action scopes"
+  },
+  {
+    "key": "admin.permission.capability.scopeDraftNote",
+    "zh-CN": "暂存此职责的记录范围。共享动作也会影响相关职责，所有变更统一预览并保存。",
+    "en-US": "Stage record scopes for this duty. Shared actions affect related duties. All changes are reviewed and saved together."
+  },
+  {
+    "key": "admin.permission.editor.draftSaveError",
+    "zh-CN": "尚未确认保存结果，草稿已保留。可重新载入查看当前配置。",
+    "en-US": "Could not confirm the save. Your draft is preserved; reload to check the current configuration."
+  },
+  {
+    "key": "admin.permission.editor.conflictDraft",
+    "zh-CN": "授权配置已被修改。当前草稿已保留，不能覆盖新版本。",
+    "en-US": "Authorization configuration changed. Your draft is preserved and cannot overwrite the newer version."
+  },
+  {
+    "key": "admin.permission.editor.reloadDraft",
+    "zh-CN": "放弃草稿并重新载入",
+    "en-US": "Discard draft and reload"
+  },
+  {
+    "key": "admin.permission.editor.jointDraft",
+    "zh-CN": "待保存：{count} 项职责变更、{scopes} 项记录范围例外。默认范围变更也将一并预览和保存。",
+    "en-US": "{count} duty changes and {scopes} record scope overrides pending. Default scope changes are reviewed and saved together."
+  },
+  {
+    "key": "admin.permission.editor.scopeChangeCount",
+    "zh-CN": "{count} 项记录范围例外",
+    "en-US": "{count} record scope overrides"
+  },
+  {
+    "key": "permission.capability.details.title",
+    "zh-CN": "权限明细",
+    "en-US": "Permission details"
+  },
+  {
+    "key": "permission.capability.details.guidance",
+    "zh-CN": "按业务职责授权。权限项数量表示配置覆盖，实际访问仍受记录范围、字段和运行条件限制。",
+    "en-US": "Select duties for authorization. Permission counts describe configuration coverage; actual access also depends on record scope, fields and runtime conditions."
+  },
+  {
+    "key": "permission.capability.details.groupSummary",
+    "zh-CN": "已选职责 {granted}/{total}",
+    "en-US": "Selected duties {granted}/{total}"
+  },
+  {
+    "key": "permission.capability.details.draftNote",
+    "zh-CN": "分别展示已保存配置和本地草稿。草稿变化以保存前服务端预览为准；配置齐备不代表实际可执行。",
+    "en-US": "Saved configuration and local draft are shown separately. The server confirms draft changes before saving; these counts do not prove runtime access."
+  },
+  {
+    "key": "permission.capability.details.search",
+    "zh-CN": "按名称或权限码筛选",
+    "en-US": "Filter by name or permission code"
+  },
+  {
+    "key": "permission.capability.details.undefined",
+    "zh-CN": "定义未提供，请核实此权限项",
+    "en-US": "Definition unavailable; verify this permission"
+  },
+  {
+    "key": "permission.capability.details.saved",
+    "zh-CN": "已保存",
+    "en-US": "Saved"
+  },
+  {
+    "key": "permission.capability.details.draft",
+    "zh-CN": "草稿",
+    "en-US": "Draft"
+  },
+  {
+    "key": "permission.capability.details.unknown",
+    "zh-CN": "待核实",
+    "en-US": "Unresolved"
+  },
+  {
+    "key": "permission.capability.details.configured",
+    "zh-CN": "已配置",
+    "en-US": "Configured"
+  },
+  {
+    "key": "permission.capability.details.missing",
+    "zh-CN": "未配置",
+    "en-US": "Not configured"
+  },
+  {
+    "key": "permission.capability.details.unchanged",
+    "zh-CN": "保持",
+    "en-US": "Unchanged"
+  },
+  {
+    "key": "permission.capability.details.add",
+    "zh-CN": "拟授予",
+    "en-US": "Will grant"
+  },
+  {
+    "key": "permission.capability.details.remove",
+    "zh-CN": "拟撤销",
+    "en-US": "Will revoke"
+  },
+  {
+    "key": "permission.capability.details.shared",
+    "zh-CN": "也被 {count} 个职责包含（声明关系，非授权来源）",
+    "en-US": "Also included by {count} duties (declarations, not grant provenance)"
+  },
+  {
+    "key": "permission.capability.details.empty",
+    "zh-CN": "没有匹配的权限项",
+    "en-US": "No matching permission items"
+  },
+  {
+    "key": "permission.capability.details.partial",
+    "zh-CN": "部分权限项已配置",
+    "en-US": "Some permission items configured"
+  },
+  {
+    "key": "permission.capability.details.coverage",
+    "zh-CN": "权限项已配置 {granted}/{total}",
+    "en-US": "Permission items {granted}/{total}"
+  },
+  {
+    "key": "permission.capability.details.partialGuidance",
+    "zh-CN": "权限项可被多个职责共用；部分配置不代表职责完整可用。勾选可补齐，撤销影响以保存前预览为准。",
+    "en-US": "Permission items may be shared by other duties. Partial configuration does not grant the complete duty. Select to complete; review revocation effects before saving."
+  },
+  {
+    "key": "permission.capability.details.permissionDiff",
+    "zh-CN": "新增 {added} 个权限项，移除 {removed} 个权限项；另有 {preserved} 个现有权限项保持不变。",
+    "en-US": "Add {added} permission items, remove {removed}; {preserved} existing permission items remain unchanged."
+  },
+  {
+    "key": "permission.capability.details.impactDetails",
+    "zh-CN": "查看关联职责状态、菜单及权限明细",
+    "en-US": "Review related duty states, menus and permission details"
+  },
+  {
+    "key": "permission.capability.details.previewCounts",
+    "zh-CN": "关联职责保存后配置：齐备 {full} 项 · 部分权限项 {partial} 项 · 未配置 {none} 项",
+    "en-US": "Related duties after saving: {full} complete · {partial} partially configured · {none} not configured"
+  },
+  {
+    "key": "command.download.fileUnavailable",
+    "zh-CN": "当前记录未提供可下载文件，或文件字段不可见。请联系管理员核对权限。",
+    "en-US": "The record does not provide an accessible file. Ask an administrator to check access."
+  },
+  {
+    "key": "roleGrantFields.title",
+    "zh-CN": "每份授权的允许字段",
+    "en-US": "Allowed fields per authorization"
+  },
+  {
+    "key": "roleGrantFields.help",
+    "zh-CN": "字段列表仅作用于对应授权及其记录范围，不授予业务操作权；隐藏、只读及共享限制继续生效。",
+    "en-US": "Field lists apply to one authorization and its record scope. They do not grant business access. Hidden, read-only and shared restrictions still apply."
+  },
+  {
+    "key": "roleGrantFields.loading",
+    "zh-CN": "正在核对当前草稿的字段候选…",
+    "en-US": "Checking the current draft…"
+  },
+  {
+    "key": "roleGrantFields.error",
+    "zh-CN": "无法核对字段候选，已保留草稿，暂时不能编辑字段。",
+    "en-US": "Could not check field candidates. Your edits are preserved; field editing is disabled."
+  },
+  {
+    "key": "roleGrantFields.empty",
+    "zh-CN": "此对象当前没有绑定模型的授权。受管来源仍须按原授权来源的规则配置。",
+    "en-US": "No model-bound authorization is available for this object. Managed sources retain their original authoring rules."
+  },
+  {
+    "key": "roleGrantFields.pending",
+    "zh-CN": "本草稿新增",
+    "en-US": "New in this draft"
+  },
+  {
+    "key": "roleGrantFields.reset",
+    "zh-CN": "撤回字段编辑",
+    "en-US": "Discard field edits"
+  },
+  {
+    "key": "roleGrantFields.managed",
+    "zh-CN": "此授权由来源管理，不能在此覆盖。",
+    "en-US": "This authorization is managed by its source. It cannot be overwritten here."
+  },
+  {
+    "key": "roleGrantFields.legacy",
+    "zh-CN": "尚未设置明确字段列表，保持现有授权规则。",
+    "en-US": "No explicit field list. Existing authorization rules are preserved."
+  },
+  {
+    "key": "roleGrantFields.configure",
+    "zh-CN": "设置明确字段列表",
+    "en-US": "Set a finite field list"
+  },
+  {
+    "key": "roleGrantFields.finite",
+    "zh-CN": "仅允许选中的字段；空列表表示不允许任何字段，未来新增字段不会自动加入。读取和写入仍受该授权的操作类型限制。",
+    "en-US": "Only selected fields are allowed. An empty list allows no fields; future fields are not included automatically. Reading and writing remain subject to the authorization’s action."
+  },
+  {
+    "key": "roleGrantFields.read",
+    "zh-CN": "允许读取",
+    "en-US": "May read"
+  },
+  {
+    "key": "roleGrantFields.write",
+    "zh-CN": "允许写入",
+    "en-US": "May write"
+  },
+  {
+    "key": "roleGrantFields.none",
+    "zh-CN": "无允许字段",
+    "en-US": "No fields"
+  },
+  {
+    "key": "roleGrantFields.pendingChanges",
+    "zh-CN": "{count} 份授权的字段编辑待保存，请与当前草稿一起预览并保存。",
+    "en-US": "{count} authorization field edits pending. Review and save with the same draft."
+  },
+  {
+    "key": "roleGrantFields.action.read",
+    "zh-CN": "读取授权",
+    "en-US": "Read authorization"
+  },
+  {
+    "key": "roleGrantFields.action.create",
+    "zh-CN": "创建授权",
+    "en-US": "Create authorization"
+  },
+  {
+    "key": "roleGrantFields.action.update",
+    "zh-CN": "修改授权",
+    "en-US": "Update authorization"
+  },
+  {
+    "key": "permission.capability_binding_review",
+    "zh-CN": "该职责涉及已有约束或受管来源的授权，请先审阅并从原授权来源调整。",
+    "en-US": "This duty involves existing constraints or managed authorization. Review and update the original authorization source first."
+  },
+  {
+    "key": "roleGrantFields.authorization",
+    "zh-CN": "业务授权",
+    "en-US": "Business authorization"
+  },
+  {
+    "key": "roleGrantFields.action.manage",
+    "zh-CN": "管理授权",
+    "en-US": "Manage authorization"
+  },
+  {
+    "key": "roleGrantFields.action.execute",
+    "zh-CN": "执行授权",
+    "en-US": "Execute authorization"
+  },
+  {
+    "key": "roleGrantFields.unconfigured",
+    "zh-CN": "此职责尚未配置当前对象。需明确配置后才能执行，仍受职责和记录范围约束。",
+    "en-US": "This object is not configured for the duty. Configure it explicitly; record scope still applies."
+  },
+  {
+    "key": "roleGrantFields.configureObject",
+    "zh-CN": "配置此对象",
+    "en-US": "Configure this object"
+  },
+  {
+    "key": "roleGrantFields.enableObjectPreview",
+    "zh-CN": "为已选职责启用此对象；仍受记录范围约束，只允许选中的字段。",
+    "en-US": "Enable this object under the selected duty. Record scope still applies; only selected fields are allowed."
   }
 ]

@@ -774,6 +774,17 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         return convertToMetaModelDTO(model);
     }
 
+    @Override
+    public Map<String, Object> findExtensionByCode(String code) {
+        if (!StringUtils.hasText(code)) {
+            return null;
+        }
+        Model model = metaModelMapper.findCurrentByCode(code);
+        // Preserve the fresh current-model lookup and the DTO's exact extension conversion.
+        // Policy readers do not need the presentation DTO's additional field-count query.
+        return model == null ? null : convertExtensionToMap(model.getExtension());
+    }
+
     /**
      * Lookup the current version of a model by code, throwing when missing.
      */

@@ -261,9 +261,9 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
         try {
           const parsed = JSON.parse(value);
           if (Array.isArray(parsed)) return parsed;
-        } catch {
+        } catch (error) {
           // CATCH: non-transactional JSON parse guard; fall through to raw value
-        }
+ console.warn('[ControlledFieldRenderer] previously-silent catch', error);        }
       }
       return value;
     }
@@ -287,9 +287,9 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
               response: item,
             }));
           }
-        } catch {
+        } catch (error) {
           // Ignore malformed persisted file JSON and fall through to raw value.
-        }
+ console.warn('[ControlledFieldRenderer] previously-silent catch', error);        }
       }
       return Array.isArray(value) ? value : [];
     }

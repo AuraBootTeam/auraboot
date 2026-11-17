@@ -164,4 +164,4 @@ Apache-2.0 不指定管辖法律、法院、仲裁机构或争议解决地。如
 
 ## npm 包的许可证
 
-当前 OSS 的八个 workspace 包(`designer-sdk`、`dsl-runtime`、`dsl-types`、`nav-model`、`plugin-sdk`、`open-platform-sdk`、`ui`、`web-testkit`)均声明 Apache-2.0,并随包提供完整的包级 `LICENSE`。不得把已退役的 v1.3 平台包元数据方案套用到 v2.0 代码。Enterprise 的 `@auraboot/auraqr-sdk` 客户端也具有明确的包级 Apache-2.0 许可;此例外不改变其他企业版代码的商业授权。包许可证不授予 AuraBoot 商标权。许可与上架状态分别判断:`auraqr-sdk` 仍为 private,registry 发布状态须另行核实。
+当前 OSS 的 workspace 包(公开八个(`designer-sdk`、`dsl-runtime`、`dsl-types`、`nav-model`、`plugin-sdk`、`open-platform-sdk`、`ui`、`web-testkit`;另有一个仅内部使用的 `wechat-mini-runtime`,`private: true` 不随 OSS workspace 发布,故无包级 LICENSE)中,公开的八个均声明 Apache-2.0,并随包提供完整的包级 `LICENSE`。不得把已退役的 v1.3 平台包元数据方案套用到 v2.0 代码。Enterprise 的 `@auraboot/auraqr-sdk` 客户端也具有明确的包级 Apache-2.0 许可;此例外不改变其他企业版代码的商业授权。包许可证不授予 AuraBoot 商标权。许可与上架状态分别判断:`auraqr-sdk` 仍为 private,registry 发布状态须另行核实。

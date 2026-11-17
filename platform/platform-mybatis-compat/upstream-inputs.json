@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "inputs": [
+    {
+      "coordinate": "ognl:ognl:3.4.17",
+      "sha256": "9929910f6352a6bbc188e945ca88342964b55a1b956296bf65df55565b45f0e8"
+    },
+    {
+      "coordinate": "org.javassist:javassist:3.33.0-GA",
+      "sha256": "1620478adc5f4d2eccd356e59513c270f1508bed53ce75deffb3107b7b43db2c"
+    },
+    {
+      "coordinate": "org.mybatis:mybatis:3.5.19",
+      "sha256": "93eea616ae355751bd5fbabb57f0732713fbe79f3196f33c51a0aeeb4255862a"
+    }
+  ],
+  "licenses": [
+    {
+      "path": "ognl-3.4.17/LICENSE.txt",
+      "sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+      "gitBlob": "7a4a3ea2424c09fbe48d455aed1eaa94d9124835",
+      "source": "https://github.com/orphan-oss/ognl/blob/OGNL_3_4_17/LICENSE.txt"
+    },
+    {
+      "path": "javassist-3.33.0-GA/License.html",
+      "sha256": "7f0b8dadfa3b7af523e2db7cc1d872e924ec8d6f7c9b8245721dc6692a64d324",
+      "gitBlob": "7846b09d3f036e7a15dc339e2c10647190cf7894",
+      "source": "https://github.com/jboss-javassist/javassist/blob/rel_3_33_0_ga/License.html"
+    }
+  ]
+}

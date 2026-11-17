@@ -150,9 +150,9 @@ export default function NotificationRuleList({
         if (result.code === ErrorCodes.SUCCESS && result.data) {
           onToggled(result.data);
         }
-      } catch {
+      } catch (error) {
         // ignore
-      } finally {
+ console.warn('[NotificationRuleList] previously-silent catch', error);      } finally {
         setTogglingId(null);
       }
     },

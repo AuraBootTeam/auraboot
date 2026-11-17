@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import type { InputProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+import type { InputProps } from '~/framework/smart/schema/smart-components';
 import {
   useExpressionValue,
   useSmartField,

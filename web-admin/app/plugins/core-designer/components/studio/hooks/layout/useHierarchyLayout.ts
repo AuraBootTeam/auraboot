@@ -17,14 +17,14 @@ import type {
   BlockConfig,
   FieldCellConfig,
   HierarchySelection,
-} from '~/plugins/core-designer/components/studio/domain/schema/layout-hierarchy';
+} from '~/framework/smart/schema/layout-hierarchy';
 import {
   DEFAULT_HIERARCHY,
   createDefaultTab,
   createDefaultFloor,
   createDefaultBlock,
   createFieldCell,
-} from '~/plugins/core-designer/components/studio/domain/schema/layout-hierarchy';
+} from '~/framework/smart/schema/layout-hierarchy';
 
 export interface UseHierarchyLayoutReturn {
   // State

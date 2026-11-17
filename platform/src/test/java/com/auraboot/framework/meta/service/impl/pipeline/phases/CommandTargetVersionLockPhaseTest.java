@@ -341,12 +341,35 @@ class CommandTargetVersionLockPhaseTest {
         verifyNoInteractions(metaModelService, dynamicDataMapper, extensionRegistry, pluginHandler);
     }
 
+    @Test void currentStateCannotReplaceTheVersionUsedByTheBusinessAuthorizationDecision() {
+        givenPhysicalModel();
+        var ctx = currentStateContext(1);
+        ctx.setTargetRecordVersion(7L);
+        ctx.setBusinessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization(
+                "dq:release", "dq_quote_request", "REQ-1", "update", 41L, 9L, 3L));
+        when(dynamicDataMapper.selectTargetVersionForUpdate("dq_quote_request", "pid", 41L, "REQ-1"))
+                .thenReturn(List.of(Map.of("row_version", 8L)));
+        assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(CasVersionConflictException.class);
+        assertThat(ctx.getTargetRecordVersion()).isEqualTo(7L);
+    }
+
     private CommandPipelineContext unsupportedContext(Integer version) {
         var ctx = context(version);
         ctx.getCommand()
                 .setExecutionConfig(
                         "{\"type\":\"custom\",\"handler\":\"dq:release\",\"options\":{\"targetVersionPolicy\":\"unsupported\"}}");
         return ctx;
+    }
+
+    @Test void onlyCurrentStateTargetLockSerializationReceivesTheSafeRestartSignal() {
+        givenPhysicalModel();
+        var conflict = new org.springframework.dao.CannotSerializeTransactionException("concurrent target update");
+        when(dynamicDataMapper.selectTargetVersionForUpdate("dq_quote_request", "pid", 41L, "REQ-1"))
+                .thenThrow(conflict);
+        assertThatThrownBy(() -> phase.execute(currentStateContext(7)))
+                .isInstanceOf(com.auraboot.framework.meta.exception.CurrentStateTargetLockConflictException.class)
+                .hasCause(conflict);
+        assertThatThrownBy(() -> phase.execute(context(7))).isSameAs(conflict);
     }
 
     private CommandPipelineContext currentStateContext(Integer expectedVersion) {

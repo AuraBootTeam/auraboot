@@ -1,0 +1,185 @@
+package com.auraboot.framework.plugin.extension;
+
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Server-owned resource contract for one already-authorized business command.
+ * This is executable owner policy, not another set of user-grantable permissions.
+ * Returning null denies the exact operation. Unknown resources/actions must deny.
+ */
+public interface BusinessResourceAuthorization {
+    /** A fresh policy may retain locked source facts for this invocation only. */
+    default BusinessResourceAuthorization newInvocationAuthorization() { return this; }
+
+    /** Control parameters and their root field obligations; null retains legacy input checks. */
+    default InputContract businessInputContract() { return null; }
+
+    record InputContract(Set<String> allowedParameters, Set<String> requiredParameters,
+                         Set<String> readableRootFields, Set<String> writableRootFields) {
+        public InputContract {
+            allowedParameters = ordered(allowedParameters);
+            requiredParameters = ordered(requiredParameters);
+            readableRootFields = ordered(readableRootFields);
+            writableRootFields = ordered(writableRootFields);
+            if (!allowedParameters.containsAll(requiredParameters)
+                    || readableRootFields.isEmpty() && writableRootFields.isEmpty()
+                    || writableRootFields.stream().anyMatch(Set.of("pid", "id", "tenant_id", "row_version",
+                        "created_by", "updated_by", "created_at", "updated_at", "deleted_flag")::contains))
+                throw new IllegalArgumentException("Explicit control input field obligations required");
+        }
+        private static Set<String> ordered(Set<String> values) {
+            if (values == null || values.size() > 128) throw new IllegalArgumentException("Finite input contract required");
+            values.forEach(value -> {
+                identifier(value);
+                if (value.startsWith("__")) throw new IllegalArgumentException("Reserved input contract key");
+            });
+            return Collections.unmodifiableSet(new java.util.TreeSet<>(values));
+        }
+    }
+
+    /** Optional owner lower bound for reading source facts after transaction-held locks. */
+    default ReadIsolation resourceReadIsolation() { return null; }
+
+    enum ReadIsolation {
+        READ_COMMITTED(java.sql.Connection.TRANSACTION_READ_COMMITTED),
+        REPEATABLE_READ(java.sql.Connection.TRANSACTION_REPEATABLE_READ),
+        SERIALIZABLE(java.sql.Connection.TRANSACTION_SERIALIZABLE);
+        private final int jdbcLevel;
+        ReadIsolation(int jdbcLevel) { this.jdbcLevel = jdbcLevel; }
+        public int jdbcLevel() { return jdbcLevel; }
+    }
+
+    /** Independent referenced objects keep their own record/field policies under the admitted duty.
+     * These are read-only effects, not additional user-grantable function permissions.
+     */
+    default Set<String> independentBusinessReadModels() { return Set.of(); }
+
+    /** Optional installed dependencies may yield null only on an approved nullable read. */
+    default Set<String> optionalBusinessResourceModels() { return Set.of(); }
+
+    /**
+     * Explicit total result-set limits for paged dependency reads (1..10,000 per model).
+     * Default closed. Page size still obeys each operation grant; the shared invocation budget
+     * remains independent. Paged owners must request repeatable-read or serializable isolation.
+     */
+    default Map<String, Integer> pagedBusinessResourceRowLimits() { return Map.of(); }
+
+    /**
+     * Finite scalar source fields that may contribute to a public artifact. This declaration
+     * does not grant user field visibility: the host separately applies the current public
+     * field policy. Empty by default; internal raw resource reads remain separate.
+     */
+    default Map<String, Set<String>> publicBusinessResourceFields() { return Map.of(); }
+
+    /** Finite root file fields and maximum artifact bytes; no arbitrary file capability by default. */
+    default Map<String, Integer> businessArtifactFields() { return Map.of(); }
+
+    /** Exact root attachment fields whose original uploaded bytes this use case must consume. */
+    default Map<String, Integer> businessSourceFileFields() { return Map.of(); }
+
+    /** Finite root relationship/state facts whose changes invalidate generated artifacts. */
+    default Set<String> businessArtifactRootBindingFields() { return Set.of(); }
+
+    /** Additional execution facts that fence cache replay without retiring readable historical bytes. */
+    default Set<String> businessArtifactIntentBindingFields() { return Set.of(); }
+
+    /** Immutable owner lower bound; mutable command metadata cannot substitute a weaker duty. */
+    Boundary businessBoundary();
+
+    record Boundary(String commandCode,String rootModel,String targetAction,Set<String> permissions) {
+        public Boundary {
+            permissions=Set.copyOf(permissions);
+            identifier(rootModel);
+            if(commandCode==null || commandCode.isBlank() || !commandCode.equals(commandCode.strip())
+                    || commandCode.length()>128 || !Set.of("read","update","delete").contains(targetAction))
+                throw new IllegalArgumentException("Exact business boundary required");
+        }
+    }
+
+    Grant authorizeResource(CommandHandlerExtension.TargetAuthorizationContext root, Request request);
+
+    /** Explicit child deletion opt-in; existing owners remain closed even if a callback is too broad. */
+    default Set<String> businessDeletableResourceModels() { return Set.of(); }
+
+    /** Finite dependency inventory; undeclared models are rejected before any lookup. */
+    Set<String> businessResourceModels();
+
+    /** Only these top-level business-result fields may leave the handler. */
+    Set<String> businessResultFields();
+
+    /** Complete public result classification; empty is not a permission to return unclassified data. */
+    default Map<String, BusinessResultField> businessResultProjection() { return Map.of(); }
+
+    enum Action { READ, QUERY, CREATE, UPDATE, DELETE }
+
+    /** Current records are host-loaded. Filters and changes are intentions, never authority. */
+    record Request(Action action, String modelCode, String recordId, Map<String, Object> record,
+                   Map<String, Object> changes, Map<String, Object> filters) {
+        public Request {
+            java.util.Objects.requireNonNull(action, "action");
+            identifier(modelCode);
+            record = snapshot(record);
+            changes = snapshot(changes);
+            filters = snapshot(filters);
+        }
+    }
+
+    /** Projection and mutation fields for this exact resource operation, not an unrestricted model. */
+    record Grant(Set<String> readableFields, Set<String> writableFields, int maximumRows) {
+        public Grant {
+            readableFields = Set.copyOf(readableFields);
+            writableFields = Set.copyOf(writableFields);
+            if (!readableFields.containsAll(Set.of("pid", "tenant_id", "row_version"))
+                    || readableFields.size() > 256 || writableFields.size() > 256
+                    || maximumRows < 1 || maximumRows > 1_000) {
+                throw new IllegalArgumentException("Bounded business resource fields and row limit required");
+            }
+            readableFields.forEach(BusinessResourceAuthorization::identifier);
+            writableFields.forEach(BusinessResourceAuthorization::identifier);
+        }
+    }
+
+    static void identifier(String value) {
+        if (value == null || !value.matches("[A-Za-z_][A-Za-z0-9_]{0,127}")) {
+            throw new IllegalArgumentException("Exact business resource/field code required");
+        }
+    }
+
+    /** Defensive immutable JSON-like facts; callbacks cannot rewrite the host's stored row. */
+    static Map<String, Object> snapshot(Map<String, Object> input) {
+        if (input == null) return Map.of();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> copy = (Map<String, Object>) freeze(input, 0);
+        return copy;
+    }
+
+    private static Object freeze(Object value, int depth) {
+        if (depth > 16) throw new IllegalArgumentException("Business resource facts exceed depth budget");
+        if (value instanceof Map<?, ?> map) {
+            if (map.size() > 1_024) throw new IllegalArgumentException("Business resource facts exceed field budget");
+            Map<String, Object> copy = new LinkedHashMap<>();
+            map.forEach((key, item) -> {
+                if (!(key instanceof String field)) throw new IllegalArgumentException("String fact keys required");
+                copy.put(field, freeze(item, depth + 1));
+            });
+            return Collections.unmodifiableMap(copy);
+        }
+        if (value instanceof List<?> list) {
+            if (list.size() > 10_000) throw new IllegalArgumentException("Business resource facts exceed list budget");
+            return list.stream().map(item -> freeze(item, depth + 1)).toList();
+        }
+        if (value instanceof java.sql.Date date) return date.toLocalDate().toString();
+        if (value instanceof java.sql.Time time) return time.toLocalTime().toString();
+        if (value instanceof java.util.Date date) return date.toInstant().toString();
+        if (value instanceof java.time.temporal.TemporalAccessor || value instanceof java.util.UUID) return value.toString();
+        if (value == null || value instanceof String || value instanceof Boolean
+                || value instanceof Integer || value instanceof Long || value instanceof Short || value instanceof Byte
+                || value instanceof Double || value instanceof Float || value instanceof java.math.BigDecimal
+                || value instanceof java.math.BigInteger) return value;
+        throw new IllegalArgumentException("Unsupported business resource fact type");
+    }
+}

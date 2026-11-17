@@ -148,6 +148,7 @@ public class CommandController {
     @PostMapping("/execute/{commandCode}")
     @RequirePermission(MetaPermission.COMMAND_EXECUTE)
     @Operation(summary = "Execute a command", description = "Execute a DSL command by code. The payload is passed as the command's input data. Supports idempotency via clientRequestId.")
+    @com.auraboot.framework.permission.annotation.DomainAuthorizationDelegated
     public ApiResponse<CommandExecuteResult> execute(
             @PathVariable String commandCode,
             @Valid @RequestBody CommandExecuteRequest request) {

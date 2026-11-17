@@ -430,9 +430,9 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ value, onCha
               try {
                 const data = JSON.parse(e.target.value);
                 onChange({ ...value, staticData: data });
-              } catch {
+              } catch (error) {
                 // Keep current value if JSON is invalid
-              }
+ console.warn('[DataSourceConfig] previously-silent catch', error);              }
             }}
             className="h-32 w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
             placeholder='[{"name": "A", "value": 100}]'

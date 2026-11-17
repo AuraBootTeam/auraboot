@@ -44,7 +44,7 @@ public class CapabilityDefinitionDTO {
     /** Atomic permission codes granted when this capability is selected. */
     private List<String> includes;
 
-    /** Preset tier this capability belongs to: viewer / editor / admin. Optional. */
+    /** Preset tier: viewer / editor / admin. The data tier preserves existing visibility controls outside the operation checklist. Optional. */
     private String tier;
 
     /** Sensitive capability (UI marks with a lock, default off). */

@@ -11,4 +11,4 @@ export type {
   TriggerEvent,
   DataSourceConfig,
   ValidationRule,
-} from './types';
+} from '~/framework/meta/schemas/linkage-types';

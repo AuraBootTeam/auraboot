@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { createFieldRenderer } from '~/framework/meta/utils/createFieldRenderer';
 import { applyFormFieldChange } from '../form/applyFormFieldChange';
 import { useFormDraft } from '~/framework/meta/rendering/pages/form/useFormDraft';
@@ -50,12 +50,36 @@ export function useFormFields({
   urlDefaultValues,
   clearFormDraftRef,
 }: UseFormFieldsArgs) {
+  useEffect(() => {
+    if (!runtime) return;
+    const manager = runtime.getStateManager();
+    const scope = runtime.getScopeId();
+    return manager.subscribe(
+      scope,
+      (state) => state.form,
+      (next) => {
+        if (!next) return;
+        setFormData((previous) => {
+          const changes = Object.entries(next).filter(
+            ([key, value]) => key !== 'mode' && key !== 'pid' && previous[key] !== value,
+          );
+          if (!changes.length) return previous;
+          for (const [key] of changes) {
+            dirtyFieldsRef.current.add(key);
+            clearFieldError(key);
+          }
+          return { ...previous, ...Object.fromEntries(changes) };
+        });
+      },
+    );
+  }, [runtime, setFormData, dirtyFieldsRef, clearFieldError]);
+
   // Render smart field using utility
   const renderSmartField = useMemo(
     () =>
       createFieldRenderer(formData, setFormData, pageContext, fieldErrors, (fieldCode, value) => {
-        syncRuntimeFieldValue(fieldCode, value);
         const patch = applyFormFieldChange(runtime, fieldCode, value);
+        syncRuntimeFieldValue(fieldCode, value);
         for (const changedField of Object.keys(patch)) {
           dirtyFieldsRef.current.add(changedField);
           clearFieldError(changedField);

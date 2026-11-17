@@ -541,6 +541,7 @@ async function loadExpressionModelFields(
     if (fields.length > 0) return fields;
   } catch (_err) {
     // Fall back to the legacy meta-model field endpoint for older runtimes.
+    console.warn('[PropertyFieldRenderer] field-options endpoint failed; falling back to legacy endpoint', _err);
   }
   const legacyFields = await fetchFieldOptions(modelCode);
   return legacyFields.map((option) => ({

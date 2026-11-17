@@ -1,5 +1,5 @@
 import React from 'react';
-import { TRIGGER_EVENT_INFO, type LinkageTrigger, type TriggerEvent } from './types';
+import { TRIGGER_EVENT_INFO, type LinkageTrigger, type TriggerEvent } from '~/framework/meta/schemas/linkage-types';
 
 interface TriggerConfigProps {
   trigger: LinkageTrigger;

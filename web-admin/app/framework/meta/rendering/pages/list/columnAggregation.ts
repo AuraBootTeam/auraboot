@@ -152,9 +152,9 @@ export function formatAggregateValue(
         minimumFractionDigits: options.precision ?? 2,
         maximumFractionDigits: options.precision ?? 2,
       }).format(value);
-    } catch {
+    } catch (error) {
       // Invalid currency code → fall through to plain number formatting.
-    }
+ console.warn('[columnAggregation] previously-silent catch', error);    }
   }
 
   return new Intl.NumberFormat(loc, {

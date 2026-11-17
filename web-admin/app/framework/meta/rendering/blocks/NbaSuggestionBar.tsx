@@ -61,9 +61,9 @@ export function NbaSuggestionBar({ modelCode, recordPid, token }: NbaSuggestionB
         ) {
           setSuggestions(result.data);
         }
-      } catch {
+      } catch (error) {
         // Silently ignore — NBA is optional enhancement
-      } finally {
+ console.warn('[NbaSuggestionBar] previously-silent catch', error);      } finally {
         setLoading(false);
       }
     };

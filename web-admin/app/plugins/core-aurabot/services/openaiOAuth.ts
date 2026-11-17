@@ -121,9 +121,9 @@ export async function startOAuthFlow(provider = 'openai'): Promise<void> {
           resolve();
           return;
         }
-      } catch {
+      } catch (error) {
         // Continue polling
-      }
+ console.warn('[openaiOAuth] previously-silent catch', error);      }
 
       setTimeout(checkStatus, 1000);
     };

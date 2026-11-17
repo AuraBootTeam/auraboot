@@ -80,14 +80,15 @@ public class AutomationServiceImpl implements AutomationService {
         return automation;
     }
 
-    @Transactional
+    // Template record selection and its field grants share the creation snapshot.
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     @Override
     public AutomationDTO create(AutomationCreateRequest request) {
         return createInternal(request, null, null);
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public AutomationDTO createPluginSeed(AutomationCreateRequest request, String pluginId, String seedKey) {
         requireSeedIdentity(pluginId, seedKey);
         return createInternal(request, pluginId, seedKey);
@@ -638,5 +639,15 @@ public class AutomationServiceImpl implements AutomationService {
                 .actionResults(entity.getActionResults())
                 .createdAt(entity.getCreatedAt())
                 .build();
+    }
+
+
+    @Override
+    public com.auraboot.framework.automation.entity.Automation findEntityByPidWithoutTenantFilter(String pid) {
+        // External webhooks arrive before a tenant context exists; suppression
+        // is scoped to this exact-PID lookup (moved verbatim from the webhook
+        // controller so controllers stop touching the mapper layer).
+        return com.auraboot.framework.application.tenant.MetaContext.runWithoutTenantFilter(
+                () -> automationMapper.findByPid(pid));
     }
 }

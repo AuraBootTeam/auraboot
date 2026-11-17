@@ -222,7 +222,8 @@ for (const c of cases) {
     if (c.enabled) expect(payload.payload[c.enabled]).toBe(false);
     await expect.poll(async () => (await records()).length).toBe(1);
     const saved = (await records())[0];
-    fixtureJournal(page).track({ model: c.model, pid: String(saved.pid) });
+    // A retained setting has no public deletion contract; its retention is asserted below.
+    if (c.allowDelete !== false) fixtureJournal(page).track({ model: c.model, pid: String(saved.pid) });
     if (c.enabled) expect(saved[c.enabled]).toBe(false);
     for (const choice of [c.select, c.extraSelect, ...(c.choices || [])].filter(Boolean))
       expect(saved[choice!.field]).toBe(choice!.value);
@@ -592,7 +593,7 @@ test('header alias enabled/disabled affects new BOM conversions and preserves pr
   expect(customerId).toBeTruthy();
   const project = await executeCommand(page, 'bom:create_project', {
     bom_project_name: marker, bom_project_customer_id: customerId, bom_pcba_code: marker,
-    bom_project_library_source: 'excel_current_library',
+    bom_project_quality_level: 'industrial',
   }, undefined, 'create');
   const projectId = String(project.recordId ?? project.pid ?? project.projectId ?? '');
   expect(projectId).toBeTruthy();
@@ -928,7 +929,7 @@ test(`${kind} rule enabled/disabled changes extracted attributes in real BOM con
   expect(customerId).toBeTruthy();
   const project = await executeCommand(page, 'bom:create_project', {
     bom_project_name: marker, bom_project_customer_id: customerId, bom_pcba_code: marker,
-    bom_project_library_source: 'excel_current_library',
+    bom_project_quality_level: 'industrial',
   }, undefined, 'create');
   const projectId = String(project.recordId ?? project.pid ?? project.projectId ?? '');
   expect(projectId).toBeTruthy();
@@ -1132,7 +1133,9 @@ for (const kind of ['aml', 'avl'] as const) {
     await page.getByRole('button', { name: '保存', exact: true }).click();
     const invalidBody = await (await invalidTransition).json();
     expect(String(invalidBody.code)).not.toBe('0');
-    expect(JSON.stringify(invalidBody)).toContain('rejected -> approved');
+    expect(JSON.stringify(invalidBody)).toContain('当前关系状态不允许此变更，请检查当前状态后重新选择。');
+    await expect(page.getByText('当前关系状态不允许此变更，请检查当前状态后重新选择。', { exact: true }).first()).toBeVisible();
+    await info.attach(`${kind}-invalid-transition-localized`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     expect(await readDynamicRecord(page, model, first)).toEqual(rejectedRecord);
     await page.getByRole('button', { name: '取消', exact: true }).click();
     const approvedRow = page.getByRole('row').filter({ hasText: marker })
@@ -1327,7 +1330,7 @@ test('B18-03 part map: mapping applies to a new conversion, prior snapshots stay
   const customerId = String(account.recordId ?? account.pid ?? account.id ?? '');
   const project = await executeCommand(page, 'bom:create_project', {
     bom_project_name: marker, bom_project_customer_id: customerId, bom_pcba_code: marker,
-    bom_project_library_source: 'excel_current_library',
+    bom_project_quality_level: 'industrial',
   }, undefined, 'create');
   const projectId = String(project.recordId ?? project.pid ?? project.projectId ?? '');
   const field = (name: string) => page.getByTestId(`form-field-${name}`);

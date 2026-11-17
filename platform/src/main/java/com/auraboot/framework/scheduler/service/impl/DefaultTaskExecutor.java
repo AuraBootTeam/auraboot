@@ -30,7 +30,27 @@ public class DefaultTaskExecutor implements TaskExecutor {
     private final ApplicationContext applicationContext;
     private final ScheduledTaskLogMapper logMapper;
     private final ScheduledTaskMapper taskMapper;
-    private final ExecutorService executorService = Executors.newCachedThreadPool();
+    /**
+     * Bounded handler pool. A task storm on a cached pool would create threads
+     * without limit; here excess tasks queue and, once the queue is full, the
+     * calling (scheduler) thread runs the task itself — natural backpressure
+     * instead of resource exhaustion.
+     */
+    private final ExecutorService executorService = new java.util.concurrent.ThreadPoolExecutor(
+            4, Math.max(8, Runtime.getRuntime().availableProcessors() * 2),
+            60L, TimeUnit.SECONDS,
+            new java.util.concurrent.LinkedBlockingQueue<>(100),
+            r -> {
+                Thread t = new Thread(r, "scheduled-task-handler");
+                t.setDaemon(true);
+                return t;
+            },
+            new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
+
+    @jakarta.annotation.PreDestroy
+    void shutdownExecutor() {
+        executorService.shutdown();
+    }
 
     @Override
     public void execute(ScheduledTask task) {

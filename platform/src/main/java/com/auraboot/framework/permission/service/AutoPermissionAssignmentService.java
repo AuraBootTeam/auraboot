@@ -45,6 +45,7 @@ import com.auraboot.framework.common.constant.StatusConstants;
 @Service
 @RequiredArgsConstructor
 public class AutoPermissionAssignmentService {
+    private final RoleAuthorizationWriteLock authorizationWriteLock;
 
     private final PermissionService permissionService;
     private final PermissionMapper permissionMapper;
@@ -91,6 +92,9 @@ public class AutoPermissionAssignmentService {
 
     private void generatePermissions(String modelCode, String moduleCode, Long tenantId,
                                      boolean assignInitialTemplate) {
+        Long authoringTenant = tenantId != null ? tenantId : MetaContext.getCurrentTenantId();
+        // Tenantless global catalog registration has no role bindings in a tenant draft.
+        if (authoringTenant != null) authorizationWriteLock.mutateForTenant(authoringTenant);
         log.info("Auto-assigning hierarchical permissions: modelCode={}, moduleCode={}",
                 modelCode, moduleCode);
 

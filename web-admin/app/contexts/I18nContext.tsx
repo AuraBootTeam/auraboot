@@ -66,9 +66,9 @@ function setCachedTranslations(loc: string, data: Translations): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(`${I18N_CACHE_KEY_PREFIX}${loc}`, JSON.stringify(data));
-  } catch {
+  } catch (error) {
     /* localStorage full — ignore */
-  }
+ console.warn('[I18nContext] previously-silent catch', error);  }
 }
 
 type Translations = Record<string, any>;

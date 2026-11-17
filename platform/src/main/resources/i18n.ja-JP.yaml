@@ -473,3 +473,6 @@ aurabot:
 "permission.capability.preset.admin": "管理者"
 
 "about.menuLabel": "{productName} について"
+
+role:
+  authorization_copy_conflict: "コピー先ロールの権限制約が異なります。範囲とポリシーを合わせてからコピーしてください。"

@@ -35,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -47,6 +48,9 @@ import static org.mockito.Mockito.when;
  */
 @ExtendWith(MockitoExtension.class)
 class DataScopeServiceImplTest {
+    @org.mockito.Mock
+    private com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
+
 
     @Test
     void invalidScopeCannotBePersistedOrPromotedToAll() {
@@ -80,6 +84,9 @@ class DataScopeServiceImplTest {
 
     @Mock
     private RoleDataScopeMapper roleDataScopeMapper;
+    @Mock
+    private com.auraboot.framework.rbac.mapper.RoleMapper roleMapper;
+
 
     @Mock
     private UserRoleMapper userRoleMapper;
@@ -220,7 +227,7 @@ class DataScopeServiceImplTest {
         MetaModelDTO modelDto = MetaModelDTO.builder()
                 .extension(Map.of("dataScope", Map.of("ownerField", "owner_user_id")))
                 .build();
-        when(metaModelService.findByCode("model.user")).thenReturn(modelDto);
+        when(metaModelService.findExtensionByCode("model.user")).thenReturn(modelDto.getExtension());
 
         DataScopeCondition c = service.resolveScope(5L, "model.user", "read");
 
@@ -291,9 +298,9 @@ class DataScopeServiceImplTest {
         when(tenantMemberMapper.selectById(5L)).thenReturn(m);
         when(teamMemberService.getTeamPidsByUserId(1L, 100L)).thenReturn(List.of("team-1", "team-2"));
         when(metaModelService.getModelDefinition("model.task")).thenReturn(Optional.of(ModelDefinition.builder().build()));
-        when(metaModelService.findByCode("model.task")).thenReturn(MetaModelDTO.builder()
+        when(metaModelService.findExtensionByCode("model.task")).thenReturn(MetaModelDTO.builder()
                 .extension(Map.of("dataScope", Map.of("teamField", "org_team_pid")))
-                .build());
+                .build().getExtension());
 
         DataScopeCondition c = service.resolveScope(5L, "model.task", "read");
 
@@ -329,9 +336,9 @@ class DataScopeServiceImplTest {
         when(tenantMemberMapper.selectById(5L)).thenReturn(m);
         when(teamMemberService.getTeamPidsByUserId(1L, 100L)).thenReturn(List.of());
         when(metaModelService.getModelDefinition("model.task")).thenReturn(Optional.of(ModelDefinition.builder().build()));
-        when(metaModelService.findByCode("model.task")).thenReturn(MetaModelDTO.builder()
+        when(metaModelService.findExtensionByCode("model.task")).thenReturn(MetaModelDTO.builder()
                 .extension(Map.of("dataScope", Map.of("teamField", "org_team_pid")))
-                .build());
+                .build().getExtension());
 
         DataScopeCondition c = service.resolveScope(5L, "model.task", "read");
         assertThat(c.scopeType()).isEqualTo("self");
@@ -359,9 +366,9 @@ class DataScopeServiceImplTest {
         when(tenantMemberMapper.selectById(5L)).thenReturn(m);
         when(teamMemberService.getTeamPidsByUserId(1L, 100L)).thenReturn(List.of("team-1"));
         when(metaModelService.getModelDefinition("model.task")).thenReturn(Optional.of(ModelDefinition.builder().build()));
-        when(metaModelService.findByCode("model.task")).thenReturn(MetaModelDTO.builder()
+        when(metaModelService.findExtensionByCode("model.task")).thenReturn(MetaModelDTO.builder()
                 .extension(Map.of("dataScope", Map.of("teamField", "org_team_pid")))
-                .build());
+                .build().getExtension());
 
         // MAX takes the higher-priority TEAM condition (documented merge rule)
         assertThat(service.resolveScope(5L, "model.task", "read").scopeType()).isEqualTo("team");
@@ -404,10 +411,10 @@ class DataScopeServiceImplTest {
                 .thenReturn(List.of("dept-1", "dept-1.1"));
         when(metaModelService.getModelDefinition("crm_opportunity_common"))
                 .thenReturn(Optional.of(ModelDefinition.builder().build()));
-        when(metaModelService.findByCode("crm_opportunity_common")).thenReturn(
+        when(metaModelService.findExtensionByCode("crm_opportunity_common")).thenReturn(
                 MetaModelDTO.builder().extension(Map.of("dataScope", Map.of(
                         "ownerField", "crm_opp_owner",
-                        "departmentOwnerField", "crm_opp_owner"))).build());
+                        "departmentOwnerField", "crm_opp_owner"))).build().getExtension());
         when(metaModelService.getFieldDataType("crm_opportunity_common", "crm_opp_owner"))
                 .thenReturn(DataTypeMapping.builder().javaType("String").build());
 
@@ -441,6 +448,20 @@ class DataScopeServiceImplTest {
     // "operator does not exist: character varying = bigint" -> self-scoped list 500. The self value
     // must be chosen by the owner column's declared type: numeric -> userId, string -> userPid.
 
+    @Test void ordinaryReadLegacyNullRequiresAQualifiedOwnerAndNoMalformedOverride() {
+        MetaContext.setMemberId(5L);
+        var owner = new com.auraboot.framework.rbac.entity.Role();
+        when(roleMapper.findEffectiveGrantOwner(100L,1L,5L,7L)).thenReturn(owner);
+        when(roleDataScopeMapper.findByTenantAndRole(100L,7L)).thenReturn(List.of());
+        assertThat(service.resolveOrdinaryReadScopeForRole(5L,7L,"quote").scopeType()).isEqualTo("not_configured");
+        assertThat(service.resolveScopeForRole(5L,7L,"quote","read","quote").scopeType()).isEqualTo("none");
+        var malformed = new RoleDataScope(); malformed.setResourceCode("quote"); malformed.setActionCode("read");
+        when(roleDataScopeMapper.findByTenantAndRole(100L,7L)).thenReturn(List.of(malformed));
+        assertThat(service.resolveOrdinaryReadScopeForRole(5L,7L,"quote").scopeType()).isEqualTo("none");
+        when(roleMapper.findEffectiveGrantOwner(100L,1L,5L,7L)).thenReturn(null);
+        assertThat(service.resolveOrdinaryReadScopeForRole(5L,7L,"quote").scopeType()).isEqualTo("none");
+    }
+
     private void stubSelfScope(String resourceCode, String ownerField) {
         when(userRoleMapper.findRoleIdsByMemberId(5L)).thenReturn(List.of(7L));
         RoleDataScope scope = new RoleDataScope();
@@ -450,7 +471,7 @@ class DataScopeServiceImplTest {
         MetaModelDTO modelDto = MetaModelDTO.builder()
                 .extension(Map.of("dataScope", Map.of("ownerField", ownerField)))
                 .build();
-        when(metaModelService.findByCode(resourceCode)).thenReturn(modelDto);
+        when(metaModelService.findExtensionByCode(resourceCode)).thenReturn(modelDto.getExtension());
     }
 
     @Test
@@ -508,8 +529,24 @@ class DataScopeServiceImplTest {
         assertThat(c.scopeType()).isEqualTo("none");
     }
 
+    private void ownedWriteTarget() {
+        var role=new com.auraboot.framework.rbac.entity.Role();role.setId(7L);role.setTenantId(100L);
+        when(roleMapper.selectById(7L)).thenReturn(role);
+    }
+
+    @Test void internalWriterCannotSelectAnotherTenantOrRole() {
+        assertThatThrownBy(()->service.removeScope(101L,7L,"orders","read"))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        var role=new com.auraboot.framework.rbac.entity.Role();role.setTenantId(101L);
+        when(roleMapper.selectById(7L)).thenReturn(role);
+        assertThatThrownBy(()->service.setScope(100L,7L,"orders","read","all","MAX"))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(roleDataScopeMapper);
+    }
+
     @Test
     void setScopeUpdatesExistingRow() {
+        ownedWriteTarget();
         RoleDataScope existing = new RoleDataScope();
         existing.setId(900L);
         existing.setScopeType("self");
@@ -531,6 +568,7 @@ class DataScopeServiceImplTest {
 
     @Test
     void setScopeInsertsWhenNoRowExists() {
+        ownedWriteTarget();
         when(roleDataScopeMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
 
         service.setScope(100L, 7L, "model.user", "read", "self", null);
@@ -552,6 +590,7 @@ class DataScopeServiceImplTest {
 
     @Test
     void removeScopeDelegatesToMapper() {
+        ownedWriteTarget();
         service.removeScope(100L, 7L, "model.user", "read");
 
         verify(roleDataScopeMapper).delete(any(LambdaQueryWrapper.class));
@@ -626,6 +665,84 @@ class DataScopeServiceImplTest {
         when(organizationService.getEmployeeByMemberPid("creator-member")).thenReturn(null, Map.of());
         assertThat(service.isCreatorInDepartments(77L, List.of("dept-a"))).isFalse();
         assertThat(service.isCreatorInDepartments(77L, List.of("dept-a"))).isFalse();
+    }
+
+    @Test
+    void businessGrantScopeNeverBorrowsAnUnrelatedRoleScope() {
+        MetaContext.setMemberId(5L);
+        var role = new com.auraboot.framework.rbac.entity.Role(); role.setDefaultDataScopeType("self");
+        when(roleMapper.findEffectiveGrantOwner(100L, 1L, 5L, 7L)).thenReturn(role);
+        var unrelated = scope("other", "manage", "all");
+        when(roleDataScopeMapper.findByTenantAndRole(100L, 7L)).thenReturn(List.of(unrelated));
+        var result = service.resolveScopeForRole(5L, 7L, "inventory.receipt", "confirm", "receipt");
+        assertThat(result.scopeType()).isEqualTo("self"); assertThat(result.ownerValue()).isEqualTo(1L);
+        org.mockito.Mockito.verify(userRoleMapper, org.mockito.Mockito.never()).findRoleIdsByMemberId(any());
+    }
+
+    @Test
+    void businessGrantExactOverrideWinsOverRoleDefault() {
+        MetaContext.setMemberId(5L);
+        var role = new com.auraboot.framework.rbac.entity.Role(); role.setDefaultDataScopeType("all");
+        when(roleMapper.findEffectiveGrantOwner(100L, 1L, 5L, 7L)).thenReturn(role);
+        when(roleDataScopeMapper.findByTenantAndRole(100L, 7L)).thenReturn(List.of(scope("inventory.receipt", "confirm", "none")));
+        assertThat(service.resolveScopeForRole(5L, 7L, "inventory.receipt", "confirm", "receipt").scopeType()).isEqualTo("none");
+    }
+
+    @Test
+    void missingDefaultAndUnknownScopeConfigurationDenyBusinessTargets() {
+        MetaContext.setMemberId(5L);
+        var role = new com.auraboot.framework.rbac.entity.Role();
+        when(roleMapper.findEffectiveGrantOwner(100L, 1L, 5L, 7L)).thenReturn(role);
+        when(roleDataScopeMapper.findByTenantAndRole(100L, 7L)).thenReturn(List.of());
+        assertThat(service.resolveScopeForRole(5L, 7L, "inventory.receipt", "confirm", "receipt").scopeType()).isEqualTo("none");
+        var entry = scope("inventory.receipt", "confirm", "all"); entry.setScopeConfig(Map.of("unrecognizedRestriction", "do not ignore"));
+        when(roleDataScopeMapper.findByTenantAndRole(100L, 7L)).thenReturn(List.of(entry));
+        assertThat(service.resolveScopeForRole(5L, 7L, "inventory.receipt", "confirm", "receipt").scopeType()).isEqualTo("none");
+    }
+
+    @Test
+    void businessRoleResolutionRejectsAnotherSubjectAndInactiveMembership() {
+        MetaContext.setMemberId(5L);
+        assertThat(service.resolveScopeForRole(6L, 7L, "inventory.receipt", "confirm", "receipt").scopeType()).isEqualTo("none");
+        assertThat(service.resolveScopeForRole(5L, 7L, "inventory.receipt", "confirm", "receipt").scopeType()).isEqualTo("none");
+        org.mockito.Mockito.verifyNoInteractions(roleDataScopeMapper);
+    }
+
+    @Test void objectBoundActionsUseTheGrantOwnersExistingReadScopeWithoutWritingConfiguration() {
+        MetaContext.setMemberId(5L);
+        var role = new com.auraboot.framework.rbac.entity.Role(); role.setDefaultDataScopeType("all");
+        when(roleMapper.findEffectiveGrantOwner(100L,1L,5L,7L)).thenReturn(role);
+        when(roleDataScopeMapper.findByTenantAndRole(100L,7L)).thenReturn(List.of(scope("quote","read","self")));
+        var result = service.resolveObjectBoundScopeForRole(5L,7L,"quote","manage","quote");
+        assertThat(result.scopeType()).isEqualTo("self"); assertThat(result.ownerValue()).isEqualTo(1L);
+        verify(userRoleMapper, never()).findRoleIdsByMemberId(any());
+    }
+
+    @Test void objectBoundActionOverridesAndMalformedRestrictionsNeverFallBackToReadAll() {
+        MetaContext.setMemberId(5L);
+        var role = new com.auraboot.framework.rbac.entity.Role();
+        when(roleMapper.findEffectiveGrantOwner(100L,1L,5L,7L)).thenReturn(role);
+        var denied = scope("quote","manage","none");
+        when(roleDataScopeMapper.findByTenantAndRole(100L,7L)).thenReturn(List.of(scope("quote","read","all"),denied));
+        assertThat(service.resolveObjectBoundScopeForRole(5L,7L,"quote","manage","quote").scopeType()).isEqualTo("none");
+        denied.setScopeType("all");denied.setScopeConfig(Map.of("unknownRestriction",true));
+        assertThat(service.resolveObjectBoundScopeForRole(5L,7L,"quote","manage","quote").scopeType()).isEqualTo("none");
+    }
+
+    @Test void objectBoundLegacyNullRequiresTheExactActiveRoleAndPreservesReadNone() {
+        MetaContext.setMemberId(5L);
+        when(roleMapper.findEffectiveGrantOwner(100L,1L,5L,7L)).thenReturn(new com.auraboot.framework.rbac.entity.Role());
+        when(roleDataScopeMapper.findByTenantAndRole(100L,7L)).thenReturn(List.of());
+        assertThat(service.resolveObjectBoundScopeForRole(5L,7L,"quote","manage","quote").scopeType()).isEqualTo("not_configured");
+        assertThat(service.resolveScopeForRole(5L,7L,"quote","manage","quote").scopeType()).isEqualTo("none");
+        when(roleDataScopeMapper.findByTenantAndRole(100L,7L)).thenReturn(List.of(scope("quote","read","none")));
+        assertThat(service.resolveObjectBoundScopeForRole(5L,7L,"quote","manage","quote").scopeType()).isEqualTo("none");
+        when(roleMapper.findEffectiveGrantOwner(100L,1L,5L,7L)).thenReturn(null);
+        assertThat(service.resolveObjectBoundScopeForRole(5L,7L,"quote","manage","quote").scopeType()).isEqualTo("none");
+    }
+
+    private static RoleDataScope scope(String resource, String action, String type) {
+        var scope = new RoleDataScope(); scope.setResourceCode(resource); scope.setActionCode(action); scope.setScopeType(type); return scope;
     }
 
     @Test

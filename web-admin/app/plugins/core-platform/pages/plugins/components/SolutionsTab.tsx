@@ -90,9 +90,9 @@ export default function SolutionsTab() {
         const json = await res.json();
         setIndustries(json.data ?? []);
       }
-    } catch {
+    } catch (error) {
       // ignore — empty sidebar is acceptable
-    }
+ console.warn('[SolutionsTab] previously-silent catch', error);    }
   }, []);
 
   useEffect(() => {

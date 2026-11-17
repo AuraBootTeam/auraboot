@@ -64,6 +64,7 @@ describe('TabsBlockRenderer mobile behavior', () => {
     expect(tablist.className).toContain('overflow-x-auto');
     expect(screen.getAllByRole('tab')).toHaveLength(3);
     for (const tab of screen.getAllByRole('tab')) {
+      expect(tab).toHaveAttribute('type', 'button');
       expect(tab.className).toContain('min-h-11');
       expect(tab.className).toContain('touch-manipulation');
       expect(tab.className).toContain('whitespace-nowrap');

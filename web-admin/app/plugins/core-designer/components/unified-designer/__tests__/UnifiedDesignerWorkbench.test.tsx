@@ -756,7 +756,7 @@ describe('UnifiedDesignerWorkbench', () => {
   });
 
   it('shows rejected save errors without clearing the dirty document', async () => {
-    const onSave = vi.fn().mockRejectedValue(new Error('Backend rejected PageSchema V3.'));
+    const onSave = vi.fn().mockRejectedValue(new Error('Backend rejected UnifiedPageSchema V3.'));
     render(<UnifiedDesignerWorkbench initialDocument={samplePageSchemaV3} onSave={onSave} />);
 
     fireEvent.click(screen.getByTestId('outline-item-field_customer_name'));
@@ -769,7 +769,7 @@ describe('UnifiedDesignerWorkbench', () => {
       expect(screen.getByTestId('designer-dirty-state')).toHaveTextContent('保存失败');
     });
     const saveError = screen.getByTestId('designer-save-error');
-    expect(saveError).toHaveTextContent('Backend rejected PageSchema V3.');
+    expect(saveError).toHaveTextContent('Backend rejected UnifiedPageSchema V3.');
     expect(saveError).toHaveAttribute('role', 'alert');
     expect(saveError).not.toHaveClass('truncate');
     expect(screen.getByTestId('designer-save')).not.toBeDisabled();

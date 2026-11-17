@@ -58,6 +58,26 @@ class DynamicDataAccessorCommandAuthorityTest {
     }
 
     @Test
+    void processingReadRetainsIdentityMaskingFailureAndExactRelatedRecordBoundary() {
+        MetaContext.setContext(7L,42L,"actor","Actor");MetaContext.setMemberId(43L);
+        var accessor=new DynamicDataAccessorImpl(dynamicDataService);
+        when(dynamicDataService.getByIdForProcessing("m","other")).thenAnswer(call -> {
+            assertThat(MetaContext.hasCommandPermitScope()).isFalse();
+            assertThat(MetaContext.getCurrentMemberId()).isEqualTo(43L);
+            return Map.of("pid","other","name","masked");
+        });
+        when(dynamicDataService.getByIdForProcessing("m","denied")).thenThrow(
+                new org.springframework.security.access.AccessDeniedException("data policy denied"));
+        MetaContext.runWithCommandPermitPlan("TARGET",9L,"m","root",() -> {
+            assertThat(accessor.getByIdForProcessing("m","other")).containsEntry("name","masked");
+            assertThatThrownBy(() -> accessor.getByIdForProcessing("m","denied"))
+                    .isInstanceOf(com.auraboot.framework.plugin.extension.DataAccessorException.class);
+            assertThat(MetaContext.getCommandExpectedVersion("m","root")).isEqualTo(9L);
+        });
+        org.mockito.Mockito.verify(dynamicDataService,org.mockito.Mockito.never()).getById(anyString(),anyString());
+    }
+
+    @Test
     void relatedReadDenialAndTypedAbsenceNeverRelaxTheOuterWritePermit() {
         var accessor = new DynamicDataAccessorImpl(dynamicDataService);
         when(dynamicDataService.getById("m", "denied")).thenAnswer(call -> {

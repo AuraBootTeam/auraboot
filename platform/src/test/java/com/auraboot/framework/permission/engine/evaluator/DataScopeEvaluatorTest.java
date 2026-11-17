@@ -72,6 +72,15 @@ class DataScopeEvaluatorTest {
     }
 
     @Test
+    void ownedRecordDoesNotResolveAnUnusedSharedRootAlternative() {
+        MetaContext.setContext(99L,7L,"actor","actor");
+        var self=new DataScopeCondition("self","created_by",7L,null,List.of(),List.of());
+        assertEquals(EvaluationVerdict.ALLOW,evaluator.evaluateCurrentGrantScope(
+                self,1L,"quote","read",Map.of("created_by",7L)).verdict());
+        org.mockito.Mockito.verifyNoInteractions(rowSurfaceResolver,recordShareService);
+    }
+
+    @Test
     void selfScopeOwnerMatchAllows() {
         when(dataScopeService.resolveScope(1L, "M", "view"))
                 .thenReturn(new DataScopeCondition("self", "owner_id", 1L, null, List.of(), List.of()));

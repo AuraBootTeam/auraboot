@@ -42,6 +42,12 @@ public interface DynamicDataService {
      */
     Map<String, Object> getById(String modelCode, String recordId);
 
+    /** Same public business/read/field gates, without display-only reference expansion. */
+    default Map<String,Object> getByIdForProcessing(String modelCode, String recordId) {
+        return getById(modelCode,recordId);
+    }
+
+
     /** Read through every normal authorization and masking gate, without display-only reference expansion. */
     Map<String, Object> getByIdForAuthorization(String modelCode, String recordId);
 
@@ -68,6 +74,11 @@ public interface DynamicDataService {
      * @return 创建的数据记录
      */
     Map<String, Object> create(String modelCode, Map<String, Object> data);
+
+    /** Ordinary creation lifecycle with no caller-facing record projection. */
+    default void createWithoutResult(String modelCode, Map<String, Object> data) {
+        create(modelCode, data);
+    }
 
     /**
      * 更新数据
@@ -124,6 +135,12 @@ public interface DynamicDataService {
      * @return created rows with generated primary keys, in input order
      */
     List<Map<String, Object>> bulkCreate(String modelCode, List<Map<String, Object>> dataList);
+
+    /** Preserve bulk write/read authorization while omitting display-only reference labels. */
+    default List<Map<String,Object>> bulkCreateForProcessing(String modelCode,List<Map<String,Object>> rows) {
+        return bulkCreate(modelCode,rows);
+    }
+
 
     /**
      * 批量更新数据

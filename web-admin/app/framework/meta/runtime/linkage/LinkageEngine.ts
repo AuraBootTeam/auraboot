@@ -10,7 +10,7 @@ import type {
   LinkageRule,
   LinkageAction,
   TriggerEvent,
-} from '~/plugins/core-designer/components/studio/workbench/panels/linkage/types';
+} from '~/framework/meta/schemas/linkage-types';
 import type { ScopedStateManager, FieldMeta } from '~/framework/meta/runtime/state/scoped-state';
 import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { expressionEvaluator } from '~/framework/meta/runtime/expression/evaluator';
@@ -176,9 +176,9 @@ export class LinkageEngine {
             let resolvedValue: any;
             try {
               resolvedValue = expressionEvaluator.evaluate(action.value, context);
-            } catch {
+            } catch (error) {
               // expression parse error — use raw value
-            }
+ console.warn('[LinkageEngine] previously-silent catch', error);            }
             if (resolvedValue === undefined) {
               resolvedValue = action.value;
             }
