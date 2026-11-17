@@ -82,7 +82,7 @@ public class ExternalEventIngressService {
         if (defaultsEnabled) {
             try {
                 Map<String, Object> input = objectMapper.readValue(rawBody, new com.fasterxml.jackson.core.type.TypeReference<LinkedHashMap<String, Object>>() { });
-                String canonicalHash = secretCodec.sha256(normalizer.canonical(input));
+                String canonicalHash = secretCodec.sha256(normalizer.canonical(normalizer.fingerprintInput(sourceCode,input)));
                 String prior = idempotencyMapper.findRequestHash(principal.tenantId(), installation.getId(), routeCode, idempotencyKey);
                 if (!requestHash.equals(prior)) requestHash = canonicalHash;
             } catch (com.fasterxml.jackson.core.JsonProcessingException invalid) {
@@ -330,7 +330,7 @@ public class ExternalEventIngressService {
         public IngressResult(String eventId, boolean duplicate) { this(eventId,duplicate,null); }
         public Map<String,Object> publicReceipt() {
             var result=new LinkedHashMap<String,Object>();
-            if(!businessRequest || callerIdProvided)result.put("eventId",eventId);
+            result.put("eventId",eventId);
             if(recordPid!=null)result.put("recordPid",recordPid);
             if(!businessRequest)result.put("duplicate",duplicate);
             else if(recordPid==null || recordPid.isBlank())throw new IllegalStateException("Business acceptance receipt missing");

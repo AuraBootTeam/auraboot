@@ -54,6 +54,12 @@ public interface ExternalEventIngressExtension extends ExtensionPoint {
     @FunctionalInterface
     interface RequestNormalizer {
         PreparedRequest normalize(java.util.Map<String, Object> request, RequestDefaults defaults);
+
+        /** Pure retry identity projection. Default retains every caller field. Providers may
+         * omit only explicitly ignored wire fields, never defaults or business facts. */
+        default java.util.Map<String,Object> fingerprintInput(java.util.Map<String,Object> request) {
+            return request;
+        }
     }
 
     /** Safe provider field errors discovered while resolving the installed business binding. */
