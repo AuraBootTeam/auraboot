@@ -1,12 +1,12 @@
 ---
 type: system-reference
 status: active
-updated: 2026-10-30
+updated: 2026-11-18
 ---
 
 # 插件定制保护与字段删除准入
 
-本文定义 Page、Dashboard 的插件重导入保护，以及普通字段删除的保留数据边界。架构审查、需求和过程账本位于 Enterprise 的 `platform-business-system-foundation.md` / `2026-10-30-business-foundation-journeys.md`。本文不定义通用三方合并、破坏性迁移或自动回退。
+本文定义 Page、Dashboard、Menu 的插件重导入保护，以及普通字段删除的保留数据边界。架构审查、需求和过程账本位于 Enterprise 的 `platform-business-system-foundation.md` / `2026-10-30-business-foundation-journeys.md`。本文不定义通用三方合并、破坏性迁移或自动回退。
 
 ## 安全覆盖
 
@@ -26,6 +26,18 @@ Page 使用 `ResourceType.PAGE/page`，Dashboard 使用 `ResourceType.DASHBOARD/
 预览按真实资源存在性判定 CREATE/UPDATE，并使用小写资源身份和强类型保护投影。既有未跟踪 Page/Dashboard 也按需保留的内容展示；查询故障/NULL 不可被静默显示为“未修改”。预览提供的是资源变化与保护提示，执行仍在导入事务内重新检查，不是锁定未来状态的承诺。
 
 自动 stub 是有限例外：只有 `auto_created=true` 且 `rowVersion=1` 的未编辑 stub 允许标准定义接替。通过页面 service 保存会移除 stub 标记；历史编辑后的 stub 不再仅凭标记绕过保护。
+
+## 菜单接管、重导入与退出
+
+菜单的 `OVERWRITE_SAFE` 只同步同租户、同 plugin ID 的已跟踪且未修改资源；不同安装 PID 可以属于同一 plugin ID。既有未跟踪、已认领、已修改或属于另一插件的菜单均保留，SKIP 不转移归属或重写基线。已跟踪记录的修改标记为 NULL 或读取失败时中止导入，不能视为未修改。
+
+跨插件菜单接管需要操作者显式选择 `OVERWRITE`；它沿用既有覆盖权限与校验，不是自动迁移授权，也不提供通用资源移交或回退协议。接管保留菜单 PID，更新菜单行和 tracking 归属。旧包之后以默认安全策略重导入原声明时，不会自动抢回菜单；旧包显式选择 OVERWRITE 仍表示再次接管，因此不能把它作为安全重导入使用。
+
+声明瘦身的 prune 与插件卸载的菜单清理共用保护选择：仅选择 tracking 明确属于 shared/plugin_owned、修改标记明确为 false、菜单行与 tracking 的 plugin PID 一致、且非 authoringManaged 的本租户菜单。用户认领、修改、未知保护状态和归属不一致的菜单不自动清理。选择时锁定菜单及 tracking 行，锁持续到导入/卸载事务结束。
+
+未修改的旧菜单仍按原规则退出；被接收方接管的菜单不再属于旧包清理范围。有保留子菜单时，不能清理其父菜单；整个清理失败并保留原层次，不静默重挂父级。停用插件与卸载插件仍是不同操作。
+
+真实 PostgreSQL 回归入口：`:platform-app:test --tests '*PluginMenuHandoverIntegrationTest'`。用例覆盖用户认领/修改、显式接管、旧包原声明安全重导、瘦身、停用/卸载、同包重复更新、未知标记、authoringManaged、租户隔离和保留子菜单。它验证菜单服务与数据归属，不等同权限/UI验收，也不证明 Agent、角色等其它类型具备相同接管合同。
 
 ## 既有安装升级
 
