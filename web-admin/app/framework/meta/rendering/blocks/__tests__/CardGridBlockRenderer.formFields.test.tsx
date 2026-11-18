@@ -21,7 +21,7 @@ vi.mock('../../components/ComponentLoader', () => ({ ComponentLoader: ({ props }
     readOnly={props.readOnly} onChange={(event) => props.onChange(event.target.value)} /></label>
 ) }));
 
-function setup(bind = true, grouped = false, computed = false, grid = false, reconcile = false, actions?: any[]) {
+function setup(bind = true, grouped = false, computed = false, grid = false, reconcile = false, actions?: any[], conditionalCapacity = false) {
   const state = new ScopedStateManager({} as any);
   state.createScope('review');
   let rows: any[] = [
@@ -46,7 +46,8 @@ function setup(bind = true, grouped = false, computed = false, grid = false, rec
     ...(grid ? { fieldsLayout: { type: 'grid', cols: 12, rowGap: 12, colGap: 12 } } : {}),
     ...(grouped ? { groupByField: 'sourcePid', groupTitleField: 'sourceLabel' } : {}),
     fields: [
-      { field: 'availableQty', label: 'Available capacity', component: 'SmartInput', readOnly: true },
+      { field: 'availableQty', label: 'Available capacity', component: 'SmartInput', readOnly: true,
+        ...(conditionalCapacity ? { visibleWhen: '${row.sourcePid === "source-a"}' } : {}) },
       { field: 'proposedQty', label: 'Proposed quantity', component: 'SmartInput' },
       { field: 'score', label: 'Score', component: 'SmartInput', readOnly: true, ...(grid ? { layout: { colSpan: 12 } } : {}) },
       ...(computed ? [{ field: 'groupTotal', label: 'Group total', component: 'SmartInput', valueWhen: '${fn.DECIMAL_SUM_BY(form.choices, "proposedQty", "sourcePid", row.sourcePid)}' }] : []),
@@ -61,6 +62,16 @@ function setup(bind = true, grouped = false, computed = false, grid = false, rec
 
 describe('Card-grid draft form fields', () => {
   beforeEach(() => {handleAction.mockReset(); hasPermission.mockReset().mockReturnValue(true);});
+
+  it('removes invisible fields before placing each card in its own grid', () => {
+    setup(true, false, false, true, false, undefined, true);
+    const cards = screen.getAllByTestId('card-grid-card');
+    expect(cards[0].querySelector('[data-testid="grid-item-availableQty"]')).not.toBeNull();
+    expect(cards[0].querySelector<HTMLElement>('[data-testid="grid-item-proposedQty"]')!.style.gridColumn).toBe('7 / span 6');
+    expect(cards[1].querySelector('[data-testid="grid-item-availableQty"]')).toBeNull();
+    expect(cards[1].querySelector<HTMLElement>('[data-testid="grid-item-proposedQty"]')!.style.gridColumn).toBe('1 / span 6');
+    expect(within(cards[1]).getByRole('textbox', { name: 'Proposed quantity' })).toHaveValue('40');
+  });
 
   it('gates actions by current row and permissions and prevents concurrent duplicate actions', async () => {
     hasPermission.mockImplementation(code => code !== 'denied');

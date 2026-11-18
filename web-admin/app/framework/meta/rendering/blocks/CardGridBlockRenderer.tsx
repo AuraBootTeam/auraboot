@@ -118,14 +118,6 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   const selectionRule: RowSelectionRule | undefined = rowSelection ? {identityField:readOwnPath(rowSelection,'identityField') as string,selectedField:readOwnPath(rowSelection,'selectedField') as string,positiveField:readOwnPath(rowSelection,'positiveField') as string} : undefined;
   const cardFields: FieldConfig[] = Array.isArray(cfg.fields) ? cfg.fields : [];
   const fieldsLayout: LayoutConfig | undefined = cfg.fieldsLayout?.type === 'grid' ? cfg.fieldsLayout : undefined;
-  let nextColumn = 0;
-  const fieldBlocks = fieldsLayout ? cardFields.map(field => {
-    const cols = fieldsLayout.cols ?? 12;
-    const colSpan = field.layout?.colSpan ?? field.colSpan ?? Math.max(1, Math.floor(cols / 2));
-    const col = field.layout?.col ?? (nextColumn + colSpan > cols ? 0 : nextColumn);
-    nextColumn = (col + colSpan) % cols;
-    return { ...field, id: field.field, layout: { ...field.layout, col, colSpan } };
-  }) : [];
   const stateManager = runtime.getStateManager();
   const scopeId = runtime.getScopeId();
   useRuntimeStateSubscription(runtime);
@@ -326,6 +318,17 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
         const currentSelectionRow = selectionRule ? currentSelectionRows?.get(readOwnPath(row,selectionRule.identityField) as string) : undefined;
         const rowSelectable = !selectionRule || Boolean(currentSelectionRow && positiveRowValue(readOwnPath(currentSelectionRow,selectionRule.positiveField)));
         const rowSelected = selectionRule ? readOwnPath(row,selectionRule.selectedField) === true : false;
+        const rowContext = { ...runtime.getContext(), row } as any;
+        const visibleFields = cardFields.filter(field => !field.visibleWhen
+          || runtime.getEvaluator().evaluateCondition(field.visibleWhen, rowContext));
+        let nextColumn = 0;
+        const fieldBlocks = fieldsLayout ? visibleFields.map(field => {
+          const cols = fieldsLayout.cols ?? 12;
+          const colSpan = field.layout?.colSpan ?? field.colSpan ?? Math.max(1, Math.floor(cols / 2));
+          const col = field.layout?.col ?? (nextColumn + colSpan > cols ? 0 : nextColumn);
+          nextColumn = (col + colSpan) % cols;
+          return { ...field, id: field.field, layout: { ...field.layout, col, colSpan } };
+        }) : [];
         const renderField = (field: FieldConfig) => {
           const rowContext = { ...runtime.getContext(), row } as any;
           if (field.visibleWhen && !runtime.getEvaluator().evaluateCondition(field.visibleWhen, rowContext)) return null;
@@ -352,6 +355,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
           <div
             key={rowKey}
             data-testid="card-grid-card"
+            style={{ scrollMarginBlockStart: 'calc(var(--workspace-header-height, 3.5rem) + 1rem)' }}
             className={`rounded-card border-border bg-panel flex flex-col border shadow-sm ${compact ? 'p-3' : 'p-4'}`}
           >
             {selectionRule && (
@@ -421,10 +425,10 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
             )}
 
             {/* Declared fields; without a form array they are display-only. */}
-            {cardFields.length > 0 && (
+            {visibleFields.length > 0 && (
               <fieldset aria-label={title} className={fieldsLayout ? 'mb-3' : 'mb-3 space-y-3'}>
                 {fieldsLayout ? <GridLayoutRenderer layout={fieldsLayout}
-                  blocks={fieldBlocks} renderBlock={renderField} /> : cardFields.map(renderField)}
+                  blocks={fieldBlocks} renderBlock={renderField} /> : visibleFields.map(renderField)}
               </fieldset>
             )}
 
@@ -526,6 +530,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
         {selectionHint}
         {Array.from(groups.entries()).map(([key, group], index) => cfg.collapsibleGroups === true ? (
           <details key={key} data-testid="card-grid-group" open={cfg.groupsDefaultOpen !== false}
+            style={{ scrollMarginBlockStart: 'calc(var(--workspace-header-height, 3.5rem) + 1rem)' }}
             className={`rounded-lg border border-border ${compact ? 'group overflow-hidden' : 'p-3'} ${cfg.groupWarningField && (group.parent?.[cfg.groupWarningField] === true || group.entries.some(({ row }) => row[cfg.groupWarningField] === true)) ? 'bg-amber-50' : 'bg-surface'}`}>
             <summary className={`cursor-pointer select-none text-sm font-semibold text-text ${compact ? 'list-none p-4' : ''}`}>
               <div data-testid="card-group-heading" style={compact ? { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 24rem), 1fr))', gap: '1rem' } : undefined}>
@@ -542,6 +547,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
           </details>
         ) : (
           <section key={key} data-testid="card-grid-group"
+            style={{ scrollMarginBlockStart: 'calc(var(--workspace-header-height, 3.5rem) + 1rem)' }}
             aria-labelledby={group.title ? `${block.id}-group-${index}` : undefined}>
             {group.title && <h2 id={`${block.id}-group-${index}`}
               className="text-text mb-3 text-base font-semibold">{group.title}</h2>}
