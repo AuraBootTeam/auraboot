@@ -318,6 +318,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
         const currentSelectionRow = selectionRule ? currentSelectionRows?.get(readOwnPath(row,selectionRule.identityField) as string) : undefined;
         const rowSelectable = !selectionRule || Boolean(currentSelectionRow && positiveRowValue(readOwnPath(currentSelectionRow,selectionRule.positiveField)));
         const rowSelected = selectionRule ? readOwnPath(row,selectionRule.selectedField) === true : false;
+        const visibleActions = cardActions.filter(action => actionAllowed(action, row));
         const rowContext = { ...runtime.getContext(), row } as any;
         const visibleFields = cardFields.filter(field => !field.visibleWhen
           || runtime.getEvaluator().evaluateCondition(field.visibleWhen, rowContext));
@@ -433,10 +434,9 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
             )}
 
             {/* Actions */}
-            {cardActions.length > 0 && (
+            {visibleActions.length > 0 && (
               <div className="mt-auto flex flex-wrap gap-2 pt-2">
-                {cardActions.map((action) => {
-                  if (!actionAllowed(action, row)) return null;
+                {visibleActions.map((action) => {
                   const label = getLocalizedText(action.label || action.code, locale, t);
                   const disabled = actionDisabled(action, row);
                   const running = runningAction === `${idx}:${action.code}`;
@@ -520,7 +520,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
             onChange={event => setGroupSearch(current => ({ ...current, [key]: event.target.value }))} />
         </div> : null}
         {group.entries.length === 0 && parentConfig?.emptyText ? <p className="text-text-2 py-3 text-sm">{getLocalizedText(parentConfig.emptyText, locale, t)}</p> : null}
-        <div data-testid="card-grid-tracks" className={`mt-3 grid gap-3 ${columnsClass}`} style={columnsStyle}>
+        <div data-testid="card-grid-tracks" className={`mt-3 grid gap-3 ${columnsClass}`} style={{ ...columnsStyle, alignItems: compact ? 'start' : undefined }}>
           {entries.map(({ row, index: originalIndex }) => renderCard(row, originalIndex))}
         </div>
       </>;
