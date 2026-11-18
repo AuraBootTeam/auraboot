@@ -104,24 +104,26 @@ public class NativeRecordFieldAuthorization {
         com.auraboot.framework.meta.util.JsonbFieldHelper.normalizeJsonReadValues(model, canonical);
         if ("create".equals(action) && !Objects.equals(canonical.get("created_by"), MetaContext.getCurrentUserId()))
             throw denied("Created record ownership is not the current actor");
+        boolean related = com.auraboot.framework.plugin.pf4j.RelatedMutationFieldScope.permits(
+                action,modelCode,pid,canonical,submitted,observed);
         // A queued command lends only the freshly checked root. Its owning business duty
         // still uses complete current scope/condition/field facts, never technical sub-permissions.
         com.auraboot.framework.permission.engine.model.BusinessGrantDecision grant = null;
-        if (AsyncTaskExecutionContext.isActive() && "TARGET".equals(MetaContext.getCommandPermitScopeFor(modelCode))
+        if (!related && AsyncTaskExecutionContext.isActive() && "TARGET".equals(MetaContext.getCommandPermitScopeFor(modelCode))
                 && Objects.equals(pid, MetaContext.getCommandPermitTargetFor(modelCode))
                 && MetaContext.getAuthorizedCommandCode() != null) {
             grant = authorization.resolveDeclaredRootWriteOrNull(MetaContext.getCurrentMemberId(),
                     MetaContext.getCommandAuthority(), modelCode, canonical, action);
         }
         boolean owningBusinessGrant = grant != null;
-        if (grant == null) grant = "create".equals(action)
+        if (!related && grant == null) grant = "create".equals(action)
                 ? authorization.resolveOrdinaryCreate(MetaContext.getCurrentMemberId(), modelCode, canonical)
                 : authorization.resolveOrdinaryUpdate(MetaContext.getCurrentMemberId(), modelCode, canonical);
-        if (grant == null || !grant.result().granted()
+        if (!related && (grant == null || !grant.result().granted()
                 || !Objects.equals(grant.tenantId(), MetaContext.getCurrentTenantId())
                 || !Objects.equals(grant.userId(), MetaContext.getCurrentUserId())
                 || !Objects.equals(grant.memberId(), MetaContext.getCurrentMemberId())
-                || !Objects.equals(grant.modelCode(), modelCode) || !Objects.equals(grant.recordPid(), pid))
+                || !Objects.equals(grant.modelCode(), modelCode) || !Objects.equals(grant.recordPid(), pid)))
             throw denied("The complete write grant does not match this record");
         for (String key : submitted.keySet()) {
             if ("update".equals(action) && "_expectedVersion".equals(key)) continue;
@@ -139,10 +141,10 @@ public class NativeRecordFieldAuthorization {
             if (com.auraboot.framework.meta.constant.SystemFieldConstants.isSystemField(field.getCode())
                     || com.auraboot.framework.meta.constant.SystemFieldConstants.isSystemField(field.getColumnName()))
                 throw denied("Immutable submitted field alias");
-            if (!grant.canWrite(field.getCode())) throw denied("Submitted field is outside the matching write grant");
+            if (!related && !grant.canWrite(field.getCode())) throw denied("Submitted field is outside the matching write grant");
         }
 
-        if (!observed.isEmpty()) {
+        if (!related && !observed.isEmpty()) {
             var readGrant = authorization.resolveOrdinaryRead(MetaContext.getCurrentMemberId(), modelCode, canonical);
             if (readGrant == null || !readGrant.result().granted()
                     || !Objects.equals(readGrant.tenantId(), MetaContext.getCurrentTenantId())
@@ -152,7 +154,7 @@ public class NativeRecordFieldAuthorization {
                     || observed.stream().anyMatch(field -> !readGrant.canRead(field)))
                 throw new AccessDeniedException("FIELD_READ_DENIED: conditional mutation requires matching readable grant fields");
         }
-        return owningBusinessGrant;
+        return related || owningBusinessGrant;
     }
 
     private static AccessDeniedException denied(String reason) {

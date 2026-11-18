@@ -59,7 +59,8 @@ public final class RelatedUpdateCommandDataAccessor extends DynamicDataAccessorI
         var context=new CommandHandlerExtension.TargetAuthorizationContext(command,rootModel,rootPid,"update",tenant,actor,root,reads);
         if(!handler.authorizeRelatedCreate(new CommandHandlerExtension.RelatedCreateAuthorizationContext(context,model,intended)))
             throw new AccessDeniedException("Related create is not authorized");
-        return MetaContext.runWithCommandPermitPlan("ALL",null,model,null,()->super.create(model,new LinkedHashMap<>(intended)));
+        return MetaContext.runWithCommandPermitPlan("ALL",null,model,null,()->
+                RelatedMutationFieldScope.within(model,"create",null,intended,java.util.Set.of(),()->super.create(model,new LinkedHashMap<>(intended))));
     }
     @Override public java.util.Optional<Map<String,Object>> tryCreate(String model,Map<String,Object> input) {
         if(!relatedCreates || rootModel.equals(model))return super.tryCreate(model,input);
@@ -82,7 +83,7 @@ public final class RelatedUpdateCommandDataAccessor extends DynamicDataAccessorI
                 rootContext,model,pid,record,intended)))
             throw new AccessDeniedException("Related record update is not authorized");
         return MetaContext.runWithCommandPermitPlan("TARGET",expected,model,pid,
-                ()->super.update(model,pid,new LinkedHashMap<>(intended)));
+                ()->RelatedMutationFieldScope.within(model,"update",pid,intended,java.util.Set.of(),()->super.update(model,pid,new LinkedHashMap<>(intended))));
     }
 
     @Override public void delete(String model,String pid) {
@@ -123,7 +124,8 @@ public final class RelatedUpdateCommandDataAccessor extends DynamicDataAccessorI
         // The enclosing command transaction makes the native single-row operations atomic as a batch.
         for(var update:updates.stream().sorted(Comparator.comparing(CompareAndSetUpdate::recordId)).toList())
             MetaContext.runWithCommandPermitPlan("TARGET",versions.get(update.recordId()),model,update.recordId(),
-                    ()->super.compareAndSetBatch(model,field,List.of(update)));
+                    ()->RelatedMutationFieldScope.within(model,"update",update.recordId(),update.nextValues(),java.util.Set.of(field),
+                            ()->{super.compareAndSetBatch(model,field,List.of(update));return null;}));
     }
 
     private Map<String,Object> authorizedRoot() {
