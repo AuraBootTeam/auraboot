@@ -776,8 +776,10 @@ public class PluginImportServiceImpl implements PluginImportService {
 
             boolean publicImport = (manifest.getPublicResources() != null && !manifest.getPublicResources().isEmpty())
                     || (manifest.getPublicQueries() != null && !manifest.getPublicQueries().isEmpty());
+            boolean trackedMetadataImport = publicImport
+                    || (manifest.getAgentDefinitions() != null && !manifest.getAgentDefinitions().isEmpty());
             PluginMetadataRollbackSnapshot.Metadata previousMetadata = null;
-            if (publicImport) {
+            if (trackedMetadataImport) {
                 var previous = pluginRecordMapper.findByTenantAndPluginId(manifest.getPluginId());
                 if (previous != null) {
                     var locked = pluginRecordMapper.lockIdentityIncludingDeleted(tenantId, previous.getPid());
@@ -791,7 +793,7 @@ public class PluginImportServiceImpl implements PluginImportService {
 
             // Create or update plugin record
             String pluginPid = createOrUpdatePlugin(manifest, tenantId);
-            if (publicImport) {
+            if (trackedMetadataImport) {
                 var installed = pluginRecordMapper.lockIdentityIncludingDeleted(tenantId, pluginPid);
                 if (installed == null || !Objects.equals(tenantId, installed.getTenantId())
                         || !Objects.equals(manifest.getPluginId(), installed.getPluginId())) {
@@ -1530,10 +1532,37 @@ public class PluginImportServiceImpl implements PluginImportService {
         auraPluginManager.requireTenantLifecycleChange(rollbackOwner);
         modelFieldRenameMigrator.assertHistoricalRollbackSafe(history.getTenantId(), history.getPluginPid());
 
+        Object agentSummary = history.getResourceSummary() == null ? null
+                : history.getResourceSummary().get(ResourceType.AGENT_DEFINITION.name());
+        var importResources = pluginResourceMapper.findByImportId(importId);
+        boolean agentImport = agentSummary instanceof Map<?, ?> || importResources.stream()
+                .anyMatch(row -> row.getResourceTypeEnum() == ResourceType.AGENT_DEFINITION);
+        if (agentImport) {
+            if (!(agentSummary instanceof Map<?, ?>))
+                throw new PluginException("Agent rollback resource summary is missing");
+            var latest = importHistoryMapper.findLastSuccessful(history.getTenantId(), history.getPluginId());
+            if (latest == null || !importId.equals(latest.getImportId()))
+                throw new PluginException("Only the latest successful Agent import can be rolled back");
+            var counts = (Map<?, ?>) agentSummary;
+            int expectedWrites = 0;
+            for (String action : List.of("CREATE", "UPDATE")) {
+                if (counts.get(action) instanceof Number count) expectedWrites += count.intValue();
+            }
+            var currentAgents = importResources.stream()
+                    .filter(row -> row.getResourceTypeEnum() == ResourceType.AGENT_DEFINITION
+                            && Objects.equals(row.getTenantId(), history.getTenantId())
+                            && Objects.equals(row.getPluginPid(), history.getPluginPid())).toList();
+            if (currentAgents.size() != expectedWrites)
+                throw new PluginException("Agent rollback owner changed or resource tracking is missing");
+            if (currentAgents.stream().anyMatch(row -> row.getActionEnum() == ResourceAction.UPDATE
+                    && row.getPreviousState() == null))
+                throw new PluginException("Agent recovery snapshot is missing");
+        }
+
         PluginMetadataRollbackSnapshot metadataRollback = null;
         boolean hasPublicPublications = pluginResourceMapper.findByPluginPid(history.getPluginPid()).stream()
                 .anyMatch(resource -> resource.getResourceTypeEnum().isPublicPublication());
-        if (hasPublicPublications) {
+        if (hasPublicPublications || agentImport) {
             var currentPlugin = pluginRecordMapper.lockIdentityIncludingDeleted(history.getTenantId(), history.getPluginPid());
             if (currentPlugin == null) {
                 throw new PluginException("Public publication plugin owner is missing");

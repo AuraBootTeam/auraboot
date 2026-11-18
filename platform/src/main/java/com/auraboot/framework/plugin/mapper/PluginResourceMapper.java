@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 
@@ -85,6 +86,19 @@ public interface PluginResourceMapper extends BaseMapper<PluginResource> {
     @Select("SELECT * FROM ab_plugin_resource WHERE tenant_id = #{tenantId} AND resource_type = #{resourceType} AND resource_code = #{resourceCode} FOR UPDATE")
     @ResultMap("mybatis-plus_PluginResource")
     PluginResource lockByTypeAndCode(@Param("tenantId") Long tenantId, @Param("resourceType") String resourceType, @Param("resourceCode") String resourceCode);
+
+    /** Restore nullable ownership/baseline fields and invalidate the session's cached import lists. */
+    @Update("""
+            UPDATE ab_plugin_resource SET
+              (plugin_pid,import_id,resource_pid,resource_id,resource_name,action,previous_state,current_state,
+               sequence,created_at,updated_at,ownership_type,import_snapshot,user_modified,user_modified_at,last_sync_version)=
+              (SELECT plugin_pid,import_id,resource_pid,resource_id,resource_name,action,previous_state,current_state,
+                      sequence,created_at,updated_at,ownership_type,import_snapshot,user_modified,user_modified_at,last_sync_version
+               FROM jsonb_populate_record(NULL::ab_plugin_resource,CAST(#{snapshot} AS jsonb)))
+            WHERE id=#{id} AND tenant_id=#{tenantId} AND resource_type='agent_definition'
+            """)
+    int restoreAgentTrackingSnapshot(@Param("id") Long id, @Param("tenantId") Long tenantId,
+                                     @Param("snapshot") String snapshot);
 
     /**
      * Check if a resource exists for a plugin.

@@ -456,6 +456,10 @@ public class PluginResourceServiceImpl implements PluginResourceService {
             publicPublicationLifecycle.withdraw(resource);
             return;
         }
+        if (type == ResourceType.AGENT_DEFINITION) {
+            agentDefinitionResources.rollback(resource);
+            return;
+        }
 
         if (type == ResourceType.MODEL_FIELD_BINDING) {
             // Binding table now has pid column — use it for soft-delete

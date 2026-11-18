@@ -16,7 +16,7 @@ This directory holds engineering-facing material that ships with the repository.
 
 ## Feature requirements and target contracts
 
-- [插件定制保护与字段删除准入](system-reference/plugin-customization-and-field-deletion.md)：Page/Dashboard 安全覆盖、菜单接管/重导/清理保护、旧标记迁移及普通字段删除的数据/引用保护。
+- [插件定制保护与字段删除准入](system-reference/plugin-customization-and-field-deletion.md)：Page/Dashboard 安全覆盖、菜单/Agent接管重导与恢复保护、旧标记迁移及普通字段删除的数据/引用保护。
 
 | Topic | Reference | Status |
 | --- | --- | --- |

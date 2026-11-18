@@ -1,12 +1,12 @@
 ---
 type: system-reference
 status: active
-updated: 2026-11-18
+updated: 2026-11-19
 ---
 
 # 插件定制保护与字段删除准入
 
-本文定义 Page、Dashboard、Menu 的插件重导入保护，以及普通字段删除的保留数据边界。架构审查、需求和过程账本位于 Enterprise 的 `platform-business-system-foundation.md` / `2026-10-30-business-foundation-journeys.md`。本文不定义通用三方合并、破坏性迁移或自动回退。
+本文定义 Page、Dashboard、Menu、Agent 的插件重导入保护，以及普通字段删除的保留数据边界。架构审查、需求和过程账本位于 Enterprise 的 `platform-business-system-foundation.md` / `2026-10-30-business-foundation-journeys.md`。本文不定义通用三方合并、破坏性迁移或自动回退。
 
 ## 安全覆盖
 
@@ -38,6 +38,20 @@ Page 使用 `ResourceType.PAGE/page`，Dashboard 使用 `ResourceType.DASHBOARD/
 未修改的旧菜单仍按原规则退出；被接收方接管的菜单不再属于旧包清理范围。有保留子菜单时，不能清理其父菜单；整个清理失败并保留原层次，不静默重挂父级。停用插件与卸载插件仍是不同操作。
 
 真实 PostgreSQL 回归入口：`:platform-app:test --tests '*PluginMenuHandoverIntegrationTest'`。用例覆盖用户认领/修改、显式接管、旧包原声明安全重导、瘦身、停用/卸载、同包重复更新、未知标记、authoringManaged、租户隔离和保留子菜单。它验证菜单服务与数据归属，不等同权限/UI验收，也不证明 Agent、角色等其它类型具备相同接管合同。
+
+## Agent 保护、接管与完整恢复
+
+Agent 的 `OVERWRITE_SAFE` 使用锁定的强类型修改状态；读取异常、已跟踪记录的 NULL 标记均拒绝写入，不能按未修改继续。已有未跟踪、用户修改/认领或其它 plugin ID 拥有的定义返回 SKIP，保持内容、评测用例、owner 和基线。同包未修改定义可同步；显式 `OVERWRITE` 仍是操作者选择的替换/接管策略，不会额外授予工具或模型权限。
+
+导入在现有 `ab_plugin_resource.previous_state/current_state` 保存 schemaVersion=1 的完整前/后像：Agent 数据库配置行（含 NULL、身份/组织关联、运行配置与授权范围）、该租户/code 的评测用例行，以及前一份 tracking。评测用例恢复保留原 ID/PID、plugin_source、删除状态和元数据；不另建历史库或向普通用户新增快照接口。Agent 对应插件的导入元数据沿用已有版本化 metadata snapshot。
+
+显式回滚只接受该插件最新成功导入、仍由该 import 拥有且资源数量相符的记录。恢复前锁定 tracking、定义和评测行，核当前数据库内容与导入后像一致；新用户修改/认领、评测变化、转给第三方、跨租户、缺失或不支持的快照均拒绝。旧快照没有完整前态时不猜默认值。原 owner 已退役/缺失也拒绝恢复，不自动重装旧包。
+
+满足条件后，在同一事务恢复配置、评测用例、原 owner/import ID、原修改/认领标记、基线及旧插件元数据。tracking 使用能恢复 NULL 并刷新 MyBatis 本地缓存的 Mapper 写入，避免后续清理读取旧列表误删已恢复记录。恢复后对完整内容复核，不完整则回滚整个事务。显式替换前已经存在的用户认领可随原快照恢复；接管后新认领仍拒绝回滚，二者不混同。
+
+资源感知的卸载调用 Agent provider，按当前 owner/后像核验后停用定义与评测行；用户认领资源继续保留。接管后旧包按安全策略重导、停用/卸载不能抢回或删除接收方定义。显式覆盖仍可能再次接管，不能当作安全重导。此合同不提供卸载后任意重新激活或通用业务数据回退；后续有新事实时需要单独处置。
+
+真实 PostgreSQL 入口：`:platform-app:test --tests '*PluginAgentHandoverIntegrationTest'`；组件/IM 投影回归为 `:platform-app:integrationTest --tests '*AgentConsumerBoundaryPostgresIT'`。前者验证公共导入、回滚、资源退出与拒绝路径，后者验证真实 Mapper/provider、IM 显示和租户边界。Hermetic 用例只保留 provider 委托合同，不能用 mock Mapper 的调用断言冒充完整恢复。未由这些用例证明 HTTP 权限、模型调用、工具执行或其它资源类型迁移安全。
 
 ## 既有安装升级
 

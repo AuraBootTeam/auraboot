@@ -41,6 +41,7 @@ public class AgentDefinitionResourceAdapter implements AgentDefinitionResourceLi
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public PluginResource importAgentDefinition(AgentDefinitionDTO dto, String pluginPid, String importId,
                                                 Long tenantId, ImportRequest.ConflictStrategy conflictStrategy) {
         AgentDefinition existing = findActiveAgentDefinition(tenantId, dto.getAgentCode());
@@ -55,16 +56,19 @@ public class AgentDefinitionResourceAdapter implements AgentDefinitionResourceLi
                     null, null, dto.getAgentCode(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
         }
 
-        if (shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.AGENT_DEFINITION, dto.getAgentCode())) {
+        AgentDefinitionRecovery recovery = recovery();
+        if (exists && recovery.preserve(tenantId, dto.getAgentCode(), pluginPid, conflictStrategy)) {
             log.info("Skipping user-modified resource: {} {}", ResourceType.AGENT_DEFINITION, logSafe(dto.getAgentCode()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.AGENT_DEFINITION,
                     null, null, dto.getAgentCode(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
         }
 
-        Map<String, Object> currentState = buildAgentDefinitionState(dto);
+        Map<String, Object> previousState = exists ? recovery.before(tenantId, dto.getAgentCode()) : null;
         Instant now = Instant.now();
 
         if (exists) {
+            existing = findActiveAgentDefinition(tenantId, dto.getAgentCode());
+            if (existing == null) throw new PluginException("Agent changed before import");
             applyAgentDefinition(existing, dto);
             existing.setUpdatedAt(now);
             existing.setDeletedFlag(false);
@@ -75,7 +79,7 @@ public class AgentDefinitionResourceAdapter implements AgentDefinitionResourceLi
             AgentDefinition updated = findActiveAgentDefinition(tenantId, dto.getAgentCode());
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.AGENT_DEFINITION,
                     updated.getPid(), updated.getId(), dto.getAgentCode(), dto.getEffectiveName(),
-                    ResourceAction.UPDATE, null, currentState);
+                    ResourceAction.UPDATE, previousState, recovery.content(tenantId, dto.getAgentCode()));
         }
 
         AgentDefinition created = new AgentDefinition();
@@ -91,7 +95,7 @@ public class AgentDefinitionResourceAdapter implements AgentDefinitionResourceLi
 
         return createResourceRecord(pluginPid, importId, tenantId, ResourceType.AGENT_DEFINITION,
                 created.getPid(), created.getId(), dto.getAgentCode(), dto.getEffectiveName(),
-                ResourceAction.CREATE, null, currentState);
+                ResourceAction.CREATE, null, recovery.content(tenantId, dto.getAgentCode()));
     }
 
     private AgentDefinition findActiveAgentDefinition(Long tenantId, String agentCode) {
@@ -139,31 +143,6 @@ public class AgentDefinitionResourceAdapter implements AgentDefinitionResourceLi
         target.setStatus(defaultString(dto.getStatus(), "active"));
         target.setStats(dto.getStats());
         target.setVisibility(defaultString(dto.getVisibility(), "private"));
-    }
-
-    private Map<String, Object> buildAgentDefinitionState(AgentDefinitionDTO dto) {
-        Map<String, Object> state = new HashMap<>();
-        state.put("agentCode", dto.getAgentCode());
-        state.put("name", dto.getEffectiveName());
-        state.put("description", dto.getDescription());
-        state.put("agentType", defaultString(dto.getAgentType(), "reactive"));
-        state.put("model", dto.getModel());
-        state.put("systemPrompt", dto.getSystemPrompt());
-        state.put("tools", dto.getTools());
-        state.put("skills", dto.getSkills());
-        state.put("guardrails", dto.getGuardrails());
-        state.put("soulProfile", dto.getSoulProfile());
-        state.put("allowedModels", dto.getAllowedModels());
-        state.put("allowedOperations", dto.getAllowedOperations());
-        state.put("knowledgeBaseIds", dto.getKnowledgeBaseIds());
-        state.put("maxTools", dto.getMaxTools());
-        state.put("maxConcurrentRuns", dto.getMaxConcurrentRuns());
-        state.put("executionTimeoutSeconds", dto.getExecutionTimeoutSeconds());
-        state.put("eventTriggers", dto.getEventTriggers());
-        state.put("autoReplyMode", defaultString(dto.getAutoReplyMode(), "mention"));
-        state.put("status", defaultString(dto.getStatus(), "active"));
-        state.put("visibility", defaultString(dto.getVisibility(), "private"));
-        return state;
     }
 
     /**
@@ -227,56 +206,19 @@ public class AgentDefinitionResourceAdapter implements AgentDefinitionResourceLi
         return value != null && !value.isBlank() ? value : fallback;
     }
 
-    private boolean isResourceUserModified(Long tenantId, ResourceType type, String resourceCode) {
-        try {
-            PluginResource pr = pluginResourceMapper.findByTypeAndCode(tenantId, type.code(), resourceCode);
-            return pr != null && Boolean.TRUE.equals(pr.getUserModified());
-        } catch (Exception e) {
-            log.debug("Failed to check user-modified status for {} {}: {}",
-                    type, logSafe(resourceCode), logSafe(e.getMessage()));
-            return false;
-        }
-    }
-
-    /**
-     * Check if OVERWRITE_SAFE strategy should skip this resource.
-     * Returns true if the strategy is OVERWRITE_SAFE and the resource has been user-modified.
-     */
-    private boolean shouldSkipForOverwriteSafe(Long tenantId, ImportRequest.ConflictStrategy strategy,
-                                                ResourceType type, String resourceCode) {
-        return strategy == ImportRequest.ConflictStrategy.OVERWRITE_SAFE
-                && isResourceUserModified(tenantId, type, resourceCode);
+    private AgentDefinitionRecovery recovery() {
+        return new AgentDefinitionRecovery(jdbcTemplate, objectMapper, pluginResourceMapper);
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public void rollback(PluginResource resource) {
-                if (resource.getResourcePid() != null) {
-                    jdbcTemplate.update("""
-                            UPDATE ab_agent_definition
-                            SET deleted_flag = TRUE, updated_at = NOW()
-                            WHERE pid = ?
-                            """, resource.getResourcePid());
-                }
-                jdbcTemplate.update("""
-                        UPDATE ab_agent_eval_case
-                        SET deleted_flag = TRUE, updated_at = NOW()
-                        WHERE tenant_id = ? AND agent_code = ?
-                        """, resource.getTenantId(), resource.getResourceCode());
+        recovery().withdraw(resource);
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public void restore(PluginResource resource) {
-            if (resource.getResourcePid() != null) {
-                jdbcTemplate.update("""
-                        UPDATE ab_agent_definition
-                        SET deleted_flag = FALSE, updated_at = NOW()
-                        WHERE pid = ?
-                        """, resource.getResourcePid());
-            }
-            jdbcTemplate.update("""
-                    UPDATE ab_agent_eval_case
-                    SET deleted_flag = FALSE, updated_at = NOW()
-                    WHERE tenant_id = ? AND agent_code = ?
-                    """, resource.getTenantId(), resource.getResourceCode());
+        recovery().restore(resource);
     }
 }
