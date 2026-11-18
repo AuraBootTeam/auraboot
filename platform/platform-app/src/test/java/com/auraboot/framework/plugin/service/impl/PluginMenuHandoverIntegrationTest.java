@@ -132,7 +132,7 @@ class PluginMenuHandoverIntegrationTest extends BaseIntegrationTest {
         String userPid = MetaContext.getCurrentUserPid();
         Long memberId = MetaContext.getCurrentMemberId();
         long other = System.nanoTime();
-        jdbc.update("INSERT INTO ab_tenant(id,pid,name) VALUES (?,?,?)", other, UniqueIdGenerator.generate(), "Menu boundary tenant");
+        jdbc.update("INSERT INTO ab_tenant(id,pid,name) VALUES (?,?,?)", other, UniqueIdGenerator.generate(), "Menu boundary " + key);
         try {
             MetaContext.setContext(other, userId, userPid, "Menu boundary reviewer");
             install(source, ImportRequest.ConflictStrategy.OVERWRITE_SAFE);
