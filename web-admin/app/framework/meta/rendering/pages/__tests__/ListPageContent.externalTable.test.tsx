@@ -189,6 +189,24 @@ describe('Actual ListPageContent→BlockRenderer external custom-only table', ()
       /field-meta|\/api\/dynamic|native_protected_model/,
     );
   });
+  it('honors the declared grid for a custom-only list without changing its external rows', async () => {
+    const manager = prepareRuntime();
+    await manager.reload('ownedRows');
+    mount({
+      ...schema,
+      layout: { type: 'grid', cols: 12, compactCols: 1, compactBreakpoint: 700 },
+      blocks: [toolbar,
+        { id: 'root-selector', blockType: 'rich-text', content: '<p>Root categories</p>', layout: { col: 0, colSpan: 3 } },
+        { ...table, layout: { col: 3, colSpan: 9 } },
+      ],
+    });
+    expect(await screen.findByTestId('table-row-owned-123')).toHaveTextContent('Bound supplier row');
+    expect(screen.getByTestId('grid-item-root-selector')).toHaveStyle({ gridColumn: '1 / span 3' });
+    expect(screen.getByTestId('grid-item-owned-table')).toHaveStyle({ gridColumn: '4 / span 9' });
+    expect(screen.getAllByRole('button', { name: 'Pending', exact: true })).toHaveLength(1);
+    expect(owned.transport).toHaveBeenCalledTimes(1);
+  });
+
   it('renders loading and exact error state rather than silently losing the table', async () => {
     const manager = prepareRuntime();
     let finish!: (value: any) => void;
