@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.plugin.extension.*;
 import java.util.Map;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
@@ -25,7 +26,52 @@ class RelatedUpdateCommandDataAccessorTest {
                 MetaContext.runWithAuthorizedCommandCode("receipt:submit",body));
     }
     Map<String,Object> changes(){return Map.of("status","enqueued","_expectedVersion",3L);}
-    @AfterEach void clear(){MetaContext.clear();}
+    @AfterEach void clear(){MetaContext.clear();org.springframework.transaction.support.TransactionSynchronizationManager.clear();}
+    @Test void relatedCasRequiresTransactionAndHandlerAndRetainsNativeVersionAndCompareValue() {
+        var bridge=accessor();var claim=new CompareAndSetUpdate("request",8L,Map.of("revision",8L));
+        command(()->assertThatThrownBy(()->bridge.compareAndSetBatch("journal","revision",List.of(claim))).isInstanceOf(IllegalStateException.class));
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        command(()->assertThatThrownBy(()->bridge.compareAndSetBatch("journal","revision",List.of(claim))).isInstanceOf(AccessDeniedException.class));
+        verifyNoInteractions(data);
+        when(handler.authorizeRelatedUpdate(any())).thenAnswer(i->{
+            CommandHandlerExtension.RelatedUpdateAuthorizationContext c=i.getArgument(0);
+            assertThat(c.changes()).isEqualTo(Map.of("revision",8L,"_expectedVersion",3L));return true;
+        });
+        doAnswer(i->{
+            assertThat(MetaContext.getCommandPermitTargetFor("journal")).isEqualTo("request");
+            assertThat(MetaContext.getCommandExpectedVersion("journal","request")).isEqualTo(3L);return null;
+        }).when(data).compareAndSetBatch("journal","revision",List.of(claim));
+        command(()->{bridge.compareAndSetBatch("journal","revision",List.of(claim));
+            assertThat(MetaContext.getCommandPermitTargetFor("receipt")).isEqualTo("root");});
+        verify(data).compareAndSetBatch("journal","revision",List.of(claim));
+    }
+    @Test void relatedCasValidatesEntireBatchBeforeNativeLocksAndRejectsForeignDuplicateOrInjectedVersion() {
+        var bridge=accessor();org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        when(handler.authorizeRelatedUpdate(any())).thenReturn(true);
+        when(reads.getById("journal","foreign")).thenReturn(Map.of("pid","foreign","tenant_id",2L,"row_version",1L));
+        var claim=new CompareAndSetUpdate("request",8L,Map.of("revision",8L));
+        command(()->{
+            assertThatThrownBy(()->bridge.compareAndSetBatch("journal","revision",List.of(claim,new CompareAndSetUpdate("foreign",1,Map.of("revision",1))))).isInstanceOf(AccessDeniedException.class);
+            assertThatThrownBy(()->bridge.compareAndSetBatch("journal","revision",List.of(claim,claim))).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(()->bridge.compareAndSetBatch("journal","revision",List.of(new CompareAndSetUpdate("request",8,Map.of("revision",8,"_expectedVersion",3))))).isInstanceOf(IllegalArgumentException.class);
+        });verifyNoInteractions(data);
+    }
+    @Test void relatedCasUsesStableLockOrderAndRestoresAuthorityAfterNativeConflict() {
+        var bridge=accessor();org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        when(reads.getById("journal","a")).thenReturn(Map.of("pid","a","tenant_id",1L,"row_version",4L));
+        when(handler.authorizeRelatedUpdate(any())).thenReturn(true);
+        var a=new CompareAndSetUpdate("a",1,Map.of("revision",1));
+        var z=new CompareAndSetUpdate("request",8,Map.of("revision",8));
+        var failure=new com.auraboot.framework.exception.ConflictException("Changed");
+        doThrow(failure).when(data).compareAndSetBatch("journal","revision",List.of(z));
+        command(()->{
+            assertThatThrownBy(()->bridge.compareAndSetBatch("journal","revision",List.of(z,a))).isSameAs(failure);
+            assertThat(MetaContext.getCommandPermitTargetFor("receipt")).isEqualTo("root");
+            assertThat(MetaContext.getCommandExpectedVersion("receipt","root")).isEqualTo(7L);
+        });
+        var order=inOrder(data);order.verify(data).compareAndSetBatch("journal","revision",List.of(a));
+        order.verify(data).compareAndSetBatch("journal","revision",List.of(z));
+    }
     @Test void explicitDecisionPinsNativeUpdateToExactVersionAndRestoresRoot() {
         var bridge=accessor();when(handler.authorizeRelatedUpdate(any())).thenAnswer(i->{
             var c=(CommandHandlerExtension.RelatedUpdateAuthorizationContext)i.getArgument(0);
