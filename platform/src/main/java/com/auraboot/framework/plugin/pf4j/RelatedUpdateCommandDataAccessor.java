@@ -19,12 +19,15 @@ import org.springframework.security.access.AccessDeniedException;
 public final class RelatedUpdateCommandDataAccessor extends DynamicDataAccessorImpl {
     public static final String OPT_IN = "relatedUpdateAuthorization";
     public static final String CREATE_OPT_IN = "relatedCreateAuthorization";
+    /** Technical root writes can opt into the same exact owner policy; no standalone model grant is added. */
+    public static final String ROOT_UPDATE_OPT_IN = "rootUpdateAuthorization";
     private final Long tenant;
     private final String command, rootModel, rootPid, actor;
     private final CommandHandlerExtension handler;
     private final RecordReadAccessor reads;
     private final boolean relatedDeletes;
     private final boolean relatedCreates;
+    private final boolean rootUpdates;
 
     public RelatedUpdateCommandDataAccessor(DynamicDataService data, Long tenant, String command,
             String rootModel, String rootPid, String actor, CommandHandlerExtension handler, RecordReadAccessor reads) {
@@ -38,6 +41,11 @@ public final class RelatedUpdateCommandDataAccessor extends DynamicDataAccessorI
     public RelatedUpdateCommandDataAccessor(DynamicDataService data, Long tenant, String command,
             String rootModel, String rootPid, String actor, CommandHandlerExtension handler,
             RecordReadAccessor reads, boolean relatedDeletes, boolean relatedCreates) {
+        this(data,tenant,command,rootModel,rootPid,actor,handler,reads,relatedDeletes,relatedCreates,false);
+    }
+    public RelatedUpdateCommandDataAccessor(DynamicDataService data, Long tenant, String command,
+            String rootModel, String rootPid, String actor, CommandHandlerExtension handler,
+            RecordReadAccessor reads, boolean relatedDeletes, boolean relatedCreates,boolean rootUpdates) {
         super(data);
         this.tenant=Objects.requireNonNull(tenant);
         this.command=Objects.requireNonNull(command);
@@ -48,6 +56,7 @@ public final class RelatedUpdateCommandDataAccessor extends DynamicDataAccessorI
         this.reads=Objects.requireNonNull(reads);
         this.relatedDeletes=relatedDeletes;
         this.relatedCreates=relatedCreates;
+        this.rootUpdates=rootUpdates;
     }
 
     @Override public Map<String,Object> create(String model,Map<String,Object> input) {
@@ -69,12 +78,16 @@ public final class RelatedUpdateCommandDataAccessor extends DynamicDataAccessorI
     }
 
     @Override public Map<String,Object> update(String model, String pid, Map<String,Object> changes) {
-        if(rootModel.equals(model) && rootPid.equals(pid)) return super.update(model,pid,changes);
+        boolean own=rootModel.equals(model) && rootPid.equals(pid);
+        if(own && !rootUpdates) return super.update(model,pid,changes);
         var root=authorizedRoot();
-        var record=load(model,pid);
+        var record=own?root:load(model,pid);
         var intended=Collections.unmodifiableMap(new LinkedHashMap<>(Objects.requireNonNull(changes)));
         long actual=version(record.get("row_version"));
         long expected=version(intended.get("_expectedVersion"));
+        Long rootVersion=own?MetaContext.getCommandExpectedVersion(rootModel,rootPid):null;
+        if(rootVersion!=null && rootVersion!=expected)
+            throw new com.auraboot.framework.meta.exception.RecordVersionConflictException("Root record version cannot be replaced");
         if(actual!=expected) throw new com.auraboot.framework.meta.exception.RecordVersionConflictException(
                 "Related record changed concurrently");
         var rootContext=new CommandHandlerExtension.TargetAuthorizationContext(command,rootModel,
@@ -124,7 +137,7 @@ public final class RelatedUpdateCommandDataAccessor extends DynamicDataAccessorI
         // The enclosing command transaction makes the native single-row operations atomic as a batch.
         for(var update:updates.stream().sorted(Comparator.comparing(CompareAndSetUpdate::recordId)).toList())
             MetaContext.runWithCommandPermitPlan("TARGET",versions.get(update.recordId()),model,update.recordId(),
-                    ()->RelatedMutationFieldScope.within(model,"update",update.recordId(),update.nextValues(),java.util.Set.of(field),
+                    ()->RelatedMutationFieldScope.within(model,"update",update.recordId(),update.nextValues(),"row_version".equals(field)?java.util.Set.of():java.util.Set.of(field),
                             ()->{super.compareAndSetBatch(model,field,List.of(update));return null;}));
     }
 

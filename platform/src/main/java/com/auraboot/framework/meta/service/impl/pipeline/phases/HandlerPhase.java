@@ -783,11 +783,16 @@ public class HandlerPhase implements CommandPhase {
                                     Boolean.TRUE.equals(pluginSettings.get(
                                         com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor.OPT_IN)),
                                     Boolean.TRUE.equals(pluginSettings.get(
-                                        com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.CREATE_OPT_IN))));
+                                        com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.CREATE_OPT_IN)),
+                                    Boolean.TRUE.equals(pluginSettings.get(
+                                        com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.ROOT_UPDATE_OPT_IN))));
                 }
                 if(Boolean.TRUE.equals(pluginSettings.get(com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.CREATE_OPT_IN))
                         && !Boolean.TRUE.equals(pluginSettings.get(com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.OPT_IN)))
                     throw new AccessDeniedException("Related create requires the exact related command boundary");
+                if(Boolean.TRUE.equals(pluginSettings.get(com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.ROOT_UPDATE_OPT_IN))
+                        && !Boolean.TRUE.equals(pluginSettings.get(com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.OPT_IN)))
+                    throw new AccessDeniedException("Root update requires the exact related command boundary");
                 com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.installRelatedWriter(
                         pluginSettings,dynamicDataService,handler,modelCode,effectiveRecordId);
                 pluginSettings.put(TenantRoleAssignmentAccessor.SETTINGS_KEY,
@@ -996,7 +1001,7 @@ public class HandlerPhase implements CommandPhase {
                 || !secondaryHandlers.isEmpty() || !Boolean.FALSE.equals(params.get("dslPersistence"))
                 || params.containsKey("async") || params.containsKey("commandCreatedModels")
                 || params.containsKey("relatedUpdateAuthorization") || params.containsKey("relatedDeleteAuthorization")
-                || params.containsKey("relatedCreateAuthorization"))
+                || params.containsKey("relatedCreateAuthorization") || params.containsKey("rootUpdateAuthorization"))
             throw new AccessDeniedException("A synchronous business command requires one complete resource owner");
         return true;
     }

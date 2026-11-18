@@ -27,6 +27,22 @@ class RelatedUpdateCommandDataAccessorTest {
     }
     Map<String,Object> changes(){return Map.of("status","enqueued","_expectedVersion",3L);}
     @AfterEach void clear(){MetaContext.clear();org.springframework.transaction.support.TransactionSynchronizationManager.clear();}
+    @Test void explicitRootUpdatesRequireAnExactOwnerDecisionAndCannotReplaceTheOriginalVersion() {
+        when(reads.getById("receipt","root")).thenReturn(Map.of("pid","root","tenant_id",1L,"row_version",7L));
+        var bridge=new RelatedUpdateCommandDataAccessor(data,1L,"receipt:submit","receipt","root","actor",handler,reads,false,false,true);
+        var input=Map.<String,Object>of("identity","verified","_expectedVersion",7L);
+        command(()->assertThatThrownBy(()->bridge.update("receipt","root",input)).isInstanceOf(AccessDeniedException.class));
+        verifyNoInteractions(data);
+        when(handler.authorizeRelatedUpdate(any())).thenAnswer(call->{
+            var context=(CommandHandlerExtension.RelatedUpdateAuthorizationContext)call.getArgument(0);
+            return context.root().recordId().equals("root") && context.recordId().equals("root") && context.changes().equals(input);
+        });
+        command(()->bridge.update("receipt","root",input));
+        verify(data).update("receipt","root",input);
+        command(()->assertThatThrownBy(()->bridge.update("receipt","root",Map.of("identity","verified","_expectedVersion",6L)))
+                .isInstanceOf(com.auraboot.framework.meta.exception.RecordVersionConflictException.class));
+        command(()->assertThat(MetaContext.getCommandExpectedVersion("receipt","root")).isEqualTo(7L));
+    }
     @Test void relatedCasRequiresTransactionAndHandlerAndRetainsNativeVersionAndCompareValue() {
         var bridge=accessor();var claim=new CompareAndSetUpdate("request",8L,Map.of("revision",8L));
         command(()->assertThatThrownBy(()->bridge.compareAndSetBatch("journal","revision",List.of(claim))).isInstanceOf(IllegalStateException.class));
