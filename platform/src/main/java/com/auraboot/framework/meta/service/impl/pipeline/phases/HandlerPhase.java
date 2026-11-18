@@ -91,6 +91,8 @@ public class HandlerPhase implements CommandPhase {
     private final DynamicDataService dynamicDataService;
     private final DynamicDataMapper dynamicDataMapper;
     private final MetaModelService metaModelService;
+    @Autowired(required=false) private com.auraboot.framework.meta.service.CommandService nativeCodeCommands;
+    @Autowired(required=false) private com.auraboot.framework.meta.service.impl.CommandAutoSetExecutor nativeCodeGenerator;
     private final RecordSnapshotReader snapshotReader;
     private final DataPermissionEngine dataPermissionEngine;
     private final DataDomainService dataDomainService;
@@ -728,6 +730,8 @@ public class HandlerPhase implements CommandPhase {
                         commandCode, tenantId, pluginSettings);
                 com.auraboot.framework.plugin.pf4j.DocumentCurrencyAccessorImpl.install(
                         pluginSettings, tenantId, currencyConversionService);
+                com.auraboot.framework.plugin.pf4j.NativeBusinessCodeAccessorImpl.install(pluginSettings,
+                        tenantId,MetaContext.exists()?MetaContext.getCurrentUserPid():null,commandCode,nativeCodeCommands,metaModelService,nativeCodeGenerator,objectMapper);
                 com.auraboot.framework.plugin.pf4j.TenantSecretAccessorImpl.install(
                         pluginSettings, tenantId, cloudConfigService, objectMapper);
                 com.auraboot.framework.plugin.pf4j.VerifiedPhoneGrantAccessorImpl.install(
