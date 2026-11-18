@@ -18,11 +18,13 @@ import org.springframework.security.access.AccessDeniedException;
 /** Explicitly authorized related updates retain native persistence and exact optimistic versions. */
 public final class RelatedUpdateCommandDataAccessor extends DynamicDataAccessorImpl {
     public static final String OPT_IN = "relatedUpdateAuthorization";
+    public static final String CREATE_OPT_IN = "relatedCreateAuthorization";
     private final Long tenant;
     private final String command, rootModel, rootPid, actor;
     private final CommandHandlerExtension handler;
     private final RecordReadAccessor reads;
     private final boolean relatedDeletes;
+    private final boolean relatedCreates;
 
     public RelatedUpdateCommandDataAccessor(DynamicDataService data, Long tenant, String command,
             String rootModel, String rootPid, String actor, CommandHandlerExtension handler, RecordReadAccessor reads) {
@@ -31,6 +33,11 @@ public final class RelatedUpdateCommandDataAccessor extends DynamicDataAccessorI
     public RelatedUpdateCommandDataAccessor(DynamicDataService data, Long tenant, String command,
             String rootModel, String rootPid, String actor, CommandHandlerExtension handler,
             RecordReadAccessor reads, boolean relatedDeletes) {
+        this(data,tenant,command,rootModel,rootPid,actor,handler,reads,relatedDeletes,false);
+    }
+    public RelatedUpdateCommandDataAccessor(DynamicDataService data, Long tenant, String command,
+            String rootModel, String rootPid, String actor, CommandHandlerExtension handler,
+            RecordReadAccessor reads, boolean relatedDeletes, boolean relatedCreates) {
         super(data);
         this.tenant=Objects.requireNonNull(tenant);
         this.command=Objects.requireNonNull(command);
@@ -40,6 +47,24 @@ public final class RelatedUpdateCommandDataAccessor extends DynamicDataAccessorI
         this.handler=Objects.requireNonNull(handler);
         this.reads=Objects.requireNonNull(reads);
         this.relatedDeletes=relatedDeletes;
+        this.relatedCreates=relatedCreates;
+    }
+
+    @Override public Map<String,Object> create(String model,Map<String,Object> input) {
+        if(!relatedCreates || rootModel.equals(model))return super.create(model,input);
+        var root=authorizedRoot();
+        if(!org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive())
+            throw new IllegalStateException("Related create requires the original transaction");
+        var intended=Collections.unmodifiableMap(new LinkedHashMap<>(Objects.requireNonNull(input)));
+        var context=new CommandHandlerExtension.TargetAuthorizationContext(command,rootModel,rootPid,"update",tenant,actor,root,reads);
+        if(!handler.authorizeRelatedCreate(new CommandHandlerExtension.RelatedCreateAuthorizationContext(context,model,intended)))
+            throw new AccessDeniedException("Related create is not authorized");
+        return MetaContext.runWithCommandPermitPlan("ALL",null,model,null,()->super.create(model,new LinkedHashMap<>(intended)));
+    }
+    @Override public java.util.Optional<Map<String,Object>> tryCreate(String model,Map<String,Object> input) {
+        if(!relatedCreates || rootModel.equals(model))return super.tryCreate(model,input);
+        try{return java.util.Optional.of(create(model,input));}
+        catch(RuntimeException error){if(!IdempotentCreateSupport.isUniqueViolation(error))throw error;return java.util.Optional.empty();}
     }
 
     @Override public Map<String,Object> update(String model, String pid, Map<String,Object> changes) {

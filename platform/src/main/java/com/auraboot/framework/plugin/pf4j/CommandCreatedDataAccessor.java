@@ -54,6 +54,7 @@ public final class CommandCreatedDataAccessor extends DynamicDataAccessorImpl im
                 || !Boolean.FALSE.equals(params.get("dslPersistence"))
                 || params.containsKey("async") || params.containsKey(RelatedCommandDataAccessor.OPT_IN)
                 || params.containsKey(RelatedUpdateCommandDataAccessor.OPT_IN)
+                || params.containsKey(RelatedUpdateCommandDataAccessor.CREATE_OPT_IN)
                 || context.getCommand()==null || context.getRequest()==null || context.getRequest().isDryRun()
                 || context.getAuthorizationVerdict()==null || !context.getAuthorizationVerdict().isAuthorized()
                 || context.getPermitPlan()==null || !context.getPermitPlan().isPermitted()

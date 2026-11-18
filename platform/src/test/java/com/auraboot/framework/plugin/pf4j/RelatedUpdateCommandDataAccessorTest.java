@@ -128,6 +128,35 @@ class RelatedUpdateCommandDataAccessorTest {
     @Test void olderHandlerDeniesByDefault() {
         var old=new CommandHandlerExtension(){public String getCommandType(){return "old";}public Object execute(CommandContext c){return null;}};
         assertThat(old.authorizeRelatedUpdate(null)).isFalse();
+        assertThat(old.authorizeRelatedCreate(null)).isFalse();
+    }
+    @Test void relatedCreateRequiresExplicitOptInOriginalAuthorityAndExactHandlerInput() {
+        accessor();var bridge=new RelatedUpdateCommandDataAccessor(data,1L,"receipt:submit","receipt","root","actor",handler,reads,false,true);
+        var input=Map.<String,Object>of("receipt_pid","root","status","draft");
+        command(()->assertThatThrownBy(()->bridge.create("journal",input)).isInstanceOf(IllegalStateException.class));
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        command(()->assertThatThrownBy(()->bridge.create("journal",input)).isInstanceOf(AccessDeniedException.class));verifyNoInteractions(data);
+        when(handler.authorizeRelatedCreate(any())).thenAnswer(i->{
+            CommandHandlerExtension.RelatedCreateAuthorizationContext c=i.getArgument(0);
+            assertThat(c.root().recordId()).isEqualTo("root");assertThat(c.input()).isEqualTo(input);
+            assertThatThrownBy(()->c.input().put("tenant_id",2L)).isInstanceOf(UnsupportedOperationException.class);return true;
+        });
+        when(data.create("journal",input)).thenAnswer(i->{
+            assertThat(MetaContext.getCommandPermitScopeFor("journal")).isEqualTo("ALL");
+            assertThat(MetaContext.getAuthorizedCommandCode()).isEqualTo("receipt:submit");return Map.of("pid","new");
+        });
+        command(()->{assertThat(bridge.create("journal",input)).containsEntry("pid","new");
+            assertThat(MetaContext.getCommandPermitTargetFor("receipt")).isEqualTo("root");});
+        verify(data).create("journal",input);
+    }
+    @Test void relatedCreateCannotBeRetainedOutsideCommandOrLeakScopeAfterNativeFailure() {
+        accessor();var bridge=new RelatedUpdateCommandDataAccessor(data,1L,"receipt:submit","receipt","root","actor",handler,reads,false,true);
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        var input=Map.<String,Object>of("receipt_pid","root");MetaContext.setContext(1L,2L,"actor","Buyer");
+        assertThatThrownBy(()->bridge.create("journal",input)).isInstanceOf(AccessDeniedException.class);verifyNoInteractions(handler,data);
+        when(handler.authorizeRelatedCreate(any())).thenReturn(true);var failure=new IllegalStateException("Native failure");when(data.create("journal",input)).thenThrow(failure);
+        command(()->{assertThatThrownBy(()->bridge.create("journal",input)).isSameAs(failure);
+            assertThat(MetaContext.getCommandPermitTargetFor("receipt")).isEqualTo("root");});
     }
     @Test void sameModelChildUpdateRetainsItsOwnHandlerDecisionAndRestoresTheRootTarget() {
         var bridge=accessor();when(reads.getById("receipt","child")).thenReturn(Map.of("pid","child","tenant_id",1L,"row_version",3L));

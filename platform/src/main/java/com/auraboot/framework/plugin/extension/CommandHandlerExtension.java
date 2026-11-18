@@ -97,6 +97,12 @@ public interface CommandHandlerExtension extends ExtensionPoint {
     record RelatedUpdateAuthorizationContext(TargetAuthorizationContext root,
             String modelCode, String recordId, Map<String,Object> record, Map<String,Object> changes) {}
 
+    /** Opt-in creation of command-owned related records; existing handlers deny by default. */
+    default boolean authorizeRelatedCreate(RelatedCreateAuthorizationContext context) { return false; }
+
+    record RelatedCreateAuthorizationContext(TargetAuthorizationContext root,
+            String modelCode, Map<String,Object> input) {}
+
     /** Explicit per-related-record delete decision; older handlers cannot grant it. */
     default boolean authorizeRelatedDelete(RelatedDeleteAuthorizationContext context) {
         return false;
