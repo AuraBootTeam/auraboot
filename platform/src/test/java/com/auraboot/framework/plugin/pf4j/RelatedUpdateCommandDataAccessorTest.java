@@ -83,4 +83,42 @@ class RelatedUpdateCommandDataAccessorTest {
         var old=new CommandHandlerExtension(){public String getCommandType(){return "old";}public Object execute(CommandContext c){return null;}};
         assertThat(old.authorizeRelatedUpdate(null)).isFalse();
     }
+    @Test void sameModelChildUpdateRetainsItsOwnHandlerDecisionAndRestoresTheRootTarget() {
+        var bridge=accessor();when(reads.getById("receipt","child")).thenReturn(Map.of("pid","child","tenant_id",1L,"row_version",3L));
+        command(()->assertThatThrownBy(()->bridge.update("receipt","child",changes())).isInstanceOf(AccessDeniedException.class));
+        when(handler.authorizeRelatedUpdate(any())).thenReturn(true);
+        when(data.update(eq("receipt"),eq("child"),anyMap())).thenAnswer(i->{
+            assertThat(MetaContext.getCommandPermitTargetFor("receipt")).isEqualTo("child");
+            assertThat(MetaContext.getCommandExpectedVersion("receipt","child")).isEqualTo(3L);return Map.of("pid","child");
+        });
+        command(()->{bridge.update("receipt","child",changes());assertThat(MetaContext.getCommandPermitTargetFor("receipt")).isEqualTo("root");});
+        verify(data).update("receipt","child",changes());
+    }
+    @Test void explicitCombinedDeleteRequiresTheHandlerAndPinsTheSameModelChild() {
+        accessor();var bridge=new RelatedUpdateCommandDataAccessor(data,1L,"receipt:submit","receipt","root","actor",handler,reads,true);
+        when(reads.getById("receipt","child")).thenReturn(Map.of("pid","child","tenant_id",1L,"row_version",3L));
+        command(()->assertThatThrownBy(()->bridge.delete("receipt","child")).isInstanceOf(AccessDeniedException.class));
+        verify(data,never()).delete(anyString(),anyString());
+        when(handler.authorizeRelatedDelete(any())).thenAnswer(i->{
+            CommandHandlerExtension.RelatedDeleteAuthorizationContext c=i.getArgument(0);
+            assertThat(c.root().recordId()).isEqualTo("root");assertThat(c.recordId()).isEqualTo("child");return true;
+        });
+        doAnswer(i->{assertThat(MetaContext.getCommandPermitTargetFor("receipt")).isEqualTo("child");
+            assertThat(MetaContext.getCommandExpectedVersion("receipt","child")).isEqualTo(3L);return null;}).when(data).delete("receipt","child");
+        command(()->{bridge.delete("receipt","child");assertThat(MetaContext.getCommandPermitTargetFor("receipt")).isEqualTo("root");});
+        verify(data).delete("receipt","child");
+    }
+    @Test void combinedDeleteRejectsMissingAuthorityForeignRowsAndRestoresAfterNativeFailure() {
+        accessor();var bridge=new RelatedUpdateCommandDataAccessor(data,1L,"receipt:submit","receipt","root","actor",handler,reads,true);
+        MetaContext.setContext(1L,2L,"actor","Buyer");
+        assertThatThrownBy(()->bridge.delete("journal","request")).isInstanceOf(AccessDeniedException.class);
+        when(reads.getById("journal","request")).thenReturn(Map.of("pid","request","tenant_id",2L,"row_version",3L));
+        command(()->assertThatThrownBy(()->bridge.delete("journal","request")).isInstanceOf(AccessDeniedException.class));
+        verifyNoInteractions(handler,data);
+        when(reads.getById("journal","request")).thenReturn(Map.of("pid","request","tenant_id",1L,"row_version",3L));
+        when(handler.authorizeRelatedDelete(any())).thenReturn(true);var failure=new com.auraboot.framework.exception.ConflictException("Changed");
+        doThrow(failure).when(data).delete("journal","request");
+        command(()->{assertThatThrownBy(()->bridge.delete("journal","request")).isSameAs(failure);
+            assertThat(MetaContext.getCommandPermitTargetFor("receipt")).isEqualTo("root");});
+    }
 }

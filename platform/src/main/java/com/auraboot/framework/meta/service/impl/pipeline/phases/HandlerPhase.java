@@ -755,18 +755,19 @@ public class HandlerPhase implements CommandPhase {
                                 instanceof TenantProjectionAccessor projection)) {
                         throw new AccessDeniedException("Related delete authorization requires a target handler and projection");
                     }
-                    pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,
+                    if (!Boolean.TRUE.equals(pluginSettings.get(
+                            com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.OPT_IN))) {
+                        pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,
                             new com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor(dynamicDataService,
                                     tenantId,commandCode,modelCode,effectiveRecordId,
                                     MetaContext.getCurrentUserPid(),handler,projection));
+                    }
                 }
                 if (Boolean.TRUE.equals(pluginSettings.get(
                         com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.OPT_IN))) {
                     if (handler == null || !relatedUpdateBoundaryAuthorized
                             || !StringUtils.hasText(effectiveRecordId)
                             || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
-                            || Boolean.TRUE.equals(pluginSettings.get(
-                                com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor.OPT_IN))
                             || !(pluginSettings.get(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY)
                                 instanceof TenantProjectionAccessor projection)) {
                         throw new AccessDeniedException("Related update requires an authorized readable target and projection");
@@ -774,7 +775,9 @@ public class HandlerPhase implements CommandPhase {
                     pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,
                             new com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor(dynamicDataService,
                                     tenantId,commandCode,modelCode,effectiveRecordId,
-                                    MetaContext.getCurrentUserPid(),handler,projection));
+                                    MetaContext.getCurrentUserPid(),handler,projection,
+                                    Boolean.TRUE.equals(pluginSettings.get(
+                                        com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor.OPT_IN))));
                 }
                 com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.installRelatedWriter(
                         pluginSettings,dynamicDataService,handler,modelCode,effectiveRecordId);

@@ -501,6 +501,25 @@ class HandlerPhaseTest {
     }
 
     @Test
+    void execute_combinesExplicitRelatedDeleteAndUpdateWithoutDiscardingEitherBoundary() {
+        MetaContext.setContext(1L,2L,"buyer-pid","Buyer");
+        var recording=new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(recording));
+        when(metaModelService.getModelDefinition("pr_purchase_order")).thenReturn(Optional.empty());
+        var ctx=buildContext(BUSINESS_COMMAND_CODE,"pr_purchase_order",Map.of("type","custom","handler",PLUGIN_HANDLER_CODE,
+                "handlerParams",Map.of("tenantProjectionRead",true,"relatedUpdateAuthorization",true,
+                        "relatedDeleteAuthorization",true,"targetRecordAuthorization","handler")));
+        ctx.setTargetRecordReadable(true);
+        ctx.setPermitPlan(new com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan(
+                com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.Decision.PERMIT,
+                null,null,"po-1",com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.ScopeGrade.ALL,0L));
+        ctx.setAuthorizationVerdict(com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict.authorized("pr.purchase.manage"));
+        phase.execute(ctx);
+        assertThat(recording.capturedContext.get().dataAccessor())
+                .isInstanceOf(com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.class);
+    }
+
+    @Test
     void execute_rejectsRelatedUpdateAsyncBeforeSubmittingAnUnscopedTask() {
         when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(new RecordingPluginHandler(PLUGIN_HANDLER_CODE)));
         CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_receipt", Map.of(
