@@ -115,6 +115,7 @@ public class BusinessArtifactAccessGuard {
         context.setBusinessGrantDecision(grant);
         context.setBusinessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization(stamp.commandCode(), stamp.rootModel(), stamp.rootPid(),
                 boundary.targetAction(), stamp.tenantId(), MetaContext.getCurrentUserId(), MetaContext.getCurrentMemberId()));
+        com.auraboot.framework.meta.service.impl.CommandBusinessActorAuthorization.require(context,owner,data,root);
         if (!stamp.rootBinding().keySet().equals(owner.businessArtifactRootBindingFields())
                 || !stamp.rootBinding().isEmpty() && !stamp.rootBinding().equals(projection.prepareArtifactReadBinding(context,owner,root)))
             throw BusinessArtifactAuthorization.denied();

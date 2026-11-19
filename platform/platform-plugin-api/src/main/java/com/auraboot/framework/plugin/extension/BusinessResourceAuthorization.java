@@ -12,6 +12,9 @@ import java.util.Set;
  * Returning null denies the exact operation. Unknown resources/actions must deny.
  */
 public interface BusinessResourceAuthorization {
+    /** Optional intrinsic actor/relationship gate, evaluated before replay and again for business-resource artifact reads. */
+    default BusinessActorAuthorization businessActorAuthorization() { return null; }
+
     /** A fresh policy may retain locked source facts for this invocation only. */
     default BusinessResourceAuthorization newInvocationAuthorization() { return this; }
 

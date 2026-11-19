@@ -820,6 +820,23 @@ class CommandTargetScopePhaseTest {
         }
     }
 
+    @Test void intrinsicActorDenialRunsBeforeIdempotencyEvenWithTheCompleteBusinessGrant() {
+        var ctx=businessTarget();var record=new java.util.HashMap<>(RECORD);record.put("tenant_id",1L);
+        when(dynamicDataService.getById(anyString(),anyString())).thenReturn(record);
+        var authorizer=org.mockito.Mockito.mock(com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization.class);
+        when(authorizer.resolve(99L,List.of("inventory.receipt.confirm"),"inv_inbound",record)).thenReturn(
+            new com.auraboot.framework.permission.engine.model.BusinessGrantDecision(PermissionResult.allow(List.of()),1L,42L,99L,"inv_inbound","REC-1",List.of()));
+        var owner=(com.auraboot.framework.plugin.extension.BusinessResourceAuthorization)commandHandler;
+        when(owner.businessActorAuthorization()).thenReturn(new com.auraboot.framework.plugin.extension.BusinessActorAuthorization() {
+            public Map<String,java.util.Set<String>> sources(){return Map.of();}
+            public boolean authorize(Context context){return false;}
+        });
+        var phase=phase();org.springframework.test.util.ReflectionTestUtils.setField(phase,"businessAuthorization",authorizer);
+        var pipeline=new CommandPipeline(List.of(phase),List.of(new IdempotencyPhase(idempotencyService)));
+        assertThatThrownBy(()->{if(pipeline.executePreGuardPhases(ctx)==null)pipeline.executeGuardedPhases(ctx);})
+            .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(idempotencyService,permissionFacade);
+    }
     private CommandPipelineContext businessTarget() {
         givenMember(); when(dynamicDataService.getById(anyString(), anyString())).thenReturn(RECORD);
         var ctx = context("inv_inbound", "REC-1");

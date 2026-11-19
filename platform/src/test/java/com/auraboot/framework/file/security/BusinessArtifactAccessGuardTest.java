@@ -77,6 +77,19 @@ class BusinessArtifactAccessGuardTest {
         when(authorization.resolve(eq(30L), anyList(), eq("orders"), eq(root))).thenReturn(denied);
         assertThatThrownBy(() -> guard.authorize(file)).isInstanceOf(AccessDeniedException.class);
     }
+    @Test void currentIntrinsicActorGateAlsoAppliesToPreviouslyGeneratedBytesAndModelReaders() {
+        var enabled=new java.util.concurrent.atomic.AtomicBoolean(true);
+        when(owner.businessActorAuthorization()).thenReturn(new com.auraboot.framework.plugin.extension.BusinessActorAuthorization() {
+            public Map<String,Set<String>> sources(){return Map.of();}
+            public boolean authorize(Context context){return enabled.get() && "actor".equals(context.target().currentUserPid());}
+        });
+        guard.authorize(file);
+        enabled.set(false);
+        assertThatThrownBy(()->guard.authorize(file)).isInstanceOf(AccessDeniedException.class);
+        when(authorization.resolve(eq(30L),anyList(),eq("orders"),eq(root))).thenReturn(denied);
+        when(authorization.resolveModelRead(30L,"orders",root)).thenReturn(allowed);
+        assertThatThrownBy(()->guard.authorize(file)).isInstanceOf(AccessDeniedException.class);
+    }
     @Test void a_valid_model_reader_does_not_need_the_generation_permission_or_creator_identity() {
         file.setCreatedBy(999L);
         when(authorization.resolve(eq(30L), anyList(), eq("orders"), eq(root))).thenReturn(denied);
