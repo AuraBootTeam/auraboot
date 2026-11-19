@@ -112,6 +112,16 @@ describe('Agent release tab', () => {
     expect(post).not.toHaveBeenCalled();
   });
 
+  it('refreshes the initially empty release list when first activation completes', async () => {
+    get.mockImplementation((url: string) => Promise.resolve({ code: '0', data: url.endsWith('/deployment-policy') ? deploymentPolicy : [] }));
+    const { rerender } = render(<ReleasesTab agentPid="TEMPLATE" agentUpdatedAt="2026-07-29T10:00:00Z" readOnly={false} disabledTemplate />);
+    await screen.findByText('No release exists yet. Publish the draft before assigning work.');
+    get.mockImplementation((url: string) => Promise.resolve({ code: '0', data: url.endsWith('/deployment-policy') ? deploymentPolicy : releases }));
+    rerender(<ReleasesTab agentPid="TEMPLATE" agentUpdatedAt="2026-07-29T10:01:00Z" readOnly={false} disabledTemplate={false} />);
+    await screen.findByTestId('agent-release-history');
+    expect(screen.getByText('v2')).toBeVisible();
+  });
+
   it('requires confirmation, publishes, and reloads release history', async () => {
     render(
       <ReleasesTab

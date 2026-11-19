@@ -2583,7 +2583,7 @@ export function ReleasesTab({
 
   useEffect(() => {
     void fetchReleases();
-  }, [fetchReleases]);
+  }, [fetchReleases, agentUpdatedAt, disabledTemplate]);
 
   const fetchDeploymentPolicy = useCallback(async () => {
     setPolicyLoading(true);
