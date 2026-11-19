@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { acquireSavedViewLock, releaseSavedViewLock } from '../saved-view/_saved-view-lock';
 
 test.describe('Community branding baseline', () => {
-  test('keeps AuraBoot attribution on the public authentication shell', async ({ page }) => {
+  test('keeps AuraBoot attribution on the public authentication shell', async ({ page }, testInfo) => {
     await page.context().clearCookies();
     await page.goto('/login');
 
@@ -10,7 +10,7 @@ test.describe('Community branding baseline', () => {
     await expect(page.getByRole('img', { name: 'AuraBoot' }).first()).toBeVisible();
     await expect(page.getByText(/登录以继续使用 AuraBoot/)).toBeVisible();
 
-    await expect(page.getByRole('button', { name: 'Switch language' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '切换语言' })).toBeVisible();
     await expect(page).toHaveTitle('AuraBoot');
 
     await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', '/manifest.json');
@@ -38,6 +38,7 @@ test.describe('Community branding baseline', () => {
       shortName: 'AuraBoot',
       iconStatuses: [200, 200, 200, 200],
     });
+    await page.screenshot({ path: testInfo.outputPath('community-login.png'), fullPage: true });
   });
 
   test('@smoke @viewer opens About from the authenticated account menu', async ({
@@ -96,11 +97,15 @@ test.describe('Community branding baseline', () => {
 
       const anonymousContext = await browser.newContext({
         baseURL: String(testInfo.project.use.baseURL),
+        locale: 'zh-CN',
       });
       try {
         const anonymousPage = await anonymousContext.newPage();
         await anonymousPage.goto(`/share/${token}`);
-        await expect(anonymousPage.getByText(/^Powered by AuraBoot · \d+ records$/)).toBeVisible();
+        await expect(anonymousPage.getByTestId('public-shared-view').locator('footer')).toHaveText('Powered by AuraBoot');
+        await expect(anonymousPage.getByRole('heading', { name: '分享的视图设置' })).toBeVisible();
+        await expect(anonymousPage.getByText('此链接分享视图设置（包括已保存的筛选条件）。业务记录需要登录后按权限访问。')).toBeVisible();
+        await expect(anonymousPage.getByRole('table')).toHaveCount(0);
         await expect(anonymousPage).toHaveTitle('AuraBoot');
         await anonymousPage.screenshot({
           path: testInfo.outputPath('shared-view-public.png'),
