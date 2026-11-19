@@ -1,3 +1,4 @@
+import { useMediaQuery } from '~/framework/meta/rendering/components/ResponsiveBlockLayout';
 import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { getByDataPath } from './detailRecordRequests';
@@ -15,6 +16,7 @@ export function DataPathTable({
   locale,
   t,
   getDictItems,
+  mobileCard,
 }: {
   title?: any;
   columns: Array<{
@@ -25,12 +27,14 @@ export function DataPathTable({
     dictCode?: string;
   }>;
   rows: any[];
+  mobileCard?: { enabled?: boolean; titleField?: string };
   locale: string;
   t: (key: string) => string;
   getDictItems?: (
     code: string,
   ) => Array<{ value: string; label: string; extension?: Record<string, any> }>;
 }) {
+  const narrow = useMediaQuery('(max-width: 640px)');
   const renderCell = (col: { field: string; renderType?: string; dictCode?: string }, row: any) => {
     const raw =
       row && Object.prototype.hasOwnProperty.call(row, col.field)
@@ -54,6 +58,66 @@ export function DataPathTable({
     }
     return <span>{String(raw)}</span>;
   };
+
+  if (narrow && mobileCard?.enabled === true) {
+    const titleColumn =
+      columns.find((column) => column.field === mobileCard.titleField) || columns[0];
+    if (mobileCard.titleField && titleColumn?.field !== mobileCard.titleField) {
+      throw new Error('DataPathTable mobileCard.titleField must identify a declared column');
+    }
+    return (
+      <section className="sub-table-section min-w-0" data-testid="detail-datapath-cards">
+        {title && (
+          <h3 className="text-text-2 mb-5 text-sm font-semibold">
+            {getLocalizedText(title, locale, t)}
+          </h3>
+        )}
+        {rows.length === 0 ? (
+          <p
+            className="border-border text-text-3 rounded border px-4 py-5 text-sm"
+            data-testid="detail-datapath-empty"
+          >
+            {t('common.noData') || '—'}
+          </p>
+        ) : (
+          <div className="grid min-w-0 gap-3">
+            {rows.map((row, index) => (
+              <article
+                key={row?.pid ?? row?.sourcePid ?? row?.id ?? index}
+                data-testid="detail-datapath-card"
+                className="border-border bg-panel min-w-0 rounded-lg border p-4 shadow-sm"
+              >
+                {titleColumn && (
+                  <div className="min-w-0 break-words">
+                    <p className="text-text-3 text-xs">
+                      {getLocalizedText(titleColumn.label, locale, t) || titleColumn.field}
+                    </p>
+                    <h4 className="text-text mt-1 text-base font-semibold">
+                      {renderCell(titleColumn, row)}
+                    </h4>
+                  </div>
+                )}
+                <dl className="border-border mt-3 grid min-w-0 grid-cols-1 gap-3 border-t pt-3">
+                  {columns
+                    .filter((column) => column !== titleColumn)
+                    .map((column) => (
+                      <div key={column.field} className="min-w-0">
+                        <dt className="text-text-3 text-xs">
+                          {getLocalizedText(column.label, locale, t) || column.field}
+                        </dt>
+                        <dd className="text-text mt-1 min-w-0 text-sm break-words whitespace-pre-wrap">
+                          {renderCell(column, row)}
+                        </dd>
+                      </div>
+                    ))}
+                </dl>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+    );
+  }
 
   return (
     <div className="sub-table-section">

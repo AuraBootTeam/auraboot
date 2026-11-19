@@ -272,6 +272,7 @@ export function DetailBlockRenderer({
     const columns = ((block as any).columns || []) as any[];
     return (
       <DataPathTable
+        mobileCard={(block as any).mobileCard}
         title={block.title}
         columns={columns}
         rows={rows}
