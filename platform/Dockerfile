@@ -91,6 +91,7 @@ RUN --mount=type=cache,target=/root/.gradle/wrapper \
 COPY platform/platform-mybatis-compat/licenses platform-mybatis-compat/licenses
 COPY platform/platform-mybatis-compat/NOTICE.auraboot platform/platform-mybatis-compat/upstream-inputs.json platform-mybatis-compat/
 COPY platform/src ./src
+COPY platform/platform-mybatis-compat/src platform-mybatis-compat/src
 COPY platform/platform-app/src platform-app/src
 COPY platform/platform-agent/src platform-agent/src
 COPY platform/platform-plugin-api/src platform-plugin-api/src

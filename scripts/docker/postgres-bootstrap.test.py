@@ -63,9 +63,9 @@ sys.exit(int(os.environ.get('QUERY_EXIT', '0')))
         self.assertNotIn(self.env['POSTGRES_PASSWORD'], ' '.join(query['args']))
 
     def test_missing_tables_query_failure_and_noncanonical_output_are_unhealthy(self):
-        for overrides in [{'QUERY_RESULT': 'f'}, {'QUERY_EXIT': '1'}, {'QUERY_RESULT': 't\nf'}, {'QUERY_RESULT': ''}]:
+        for overrides in [{'QUERY_RESULT': 'f'}, {'QUERY_EXIT': '1'}, {'QUERY_EXIT': '2'}, {'QUERY_RESULT': 't\nf'}, {'QUERY_RESULT': ''}]:
             with self.subTest(overrides=overrides):
-                self.assertNotEqual(self.run_script('postgres-health.sh', **overrides).returncode, 0)
+                self.assertEqual(self.run_script('postgres-health.sh', **overrides).returncode, 1)
 
     def test_health_relations_exist_in_the_shipped_schema(self):
         import re
@@ -77,7 +77,10 @@ sys.exit(int(os.environ.get('QUERY_EXIT', '0')))
             self.assertRegex(schema, r'CREATE TABLE public\.' + re.escape(relation) + r'\s*\(')
 
     def test_unready_tcp_does_not_attempt_schema_query(self):
-        self.assertNotEqual(self.run_script('postgres-health.sh', READY_EXIT='2').returncode, 0)
+        result = self.run_script('postgres-health.sh', READY_EXIT='2')
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('TCP listener is not ready', result.stderr)
+        self.assertNotIn(self.env['POSTGRES_PASSWORD'], result.stderr)
         self.assertEqual([call['program'] for call in self.calls()], ['pg_isready'])
 
 
