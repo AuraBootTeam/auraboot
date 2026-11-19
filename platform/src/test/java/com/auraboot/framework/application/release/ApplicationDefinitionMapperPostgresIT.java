@@ -102,6 +102,23 @@ class ApplicationDefinitionMapperPostgresIT {
         }
     }
 
+    @Test
+    void readsDashboardSnapshotsWithoutIncludingAnotherTenantOrPlugin() throws Exception {
+        try (Connection connection = admin.getConnection(); Statement statement = connection.createStatement()) {
+            statement.execute("INSERT INTO ab_plugin_resource VALUES ('01K60000000000000000000003', 42, '01K60000000000000000000001', 'dashboard', 'edu_overview', '{\"code\":\"edu_overview\"}'::jsonb, false)");
+            statement.execute("INSERT INTO ab_plugin_resource VALUES ('01K60000000000000000000004', 43, '01K60000000000000000000001', 'dashboard', 'foreign_school', '{}'::jsonb, false)");
+            statement.execute("INSERT INTO ab_plugin_resource VALUES ('01K60000000000000000000005', 42, '01K60000000000000000000099', 'dashboard', 'foreign_plugin', '{}'::jsonb, false)");
+        }
+        try (var session = sessions.openSession()) {
+            var rows = session.getMapper(ApplicationDefinitionMapper.class)
+                    .findComparableResources(42L, "01K60000000000000000000001");
+            assertThat(rows).extracting(resource -> resource.getResourceCode())
+                    .containsExactlyInAnyOrder("edu:enroll", "edu_overview");
+            assertThat(rows).filteredOn(resource -> "dashboard".equals(resource.getResourceType())).singleElement()
+                    .satisfies(resource -> assertThat(resource.getImportSnapshot()).containsEntry("code", "edu_overview"));
+        }
+    }
+
     private static PGSimpleDataSource postgres() {
         PGSimpleDataSource postgres = new PGSimpleDataSource();
         postgres.setURL(System.getenv("CRAWLER_REAL_POSTGRES_URL"));

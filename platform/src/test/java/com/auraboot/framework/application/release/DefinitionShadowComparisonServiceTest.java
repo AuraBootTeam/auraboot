@@ -83,21 +83,36 @@ class DefinitionShadowComparisonServiceTest {
                 .widgets(List.of(Map.of("id", "summary")))
                 .build();
         release.components().getFirst().manifest().setDashboards(List.of(dashboard));
-        var dashboardResource = PluginResource.builder()
-                .pluginPid(plugin.getPid())
-                .resourceType("page")
-                .resourceCode("edu_overview")
-                .importSnapshot(objectMapper.convertValue(dashboard, Map.class))
-                .userModified(false)
-                .build();
-        when(definitions.findComparableResources(42L, plugin.getPid()))
-                .thenReturn(List.of(resource(false), dashboardResource));
+        for (String resourceType : List.of("page", "dashboard")) {
+            var dashboardResource = PluginResource.builder()
+                    .pluginPid(plugin.getPid()).resourceType(resourceType).resourceCode("edu_overview")
+                    .importSnapshot(objectMapper.convertValue(dashboard, Map.class)).userModified(false).build();
+            when(definitions.findComparableResources(42L, plugin.getPid()))
+                    .thenReturn(List.of(resource(false), dashboardResource));
+            var report = comparison.comparePublishedStable(42L, "aura-edu");
+            assertEquals(DefinitionShadowComparisonService.Classification.EXACT_MATCH, report.classification());
+            assertEquals(2, report.comparedResources());
+            assertTrue(report.differences().isEmpty());
 
-        var report = comparison.comparePublishedStable(42L, "aura-edu");
+            dashboardResource.setUserModified(true);
+            assertEquals(DefinitionShadowComparisonService.Classification.DRIFTED,
+                    comparison.comparePublishedStable(42L, "aura-edu").classification());
+            dashboardResource.setUserModified(false);
+            dashboardResource.setImportSnapshot(Map.of("code", "edu_overview", "title", "Changed"));
+            assertEquals(DefinitionShadowComparisonService.Classification.DRIFTED,
+                    comparison.comparePublishedStable(42L, "aura-edu").classification());
+        }
+    }
 
-        assertEquals(DefinitionShadowComparisonService.Classification.EXACT_MATCH, report.classification());
-        assertEquals(2, report.comparedResources());
-        assertTrue(report.differences().isEmpty());
+    @Test
+    void rejectsDuplicatePageAndDashboardIdentityInsteadOfChoosingOneSnapshot() {
+        var page = PluginResource.builder().pluginPid(plugin.getPid()).resourceType("page")
+                .resourceCode("edu_overview").importSnapshot(Map.of("code", "edu_overview")).build();
+        var dashboard = PluginResource.builder().pluginPid(plugin.getPid()).resourceType("dashboard")
+                .resourceCode("edu_overview").importSnapshot(Map.of("code", "edu_overview")).build();
+        when(definitions.findComparableResources(42L, plugin.getPid())).thenReturn(List.of(page, dashboard));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> comparison.comparePublishedStable(42L, "aura-edu"));
     }
 
     private static final String OLD_RELEASE = "01K60000000000000000000009";
