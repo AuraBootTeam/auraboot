@@ -136,6 +136,10 @@ test.describe('Community branding baseline', () => {
     await page.getByTestId('about-link').click();
 
     await expect(page).toHaveURL(/\/about$/);
+    // The account link lives inside the mobile drawer. Close it before
+    // judging readability so an overlay cannot produce an apparently green image.
+    await page.getByRole('button', { name: /^(关闭|Close)$/ }).click();
+    await expect(page.getByTestId('header-sidebar-toggle')).toHaveAttribute('aria-expanded', 'false');
     await expect(page.getByTestId('about-page')).toBeVisible();
     await expect(page.getByTestId('about-edition')).toBeVisible();
     await expect(page.getByRole('heading', { name: /AuraBoot/ })).toBeVisible();
