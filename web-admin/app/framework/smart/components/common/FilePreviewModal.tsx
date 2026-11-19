@@ -136,6 +136,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent
         className={`${contentMaxWidth} w-[90vw]`}
+        style={kind === 'pdf' ? { maxWidth: 'min(90vw, 80rem)' } : undefined}
         data-testid="file-preview-modal"
         closeLabel={closeLabel}
         onCloseAutoFocus={onCloseAutoFocus}
