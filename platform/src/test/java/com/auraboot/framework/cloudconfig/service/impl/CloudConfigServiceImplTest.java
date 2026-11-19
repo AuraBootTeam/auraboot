@@ -288,6 +288,25 @@ class CloudConfigServiceImplTest {
     }
 
     @Test
+    void callbackSaltUsesExistingEncryptionAndMasking() {
+        var request = new CloudConfigSaveRequest();
+        request.setServiceType("integration"); request.setProviderCode("sample"); request.setConfigLevel("tenant");
+        request.setConfig("{\"callbackSalt\":\"synthetic-callback-salt\",\"callbackInstallationPid\":\"installation\"}");
+        request.setEnabled(true);
+        when(fieldEncryptionService.encrypt("synthetic-callback-salt")).thenReturn("ENC:callback-fixture");
+        var saved = ArgumentCaptor.forClass(CloudConfig.class);
+        cloudConfigService.saveConfig(request);
+        verify(cloudConfigMapper).insert(saved.capture());
+        assertThat(saved.getValue().getConfig()).contains("ENC:callback-fixture", "installation")
+                .doesNotContain("synthetic-callback-salt");
+        sampleConfig.setConfig(saved.getValue().getConfig());
+        when(cloudConfigMapper.findByPid("test-pid-001", 100L)).thenReturn(sampleConfig);
+        when(fieldEncryptionService.maskJsonFields(eq(sampleConfig.getConfig()), argThat(fields -> fields.contains("callbackSalt"))))
+                .thenReturn("{\"callbackSalt\":\"****\"}");
+        assertThat(cloudConfigService.getConfigMasked("test-pid-001").getConfig()).contains("****").doesNotContain("ENC:");
+    }
+
+    @Test
     void purchaseContractDefinitionUsesExistingEncryptionBeforePersistence() {
         MetaContext.setContext(100L, 200L, "user-pid", "tester");
         var request = new CloudConfigSaveRequest();
