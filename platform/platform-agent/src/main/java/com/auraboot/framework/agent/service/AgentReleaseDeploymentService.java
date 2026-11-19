@@ -3,6 +3,7 @@ package com.auraboot.framework.agent.service;
 import com.auraboot.framework.agent.identity.ExecutionPrincipal;
 import com.auraboot.framework.agent.identity.ExecutionPrincipalContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.exception.BusinessException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -146,8 +147,7 @@ public class AgentReleaseDeploymentService {
                 tenantId,
                 agentDefinitionPid);
         if (definitions.size() != 1) {
-            throw new IllegalArgumentException(
-                    "Active Agent definition not found: " + agentDefinitionPid);
+            throw new BusinessException("Activate the template before publishing; an active Agent is required in the current tenant");
         }
         Map<String, Object> definition = definitions.get(0);
         String agentCode = text(definition.get("agent_code"));
@@ -500,8 +500,7 @@ public class AgentReleaseDeploymentService {
                 agentCode,
                 fromStatus);
         if (updated != 1) {
-            throw new IllegalStateException(
-                    "Deployment lifecycle transition matched no row: agentCode=" + agentCode);
+            throw new BusinessException("No deployment exists in the expected state; activate or publish the Agent first");
         }
     }
 
