@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 import java.util.HashMap;
 import java.util.List;
@@ -63,7 +64,7 @@ public class AgentOrganizationServiceImpl implements AgentOrganizationService {
     private final AgentReleaseDeploymentService releaseDeploymentService;
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public void enrollAsEmployee(Long agentId, String departmentPid, String positionPid) {
         AgentDefinition agent = agentDefinitionMapper.selectById(agentId);
         if (agent == null) {
@@ -131,7 +132,7 @@ public class AgentOrganizationServiceImpl implements AgentOrganizationService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public void removeFromOrg(Long agentId) {
         AgentDefinition agent = agentDefinitionMapper.selectById(agentId);
         if (agent == null) {
