@@ -136,3 +136,70 @@ Automation 的 pluginId/automationKey 身份保存在模块自有 ab_automation.
 - 真实 PostgreSQL：`:platform-app:integrationTest --tests '*CustomizationProtectionPostgresIT'`。必须由受管 runtime 注入 DATABASE/POSTGRES 变量，缺前提即失败，不静默跳过；fixture 使用该隔离库的真实 Flyway schema。
 
 PostgreSQL 用例是组件集成验证，实际执行 mappers、导入器、Dashboard service/Controller、资源持久化和 Schema service；无关版本历史服务及模型解析使用测试夹具。不冒充完整 HTTP 权限或浏览器旅程，也不以此声称全部平台已通过验证。原始执行、反向对照和覆盖范围随本轮提交保存在 Workspace 任务证据中。
+
+
+## V2 handover preview receipts (first implementation slice)
+
+V2 adds preview and durable preview receipts only. It does not implement ownership
+transfer, receiver preparation imports, exit, reverse handover, or readiness
+publication. Existing v1 replacement behavior is unchanged. Registering a v2 source
+does not add it to the v1 globally retired list; lightweight Base remains usable.
+
+Trusted contracts are single JSON objects under
+`META-INF/auraboot/resource-handovers/*.json`. Core provides the catalog/validator;
+Enterprise supplies `pcba-base-manufacturing-preview`, revision 1, with the sole
+capability `preview`. `resource-handover.v2` requires `tenant-scoped`, exact package
+versions, unique typed resource identities and one declared receiver per MOVE.
+Unknown properties, duplicate JSON keys/contracts/resources, wildcard versions,
+unsupported capabilities and unresolved binding/dictionary declarations fail
+closed. Requests cannot supply a contract, SQL, table names, receivers or tenant.
+
+Administrative endpoints:
+
+| Method | Path | Behavior |
+|---|---|---|
+| GET | `/api/plugins/handovers/contracts` | Trusted contract summaries and canonical SHA-256 digests |
+| POST | `/api/plugins/handovers/previews` | Validate inventory and persist a preview receipt |
+| GET | `/api/plugins/handovers/previews/{batchPid}` | Read one tenant-scoped immutable receipt |
+| GET | `/api/plugins/handovers/previews/by-key?idempotencyKey=...` | Resolve a receipt when its acknowledgement/PID was lost |
+
+The POST body has `contractId`, `contractDigest`, `sourcePluginPid` and
+`idempotencyKey`. Unknown request properties are rejected even with a lenient
+application mapper. Every service entry rechecks authenticated tenant/actor and
+both `plugin.plugin.manage` and `sys.plugin.update`; no grants are added.
+Responses contain public PIDs, contract/resource codes and explicit planned MOVE
+or VERIFY_REFERENCE entries, never entities, snapshots, raw tenant/actor IDs or
+internal row IDs. `executionAvailable` is always false.
+
+Preview validates the source's actual tracking and live owner, exact live PIDs,
+field types, model/field binding identity, field-dictionary relationships, dictionary
+items, external provider tracking and nullable protection state. Bindings have no
+entity owner column: their source ownership is checked through tracking. Missing,
+ambiguous, extra/untracked source-owned versions, foreign ownership and unknown
+protection fail without persisting a successful receipt. Known claims and modified
+content are snapshotted unchanged; preview never adopts them. Source entity
+content and dictionary items are not reconciled with receiver templates.
+
+A separate repeatable-read transaction captures metadata and writes only
+`ab_plugin_handover_batch` and `ab_plugin_handover_item`. JSONB uses the existing
+precision-preserving `JsonNodeTypeHandler` and explicit MyBatis result maps.
+Batch/item persistence is atomic; an item failure rolls back all receipt writes.
+The database only accepts PREVIEWED status in this slice. A receipt includes all
+planned receivers and references, private metadata snapshots/fingerprints and a
+15-minute expiry. Expiry is reported without updating or refreshing the old receipt.
+
+The tenant/key uniqueness constraint is authoritative. Admission uses the existing
+DistributedLock infrastructure outside the snapshot transaction. A concurrent
+uniqueness/serialization collision may resolve only an already committed, matching
+request/complete receipt in a new read transaction; it never retries creating or
+adopting resources. Same key/different request is a conflict. Retrieval verifies
+snapshot digest, header/request binding and every persisted item's integrity.
+Replays return the original snapshot, even if live metadata subsequently changes;
+they do not certify current eligibility or extend expiry.
+
+The preview observes installed version/status and manifest-content hashes. It does
+not verify deployed artifact provenance, full executable dependency closure or
+serving readiness. All are explicit limitations in the response. There are no
+execute/exit/reverse routes and no changes to import/uninstall gates for v2. The
+later transaction/lifecycle/recovery proposal remains in Workspace migration plan
+sections 6.4.17–6.4.18; its COMMITTED and later states are not implemented here.
