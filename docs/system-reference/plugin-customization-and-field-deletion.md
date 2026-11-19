@@ -203,3 +203,9 @@ serving readiness. All are explicit limitations in the response. There are no
 execute/exit/reverse routes and no changes to import/uninstall gates for v2. The
 later transaction/lifecycle/recovery proposal remains in Workspace migration plan
 sections 6.4.17–6.4.18; its COMMITTED and later states are not implemented here.
+
+## Empty wrapper retirement entrypoints
+
+The shell importer rejects `quarry-solution` and `marketing-crm-demo` (names, plugin IDs and legacy directory arguments) before login or source-root discovery. The former uses the `quarry-delivery` profile containing its original eight dependency packages; the latter uses the Workspace Showcase marketing index and performs no plugin import. The empty marketing skeleton's tenant-admin wildcard bootstrap is not reproduced.
+
+This is source/entrypoint retirement after the owner confirmed no online consumers. It does not transfer ownership, uninstall tenant records, modify business data, add a server-side historical-artifact blacklist or change the v1/v2 handover contracts.

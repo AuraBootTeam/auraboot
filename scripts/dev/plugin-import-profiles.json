@@ -137,7 +137,6 @@
     "pcba-compliance",
     "pcba-finance",
     "sales-templates",
-    "quarry-solution",
     "dev-pipeline",
     "growth",
     "customer-pcba-solution"
@@ -148,5 +147,15 @@
     "core-aurabot",
     "page-manager",
     "org-management"
+  ],
+  "quarry-delivery": [
+    "org-management",
+    "project-management",
+    "quarry-industry",
+    "contract-cost",
+    "construction-process",
+    "doc-knowledge",
+    "dual-prevention",
+    "annual-plan"
   ]
 }

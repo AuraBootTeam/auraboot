@@ -178,6 +178,21 @@ if [ "${#PLUGINS[@]}" -eq 0 ]; then
     exit 2
 fi
 
+# These empty wrappers were replaced by composition/showcase entrypoints.
+# Reject before login and path discovery so stale checkout roots cannot revive them.
+for selected_plugin in "${PLUGINS[@]}"; do
+    selected_name="${selected_plugin%/}"
+    selected_name="${selected_name##*/}"
+    case "$selected_name" in
+        quarry-solution|com.auraboot.quarry-solution)
+            echo "ERROR: retired plugin quarry-solution; use --profile=quarry-delivery" >&2
+            exit 2 ;;
+        marketing-crm-demo|com.auraboot.marketing-crm-demo)
+            echo "ERROR: retired plugin marketing-crm-demo; use showcase/media/marketing-crm (no plugin import)" >&2
+            exit 2 ;;
+    esac
+done
+
 path_has_plugin() {
     local path="$1"
     if [ -n "$BACKEND_CONTAINER" ]; then
