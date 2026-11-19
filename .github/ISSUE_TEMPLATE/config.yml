@@ -1,14 +1,14 @@
 blank_issues_enabled: false
 contact_links:
-  - name: 📝 Product feedback / private question
-    url: https://www.auraboot.com/contact?interest=feedback
-    about: Beta feedback, unclear setup, licensing boundary questions, and private notes
+  - name: 📝 Product feedback / setup question
+    url: https://github.com/AuraBootTeam/auraboot/issues/new?template=question.yml
+    about: Public setup questions and beta feedback; never include secrets or customer data
   - name: 📚 Documentation
-    url: https://docs.auraboot.com
+    url: https://auraboot.com/docs/
     about: User guides and API reference
   - name: 🔒 Security vulnerability
     url: https://github.com/AuraBootTeam/auraboot/blob/main/SECURITY.md
     about: Do NOT open a public issue — please follow responsible disclosure
   - name: ⚖️ Licensing / commercial inquiries
-    url: https://www.auraboot.com/contact?interest=license
+    url: https://auraboot.com/zh/license/
     about: SaaS hosting, white-labeling, OEM, enterprise editions
