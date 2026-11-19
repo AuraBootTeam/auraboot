@@ -46,7 +46,7 @@ body:
     id: version
     attributes:
       label: AuraBoot version
-      placeholder: e.g. 0.1.0-beta.1, commit sha, or "main as of <date>"
+      placeholder: e.g. 1.0.0, full source commit SHA, package SHA256 and installation method
     validations:
       required: true
 
@@ -80,7 +80,7 @@ body:
     id: logs
     attributes:
       label: Logs / stack trace
-      description: Paste relevant logs. Please redact secrets/tokens.
+      description: Include the failed command, first error and relevant container/service logs. Remove tokens, cookies, authorization headers, credentials, personal data and customer attachments. Never attach .env files or database dumps.
       render: shell
 
   - type: textarea
