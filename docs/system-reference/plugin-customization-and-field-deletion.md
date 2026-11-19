@@ -51,6 +51,8 @@ Page 使用 `ResourceType.PAGE/page`，Dashboard 使用 `ResourceType.DASHBOARD/
 
 模块通过 `META-INF/auraboot/package-replacements/*.json` 声明确切旧身份、接收方、资源白名单和附加声明；Enterprise 合同仅随 Enterprise 制品提供。接收方沿用既有 plugin ID，不新增替代插件。接管只在显式接收方导入事务中运行；既有资源待移交时必须选择 `OVERWRITE_SAFE`，其它策略拒绝。菜单和权限的安全导入保留其它 owner 或已认领资源，角色保留现有授权；接管随后只转移资源行与 tracking 的 owner，不重建内容、不重置 claim/修改标记/基线、不更改原 importId、身份、员工关联或授权绑定。
 
+附加声明只合并其明确支持的菜单/权限/角色/i18n列表，不对整个manifest做JSON往返转换，避免DTO计算属性混入页面DSL；原页面对象及未知字段校验保持原样。Agent能力预检先于接管检查执行，缺模块时在普通资源读写前拒绝。
+
 接管检查租户、事务、完整 tracking、资源 PID、实际 owner、类型/代码白名单和非 NULL 保护状态，异常整笔回滚。旧包退出前重新校验 inventory，仍有未接收资源则拒绝。旧 plugin ID 的重导、版本升级和历史导入回滚均明确拒绝并指向接收方，不静默成功或覆盖接收方。接管成功后可从原生命周期或资源卸载入口退出旧安装记录。必须先升级 Core/Enterprise 制品，再导入接收方；旧版本运行时不具备此合同，不自动迁移生产。
 
 成功导入 receipt 记录 `packageResourcesAdopted`。含接管的导入拒绝通用 import rollback，防止退回旧插件元数据而遗留转交资源；需要恢复时保留接收方并显式审查归属，不提供自动反向接管。

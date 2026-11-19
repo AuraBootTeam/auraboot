@@ -378,8 +378,6 @@ public class PluginImportServiceImpl implements PluginImportService {
 
     private ImportPreviewResult createPreviewFromManifest(PluginManifestExtended manifest, String sourceName,
                                                           String sourceType, boolean deferReferenceValidation) {
-        packageReplacements.requireImportable(manifest.getPluginId());
-        manifest = packageReplacements.contribute(manifest);
         // Fail-fast preview when the manifest is missing pluginId. The downstream
         // ab_plugin_import_history.plugin_id column is NOT NULL; without this guard a
         // malformed manifest (e.g. a plugin.json that uses `code` instead of `pluginId`,
@@ -404,6 +402,8 @@ public class PluginImportServiceImpl implements PluginImportService {
         // Sanitize comment-only declarations before deciding which optional capabilities are required.
         manifest.sanitize();
         PluginAgentResourceGuard.requireManifest(manifest, agentDefinitionResources);
+        packageReplacements.requireImportable(manifest.getPluginId());
+        manifest = packageReplacements.contribute(manifest);
 
         String importId = UlidGenerator.generate();
         Long tenantId = requireTenantContextForImport();
@@ -624,6 +624,7 @@ public class PluginImportServiceImpl implements PluginImportService {
      * rows to be visible — hence the lock must not be inside @Transactional scope.
      */
     private ImportExecuteResult executeWithLock(ImportContext context, ImportRequest request) {
+        PluginAgentResourceGuard.requireManifest(context.getManifest(), agentDefinitionResources);
         packageReplacements.requireImportable(context.getManifest().getPluginId());
         packageReplacements.selectAgentTemplates(context.getManifest(), request.getAgentTemplateCodes());
         PluginAgentResourceGuard.requireManifest(context.getManifest(), agentDefinitionResources);
@@ -1517,7 +1518,6 @@ public class PluginImportServiceImpl implements PluginImportService {
         if (history == null) {
             throw new PluginException("Import not found: " + importId);
         }
-        packageReplacements.requireImportable(history.getPluginId());
 
         if (!ImportStatus.SUCCESS.code().equals(history.getStatus())) {
             throw new PluginException("Can only rollback successful imports");
@@ -1541,6 +1541,7 @@ public class PluginImportServiceImpl implements PluginImportService {
         if (!Objects.equals(history.getTenantId(), MetaContext.getCurrentTenantId())) {
             throw new PluginException("Rollback tenant does not match import owner");
         }
+        packageReplacements.requireImportable(history.getPluginId());
         var rollbackOwner = pluginRecordMapper.lockIdentityIncludingDeleted(history.getTenantId(), history.getPluginPid());
         if (rollbackOwner == null) throw new PluginException("Plugin rollback owner is missing");
         auraPluginManager.requireTenantLifecycleChange(rollbackOwner);

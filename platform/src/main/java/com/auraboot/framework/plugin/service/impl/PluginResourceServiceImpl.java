@@ -369,12 +369,12 @@ public class PluginResourceServiceImpl implements PluginResourceService {
     @Override
     @Transactional
     public UninstallResult executeUninstall(String pluginPid, Long tenantId, UninstallRequest request) {
+        UninstallPreviewResult preview = generateUninstallPreview(pluginPid, tenantId);
         var installed = pluginRecordMapper.findByPid(pluginPid);
         if (installed == null || !Objects.equals(installed.getTenantId(), tenantId)) {
             throw new IllegalArgumentException("Plugin tenant does not match uninstall owner");
         }
         packageReplacements.requireReadyToExit(installed.getPluginId(), tenantId);
-        UninstallPreviewResult preview = generateUninstallPreview(pluginPid, tenantId);
 
         if (!request.isForce() && preview.isHasConflicts()) {
             for (ResourceUninstallInfo resource : preview.getNeedsDecision()) {

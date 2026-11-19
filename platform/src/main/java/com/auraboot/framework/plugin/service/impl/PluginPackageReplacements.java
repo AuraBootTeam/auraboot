@@ -4,7 +4,6 @@ import com.auraboot.framework.plugin.dto.imports.PluginManifestExtended;
 import com.auraboot.framework.plugin.exception.PluginException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -70,24 +69,42 @@ public class PluginPackageReplacements {
 
     /** Add edition resources to an existing installation unit, without a new plugin identity. */
     public PluginManifestExtended contribute(PluginManifestExtended manifest) {
-        ObjectNode node = json.valueToTree(manifest);
+        // A JSON round trip would serialize DTO getters such as PageSchemaDTO.isValid
+        // back into unknown DSL fields. Copy the container, retaining untouched DTOs.
+        PluginManifestExtended result = new PluginManifestExtended();
+        org.springframework.beans.BeanUtils.copyProperties(manifest, result);
         for (var c : contracts) if (c.path("receiverPluginId").asText().equals(manifest.getPluginId())) {
             c.path("declarations").fields().forEachRemaining(field -> {
-                var values = node.path(field.getKey()).isArray() ? node.withArray(field.getKey()) : node.putArray(field.getKey());
-                for (var value : field.getValue()) {
-                    boolean exists = false;
-                    for (var existing : values) {
-                        String identity = field.getKey().equals("i18nResources") ? "key" : "code";
-                        if (existing.path(identity).equals(value.path(identity))) {
-                            if (!containsDeclaration(existing, value)) throw new PluginException("Conflicting replacement declaration: " + field.getKey());
-                            exists = true;
-                        }
-                    }
-                    if (!exists) values.add(value);
+                switch (field.getKey()) {
+                    case "menus" -> result.setMenus(merge(result.getMenus(), field.getValue(),
+                            com.auraboot.framework.plugin.dto.imports.MenuDefinitionDTO.class, "code"));
+                    case "permissions" -> result.setPermissions(merge(result.getPermissions(), field.getValue(),
+                            com.auraboot.framework.plugin.dto.imports.PermissionDefinitionDTO.class, "code"));
+                    case "roles" -> result.setRoles(merge(result.getRoles(), field.getValue(),
+                            com.auraboot.framework.plugin.dto.imports.RoleDefinitionDTO.class, "code"));
+                    case "i18nResources" -> result.setI18nResources(merge(result.getI18nResources(), field.getValue(),
+                            com.auraboot.framework.plugin.dto.imports.I18nDefinitionDTO.class, "key"));
+                    default -> throw new PluginException("Unsupported replacement declaration: " + field.getKey());
                 }
             });
         }
-        return json.convertValue(node, PluginManifestExtended.class);
+        return result;
+    }
+
+    private <T> List<T> merge(List<T> original, JsonNode declarations, Class<T> type, String identity) {
+        var result = new ArrayList<>(original == null ? List.<T>of() : original);
+        for (var declaration : declarations) {
+            boolean exists = false;
+            for (var value : result) {
+                JsonNode existing = json.valueToTree(value);
+                if (existing.path(identity).equals(declaration.path(identity))) {
+                    if (!containsDeclaration(existing, declaration)) throw new PluginException("Conflicting replacement declaration: " + identity);
+                    exists = true;
+                }
+            }
+            if (!exists) result.add(json.convertValue(declaration, type));
+        }
+        return result;
     }
 
     private boolean containsDeclaration(JsonNode existing, JsonNode declaration) {
