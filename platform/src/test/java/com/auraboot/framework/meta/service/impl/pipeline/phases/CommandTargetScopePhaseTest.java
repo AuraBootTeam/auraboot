@@ -761,6 +761,21 @@ class CommandTargetScopePhaseTest {
         assertThat(ctx.getBusinessTargetAuthorization()).isNull();
     }
 
+    @Test void exactPrivateInputSelectorsAreCapturedBeforeIdempotency() {
+        var ctx=businessTarget();var authorizer=org.mockito.Mockito.mock(com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization.class);
+        when(authorizer.resolve(99L,List.of("inventory.receipt.confirm"),"inv_inbound",RECORD)).thenReturn(
+            new com.auraboot.framework.permission.engine.model.BusinessGrantDecision(PermissionResult.allow(List.of()),1L,42L,99L,"inv_inbound","REC-1",List.of()));
+        var owner=(com.auraboot.framework.plugin.extension.BusinessResourceAuthorization)commandHandler;
+        var reference=new com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.TenantSecretReference("integration","contract","definition");
+        when(owner.businessTenantSecrets()).thenReturn(java.util.Set.of(reference));
+        ctx.setExecConfig(Map.of("type","custom","permissions",List.of("inventory.receipt.confirm"),"handlerParams",Map.of(
+            "targetRecordAuthorization","business","targetRecordAction","update","dslPersistence",false,
+            "tenantSecretRead",true,"tenantSecretServiceTypes",List.of("integration"),"tenantSecretFields",List.of("definition"))));
+        var phase=phase();org.springframework.test.util.ReflectionTestUtils.setField(phase,"businessAuthorization",authorizer);phase.execute(ctx);
+        assertThat(ctx.getBusinessTenantSecrets()).containsExactly(reference);
+        assertThat(com.auraboot.framework.meta.service.impl.pipeline.CommandIdempotencyIntent.snapshot(ctx)).containsKey("businessTenantSecrets");
+    }
+
     @Test void declaredPublicOutputPolicyIsCapturedAtTheTargetGateBeforeIdempotency() {
         var ctx = businessTarget();
         var authorizer = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization.class);

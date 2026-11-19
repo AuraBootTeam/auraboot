@@ -65,6 +65,8 @@ public class BusinessArtifactAccessGuard {
                 || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()) throw BusinessArtifactAuthorization.denied();
         var handler = extensions.getBusinessResourceOwner(stamp.commandCode()).orElseThrow(BusinessArtifactAuthorization::denied);
         if (!(handler instanceof BusinessResourceAuthorization owner)) throw BusinessArtifactAuthorization.denied();
+        if(!stamp.tenantSecrets().equals(com.auraboot.framework.plugin.pf4j.BusinessTenantSecretContract.references(owner)))
+            throw BusinessArtifactAuthorization.denied();
         var currentFields=java.util.Set.copyOf(owner.businessCurrentArtifactFields());
         if(!owner.businessArtifactFields().keySet().containsAll(currentFields))throw BusinessArtifactAuthorization.denied();
         Integer budget = owner.businessArtifactFields().get(stamp.rootField());

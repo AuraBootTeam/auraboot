@@ -68,6 +68,18 @@ class BusinessArtifactAccessGuardTest {
         when(projection.prepare(any(), same(owner))).thenReturn(plan);
     }
     @AfterEach void clear() { MetaContext.clear(); }
+    @Test void changedTenantSecretSelectorsRetireArtifactsWithoutGrantingAnotherProvider() throws Exception {
+        var reference=new BusinessResourceAuthorization.TenantSecretReference("integration","contract","definition");
+        var plan=plan(fields(Set.of("name","brand"),List.of()));
+        file.setArtifactAuthorization(BusinessArtifactAuthorization.capture(plan,"export_file",Map.of(),Set.of(reference)).encode());
+        when(owner.businessTenantSecrets()).thenReturn(Set.of(reference));
+        definition.setExecutionConfig(new ObjectMapper().writeValueAsString(Map.of("type","custom","permissions",List.of("orders.export"),
+            "handlerParams",Map.of("targetRecordAuthorization","business","targetRecordAction","update","dslPersistence",false,
+                "tenantSecretRead",true,"tenantSecretServiceTypes",List.of("integration"),"tenantSecretFields",List.of("definition")))));
+        guard.authorize(file);
+        when(owner.businessTenantSecrets()).thenReturn(Set.of(new BusinessResourceAuthorization.TenantSecretReference("integration","different","definition")));
+        assertThatThrownBy(()->guard.authorize(file)).isInstanceOf(AccessDeniedException.class);
+    }
     @Test void currentOnlySlotsRejectReplacedOrClearedFilePointersWithoutRelyingOnCreator() {
         when(owner.businessCurrentArtifactFields()).thenReturn(Set.of("export_file"));
         var current=new java.util.HashMap<String,Object>(root);current.put("export_file",file.getPid());

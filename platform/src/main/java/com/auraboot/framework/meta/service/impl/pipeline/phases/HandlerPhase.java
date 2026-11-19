@@ -855,6 +855,11 @@ public class HandlerPhase implements CommandPhase {
                         controls.add(com.auraboot.framework.plugin.extension.FileAccessor.SETTINGS_KEY);
                         controls.add(com.auraboot.framework.plugin.extension.DocumentOutputAccessor.SETTINGS_KEY);
                     }
+                    var tenantSecrets=businessScope.tenantSecretAccessor(pluginSettings);
+                    if(tenantSecrets!=null) {
+                        controls.add(com.auraboot.framework.plugin.extension.TenantSecretAccessor.SETTINGS_KEY);
+                        pluginSettings.put(com.auraboot.framework.plugin.extension.TenantSecretAccessor.SETTINGS_KEY,tenantSecrets);
+                    }
                     pluginSettings.keySet().removeIf(key->key.startsWith("__") && !controls.contains(key));
                     pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,businessScope.accessor());
                 }

@@ -89,6 +89,17 @@ public interface BusinessResourceAuthorization {
     /** Single-file slots whose readable bytes must still equal the root's current file PID. */
     default Set<String> businessCurrentArtifactFields() { return Set.of(); }
 
+    /** Exact private tenant configuration inputs; no general secret capability by default. */
+    default Set<TenantSecretReference> businessTenantSecrets() { return Set.of(); }
+
+    record TenantSecretReference(String serviceType,String providerCode,String field) {
+        public TenantSecretReference {
+            for(String value:new String[]{serviceType,providerCode,field})
+                if(value==null || !value.matches("[a-zA-Z][a-zA-Z0-9_-]{0,63}"))
+                    throw new IllegalArgumentException("Exact tenant secret selectors required");
+        }
+    }
+
     /** Exact root attachment fields whose original uploaded bytes this use case must consume. */
     default Map<String, Integer> businessSourceFileFields() { return Map.of(); }
 

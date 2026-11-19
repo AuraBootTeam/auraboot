@@ -66,6 +66,23 @@ class BusinessArtifactAuthorizationTest {
         return new CommandPublicOutputProjectionPlan(TARGET, null, Map.of("orders", new ModelFields(Set.of("export_file"), Set.of("export_file"), List.of(), List.of()), "lines", lines));
     }
 
+    @Test void exactTenantSecretSelectorsRoundTripWithoutChangingLegacyPublicFingerprints() {
+        var plan=plan(fields(Set.of("name","brand"),List.of()));
+        var reference=new com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.TenantSecretReference("integration","contract","definition");
+        var stamp=BusinessArtifactAuthorization.capture(plan,"export_file",Map.of(),Set.of(reference));
+        assertThat(BusinessArtifactAuthorization.parse(stamp.encode())).isEqualTo(stamp);
+        assertThat(stamp.tenantSecrets()).containsExactly(reference);assertThat(stamp.fingerprint()).isEqualTo(plan.fingerprint());
+        assertThat(BusinessArtifactAuthorization.capture(plan,"export_file").encode()).doesNotContain("tenantSecrets");
+        assertThatThrownBy(()->stamp.tenantSecrets().clear()).isInstanceOf(UnsupportedOperationException.class);
+    }
+    @Test void tenantSecretProvenanceRejectsWildcardsAndOversizedSelectorSets() {
+        assertThatThrownBy(()->new com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.TenantSecretReference("integration","*","definition"))
+            .isInstanceOf(IllegalArgumentException.class);
+        var refs=java.util.stream.IntStream.range(0,9).mapToObj(i->new com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.TenantSecretReference("integration","provider"+i,"definition"))
+            .collect(java.util.stream.Collectors.toSet());
+        assertThatThrownBy(()->BusinessArtifactAuthorization.capture(plan(fields(Set.of("name"),List.of())),"export_file",Map.of(),refs))
+            .isInstanceOf(AccessDeniedException.class);
+    }
     @Test void immutable_source_view_round_trips_without_storing_raw_values() {
         var plan = plan(fields(Set.of("name", "brand"), List.of()));
         var stamp = BusinessArtifactAuthorization.capture(plan, "export_file");
