@@ -64,6 +64,8 @@ class CommandBusinessActorAuthorizationTest {
         for(var action:List.<java.util.function.Consumer<RecordReadAccessor>>of(
             reads->reads.getById("secrets","member"),
             reads->reads.queryPage("members",new DataPageQuery(Map.of("secret","x"),Map.of(),List.of(),1,2)),
+            reads->reads.queryPage("members",new DataPageQuery(Map.of(),Map.of(),List.of(),1,2,"",
+                    Map.of("secret",new DataPageQuery.TimeRange(java.time.Instant.EPOCH,java.time.Instant.EPOCH.plusSeconds(1))))),
             reads->reads.queryPage("members",new DataPageQuery(Map.of(),Map.of(),List.of(new DataPageQuery.Sort("secret",false)),1,2)),
             reads->reads.queryPage("members",new DataPageQuery(Map.of(),Map.of(),List.of(),2,2)),
             reads->reads.queryPage("members",new DataPageQuery(Map.of(),Map.of(),List.of(),1,101)),

@@ -452,7 +452,7 @@ public class BusinessCommandDataAccessorFactory {
                 @Override public DataPage queryPage(String model, DataPageQuery query) {
                     return operation(() -> {
                     requireCallback();
-                    if (query.page() != 1 || !query.anyOfFilters().isEmpty() || !query.sorts().isEmpty()
+                    if (query.page() != 1 || !query.timeRanges().isEmpty() || !query.anyOfFilters().isEmpty() || !query.sorts().isEmpty()
                             || !query.keyword().isEmpty()) throw denied();
                     var rows = query(model, query.exactFilters(), query.size());
                     return new DataPage(rows, rows.size(), 1, query.size());
@@ -507,7 +507,7 @@ public class BusinessCommandDataAccessorFactory {
             model(model);
             Integer limit = pagedLimits.get(model);
             if (limit == null || pagedReadsDirty || query == null || query.exactFilters().isEmpty()
-                    || query.exactFilters().size() > 32 || !query.anyOfFilters().isEmpty()
+                    || query.exactFilters().size() > 32 || !query.timeRanges().isEmpty() || !query.anyOfFilters().isEmpty()
                     || !query.sorts().isEmpty() || !query.keyword().isEmpty()) throw denied();
             var request = new BusinessResourceAuthorization.Request(BusinessResourceAuthorization.Action.QUERY,
                     model, null, null, null, query.exactFilters());

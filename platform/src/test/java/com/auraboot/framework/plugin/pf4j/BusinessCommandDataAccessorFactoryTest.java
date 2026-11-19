@@ -417,13 +417,14 @@ class BusinessCommandDataAccessorFactoryTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(strings={"empty", "sort", "keyword", "any", "oversize"})
+    @org.junit.jupiter.params.provider.ValueSource(strings={"empty", "sort", "keyword", "any", "oversize", "time"})
     void pagedReadsRejectUnreviewedQueryDimensionsBeforeNativeExecution(String variant) throws Exception {
         pagedOwner();
         var query = new DataPageQuery(variant.equals("empty") ? Map.of() : Map.of("parent", "root-1"),
                 variant.equals("any") ? Map.of("qty", List.<Object>of(1,2)) : Map.of(),
                 variant.equals("sort") ? List.of(new DataPageQuery.Sort("pid",false)) : List.of(),
-                1,variant.equals("oversize") ? 3 : 2,variant.equals("keyword") ? "secret" : "");
+                1,variant.equals("oversize") ? 3 : 2,variant.equals("keyword") ? "secret" : "",
+                variant.equals("time") ? Map.of("created_at",new DataPageQuery.TimeRange(java.time.Instant.EPOCH,java.time.Instant.EPOCH.plusSeconds(1))) : Map.of());
         command(scope -> { denied(() -> scope.accessor().queryPage("line", query)); return null; });
         verify(data,never()).list(anyString(),any());
     }

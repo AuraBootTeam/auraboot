@@ -67,6 +67,7 @@ public final class CommandBusinessActorAuthorization {
                 if(query==null || query.page()!=1 || query.size()>100 || !query.keyword().isEmpty())throw reject();
                 var fields=admit(model,query.size());
                 if(!fields.containsAll(query.exactFilters().keySet()) || !fields.containsAll(query.anyOfFilters().keySet())
+                        || !fields.containsAll(query.timeRanges().keySet())
                         || query.sorts().stream().anyMatch(sort->!fields.contains(sort.field())))throw reject();
                 DataPage page;
                 try {page=MetaContext.runWithCommandPermitScope("ALL",()->delegate.queryPage(model,query));}
