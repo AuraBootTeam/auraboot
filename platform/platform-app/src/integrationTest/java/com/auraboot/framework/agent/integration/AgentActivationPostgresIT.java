@@ -84,8 +84,10 @@ class AgentActivationPostgresIT {
         assertThat(String.valueOf(runtime.releaseSpec().get("guardrails"))).contains("test-provider");
         assertThat(jdbc.queryForObject("SELECT employee_id FROM ab_agent_definition WHERE tenant_id=? AND pid=?",Long.class,tenant,pid)).isNull();
         assertThat(jdbc.queryForObject("SELECT user_modified FROM ab_plugin_resource WHERE tenant_id=? AND resource_code=?",Boolean.class,tenant,code)).isTrue();
+        jdbc.update("UPDATE ab_agent_definition SET system_prompt='Unpublished edit' WHERE tenant_id=? AND pid=?",tenant,pid);
         var second=tx.execute(status->activation.activate(tenant,pid,"test-provider",actor));
         assertThat(second.releasePid()).isEqualTo(first.releasePid());assertThat(second.created()).isFalse();assertThat(releases()).isEqualTo(1);
+        assertThat(releases.requireActive(tenant,code).releaseSpec().get("system_prompt")).isEqualTo("Preserved prompt");
     }
     @Test void missingProviderAndForeignIdentityCannotChangeTemplate(){
         String before=state(),protection=tracking();
@@ -100,5 +102,19 @@ class AgentActivationPostgresIT {
         assertThatThrownBy(()->tx.execute(status->service.activate(tenant,pid,"test-provider",actor))).isInstanceOf(BusinessException.class);
         assertThat(state()).isEqualTo(before);assertThat(tracking()).isEqualTo(protection);assertThat(releases()).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_agent_deployment WHERE tenant_id=? AND agent_code=?",Long.class,tenant,code)).isZero();
+    }
+
+    @Test void concurrentActivationCreatesOneRelease() throws Exception {
+        try(var pool=java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var start=new java.util.concurrent.CountDownLatch(1);
+            java.util.concurrent.Callable<AgentReleaseDeploymentService.PublishedRelease> call=()->{
+                MetaContext.setContext(tenant,actor,"activation-reviewer","activation-reviewer");
+                try {start.await();return tx.execute(status->activation.activate(tenant,pid,"test-provider",actor));}
+                finally {MetaContext.clear();}
+            };
+            var first=pool.submit(call);var second=pool.submit(call);start.countDown();
+            var a=first.get(15,java.util.concurrent.TimeUnit.SECONDS);var b=second.get(15,java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(a.releasePid()).isEqualTo(b.releasePid());assertThat(a.created()).isNotEqualTo(b.created());assertThat(releases()).isEqualTo(1);
+        }
     }
 }

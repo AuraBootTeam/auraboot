@@ -64,12 +64,14 @@ public class AgentActivationService {
             if (!providerCode.equals(guardrails.path("provider").asText())) {
                 throw new BusinessException("Agent is already active; edit its draft before publishing changes");
             }
+            AgentReleaseDeploymentService.RuntimeBinding current;
             try {
-                releases.requireActive(tenantId, codes.getFirst());
+                current = releases.requireActive(tenantId, codes.getFirst());
             } catch (IllegalStateException e) {
                 throw new BusinessException("The active Agent deployment is unavailable; review its release before activation");
             }
-            return releases.publish(tenantId, pid, actorUserId);
+            return new AgentReleaseDeploymentService.PublishedRelease(current.deploymentPid(),
+                    current.releasePid(), current.releaseHash(), current.releaseNo(), false);
         }
         if (!"disabled".equals(row.get("status"))) {
             throw new BusinessException("Only a disabled template can be activated; resume a suspended Agent instead");
