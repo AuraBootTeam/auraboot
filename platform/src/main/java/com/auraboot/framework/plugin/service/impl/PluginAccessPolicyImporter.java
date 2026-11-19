@@ -126,7 +126,7 @@ final class PluginAccessPolicyImporter {
                     null, null, dto.getCode(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
         }
 
-        if (support.shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.PERMISSION, dto.getCode())) {
+        if (exists && support.preserveExistingForSafeImport(tenantId, conflictStrategy, ResourceType.PERMISSION, dto.getCode(), pluginPid)) {
             log.info("Skipping user-modified resource: {} {}", ResourceType.PERMISSION, PluginImportSupport.logSafe(dto.getCode()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PERMISSION,
                     null, null, dto.getCode(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);

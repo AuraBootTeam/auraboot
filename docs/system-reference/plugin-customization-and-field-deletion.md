@@ -39,6 +39,26 @@ Page 使用 `ResourceType.PAGE/page`，Dashboard 使用 `ResourceType.DASHBOARD/
 
 真实 PostgreSQL 回归入口：`:platform-app:test --tests '*PluginMenuHandoverIntegrationTest'`。用例覆盖用户认领/修改、显式接管、旧包原声明安全重导、瘦身、停用/卸载、同包重复更新、未知标记、authoringManaged、租户隔离和保留子菜单。它验证菜单服务与数据归属，不等同权限/UI验收，也不证明 Agent、角色等其它类型具备相同接管合同。
 
+## 已退役薄包装的保留式接管
+
+以下旧安装身份退出源码分发，已有资源交给现有安装单元；不会在启动时自动迁移或卸载。
+
+| 旧 plugin ID | 接收安装单元 | 功能提供方 |
+| --- | --- | --- |
+| `com.auraboot.platform-admin-ee` | `com.auraboot.platform-admin` | Enterprise 授权管理附加菜单 |
+| `com.auraboot.d7-knowledge-wiki` | `com.auraboot.core-aurabot` | Enterprise D7 工作台、权限和导航；私有实现/知识不进入 OSS |
+| `com.auraboot.ai-employees` | `com.auraboot.core-aurabot` | OSS Agent；四个角色改为可选模板，已有员工保留 |
+
+模块通过 `META-INF/auraboot/package-replacements/*.json` 声明确切旧身份、接收方、资源白名单和附加声明；Enterprise 合同仅随 Enterprise 制品提供。接收方沿用既有 plugin ID，不新增替代插件。接管只在显式接收方导入事务中运行；既有资源待移交时必须选择 `OVERWRITE_SAFE`，其它策略拒绝。菜单和权限的安全导入保留其它 owner 或已认领资源，角色保留现有授权；接管随后只转移资源行与 tracking 的 owner，不重建内容、不重置 claim/修改标记/基线、不更改原 importId、身份、员工关联或授权绑定。
+
+接管检查租户、事务、完整 tracking、资源 PID、实际 owner、类型/代码白名单和非 NULL 保护状态，异常整笔回滚。旧包退出前重新校验 inventory，仍有未接收资源则拒绝。旧 plugin ID 的重导、版本升级和历史导入回滚均明确拒绝并指向接收方，不静默成功或覆盖接收方。接管成功后可从原生命周期或资源卸载入口退出旧安装记录。必须先升级 Core/Enterprise 制品，再导入接收方；旧版本运行时不具备此合同，不自动迁移生产。
+
+成功导入 receipt 记录 `packageResourcesAdopted`。含接管的导入拒绝通用 import rollback，防止退回旧插件元数据而遗留转交资源；需要恢复时保留接收方并显式审查归属，不提供自动反向接管。
+
+`core-aurabot` 的 `agentTemplates` 仅是提供方无关的配方，只有请求指定 `agentTemplateCodes` 才成为当前导入的 Agent 定义。默认不创建四个员工；模板首次创建为 disabled、不绑定模型或组织身份，启用前由租户配置 provider、工具范围并走既有入职流程。已有认领/修改资源仍按安全策略保留。CLI 接收：`aura plugin publish <receiver-directory> --conflict-strategy overwrite_safe --yes`；选择模板可追加 `--agent-templates aria`。Enterprise 注册表拒绝旧包名，防止跨根目录回退。
+
+原 `defaultBootstrap` 通配授权配置不转为新默授权；既有授权保留，新角色按明确权限初始化。真实 PG 合同用例为 `PluginPackageReplacementIntegrationTest`；Enterprise 声明以相同字节的测试 fixture 验证，不代表已执行 D7 页面、内部知识或授权业务的浏览器验收。
+
 ## Agent 保护、接管与完整恢复
 
 Agent 的 `OVERWRITE_SAFE` 使用锁定的强类型修改状态；读取异常、已跟踪记录的 NULL 标记均拒绝写入，不能按未修改继续。已有未跟踪、用户修改/认领或其它 plugin ID 拥有的定义返回 SKIP，保持内容、评测用例、owner 和基线。同包未修改定义可同步；显式 `OVERWRITE` 仍是操作者选择的替换/接管策略，不会额外授予工具或模型权限。

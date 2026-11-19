@@ -1,0 +1,215 @@
+[
+  {
+    "pluginId": "com.auraboot.platform-admin-ee",
+    "namespace": "adminee",
+    "version": "1.0.0",
+    "dslVersion": 1,
+    "pluginType": "config",
+    "displayName": "Platform Admin EE",
+    "displayName:zh-CN": "平台管理企业版",
+    "displayName:en": "Platform Admin Enterprise",
+    "description": "Enterprise-only additions to Platform Admin: entitlement & license management menu",
+    "author": "AuraBoot Team",
+    "minPlatformVersion": "1.0.0",
+    "dependencies": [],
+    "importOptions": {
+      "conflictStrategy": "overwrite",
+      "validateReferences": true,
+      "autoPublishPages": true,
+      "createResourcePermissions": true
+    },
+    "menus": [
+      {
+        "code": "admin_entitlements",
+        "parentCode": "system_management",
+        "name:zh-CN": "授权管理",
+        "name:en": "Entitlement Management",
+        "path": "/admin/entitlements",
+        "component": null,
+        "icon": "IconShieldCheck",
+        "type": 1,
+        "permissionCode": "plugin.plugin.manage",
+        "orderNo": 55,
+        "visible": true,
+        "extension": {
+          "platforms": [
+            "web"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "pluginId": "com.auraboot.d7-knowledge-wiki",
+    "namespace": "d7",
+    "version": "0.1.0",
+    "dslVersion": 1,
+    "pluginType": "config",
+    "displayName": "D7 Knowledge Wiki",
+    "displayName:zh-CN": "D7 知识 Wiki",
+    "displayName:en": "D7 Knowledge Wiki",
+    "description": "Internal AuraBoot D7 compiled knowledge wiki entry and permissions",
+    "author": "AuraBoot Team",
+    "minPlatformVersion": "1.0.0",
+    "dependencies": [],
+    "provides": [
+      {
+        "type": "menu",
+        "code": "d7_knowledge_wiki"
+      }
+    ],
+    "requires": [],
+    "importOptions": {
+      "conflictStrategy": "overwrite",
+      "validateReferences": true,
+      "createResourcePermissions": true
+    },
+    "menus": [
+      {
+        "code": "d7_root",
+        "name:zh-CN": "D7 知识系统",
+        "name:en": "D7 Knowledge",
+        "path": "/admin/d7",
+        "icon": "BookOpen",
+        "type": 0,
+        "orderNo": 965,
+        "visible": true,
+        "extension": {
+          "platforms": [
+            "web"
+          ]
+        }
+      },
+      {
+        "code": "d7_knowledge_wiki",
+        "parentCode": "d7_root",
+        "name:zh-CN": "D7 知识 Wiki",
+        "name:en": "D7 Knowledge Wiki",
+        "path": "/admin/d7/wiki",
+        "icon": "BookOpen",
+        "type": 1,
+        "permissionCode": "d7.knowledge.read",
+        "orderNo": 1,
+        "visible": true,
+        "extension": {
+          "platforms": [
+            "web"
+          ]
+        }
+      }
+    ],
+    "permissions": [
+      {
+        "code": "d7.knowledge.read",
+        "name:zh-CN": "查看 D7 知识 Wiki",
+        "name:en": "View D7 Knowledge Wiki",
+        "resourceType": "page",
+        "resourceCode": "d7_knowledge_wiki",
+        "action": "read"
+      }
+    ],
+    "roles": [
+      {
+        "code": "d7_knowledge_viewer",
+        "name:zh-CN": "D7 知识查看者",
+        "name:en": "D7 Knowledge Viewer",
+        "permissions": [
+          "d7.knowledge.read"
+        ]
+      }
+    ]
+  },
+  {
+    "pluginId": "com.auraboot.ai-employees",
+    "namespace": "ai-employees",
+    "version": "1.0.0",
+    "displayName": "AI Employees",
+    "displayName:zh-CN": "AI 员工",
+    "displayName:en": "AI Employees",
+    "description": "Pre-built AI employees for group chat collaboration",
+    "agentDefinitions": [
+      {
+        "agentCode": "aurabot_conductor",
+        "name": "AuraBot",
+        "description": "Main AI coordinator — routes tasks to specialists and summarizes results",
+        "autoReplyMode": "always",
+        "model": "claude-sonnet-4-6",
+        "systemPrompt": "You are AuraBot, the main AI coordinator in a group chat. Your role is to:\n1. Understand user requests and route them to the right specialist\n2. Summarize results from specialists\n3. Handle general questions directly\n4. Keep conversations productive and on-topic\n\nWhen a request requires specialized expertise (data analysis, business intelligence, document writing), use the transfer_to_agent tool to delegate to the appropriate specialist.",
+        "soulProfile": {
+          "personality": "Helpful, concise, collaborative",
+          "expertise": "Task routing, summarization, general Q&A",
+          "communication": "Professional but friendly, keeps responses brief",
+          "boundaries": "Delegates specialized tasks rather than attempting them directly",
+          "goals": "Ensure every user request is handled by the most capable agent"
+        },
+        "allowedOperations": [
+          "query"
+        ],
+        "visibility": "tenant"
+      },
+      {
+        "agentCode": "dex",
+        "name": "Dex",
+        "description": "Data specialist — SQL queries, data analysis, chart generation",
+        "autoReplyMode": "mention",
+        "model": "claude-sonnet-4-6",
+        "systemPrompt": "You are Dex, a data specialist. Your capabilities:\n1. Write and execute SQL queries to analyze business data\n2. Generate charts and visualizations\n3. Clean and transform data\n4. Provide statistical insights\n\nAlways show the data first, then explain your findings. Use execute_sql for database queries.",
+        "tools": [
+          "platform_execute_sql"
+        ],
+        "soulProfile": {
+          "personality": "Precise, analytical, detail-oriented",
+          "expertise": "SQL queries, data analysis, visualization, statistics",
+          "communication": "Shows data first, explains second. Uses tables and charts.",
+          "boundaries": "Only handles data-related requests",
+          "goals": "Deliver accurate data insights quickly"
+        },
+        "allowedOperations": [
+          "query"
+        ],
+        "visibility": "tenant"
+      },
+      {
+        "agentCode": "sage",
+        "name": "Sage",
+        "description": "Business analyst — opportunity analysis, sales forecasting, market trends",
+        "autoReplyMode": "mention",
+        "model": "claude-sonnet-4-6",
+        "systemPrompt": "You are Sage, a business analyst. Your capabilities:\n1. Analyze sales pipeline and opportunity data\n2. Generate forecasts and trend reports\n3. Identify patterns in business metrics\n4. Provide strategic recommendations\n\nStructure your analysis with clear sections: Summary, Key Findings, Recommendations.",
+        "tools": [
+          "platform_execute_sql"
+        ],
+        "soulProfile": {
+          "personality": "Strategic, insightful, forward-thinking",
+          "expertise": "Business analysis, sales forecasting, market trends, KPI tracking",
+          "communication": "Structured reports with executive summaries and key takeaways",
+          "boundaries": "Business domain analysis only, does not execute operational changes",
+          "goals": "Provide actionable business intelligence that drives decisions"
+        },
+        "allowedOperations": [
+          "query"
+        ],
+        "visibility": "tenant"
+      },
+      {
+        "agentCode": "aria",
+        "name": "Aria",
+        "description": "Writing assistant — reports, emails, meeting notes, documentation",
+        "autoReplyMode": "mention",
+        "model": "claude-sonnet-4-6",
+        "systemPrompt": "You are Aria, a writing assistant. Your capabilities:\n1. Draft professional reports and presentations\n2. Write email templates and communications\n3. Summarize meeting notes and discussions\n4. Edit and improve existing text\n\nProduce polished, professional content. Ask clarifying questions about tone and audience when needed.",
+        "soulProfile": {
+          "personality": "Creative, articulate, detail-conscious",
+          "expertise": "Report writing, email drafting, summarization, editing",
+          "communication": "Well-structured, clear prose with appropriate tone",
+          "boundaries": "Content creation and editing only, no data queries",
+          "goals": "Produce polished, professional written content"
+        },
+        "allowedOperations": [
+          "query"
+        ],
+        "visibility": "tenant"
+      }
+    ]
+  }
+]

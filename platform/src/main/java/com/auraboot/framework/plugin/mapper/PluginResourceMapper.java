@@ -16,6 +16,10 @@ import java.util.List;
  */
 @Mapper
 public interface PluginResourceMapper extends BaseMapper<PluginResource> {
+    /** Ownership-only adoption invalidates cached source/import lists without replacing baselines. */
+    @Update("UPDATE ab_plugin_resource SET plugin_pid=#{receiver} WHERE tenant_id=#{tenant} AND id=#{id} AND plugin_pid=#{source}")
+    int adoptOwner(@Param("tenant") Long tenant, @Param("id") Long id,
+                   @Param("source") String source, @Param("receiver") String receiver);
 
     /**
      * Find resources by plugin PID.

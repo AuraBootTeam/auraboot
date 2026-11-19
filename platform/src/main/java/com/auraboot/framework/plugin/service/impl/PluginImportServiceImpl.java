@@ -172,6 +172,8 @@ public class PluginImportServiceImpl implements PluginImportService {
 
     private final ObjectMapper objectMapper = createObjectMapper();
     private final PluginPublicPublicationLifecycle publicPublicationLifecycle;
+    @org.springframework.beans.factory.annotation.Autowired
+    private PluginPackageReplacements packageReplacements;
 
     // Cache for in-progress imports (importId -> manifest)
     private final Map<String, ImportContext> importContextCache = new ConcurrentHashMap<>();
@@ -376,6 +378,8 @@ public class PluginImportServiceImpl implements PluginImportService {
 
     private ImportPreviewResult createPreviewFromManifest(PluginManifestExtended manifest, String sourceName,
                                                           String sourceType, boolean deferReferenceValidation) {
+        packageReplacements.requireImportable(manifest.getPluginId());
+        manifest = packageReplacements.contribute(manifest);
         // Fail-fast preview when the manifest is missing pluginId. The downstream
         // ab_plugin_import_history.plugin_id column is NOT NULL; without this guard a
         // malformed manifest (e.g. a plugin.json that uses `code` instead of `pluginId`,
@@ -620,6 +624,8 @@ public class PluginImportServiceImpl implements PluginImportService {
      * rows to be visible — hence the lock must not be inside @Transactional scope.
      */
     private ImportExecuteResult executeWithLock(ImportContext context, ImportRequest request) {
+        packageReplacements.requireImportable(context.getManifest().getPluginId());
+        packageReplacements.selectAgentTemplates(context.getManifest(), request.getAgentTemplateCodes());
         PluginAgentResourceGuard.requireManifest(context.getManifest(), agentDefinitionResources);
         // Merge manifest importOptions as defaults before applying hard defaults.
         // Manifest options only take effect when the request field is null (i.e., not explicitly set by caller).
@@ -805,15 +811,18 @@ public class PluginImportServiceImpl implements PluginImportService {
                         new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}));
             }
             result.setPluginPid(pluginPid);
+            packageReplacements.requireSafeAdoption(manifest.getPluginId(), tenantId, request.getConflictStrategy());
 
             // V2 plans own only physical DDL deferral; logical required remains unchanged.
             try (var migration = modelFieldRenameMigrator.prepare(request.getIdentifierMappingPath(),
                     identifierMappingRoot(context, request), manifest, tenantId, pluginPid, importId)) {
                 var seeds = seedUpgradeContext(tenantId, manifest.getPluginId());
                 importResources(context, request, result, pluginPid, seeds);
+                int adopted = packageReplacements.adopt(manifest.getPluginId(), pluginPid, tenantId);
                 Map<String, Object> receipt = new LinkedHashMap<>();
                 receipt.put("moduleSeedBaselines", seeds.baselines());
                 receipt.put("warnings", new ArrayList<>(result.getWarnings()));
+                receipt.put("packageResourcesAdopted", adopted);
                 context.getHistory().setResult(receipt);
                 if (migration.isV2()) result.setFieldMigrations(migration.complete());
                 else applyIdentifierDataMigration(request, result, tenantId);
@@ -1508,9 +1517,14 @@ public class PluginImportServiceImpl implements PluginImportService {
         if (history == null) {
             throw new PluginException("Import not found: " + importId);
         }
+        packageReplacements.requireImportable(history.getPluginId());
 
         if (!ImportStatus.SUCCESS.code().equals(history.getStatus())) {
             throw new PluginException("Can only rollback successful imports");
+        }
+        if (history.getResult() != null && history.getResult().get("packageResourcesAdopted") instanceof Number adopted
+                && adopted.intValue() > 0) {
+            throw new PluginException("Package adoption cannot use generic import rollback; preserve the receiver and review ownership explicitly");
         }
 
         if (agentDefinitionResources == null) {

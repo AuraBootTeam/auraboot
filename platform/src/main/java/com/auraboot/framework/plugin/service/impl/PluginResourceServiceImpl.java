@@ -58,6 +58,8 @@ public class PluginResourceServiceImpl implements PluginResourceService {
     private final ObjectMapper objectMapper;
     // JdbcTemplate retained only for getCurrentDatabaseState() which requires dynamic table/column queries
     private final JdbcTemplate jdbcTemplate;
+    @org.springframework.beans.factory.annotation.Autowired
+    private PluginPackageReplacements packageReplacements;
 
     // Fields to ignore when comparing states.
     // Superset of SystemFieldConstants.ALL_INFRASTRUCTURE — includes camelCase variants
@@ -367,6 +369,11 @@ public class PluginResourceServiceImpl implements PluginResourceService {
     @Override
     @Transactional
     public UninstallResult executeUninstall(String pluginPid, Long tenantId, UninstallRequest request) {
+        var installed = pluginRecordMapper.findByPid(pluginPid);
+        if (installed == null || !Objects.equals(installed.getTenantId(), tenantId)) {
+            throw new IllegalArgumentException("Plugin tenant does not match uninstall owner");
+        }
+        packageReplacements.requireReadyToExit(installed.getPluginId(), tenantId);
         UninstallPreviewResult preview = generateUninstallPreview(pluginPid, tenantId);
 
         if (!request.isForce() && preview.isHasConflicts()) {

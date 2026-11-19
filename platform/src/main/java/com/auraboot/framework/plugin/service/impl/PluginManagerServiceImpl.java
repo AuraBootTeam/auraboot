@@ -54,6 +54,8 @@ public class PluginManagerServiceImpl implements PluginManagerService {
      * Key: pluginId
      */
     private final Map<String, Plugin> pluginInstances = new ConcurrentHashMap<>();
+    @org.springframework.beans.factory.annotation.Autowired
+    private PluginPackageReplacements packageReplacements;
 
     // ========== PluginManagerService ==========
 
@@ -279,6 +281,7 @@ public class PluginManagerServiceImpl implements PluginManagerService {
     @Transactional
     public PluginOperationResult uninstall(String pluginId, boolean removeData) {
         Long tenantId = MetaContext.getCurrentTenantId();
+        packageReplacements.requireReadyToExit(pluginId, tenantId);
         log.info("Uninstalling plugin: {} for tenant {} (removeData: {})", pluginId, tenantId, removeData);
 
         PluginRecord record = pluginRecordMapper.findByTenantAndPluginId(pluginId);

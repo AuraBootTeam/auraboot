@@ -11,6 +11,8 @@ interface PublishOptions {
   user?: string;
   password?: string;
   yes?: boolean;
+  conflictStrategy?: 'overwrite' | 'overwrite_safe' | 'skip' | 'error';
+  agentTemplates?: string;
 }
 
 /**
@@ -96,12 +98,13 @@ export async function publishCommand(dir: string, options: PublishOptions): Prom
 
     log.info('Uploading manifest...');
     const importParams = new URLSearchParams({
-      conflictStrategy: 'overwrite',
+      conflictStrategy: options.conflictStrategy ?? 'overwrite',
       autoPublishModels: 'true',
       autoPublishFields: 'true',
       autoPublishCommands: 'true',
       autoPublishPages: 'true',
     });
+    if (options.agentTemplates) importParams.set('agentTemplateCodes', options.agentTemplates);
     const importResp = await fetch(
       `${options.target}/api/plugins/import/execute-direct?${importParams}`,
       {

@@ -66,10 +66,15 @@ final class PluginImportSupport {
     /** Safe menu synchronization cannot adopt another plugin family's existing menu. */
     boolean preserveExistingMenuForSafeImport(Long tenantId, ImportRequest.ConflictStrategy strategy,
                                                String resourceCode, String incomingPluginPid) {
+        return preserveExistingForSafeImport(tenantId, strategy, ResourceType.MENU, resourceCode, incomingPluginPid);
+    }
+
+    boolean preserveExistingForSafeImport(Long tenantId, ImportRequest.ConflictStrategy strategy,
+                                           ResourceType type, String resourceCode, String incomingPluginPid) {
         if (strategy != ImportRequest.ConflictStrategy.OVERWRITE_SAFE) return false;
-        PluginResourceMapper.ModificationState state = lockProtectionState(tenantId, ResourceType.MENU, resourceCode);
+        PluginResourceMapper.ModificationState state = lockProtectionState(tenantId, type, resourceCode);
         if (state == null || Boolean.TRUE.equals(state.modified())) return true;
-        var owned = pluginResourceMapper.lockByTypeAndCode(tenantId, ResourceType.MENU.code(), resourceCode);
+        var owned = pluginResourceMapper.lockByTypeAndCode(tenantId, type.code(), resourceCode);
         if (owned == null) throw new PluginException("Menu ownership changed during safe import");
         if (!"shared".equals(owned.getOwnershipType()) && !"plugin_owned".equals(owned.getOwnershipType())) return true;
         Integer sameFamily = jdbcTemplate.queryForObject("""

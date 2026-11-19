@@ -12,7 +12,7 @@ interface ImportOptions {
   dryRun?: boolean;
   token?: string;
   env?: string;
-  conflictStrategy?: 'overwrite' | 'skip' | 'error';
+  conflictStrategy?: 'overwrite' | 'overwrite_safe' | 'skip' | 'error';
 }
 
 interface DryRunResult {

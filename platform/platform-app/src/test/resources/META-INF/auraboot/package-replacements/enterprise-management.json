@@ -1,0 +1,128 @@
+[
+  {
+    "oldPluginId": "com.auraboot.platform-admin-ee",
+    "receiverPluginId": "com.auraboot.platform-admin",
+    "resources": [
+      {
+        "type": "menu",
+        "code": "admin_entitlements"
+      }
+    ],
+    "declarations": {
+      "menus": [
+        {
+          "code": "admin_entitlements",
+          "parentCode": "system_management",
+          "name:zh-CN": "授权管理",
+          "name:en": "Entitlement Management",
+          "path": "/admin/entitlements",
+          "component": null,
+          "icon": "IconShieldCheck",
+          "type": 1,
+          "permissionCode": "plugin.plugin.manage",
+          "orderNo": 55,
+          "visible": true,
+          "extension": {
+            "platforms": [
+              "web"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "oldPluginId": "com.auraboot.d7-knowledge-wiki",
+    "receiverPluginId": "com.auraboot.core-aurabot",
+    "resources": [
+      {
+        "type": "menu",
+        "code": "d7_root"
+      },
+      {
+        "type": "menu",
+        "code": "d7_knowledge_wiki"
+      },
+      {
+        "type": "permission",
+        "code": "d7.knowledge.read"
+      },
+      {
+        "type": "role",
+        "code": "d7_knowledge_viewer"
+      }
+    ],
+    "declarations": {
+      "menus": [
+        {
+          "code": "d7_root",
+          "name:zh-CN": "D7 知识系统",
+          "name:en": "D7 Knowledge",
+          "path": "/admin/d7",
+          "icon": "BookOpen",
+          "type": 0,
+          "orderNo": 965,
+          "visible": true,
+          "extension": {
+            "platforms": [
+              "web"
+            ]
+          }
+        },
+        {
+          "code": "d7_knowledge_wiki",
+          "parentCode": "d7_root",
+          "name:zh-CN": "D7 知识 Wiki",
+          "name:en": "D7 Knowledge Wiki",
+          "path": "/admin/d7/wiki",
+          "icon": "BookOpen",
+          "type": 1,
+          "permissionCode": "d7.knowledge.read",
+          "orderNo": 1,
+          "visible": true,
+          "extension": {
+            "platforms": [
+              "web"
+            ]
+          }
+        }
+      ],
+      "permissions": [
+        {
+          "code": "d7.knowledge.read",
+          "name:zh-CN": "查看 D7 知识 Wiki",
+          "name:en": "View D7 Knowledge Wiki",
+          "resourceType": "page",
+          "resourceCode": "d7_knowledge_wiki",
+          "action": "read"
+        }
+      ],
+      "roles": [
+        {
+          "code": "d7_knowledge_viewer",
+          "name:zh-CN": "D7 知识查看者",
+          "name:en": "D7 Knowledge Viewer",
+          "permissions": [
+            "d7.knowledge.read"
+          ]
+        }
+      ],
+      "i18nResources": [
+        {
+          "key": "menu.d7_root",
+          "source": "import",
+          "refType": "menu",
+          "zh-CN": "D7 知识系统",
+          "en-US": "D7 Knowledge"
+        },
+        {
+          "key": "menu.d7_knowledge_wiki",
+          "source": "import",
+          "refType": "menu",
+          "zh-CN": "D7 知识 Wiki",
+          "en-US": "D7 Knowledge Wiki"
+        }
+      ]
+    }
+  }
+]
