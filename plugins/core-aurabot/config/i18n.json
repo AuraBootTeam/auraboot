@@ -932,5 +932,103 @@
     "zh-CN": "无法读取业务参数，请取消后重试或联系管理员。",
     "en-US": "Business parameters are unavailable. Cancel and try again or contact an administrator.",
     "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.title",
+    "source": "import",
+    "zh-CN": "首次启用并发布",
+    "en-US": "First enable and publish",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.help",
+    "source": "import",
+    "zh-CN": "选择已配置的 AI 服务。此操作将启用该同事并发布首个不可变版本，入职需要另行操作。",
+    "en-US": "Choose a configured AI service. This enables the colleague and publishes its first immutable release. Enrollment is a separate step.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.provider",
+    "source": "import",
+    "zh-CN": "AI 服务",
+    "en-US": "AI service",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.choose",
+    "source": "import",
+    "zh-CN": "请选择 AI 服务",
+    "en-US": "Choose an AI service",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.required",
+    "source": "import",
+    "zh-CN": "请先选择 AI 服务。",
+    "en-US": "Choose an AI service first.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.loadFailed",
+    "source": "import",
+    "zh-CN": "无法加载 AI 服务，请重试后再启用。",
+    "en-US": "AI services could not be loaded. Retry before enabling.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.empty",
+    "source": "import",
+    "zh-CN": "尚未配置 AI 服务，请先前往 AI 设置添加，再返回此处。",
+    "en-US": "No AI service is configured. Add one in AI Settings, then return here.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.settings",
+    "source": "import",
+    "zh-CN": "AI 设置",
+    "en-US": "AI Settings",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.failed",
+    "source": "import",
+    "zh-CN": "启用失败，已保留所选服务。请检查 AI 服务后重试。",
+    "en-US": "Activation failed. Your selection is preserved; retry after checking the AI service.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.busy",
+    "source": "import",
+    "zh-CN": "正在启用并发布…",
+    "en-US": "Enabling and publishing…",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.success",
+    "source": "import",
+    "zh-CN": "AI 同事已启用并发布首个版本，现在可以办理入职。",
+    "en-US": "Colleague enabled and first release published. You can now enroll it.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.disabledHelp",
+    "source": "import",
+    "zh-CN": "此模板尚未启用。请先选择 AI 服务并发布首个版本，再办理入职。",
+    "en-US": "This template is disabled. Choose an AI service and publish its first release before enrollment.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.denied",
+    "source": "import",
+    "zh-CN": "此模板尚未启用，请联系具有运行管理权限的管理员启用。",
+    "en-US": "This template is disabled. Ask an administrator with runtime management permission to enable it.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.beforePublish",
+    "source": "import",
+    "zh-CN": "请先使用页面上方的入口，首次启用并发布此模板。",
+    "en-US": "Enable and publish this template first using the action above.",
+    "refType": "ui"
   }
 ]

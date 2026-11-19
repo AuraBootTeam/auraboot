@@ -102,6 +102,16 @@ describe('Agent release tab', () => {
     expect(get).toHaveBeenCalledWith('/api/agent/definitions/AGENT_1/deployment-policy');
   });
 
+  it('does not publish or fetch deployment policy before a disabled template is enabled', async () => {
+    render(<ReleasesTab agentPid="DISABLED_TEMPLATE" agentUpdatedAt="2026-07-29T10:00:00Z" readOnly={false} disabledTemplate />);
+    await screen.findByTestId('agent-release-history');
+    expect(screen.getByTestId('publish-agent-release')).toBeDisabled();
+    expect(screen.queryByTestId('agent-deployment-policy')).not.toBeInTheDocument();
+    expect(get).toHaveBeenCalledExactlyOnceWith('/api/agent/definitions/DISABLED_TEMPLATE/releases');
+    fireEvent.click(screen.getByTestId('publish-agent-release'));
+    expect(post).not.toHaveBeenCalled();
+  });
+
   it('requires confirmation, publishes, and reloads release history', async () => {
     render(
       <ReleasesTab
