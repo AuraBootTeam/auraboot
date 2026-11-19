@@ -1,9 +1,11 @@
 AuraBoot
 Copyright (c) 2026 The AuraBoot Project and its contributors.
 
-This product is licensed under the Apache License, Version 2.0 with the
-AuraBoot supplementary terms (trademark and commercial-contact provisions
-only) — see LICENSE.txt (AuraBoot License v2.0, Part 1 + Part 2).
+AuraBoot 1.0 platform-owned material in this distribution is licensed under
+AuraBoot Community License 3.0 (source-available), see LICENSE.txt and
+LICENSE-SCOPE.md. Independent packages and third-party components keep their
+own licenses. Previously Apache-licensed copies retain their granted rights;
+the historical root text is preserved in LICENSE-LEGACY-2.0.txt.
 
 ================================================================================
 Third-Party Software

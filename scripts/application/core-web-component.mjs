@@ -19,7 +19,9 @@ function readRegularWebFile(file,limit=Infinity) {
   } finally {closeSync(descriptor);}
 }
 const roots=['packages','web-admin','scripts/application','distribution/application'];
-const files=['VERSION','LICENSE.txt','package.json','pnpm-lock.yaml','pnpm-workspace.yaml'];
+const files=['VERSION','LICENSE.txt','NOTICE','LICENSE-SCOPE.md','LICENSE-LEGACY-2.0.txt',
+  'platform/platform-mybatis-compat/NOTICE.auraboot',
+  'platform/platform-mybatis-compat/licenses/ognl-3.4.17/LICENSE.txt','package.json','pnpm-lock.yaml','pnpm-workspace.yaml'];
 const optional=['.npmrc','tsconfig.json','tsconfig.base.json'];
 const required=[...files,'web-admin/package.json','scripts/application/stage-core-only-artifacts.mjs',
   'scripts/application/core-web-component.mjs','scripts/application/application-contract.mjs'];

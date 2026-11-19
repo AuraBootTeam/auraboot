@@ -52,7 +52,7 @@ test.describe('Community branding baseline', () => {
     await expect(page).toHaveURL(/\/about$/);
     await expect(page.getByTestId('about-page')).toBeVisible();
     await expect(page.getByRole('heading', { name: /AuraBoot/ })).toBeVisible();
-    await expect(page.getByRole('link', { name: /AuraBoot License Agreement/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /AuraBoot Community License 3.0/ })).toBeVisible();
     await expect(page).toHaveTitle('About AuraBoot');
     await page.screenshot({ path: testInfo.outputPath('about-desktop.png'), fullPage: true });
   });

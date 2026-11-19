@@ -72,7 +72,7 @@ test.describe('Standard deployment branding', () => {
       'Northstar Holdings Ltd.',
     );
     await expect(page.getByTestId('about-auraboot-notice')).toContainText(
-      'AuraBoot License Agreement 1.3',
+      'AuraBoot Community License 3.0 (1.0 distribution)',
     );
     await expect(page).toHaveTitle('About Northstar');
     await page.screenshot({ path: testInfo.outputPath('standard-about.png'), fullPage: true });

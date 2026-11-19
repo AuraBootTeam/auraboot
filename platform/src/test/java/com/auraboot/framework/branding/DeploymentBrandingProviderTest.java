@@ -63,6 +63,29 @@ class DeploymentBrandingProviderTest {
     }
 
     @Test
+    void businessBrandingRetainsRightsAfterSupportPeriodAndRejectsWrongEdition() throws Exception {
+        Path config = writeBranding("SO-2026-001", "https://northstar.example.com");
+        MockEnvironment business = signedEnvironment(config)
+                .withProperty("EDITION", "business")
+                .withProperty("AURABOOT_COMMERCIAL_LICENSE_PATH", fixturePath("license-business.json").toString())
+                .withProperty("AURABOOT_COMMERCIAL_LICENSE_SIGNATURE_PATH", fixturePath("license-business.sig").toString())
+                .withProperty("AURABOOT_COMMERCIAL_LICENSE_PUBLIC_KEY_PATH", fixturePath("public-business.pem").toString())
+                .withProperty("AURABOOT_COMMERCIAL_LICENSE_KEY_ID", "test-business-2026-01");
+
+        DeploymentBrandingProvider provider = new DeploymentBrandingProvider(business, new ObjectMapper());
+        assertThat(provider.current().productName()).isEqualTo("Northstar");
+        assertThat(provider.isCommercialBrandingEnabled()).isTrue();
+
+        business.withProperty("EDITION", "standard");
+        assertThatThrownBy(() -> new DeploymentBrandingProvider(business, new ObjectMapper()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("edition does not match");
+        business.withProperty("EDITION", "community");
+        assertThat(new DeploymentBrandingProvider(business, new ObjectMapper()).current())
+                .isEqualTo(BrandingIdentity.community());
+    }
+
+    @Test
     void signedCommercialBrandingRejectsTamperingAndDeploymentMismatch() throws Exception {
         Path config = writeBranding("SO-2026-001", "https://northstar.example.com");
         Path tamperedLicense = tempDirectory.resolve("tampered-license.json");

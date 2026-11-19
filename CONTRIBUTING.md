@@ -214,7 +214,7 @@ See the [plugin development guide](https://docs.auraboot.com) for details.
 
 ## Contributor License Agreement
 
-AuraBoot Community uses [Apache License 2.0 with trademark and commercial-contact supplements](LICENSE.txt). The supplements do not restrict Apache-2.0 rights; proprietary enterprise code and official services have separate commercial agreements. Contributions may be used in the community and commercial editions under the signed [Contributor License Agreement (CLA)](CLA.md); contributors retain their copyright.
+The AuraBoot 1.0 candidate uses the custom source-available [Community License 3.0](LICENSE.txt) for covered platform material. [Independent package licenses and prior Apache grants](LICENSE-SCOPE.md) remain unchanged. Separately proprietary code and services follow their own agreements. Contributions may be used in the community and commercial editions under the signed [Contributor License Agreement (CLA)](CLA.md); contributors retain their copyright.
 
 **On your first pull request**, the CLA Assistant bot will comment with a one-click sign-off instruction. You sign by replying:
 

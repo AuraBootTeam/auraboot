@@ -3,7 +3,10 @@
 This candidate is a Linux amd64 verification artifact, not a published registry
 release. Keep its original archive, SHA-256, `application.lock` and
 `release-receipt.json` together. Read `LICENSE.txt` and `NOTICE` for the bundled
-terms; a website proposal does not replace them.
+terms, plus `LICENSE-SCOPE.md`, the preserved independent package licenses
+and third-party notices. This 1.0 candidate uses Community License 3.0 for
+covered platform-owned material; previously published RC11 Apache grants
+remain unchanged. A website price or candidate build is not a commercial order.
 
 The foundation includes metadata, page configuration, organization, platform
 administration and ownership configuration. It is not the Enterprise Showcase.

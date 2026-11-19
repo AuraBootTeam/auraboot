@@ -125,7 +125,7 @@ export const COMMUNITY_BRANDING: Readonly<BrandingConfig> = Object.freeze({
   supportUrl: 'https://auraboot.com/contact',
   sourceUrl: 'https://github.com/AuraBootTeam/auraboot',
   commercialContactUrl: 'https://auraboot.com/contact',
-  licenseName: 'AuraBoot License Agreement 1.3',
+  licenseName: 'AuraBoot Community License 3.0 (1.0 distribution)',
   licenseUrl: 'https://github.com/AuraBootTeam/auraboot/blob/main/LICENSE.txt',
   copyrightHolder: 'The AuraBoot Project and its contributors',
   aurabootCopyrightHolder: 'The AuraBoot Project and its contributors',
@@ -239,7 +239,7 @@ function printableAsciiText(value: unknown, field: keyof DeploymentBrandingDocum
 }
 
 export function isCommercialEdition(edition: string | undefined): boolean {
-  return ['standard', 'professional', 'enterprise'].includes(edition?.trim().toLowerCase() ?? '');
+  return ['standard', 'business', 'professional', 'enterprise'].includes(edition?.trim().toLowerCase() ?? '');
 }
 
 /**

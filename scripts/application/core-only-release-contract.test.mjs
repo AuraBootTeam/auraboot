@@ -12,6 +12,7 @@ import {canonicalJson,readStructuredFile,resolveApplication,sha256Path} from './
 import {captureCoreWebInputs,coreWebEnvironment,createCoreWebComponent,copyCoreWebComponent,verifyCoreWebComponent,readCoreWebSelection}
   from './core-web-component.mjs';
 import test from 'node:test';
+import { distributionLicenseFiles, copyDistributionLicenses, copyPackageLicense } from './distribution-licenses.mjs';
 
 const root = resolve(import.meta.dirname, '../..');
 const stage = readFileSync(resolve(root, 'scripts/application/stage-core-only-artifacts.mjs'), 'utf8');
@@ -520,7 +521,9 @@ function platformFixture(t) {
 function webComponentFixture(t) {
   const f=platformFixture(t),repo=join(f.directory,'source');mkdirSync(repo);
   const put=(name,body)=>{mkdirSync(path.dirname(join(repo,name)),{recursive:true});writeFileSync(join(repo,name),body);};
-  for(const name of ['VERSION','LICENSE.txt','package.json','pnpm-lock.yaml','pnpm-workspace.yaml',
+  for(const name of ['VERSION','LICENSE.txt','NOTICE','LICENSE-SCOPE.md','LICENSE-LEGACY-2.0.txt',
+    'platform/platform-mybatis-compat/NOTICE.auraboot',
+    'platform/platform-mybatis-compat/licenses/ognl-3.4.17/LICENSE.txt','package.json','pnpm-lock.yaml','pnpm-workspace.yaml',
     'web-admin/package.json','web-admin/app/view.ts','packages/sdk/package.json',
     'scripts/application/stage-core-only-artifacts.mjs','scripts/application/core-web-component.mjs',
     'scripts/application/application-contract.mjs','distribution/application/manifest.json','platform/Backend.java'])put(name,name+'\n');
@@ -785,4 +788,43 @@ test('platform consumer uses the original frozen dataset selection and never res
     writeFileSync(inputs,JSON.stringify({files}));const destination=join(f.directory,name);
     await assert.rejects(consumePlatformArtifacts({...f,inputs,destination}));assert.equal(existsSync(destination),false);
   }
+});
+
+
+test('1.0 distribution retains byte-identical scope, historical and independent third-party licenses', t => {
+  const destination = mkdtempSync(join(tmpdir(), 'aura-license-envelope-'));
+  t.after(() => rmSync(destination, { recursive: true, force: true }));
+  copyDistributionLicenses(root, destination);
+  assert.ok(distributionLicenseFiles.length >= 14);
+  for (const name of distributionLicenseFiles) {
+    assert.deepEqual(readFileSync(join(destination, name)), readFileSync(join(root, name)), name);
+  }
+  assert.match(readFileSync(join(destination, 'LICENSE.txt'), 'utf8'), /source-available/);
+  assert.match(readFileSync(join(destination, 'packages/plugin-sdk/LICENSE'), 'utf8'), /Apache License/);
+});
+
+test('SDK staging and actual npm packing retain the independent Apache license', t => {
+  const destination = mkdtempSync(join(tmpdir(), 'aura-sdk-license-'));
+  t.after(() => rmSync(destination, { recursive: true, force: true }));
+  const source = join(root, 'packages/plugin-sdk');
+  copyPackageLicense(source, destination);
+  const manifest = JSON.parse(readFileSync(join(source, 'package.json'), 'utf8'));
+  writeFileSync(join(destination, 'package.json'), JSON.stringify({
+    name: manifest.name, version: manifest.version, license: manifest.license, files: ['index.js'],
+  }));
+  writeFileSync(join(destination, 'index.js'), 'export const licenseFixture = true;\n');
+  execFileSync('pnpm', ['pack', '--pack-destination', destination], { cwd: destination, stdio: 'pipe' });
+  const archive = readdirSync(destination).filter(name => name.endsWith('.tgz'));
+  assert.equal(archive.length, 1);
+  const bytes = execFileSync('tar', ['-xOf', join(destination, archive[0]), 'package/LICENSE']);
+  assert.deepEqual(bytes, readFileSync(join(source, 'LICENSE')));
+  const packedManifest = JSON.parse(execFileSync('tar', ['-xOf', join(destination, archive[0]), 'package/package.json']));
+  assert.equal(packedManifest.license, 'Apache-2.0');
+  assert.ok(!bytes.toString().includes('AURABOOT COMMUNITY LICENSE'));
+});
+
+test('independent license staging refuses a missing package license rather than borrowing platform terms', t => {
+  const directory = mkdtempSync(join(tmpdir(), 'aura-license-missing-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  assert.throws(() => copyPackageLicense(join(directory, 'missing-sdk'), join(directory, 'out')), /ENOENT/);
 });
