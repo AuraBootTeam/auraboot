@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: 📝 Product feedback / setup question
-    url: https://github.com/AuraBootTeam/auraboot/issues/new/choose
+    url: https://github.com/AuraBootTeam/auraboot/issues/new?template=question.yml
     about: Public setup questions and beta feedback; never include secrets or customer data
   - name: 📚 Documentation
     url: https://auraboot.com/docs/
