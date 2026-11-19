@@ -65,7 +65,7 @@ describe('Card-grid draft form fields', () => {
 
   it('removes invisible fields before placing each card in its own grid', () => {
     setup(true, false, false, true, false, undefined, true);
-    const cards = screen.getAllByTestId('card-grid-card');
+    const cards: HTMLElement[] = screen.getAllByTestId('card-grid-card');
     expect(cards[0].querySelector('[data-testid="grid-item-availableQty"]')).not.toBeNull();
     expect(cards[0].querySelector<HTMLElement>('[data-testid="grid-item-proposedQty"]')!.style.gridColumn).toBe('7 / span 6');
     expect(cards[1].querySelector('[data-testid="grid-item-availableQty"]')).toBeNull();
