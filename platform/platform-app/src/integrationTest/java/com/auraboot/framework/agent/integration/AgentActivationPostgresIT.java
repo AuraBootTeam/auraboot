@@ -44,6 +44,7 @@ class AgentActivationPostgresIT {
     long tenant;
     final long actor = 33L;
     String pid, code;
+    final String pluginPid = UlidGenerator.generate();
 
     @BeforeEach void setup() throws Exception {
         String url=System.getenv("TEST_DATABASE_URL");
@@ -64,8 +65,8 @@ class AgentActivationPostgresIT {
         activation=new AgentActivationService(jdbc,json,providers,tracker,releases);
         code="activation_"+UlidGenerator.generate();
         tx.executeWithoutResult(status->{
-            jdbc.update("INSERT INTO ab_plugin(pid,tenant_id,plugin_id,namespace,version,display_name,status,deleted_flag,manifest) VALUES (?,?,?,?,?,?,?,FALSE,'{}'::jsonb)","activation-plugin",tenant,"com.test.activation","activation","1.0.0","Activation fixture","installed");
-            var resource=importer.importAgentDefinition(AgentDefinitionDTO.builder().agentCode(code).name("Disabled template").systemPrompt("Preserved prompt").status("disabled").tools(List.of()).build(),"activation-plugin","activation-fixture",tenant,ConflictStrategy.OVERWRITE);
+            jdbc.update("INSERT INTO ab_plugin(pid,tenant_id,plugin_id,namespace,version,display_name,status,deleted_flag,manifest) VALUES (?,?,?,?,?,?,?,FALSE,'{}'::jsonb)",pluginPid,tenant,"com.test.activation","activation","1.0.0","Activation fixture","installed");
+            var resource=importer.importAgentDefinition(AgentDefinitionDTO.builder().agentCode(code).name("Disabled template").systemPrompt("Preserved prompt").status("disabled").tools(List.of()).build(),pluginPid,"activation-fixture",tenant,ConflictStrategy.OVERWRITE);
             ledger.insert(resource);pid=resource.getResourcePid();
         });
     }

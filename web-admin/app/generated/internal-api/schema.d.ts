@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 3316b811d6fa6c29c2bb582f19f3ee3c172bea658c9e3a3cd8f0a6ceca24c665
+ * Contract SHA-256: 13c82dd1369bff005633932040fa1203f62ac14bdc7a0d468beec2edd8df7967
  */
 export interface paths {
     "/api/activities": {
@@ -32473,6 +32473,7 @@ export interface components {
         };
         /** @description Directory path and import options */
         DirectoryImportRequest: {
+            agentTemplateCodes?: string[];
             autoDeployProcesses?: boolean;
             autoPublishCommands?: boolean;
             autoPublishFields?: boolean;
@@ -34551,6 +34552,7 @@ export interface components {
             warnings?: string[];
         };
         ImportRequest: {
+            agentTemplateCodes?: string[];
             autoDeployProcesses?: boolean;
             autoPublishCommands?: boolean;
             autoPublishFields?: boolean;
@@ -38670,6 +38672,7 @@ export interface components {
         };
         PluginManifestExtended: {
             agentDefinitions?: components["schemas"]["AgentDefinitionDTO"][];
+            agentTemplates?: components["schemas"]["AgentDefinitionDTO"][];
             applicationModules?: string[];
             author?: string;
             automations?: components["schemas"]["AutomationDefinitionDTO"][];
@@ -75767,6 +75770,7 @@ export interface operations {
     executeDirect: {
         parameters: {
             query?: {
+                agentTemplateCodes?: string[];
                 autoDeployProcesses?: boolean;
                 autoPublishCommands?: boolean;
                 autoPublishFields?: boolean;

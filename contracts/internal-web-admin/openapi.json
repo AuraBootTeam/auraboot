@@ -25961,6 +25961,12 @@
       "DirectoryImportRequest": {
         "description": "Directory path and import options",
         "properties": {
+          "agentTemplateCodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "autoDeployProcesses": {
             "type": "boolean"
           },
@@ -31936,6 +31942,12 @@
       },
       "ImportRequest": {
         "properties": {
+          "agentTemplateCodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "autoDeployProcesses": {
             "type": "boolean"
           },
@@ -43183,6 +43195,12 @@
       "PluginManifestExtended": {
         "properties": {
           "agentDefinitions": {
+            "items": {
+              "$ref": "#/components/schemas/AgentDefinitionDTO"
+            },
+            "type": "array"
+          },
+          "agentTemplates": {
             "items": {
               "$ref": "#/components/schemas/AgentDefinitionDTO"
             },
@@ -103027,6 +103045,17 @@
             "schema": {
               "default": true,
               "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agentTemplateCodes",
+            "required": false,
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
             }
           },
           {
