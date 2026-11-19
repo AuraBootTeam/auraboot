@@ -92,8 +92,13 @@ public class AgentOrganizationServiceImpl implements AgentOrganizationService {
         if (systemUserId == null) {
             systemUserId = systemAgentUserProvisioner.ensureSystemAgentUser(
                     agent.getAgentCode(), agent.getName());
-            agent.setSystemUserId(systemUserId);
-            agentDefinitionMapper.updateById(agent);
+            // Association writes must not serialize unrelated nullable blueprint fields.
+            if (agentDefinitionMapper.update(null, new LambdaUpdateWrapper<AgentDefinition>()
+                    .eq(AgentDefinition::getId, agentId)
+                    .eq(AgentDefinition::getTenantId, tenantId)
+                    .set(AgentDefinition::getSystemUserId, systemUserId)) != 1) {
+                throw new BusinessException("Agent association changed; reload before enrollment");
+            }
         }
 
         // 2. Create or find service tenant_member for this agent's system user
@@ -127,8 +132,13 @@ public class AgentOrganizationServiceImpl implements AgentOrganizationService {
         tenantMemberService.updateMember(serviceMember);
 
         // 5. Update agent_definition.employee_id
-        agent.setEmployeeId(employeeId);
-        agentDefinitionMapper.updateById(agent);
+        if (agentDefinitionMapper.update(null, new LambdaUpdateWrapper<AgentDefinition>()
+                .eq(AgentDefinition::getId, agentId)
+                .eq(AgentDefinition::getTenantId, tenantId)
+                .isNull(AgentDefinition::getEmployeeId)
+                .set(AgentDefinition::getEmployeeId, employeeId)) != 1) {
+            throw new BusinessException("Agent association changed; reload before enrollment");
+        }
         releaseDeploymentService.bindEmployee(
                 tenantId,
                 agent.getAgentCode(),
