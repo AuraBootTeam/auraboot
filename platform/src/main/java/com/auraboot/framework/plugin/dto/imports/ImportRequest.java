@@ -23,6 +23,8 @@ import lombok.Data;
 @Builder
 @AllArgsConstructor
 public class ImportRequest {
+    /** Explicit opt-in to provider-neutral Agent recipes; never populated by default installation. */
+    private java.util.List<String> agentTemplateCodes;
 
     /**
      * No-arg constructor with defaults — annotated @JsonCreator to force Jackson

@@ -9,6 +9,8 @@ public interface AgentDefinitionResourceLifecycle {
     boolean exists(Long tenantId, String agentCode);
     PluginResource importAgentDefinition(AgentDefinitionDTO dto, String pluginPid, String importId,
                                         Long tenantId, ImportRequest.ConflictStrategy conflictStrategy);
+    /** Withdraw the current owned import image, refusing changed content or protection state. */
     void rollback(PluginResource resource);
+    /** Restore a versioned pre-import image and tracking; this is not an arbitrary undelete API. */
     void restore(PluginResource resource);
 }

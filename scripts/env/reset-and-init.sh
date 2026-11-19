@@ -92,7 +92,7 @@ fi
 
 resolve_enterprise_root() {
   if [ -n "${AURA_ENTERPRISE_ROOT:-}" ]; then
-    if [ -f "$AURA_ENTERPRISE_ROOT/plugins/platform-admin-ee/plugin.json" ]; then
+    if [ -f "$AURA_ENTERPRISE_ROOT/scripts/plugins-registry.json" ] && [ -f "$AURA_ENTERPRISE_ROOT/platform/platform-enterprise-core/build.gradle" ]; then
       (cd "$AURA_ENTERPRISE_ROOT" && pwd)
       return
     fi
@@ -105,7 +105,7 @@ resolve_enterprise_root() {
     "$PROJECT_ROOT/../auraboot-enterprise" \
     "$PROJECT_ROOT/../../auraboot-enterprise"
   do
-    if [ -f "$candidate/plugins/platform-admin-ee/plugin.json" ]; then
+    if [ -f "$candidate/scripts/plugins-registry.json" ] && [ -f "$candidate/platform/platform-enterprise-core/build.gradle" ]; then
       (cd "$candidate" && pwd)
       return
     fi

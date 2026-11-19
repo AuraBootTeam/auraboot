@@ -2,6 +2,7 @@ package com.auraboot.framework.agent.service;
 
 import com.auraboot.framework.agent.entity.AgentDefinition;
 import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
+import com.auraboot.framework.exception.BusinessException;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -61,10 +62,14 @@ public class AgentLifecycleService {
 
     private Transition transition(String agentPid, String target, Long actorUserId, String reason) {
         AgentDefinition agent = agentDefinitionMapper.findByPid(agentPid);
-        if (agent == null) {
+        if (agent == null || !java.util.Objects.equals(agent.getTenantId(),
+                com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId())) {
             throw new IllegalArgumentException("Agent not found: " + agentPid);
         }
         String previous = agent.getStatus();
+        if (!STATUS_ACTIVE.equals(previous) && !STATUS_SUSPENDED.equals(previous)) {
+            throw new BusinessException("Activate the disabled template before using suspend or resume");
+        }
         if (target.equals(previous)) {
             return new Transition(agentPid, agent.getAgentCode(), previous, target, false);
         }
@@ -73,11 +78,12 @@ public class AgentLifecycleService {
         int updated = agentDefinitionMapper.update(null, new LambdaUpdateWrapper<AgentDefinition>()
                 .eq(AgentDefinition::getPid, agentPid)
                 .eq(AgentDefinition::getTenantId, agent.getTenantId())
+                .eq(AgentDefinition::getStatus, previous)
                 .set(AgentDefinition::getStatus, target)
                 .set(AgentDefinition::getUpdatedBy, actorUserId)
                 .set(AgentDefinition::getUpdatedAt, Instant.now()));
         if (updated == 0) {
-            throw new IllegalStateException("Agent lifecycle update matched no row: " + agentPid);
+            throw new BusinessException("Agent state changed; reload before changing its lifecycle");
         }
         releaseDeploymentService.setDeploymentStatus(
                 agent.getTenantId(),

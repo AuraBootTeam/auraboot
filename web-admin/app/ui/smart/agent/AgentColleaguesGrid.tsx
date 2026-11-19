@@ -342,8 +342,11 @@ export function AgentColleaguesGrid(_props?: { block?: unknown; runtime?: unknow
   const toast = useToastContext();
   const [agents, setAgents] = useState<AgentRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<'denied' | 'failed' | null>(null);
 
   const fetchAgents = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
     try {
       const res = await get<{ records: AgentRecord[]; total: number }>(
         '/api/dynamic/agent-definition/list',
@@ -351,8 +354,13 @@ export function AgentColleaguesGrid(_props?: { block?: unknown; runtime?: unknow
       );
       if (ResultHelper.isSuccess(res) && res.data?.records) {
         setAgents(res.data.records);
+      } else {
+        setAgents([]);
+        setLoadError(String(res.code) === '403' ? 'denied' : 'failed');
       }
     } catch {
+      setAgents([]);
+      setLoadError('failed');
       toast.showErrorToast(
         t('ai.colleagues.error.loadFailed', undefined, 'Failed to load AI colleagues'),
       );
@@ -391,14 +399,14 @@ export function AgentColleaguesGrid(_props?: { block?: unknown; runtime?: unknow
             {t('ai.colleagues.subtitle', undefined, 'Manage your AI team members')}
           </p>
         </div>
-        <button
+        {!loadError && !loading && <button
           onClick={handleCreate}
           className="bg-accent hover:bg-accent-hover inline-flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors"
           data-testid="create-agent-btn"
         >
           <PlusIcon className="h-4 w-4" />
           {t('ai.colleagues.create', undefined, 'Create AI Colleague')}
-        </button>
+        </button>}
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -411,6 +419,12 @@ export function AgentColleaguesGrid(_props?: { block?: unknown; runtime?: unknow
             <CardSkeleton />
             <CardSkeleton />
           </>
+        ) : loadError ? (
+          <div role="alert" data-testid="agent-list-error" className="border-border bg-panel col-span-full rounded-xl border p-6">
+            <h2 className="text-text font-semibold">{loadError === 'denied' ? t('ai.colleagues.list.denied', undefined, 'You do not have permission to view AI colleagues') : t('ai.colleagues.error.loadFailed', undefined, 'Failed to load AI colleagues')}</h2>
+            <p className="text-text-3 mt-2 text-sm">{loadError === 'denied' ? t('ai.colleagues.list.deniedHelp', undefined, 'Ask an administrator for access. No colleague data is shown.') : t('ai.colleagues.list.retryHelp', undefined, 'Check your connection and try again.')}</p>
+            <button type="button" onClick={() => void fetchAgents()} className="border-border mt-4 rounded-lg border px-3 py-2 text-sm">{t('common.retry', undefined, 'Retry')}</button>
+          </div>
         ) : sortedAgents.length === 0 ? (
           <EmptyState onCreate={handleCreate} />
         ) : (

@@ -55,7 +55,7 @@ const REQUIRED_PLUGINS = [
   'pcba-compliance',
   'pcba-finance',
   'pcba-sales',
-  'pcba-warehouse',
+
 ];
 
 const PAGE_KEYS = {

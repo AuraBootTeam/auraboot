@@ -95,7 +95,7 @@ const REQUIRED_PLUGINS = [
   'pcba-compliance',
   'pcba-finance',
   'pcba-sales',
-  'pcba-warehouse',
+
 ];
 
 function escapeRegExp(value: string): string {

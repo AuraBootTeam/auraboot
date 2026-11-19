@@ -739,6 +739,8 @@ plugin
   .option('-u, --user <email>', 'Login email')
   .option('-p, --password <password>', 'Login password')
   .option('--yes', 'Skip confirmation prompts')
+  .option('--conflict-strategy <strategy>', 'Conflict strategy: overwrite | overwrite_safe | skip | error', 'overwrite')
+  .option('--agent-templates <codes>', 'Explicit comma-separated Agent template codes; omitted by default')
   .action(async (dir: string | undefined, options: any) => {
     await publishCommand(dir || '.', options);
   });
