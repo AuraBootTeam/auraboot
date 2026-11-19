@@ -510,6 +510,28 @@ class BusinessCommandDataAccessorFactoryTest {
         assertThat(holder.isRollbackOnly()).isTrue();
     }
 
+    @Test void structuredInventoryCannotDisagreeWithTheCapturedPublicPlan() throws Exception {
+        publicOwner();owner.structuredFields=Map.of("line",Set.of("qty"));
+        assertThatThrownBy(()->command(scope->null)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(holder.isRollbackOnly()).isTrue();
+    }
+    @Test void currentArtifactSlotsMustBelongToTheFiniteArtifactInventory() {
+        owner.currentFields=Set.of("file");
+        assertThatThrownBy(()->command(scope->null)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(holder.isRollbackOnly()).isTrue();
+    }
+    @Test void structuredInventoryCannotChangeDuringTheInvocation() throws Exception {
+        publicOwner();command(scope->{
+            owner.structuredFields=Map.of("line",Set.of("qty"));
+            denied(()->scope.accessor().getById("line","line-1"));return null;
+        });assertThat(holder.isRollbackOnly()).isTrue();
+    }
+    @Test void freshInvocationCannotChangeStructuredSourceSemantics() throws Exception {
+        publicOwner();owner.structuredFields=Map.of("line",Set.of("qty"));
+        var replacement=new Owner();replacement.readIsolation=owner.readIsolation;replacement.publicFields=owner.publicFields;owner.invocation=replacement;
+        assertThatThrownBy(()->command(scope->null)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(mapper);
+    }
     @Test void publicOutputRequiresThePreparedDeclarationAndHostService() throws Exception {
         publicOwner(); context.setPublicOutputProjection(null);
         assertThatThrownBy(() -> command(scope -> null)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
@@ -736,7 +758,9 @@ class BusinessCommandDataAccessorFactoryTest {
         ReadIsolation readIsolation;
         Map<String,Integer> pagedLimits = Map.of();
         Map<String,Set<String>> publicFields = Map.of();
+        Map<String,Set<String>> structuredFields = Map.of();
         Map<String,Integer> artifactFields = Map.of();
+        Set<String> currentFields=Set.of();
         Map<String,Integer> sourceFileFields = Map.of();
         Map<String,BusinessResultField> resultProjection = Map.of();
         boolean denyLineRead;
@@ -744,7 +768,9 @@ class BusinessCommandDataAccessorFactoryTest {
         public BusinessResourceAuthorization newInvocationAuthorization() { return invocation == null ? this : invocation; }
         public Map<String,Integer> pagedBusinessResourceRowLimits() { return pagedLimits; }
         public Map<String,Set<String>> publicBusinessResourceFields() { return publicFields; }
+        public Map<String,Set<String>> publicBusinessResourceStructuredFields() { return structuredFields; }
         public Map<String,Integer> businessArtifactFields() { return artifactFields; }
+        public Set<String> businessCurrentArtifactFields() { return currentFields; }
         public Map<String,Integer> businessSourceFileFields() { return sourceFileFields; }
         public ReadIsolation resourceReadIsolation() { return readIsolation; }
         public Set<String> optionalBusinessResourceModels() { return optionalReference ? Set.of("reference") : Set.of(); }

@@ -68,6 +68,21 @@ class BusinessArtifactAccessGuardTest {
         when(projection.prepare(any(), same(owner))).thenReturn(plan);
     }
     @AfterEach void clear() { MetaContext.clear(); }
+    @Test void currentOnlySlotsRejectReplacedOrClearedFilePointersWithoutRelyingOnCreator() {
+        when(owner.businessCurrentArtifactFields()).thenReturn(Set.of("export_file"));
+        var current=new java.util.HashMap<String,Object>(root);current.put("export_file",file.getPid());
+        when(data.getByIdForAuthorization("orders",PID)).thenReturn(current);
+        when(authorization.resolve(eq(30L),anyList(),eq("orders"),eq(current))).thenReturn(allowed);
+        when(authorization.resolveModelRead(30L,"orders",current)).thenReturn(denied);
+        guard.authorize(file);
+        current.put("export_file","01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        assertThatThrownBy(()->guard.authorize(file)).isInstanceOf(AccessDeniedException.class);
+        current.remove("export_file");assertThatThrownBy(()->guard.authorize(file)).isInstanceOf(AccessDeniedException.class);
+    }
+    @Test void anUndeclaredCurrentSlotCannotChangeArtifactAccessSemantics() {
+        when(owner.businessCurrentArtifactFields()).thenReturn(Set.of("other_file"));
+        assertThatThrownBy(()->guard.authorize(file)).isInstanceOf(AccessDeniedException.class);
+    }
     @Test void an_owner_requiring_root_relationships_rejects_an_older_unbound_stamp() {
         when(owner.businessArtifactRootBindingFields()).thenReturn(Set.of("project"));
         assertThatThrownBy(() -> guard.authorize(file)).isInstanceOf(AccessDeniedException.class);

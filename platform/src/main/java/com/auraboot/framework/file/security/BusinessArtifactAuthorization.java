@@ -115,7 +115,8 @@ public record BusinessArtifactAuthorization(int version, Long tenantId, String c
         if (!models.keySet().equals(current.models().keySet())) return false;
         for (var entry : models.entrySet()) {
             var before = entry.getValue(); var now = current.models().get(entry.getKey());
-            if (!before.declared().equals(now.declared()) || !now.readable().containsAll(before.readable())) return false;
+            if (!before.declared().equals(now.declared()) || !before.structured().equals(now.structured())
+                    || !now.readable().containsAll(before.readable())) return false;
             for (String field : before.readable()) {
                 var policy = now.policyMasks().stream().filter(mask -> field.equals(mask.field())).toList();
                 var detail = now.detailMasks().stream().filter(mask -> field.equals(mask.field())).toList();

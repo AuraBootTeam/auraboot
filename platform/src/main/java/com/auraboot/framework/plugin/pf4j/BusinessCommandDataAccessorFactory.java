@@ -72,7 +72,9 @@ public class BusinessCommandDataAccessorFactory {
                 || !Objects.equals(owner.resourceReadIsolation(), invocationOwner.resourceReadIsolation())
                 || !Objects.equals(owner.independentBusinessReadModels(), invocationOwner.independentBusinessReadModels())
                 || !Objects.equals(owner.publicBusinessResourceFields(), invocationOwner.publicBusinessResourceFields())
+                || !Objects.equals(owner.publicBusinessResourceStructuredFields(), invocationOwner.publicBusinessResourceStructuredFields())
                 || !Objects.equals(owner.businessArtifactFields(), invocationOwner.businessArtifactFields())
+                || !Objects.equals(owner.businessCurrentArtifactFields(), invocationOwner.businessCurrentArtifactFields())
                 || !Objects.equals(owner.businessSourceFileFields(), invocationOwner.businessSourceFileFields())
                 || !Objects.equals(owner.businessArtifactRootBindingFields(), invocationOwner.businessArtifactRootBindingFields())
                 || !Objects.equals(owner.businessArtifactIntentBindingFields(), invocationOwner.businessArtifactIntentBindingFields())
@@ -119,7 +121,9 @@ public class BusinessCommandDataAccessorFactory {
         private record OutputSource(Map<String,Object> raw, Map<String,Object> projected) {}
         private final Map<SourceKey,OutputSource> outputSources = new HashMap<>();
         private Map<String,Set<String>> publicDeclarations;
+        private Map<String,Set<String>> structuredDeclarations;
         private Map<String,Integer> artifactFields;
+        private Set<String> currentArtifactFields;
         private Map<String,Integer> sourceFileFields;
         private final Map<String,byte[]> sourceBytes = new HashMap<>();
         private final Map<String,String> sourcePids = new HashMap<>();
@@ -167,10 +171,12 @@ public class BusinessCommandDataAccessorFactory {
             if (context.getPublicOutputProjection() != outputPlan
                     || sourceFileFields != null && !sourceFileFields.equals(owner.businessSourceFileFields())
                     || artifactFields != null && !artifactFields.equals(owner.businessArtifactFields())
+                    || currentArtifactFields != null && !currentArtifactFields.equals(owner.businessCurrentArtifactFields())
                     || artifactBindingFields != null && !artifactBindingFields.equals(owner.businessArtifactRootBindingFields())
                     || artifactIntentFields != null && !artifactIntentFields.equals(owner.businessArtifactIntentBindingFields())
                     || artifactBinding != null && !artifactBinding.equals(context.getArtifactRootBinding())
-                    || publicDeclarations != null && !publicDeclarations.equals(owner.publicBusinessResourceFields())) throw denied();
+                    || publicDeclarations != null && !publicDeclarations.equals(owner.publicBusinessResourceFields())
+                    || structuredDeclarations != null && !structuredDeclarations.equals(owner.publicBusinessResourceStructuredFields())) throw denied();
             if (readIsolation != null) {
                 try { if (connection.getTransactionIsolation() != readIsolation.jdbcLevel()) throw denied(); }
                 catch (SQLException failure) { throw new IllegalStateException("Cannot validate business source isolation", failure); }
@@ -230,7 +236,14 @@ public class BusinessCommandDataAccessorFactory {
             pagedLimits = Map.copyOf(owner.pagedBusinessResourceRowLimits());
             publicDeclarations = owner.publicBusinessResourceFields().entrySet().stream().collect(
                     java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey, entry -> Set.copyOf(entry.getValue())));
+            structuredDeclarations = owner.publicBusinessResourceStructuredFields().entrySet().stream().collect(
+                    java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey, entry -> Set.copyOf(entry.getValue())));
+            if(!publicDeclarations.keySet().containsAll(structuredDeclarations.keySet())
+                    || structuredDeclarations.entrySet().stream().anyMatch(entry -> entry.getValue().isEmpty()
+                        || !publicDeclarations.get(entry.getKey()).containsAll(entry.getValue())))throw denied();
             artifactFields = Map.copyOf(owner.businessArtifactFields());
+            currentArtifactFields=Set.copyOf(owner.businessCurrentArtifactFields());
+            if(!artifactFields.keySet().containsAll(currentArtifactFields))throw denied();
             sourceFileFields = Map.copyOf(owner.businessSourceFileFields());
             if (sourceFileFields.size() > 8 || sourceFileFields.values().stream().anyMatch(limit -> limit < 1 || limit > 67_108_864)
                     || sourceFileFields.values().stream().mapToLong(Integer::longValue).sum() > 67_108_864
@@ -250,6 +263,8 @@ public class BusinessCommandDataAccessorFactory {
                         || !Objects.equals(outputPlan.target(), witness)
                         || !publicDeclarations.keySet().equals(outputPlan.models().keySet())
                         || publicDeclarations.entrySet().stream().anyMatch(entry -> !entry.getValue().equals(outputPlan.models().get(entry.getKey()).declared()))
+                        || publicDeclarations.keySet().stream().anyMatch(model -> !structuredDeclarations.getOrDefault(model,Set.of())
+                            .equals(outputPlan.models().get(model).structured()))
                         || !dependencies.containsAll(publicDeclarations.keySet())
                         || readIsolation != BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ
                             && readIsolation != BusinessResourceAuthorization.ReadIsolation.SERIALIZABLE) throw denied();

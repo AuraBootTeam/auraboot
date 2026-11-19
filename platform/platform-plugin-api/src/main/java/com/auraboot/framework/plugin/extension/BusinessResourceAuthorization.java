@@ -72,14 +72,22 @@ public interface BusinessResourceAuthorization {
     default Map<String, Integer> pagedBusinessResourceRowLimits() { return Map.of(); }
 
     /**
-     * Finite scalar source fields that may contribute to a public artifact. This declaration
+     * Finite source fields that may contribute to a public artifact; structured fields need a separate opt-in. This declaration
      * does not grant user field visibility: the host separately applies the current public
      * field policy. Empty by default; internal raw resource reads remain separate.
      */
     default Map<String, Set<String>> publicBusinessResourceFields() { return Map.of(); }
 
+    /** Explicit JSON fields from the public source inventory, treated as atomic visible fields.
+     * Hidden fields are omitted; readable structured fields with masks fail closed. Default closed.
+     */
+    default Map<String, Set<String>> publicBusinessResourceStructuredFields() { return Map.of(); }
+
     /** Finite root file fields and maximum artifact bytes; no arbitrary file capability by default. */
     default Map<String, Integer> businessArtifactFields() { return Map.of(); }
+
+    /** Single-file slots whose readable bytes must still equal the root's current file PID. */
+    default Set<String> businessCurrentArtifactFields() { return Set.of(); }
 
     /** Exact root attachment fields whose original uploaded bytes this use case must consume. */
     default Map<String, Integer> businessSourceFileFields() { return Map.of(); }
