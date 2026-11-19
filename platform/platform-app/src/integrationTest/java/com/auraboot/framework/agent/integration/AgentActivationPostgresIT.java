@@ -104,6 +104,34 @@ class AgentActivationPostgresIT {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_agent_deployment WHERE tenant_id=? AND agent_code=?",Long.class,tenant,code)).isZero();
     }
 
+    @Test void releaseViewComparesBlueprintRatherThanLifecycleTimestampAndScopesChoices(){
+        tx.execute(status->activation.activate(tenant,pid,"test-provider",actor));
+        var original=releases.listReleases(tenant,pid).getFirst();
+        assertThat(original.get("matches_draft")).isEqualTo(true);
+        jdbc.update("UPDATE ab_agent_definition SET status='suspended',updated_at=CURRENT_TIMESTAMP WHERE tenant_id=? AND pid=?",tenant,pid);
+        releases.setDeploymentStatus(tenant,code,"active","suspended",actor);
+        var paused=releases.listReleases(tenant,pid).getFirst();
+        assertThat(paused.get("matches_draft")).isEqualTo(true);
+        assertThat(paused.get("deployed")).isEqualTo(true);
+        assertThat(paused.get("deployment_status")).isEqualTo("suspended");
+        jdbc.update("INSERT INTO ab_tenant(id,pid,name) VALUES (?,?,?)",tenant,UlidGenerator.generate(),"Release view tenant");
+        jdbc.update("INSERT INTO ab_tenant(id,pid,name) VALUES (?,?,?)",tenant+1,UlidGenerator.generate(),"Foreign release view tenant");
+        long roleId=10_000_000_000_000_000L+tenant;
+        jdbc.update("INSERT INTO ab_role(id,pid,tenant_id,name,code,status,deleted_flag) VALUES (?,?,?,?,?,'active',FALSE)", roleId,UlidGenerator.generate(),tenant,"Allowed review team","review_"+code);
+        jdbc.update("INSERT INTO ab_role(id,pid,tenant_id,name,code,status,deleted_flag) VALUES (?,?,?,?,?,'active',FALSE)", roleId+1,UlidGenerator.generate(),tenant+1,"Foreign review team","foreign_"+code);
+        jdbc.update("UPDATE ab_agent_deployment SET channel_policy=?::jsonb WHERE tenant_id=? AND agent_code=?", "{\"allowedRoleIds\":["+roleId+"]}",tenant,code);
+        var policy=releases.getDeploymentPolicy(tenant,pid).channelPolicy();
+        assertThat(policy.get("allowedRoleIds")).isEqualTo(List.of(String.valueOf(roleId)));
+        assertThat(String.valueOf(policy.get("subjectChoices"))).contains("Allowed review team").doesNotContain("Foreign review team");
+        jdbc.update("UPDATE ab_agent_definition SET status='active',updated_at=CURRENT_TIMESTAMP WHERE tenant_id=? AND pid=?",tenant,pid);
+        releases.setDeploymentStatus(tenant,code,"suspended","active",actor);
+        assertThat(releases.listReleases(tenant,pid).getFirst().get("matches_draft")).isEqualTo(true);
+        jdbc.update("UPDATE ab_agent_definition SET system_prompt='Real unpublished change' WHERE tenant_id=? AND pid=?",tenant,pid);
+        assertThat(releases.listReleases(tenant,pid).getFirst().get("matches_draft")).isEqualTo(false);
+        assertThat(releases.listReleases(tenant+1,pid)).isEmpty();
+        assertThatThrownBy(()->releases.getDeploymentPolicy(tenant+1,pid)).isInstanceOf(IllegalArgumentException.class);
+    }
+
     @Test void concurrentActivationCreatesOneRelease() throws Exception {
         try(var pool=java.util.concurrent.Executors.newFixedThreadPool(2)) {
             var start=new java.util.concurrent.CountDownLatch(1);

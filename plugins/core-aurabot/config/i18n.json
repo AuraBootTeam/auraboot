@@ -1142,5 +1142,117 @@
     "zh-CN": "入职失败，请检查部门和岗位后重试。",
     "en-US": "Enrollment failed. Check the department and position, then retry.",
     "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.list.denied",
+    "source": "import",
+    "zh-CN": "您没有查看 AI 同事的权限",
+    "en-US": "You do not have permission to view AI colleagues",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.list.deniedHelp",
+    "source": "import",
+    "zh-CN": "请联系管理员申请访问权限，当前未显示任何同事数据。",
+    "en-US": "Ask an administrator for access. No colleague data is shown.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.list.retryHelp",
+    "source": "import",
+    "zh-CN": "请检查网络连接后重试。",
+    "en-US": "Check your connection and try again.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.releases.paused",
+    "source": "import",
+    "zh-CN": "当前版本 · 已暂停",
+    "en-US": "Current version · suspended",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.policy.subject.allowedUserIds",
+    "source": "import",
+    "zh-CN": "允许的用户",
+    "en-US": "Allowed users",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.policy.subject.allowedMemberIds",
+    "source": "import",
+    "zh-CN": "允许的组织成员",
+    "en-US": "Allowed organization members",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.policy.subject.allowedRoleIds",
+    "source": "import",
+    "zh-CN": "允许的角色",
+    "en-US": "Allowed roles",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.policy.unnamed",
+    "source": "import",
+    "zh-CN": "未命名的人员或角色",
+    "en-US": "Unnamed person or role",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.policy.unavailable",
+    "source": "import",
+    "zh-CN": "不可用的原选择 {number}",
+    "en-US": "Unavailable selection {number}",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.policy.selectionHelp",
+    "source": "import",
+    "zh-CN": "选择名称可限制访问范围；清空选择则沿用租户兼容访问。",
+    "en-US": "Select names to restrict access. Clear the selection to keep tenant-compatible access.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.type.reactive",
+    "source": "import",
+    "zh-CN": "响应型同事",
+    "en-US": "Reactive colleague",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.type.copilot",
+    "source": "import",
+    "zh-CN": "协作助手",
+    "en-US": "Copilot",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.type.autonomous",
+    "source": "import",
+    "zh-CN": "自主执行型",
+    "en-US": "Autonomous colleague",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.type.proactive",
+    "source": "import",
+    "zh-CN": "主动协作型",
+    "en-US": "Proactive colleague",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.type.workflow",
+    "source": "import",
+    "zh-CN": "流程执行型",
+    "en-US": "Workflow colleague",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.releases.unknown",
+    "source": "import",
+    "zh-CN": "暂时无法核对草稿内容，请刷新后重试。",
+    "en-US": "Draft content could not be compared. Refresh to retry.",
+    "refType": "ui"
   }
 ]

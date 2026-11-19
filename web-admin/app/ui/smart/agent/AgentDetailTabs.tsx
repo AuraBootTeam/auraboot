@@ -136,6 +136,8 @@ interface AgentReleaseItem {
   source_updated_at: string | null;
   published_at: string;
   deployed: boolean;
+  matches_draft?: boolean;
+  deployment_status?: string;
 }
 
 interface AgentDeploymentPolicy {
@@ -144,9 +146,10 @@ interface AgentDeploymentPolicy {
     version?: string;
     allowedChannels?: string[];
     allowedInitiatorTypes?: string[];
-    allowedUserIds?: number[];
-    allowedMemberIds?: number[];
-    allowedRoleIds?: number[];
+    allowedUserIds?: (string | number)[];
+    allowedMemberIds?: (string | number)[];
+    allowedRoleIds?: (string | number)[];
+    subjectChoices?: Record<string, { id: string; name: string | null }[]>;
   };
   policySnapshot: Record<string, unknown>;
 }
@@ -322,7 +325,7 @@ function ProfileTab({
               >
                 {AGENT_TYPES.map((type) => (
                   <option key={type} value={type}>
-                    {type}
+                    {t(`ai.colleagues.type.${type}`, undefined, 'AI colleague')}
                   </option>
                 ))}
               </select>
@@ -2640,16 +2643,6 @@ export function ReleasesTab({
     });
   };
 
-  const parseIds = (value: string) =>
-    Array.from(
-      new Set(
-        value
-          .split(',')
-          .map((item) => Number(item.trim()))
-          .filter((item) => Number.isSafeInteger(item) && item > 0),
-      ),
-    );
-
   const saveDeploymentPolicy = async () => {
     if (!deploymentPolicy) return;
     setPolicySaving(true);
@@ -2741,9 +2734,7 @@ export function ReleasesTab({
   };
 
   const deployed = releases.find((release) => release.deployed);
-  const unpublishedChanges =
-    !deployed?.source_updated_at ||
-    new Date(agentUpdatedAt).getTime() > new Date(deployed.source_updated_at).getTime();
+  const unpublishedChanges = deployed ? deployed.matches_draft !== true : releases.length === 0;
 
   if (loading) {
     return (
@@ -2794,7 +2785,9 @@ export function ReleasesTab({
             }`}
             data-testid="agent-release-draft-state"
           >
-            {unpublishedChanges
+            {deployed && deployed.matches_draft == null
+              ? t('ai.colleagues.releases.unknown', undefined, 'Draft content could not be compared. Refresh to retry.')
+              : unpublishedChanges
               ? t('ai.colleagues.releases.unpublished', undefined, 'Draft changes are not deployed')
               : t('ai.colleagues.releases.current', undefined, 'Deployment matches the draft')}
           </p>
@@ -2840,11 +2833,7 @@ export function ReleasesTab({
                 )}
               </p>
             </div>
-            {deploymentPolicy?.channelPolicy.version && (
-              <span className="bg-subtle text-text-2 dark:bg-subtle dark:text-text-3 rounded-full px-2.5 py-1 font-mono text-xs">
-                {deploymentPolicy.channelPolicy.version}
-              </span>
-            )}
+
           </div>
 
           {policyLoading ? (
@@ -2922,51 +2911,22 @@ export function ReleasesTab({
               </fieldset>
 
               <div className="grid gap-3 md:grid-cols-3">
-                {[
-                  [
-                    'allowedUserIds',
-                    t('ai.colleagues.policy.allowedUserIds', undefined, 'User IDs'),
-                  ],
-                  [
-                    'allowedMemberIds',
-                    t('ai.colleagues.policy.allowedMemberIds', undefined, 'Member IDs'),
-                  ],
-                  [
-                    'allowedRoleIds',
-                    t('ai.colleagues.policy.allowedRoleIds', undefined, 'Role IDs'),
-                  ],
-                ].map(([field, label]) => (
-                  <label key={field} className="text-text-2 dark:text-text-3 text-sm">
-                    {label}
-                    <input
-                      type="text"
-                      value={
-                        (
-                          deploymentPolicy.channelPolicy[
-                            field as keyof AgentDeploymentPolicy['channelPolicy']
-                          ] as number[] | undefined
-                        )?.join(', ') ?? ''
-                      }
-                      disabled={readOnly || policySaving}
-                      onChange={(event) =>
-                        setDeploymentPolicy((current) =>
-                          current
-                            ? {
-                                ...current,
-                                channelPolicy: {
-                                  ...current.channelPolicy,
-                                  [field]: parseIds(event.target.value),
-                                },
-                              }
-                            : current,
-                        )
-                      }
-                      placeholder="101, 102"
-                      className="border-border-strong dark:border-border dark:bg-subtle mt-1 w-full rounded-lg border px-3 py-2"
-                      data-testid={`deployment-policy-${field}`}
-                    />
-                  </label>
-                ))}
+                {(['allowedUserIds', 'allowedMemberIds', 'allowedRoleIds'] as const).map((field) => {
+                  const selected = (deploymentPolicy.channelPolicy[field] ?? []).map(String);
+                  const choices = deploymentPolicy.channelPolicy.subjectChoices?.[field] ?? [];
+                  const unresolved = selected.filter((id) => !choices.some((choice) => choice.id === id));
+                  return <label key={field} className="text-text-2 text-sm">
+                    {t(`ai.colleagues.policy.subject.${field}`, undefined, 'Allowed people')}
+                    <select multiple value={selected} disabled={readOnly || policySaving} onChange={(event) => {
+                      const values = Array.from(event.target.selectedOptions, (option) => option.value);
+                      setDeploymentPolicy((current) => current ? { ...current, channelPolicy: { ...current.channelPolicy, [field]: values } } : current);
+                    }} data-testid={`deployment-policy-${field}`} className="border-border bg-panel mt-1 min-h-24 w-full rounded-lg border px-3 py-2">
+                      {choices.map((choice) => <option key={choice.id} value={choice.id}>{choice.name || t('ai.colleagues.policy.unnamed', undefined, 'Unnamed person or role')}</option>)}
+                      {unresolved.map((id, index) => <option key={id} value={id}>{t('ai.colleagues.policy.unavailable', { number: index + 1 }, `Unavailable selection ${index + 1}`)}</option>)}
+                    </select>
+                    <span className="text-text-3 mt-1 block text-xs">{t('ai.colleagues.policy.selectionHelp', undefined, 'Select names to restrict access. Clear the selection to keep tenant-compatible access.')}</span>
+                  </label>;
+                })}
               </div>
 
               {!readOnly && (
@@ -3098,7 +3058,7 @@ export function ReleasesTab({
                   </span>
                   {release.deployed && (
                     <span className="bg-status-green-bg text-status-green dark:bg-status-green-bg/40 dark:text-status-green rounded-full px-2 py-0.5 text-xs font-medium">
-                      {t('ai.colleagues.releases.deployed', undefined, 'Deployed')}
+                      {release.deployment_status === 'suspended' ? t('ai.colleagues.releases.paused', undefined, 'Current version · suspended') : t('ai.colleagues.releases.deployed', undefined, 'Deployed')}
                     </span>
                   )}
                   {!release.deployed && (
@@ -3107,9 +3067,6 @@ export function ReleasesTab({
                     </span>
                   )}
                 </div>
-                <p className="text-text-3 dark:text-text-3 mt-1 font-mono text-xs">
-                  {release.release_hash.slice(0, 12)} · {release.pid}
-                </p>
               </div>
               <time className="text-text-3 dark:text-text-3 text-sm">
                 {formatInTimezone(release.published_at, formats.datetime, timezone)}
@@ -3334,7 +3291,7 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
         <div className="flex-1">
           <h1 className="text-text text-xl font-semibold dark:text-white">{agent.name}</h1>
           <p className="text-text-3 dark:text-text-3 text-sm">
-            {agent.agent_code}
+            {t(`ai.colleagues.type.${agent.agent_type}`, undefined, 'AI colleague')}
             {isAuraBot && (
               <span className="bg-accent ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold text-white">
                 {t('ai.colleagues.badge.official', undefined, 'Official')}
@@ -3494,7 +3451,7 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
           <ReleasesTab
             agentPid={agentPid}
             agentUpdatedAt={agent.updated_at}
-            readOnly={readOnly || !canManageRuntime}
+            readOnly={readOnly || !canManageRuntime || isSuspended}
             disabledTemplate={isDisabled}
           />
         )}
