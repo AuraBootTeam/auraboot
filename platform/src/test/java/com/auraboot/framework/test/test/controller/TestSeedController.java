@@ -182,7 +182,12 @@ public class TestSeedController {
                     """);
         } else {
             // Product browser gates need a real foreign identity, not unrelated demo plugins.
-            ensureTestAdminCanUseImportedResources(tenant, user);
+            MetaContext.setContext(tenant.getId(), user.getId(), user.getPid(), user.getEmail());
+            try {
+                ensureTestAdminCanUseImportedResources(tenant, user);
+            } finally {
+                MetaContext.clear();
+            }
         }
 
         // 5.6 Ensure a second "colleague" user exists in the test tenant so that
