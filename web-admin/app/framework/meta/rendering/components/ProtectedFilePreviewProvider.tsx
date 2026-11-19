@@ -200,6 +200,7 @@ export function ProtectedFilePreviewProvider({ children }: { children: ReactNode
           fileUrl={preview.objectUrl}
           fileName={preview.name}
           fileType="application/pdf"
+          verifiedPdfBlob
           description={text('description')}
           closeLabel={text('close')}
           onCloseAutoFocus={(event) => {

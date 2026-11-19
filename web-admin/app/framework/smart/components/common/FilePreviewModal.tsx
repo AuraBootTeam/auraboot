@@ -25,6 +25,8 @@ export interface FilePreviewModalProps {
   fileName: string;
   /** MIME type or file extension */
   fileType?: string;
+  /** Opt in only for a Blob whose PDF MIME and magic bytes were verified by its owner. */
+  verifiedPdfBlob?: boolean;
   description?: string;
   closeLabel?: string;
   onCloseAutoFocus?: (event: Event) => void;
@@ -85,6 +87,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   fileUrl,
   fileName,
   fileType,
+  verifiedPdfBlob,
   description,
   closeLabel,
   onCloseAutoFocus,
@@ -161,7 +164,13 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
             <iframe
               src={fileUrl}
               title={fileName}
-              sandbox="allow-scripts allow-same-origin"
+              sandbox={
+                verifiedPdfBlob === true &&
+                fileType === 'application/pdf' &&
+                fileUrl.startsWith('blob:')
+                  ? undefined
+                  : 'allow-scripts allow-same-origin'
+              }
               className="h-[70vh] w-full rounded-lg border border-gray-200"
             />
           )}
