@@ -828,3 +828,31 @@ test('independent license staging refuses a missing package license rather than 
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   assert.throws(() => copyPackageLicense(join(directory, 'missing-sdk'), join(directory, 'out')), /ENOENT/);
 });
+
+
+test('frozen v1 Web receipts remain readable while new capture requires the 1.0 legal envelope', t => {
+  const f = webComponentFixture(t);
+  const historical = structuredClone(f.receipt);
+  const additions = new Set(['NOTICE', 'LICENSE-SCOPE.md', 'LICENSE-LEGACY-2.0.txt',
+    'platform/platform-mybatis-compat/NOTICE.auraboot',
+    'platform/platform-mybatis-compat/licenses/ognl-3.4.17/LICENSE.txt']);
+  const component = historical.webComponent;
+  component.inputs.files = component.inputs.files.filter(entry => !additions.has(entry.path));
+  component.inputDigest = 'sha256:' + createHash('sha256').update(canonicalJson(component.inputs)).digest('hex');
+  assert.equal(verifyCoreWebComponent({ root: f.root, catalog: f.catalog, receipt: historical }).source.commit, f.before.source.commit);
+  // Old provenance remains internally bound; omitting an original required recipe still fails.
+  const incomplete = structuredClone(historical);
+  incomplete.webComponent.inputs.files = incomplete.webComponent.inputs.files.filter(entry => entry.path !== 'pnpm-lock.yaml');
+  incomplete.webComponent.inputDigest = 'sha256:' + createHash('sha256').update(canonicalJson(incomplete.webComponent.inputs)).digest('hex');
+  assert.throws(() => verifyCoreWebComponent({ root: f.root, catalog: f.catalog, receipt: incomplete }), /Complete Web recipe/);
+  rmSync(join(f.repo, 'LICENSE-SCOPE.md'));
+  assert.throws(() => f.commit(), error => error.code === 'ENOENT' && error.path === join(f.repo, 'LICENSE-SCOPE.md'));
+});
+
+test('a changed 1.0 license scope invalidates the current Web input identity', t => {
+  const f = webComponentFixture(t);
+  f.put('LICENSE-SCOPE.md', 'Changed covered license scope\n');
+  const changed = f.commit();
+  assert.notEqual(changed.inputDigest, f.before.inputDigest);
+  assert.ok(changed.inputs.files.some(entry => entry.path === 'LICENSE-SCOPE.md'));
+});

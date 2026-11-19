@@ -52,6 +52,7 @@ test.describe('Community branding baseline', () => {
 
     await expect(page).toHaveURL(/\/about$/);
     await expect(page.getByTestId('about-page')).toBeVisible();
+    await expect(page.getByTestId('about-edition')).toHaveText('Community');
     await expect(page.getByRole('heading', { name: /AuraBoot/ })).toBeVisible();
     await expect(page.getByRole('link', { name: /AuraBoot Community License 3.0/ })).toBeVisible();
     await expect(page).toHaveTitle('About AuraBoot');

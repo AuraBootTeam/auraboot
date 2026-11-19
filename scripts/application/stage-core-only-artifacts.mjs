@@ -254,6 +254,7 @@ function packWebShell(repoRoot, destination, version) {
       name: '@auraboot/web-shell',
       version,
       private: false,
+      license: 'SEE LICENSE IN LICENSE.txt',
       type: 'module',
       packageManager: rootManifest.packageManager,
       engines: { node: '>=20' },
