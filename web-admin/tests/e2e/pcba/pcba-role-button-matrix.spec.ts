@@ -70,7 +70,6 @@ const BACKEND_PLUGIN_JARS = [
   'pcba-compliance/backend/build/libs/pcba-compliance-plugin-1.0.0.jar',
   'pcba-finance/backend/build/libs/pcba-finance-plugin-1.0.0.jar',
   'pcba-sales/backend/build/libs/pcba-sales-plugin-1.0.0.jar',
-  'pcba-warehouse/backend/build/libs/pcba-warehouse-plugin-1.0.0.jar',
 ];
 
 const REQUIRED_PLUGINS = [
@@ -89,7 +88,7 @@ const REQUIRED_PLUGINS = [
   'pcba-compliance',
   'pcba-finance',
   'pcba-sales',
-  'pcba-warehouse',
+
 ];
 
 const PAGE_KEYS = {

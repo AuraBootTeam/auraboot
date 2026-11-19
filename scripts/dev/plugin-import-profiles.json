@@ -81,8 +81,7 @@
     "pcba-compliance",
     "pcba-solution",
     "pcba-sales",
-    "pcba-quote",
-    "pcba-warehouse"
+    "pcba-quote"
   ],
   "enterprise-demo": [
     "core-meta",
@@ -133,7 +132,6 @@
     "pcba-sales",
     "pcba-quote",
     "pcba-manufacturing",
-    "pcba-warehouse",
     "pcba-compliance",
     "pcba-finance",
     "sales-templates",

@@ -184,6 +184,9 @@ for selected_plugin in "${PLUGINS[@]}"; do
     selected_name="${selected_plugin%/}"
     selected_name="${selected_name##*/}"
     case "$selected_name" in
+        pcba-warehouse|com.auraboot.pcba-warehouse)
+            echo "ERROR: retired plugin pcba-warehouse; import inventory; manufacturing roles come from pcba-solution" >&2
+            exit 2 ;;
         quarry-solution|com.auraboot.quarry-solution)
             echo "ERROR: retired plugin quarry-solution; use --profile=quarry-delivery" >&2
             exit 2 ;;
