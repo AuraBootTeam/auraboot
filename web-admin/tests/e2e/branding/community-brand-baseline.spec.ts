@@ -140,6 +140,7 @@ test.describe('Community branding baseline', () => {
     // judging readability so an overlay cannot produce an apparently green image.
     await page.getByRole('button', { name: /^(关闭|Close)$/ }).click();
     await expect(page.getByTestId('header-sidebar-toggle')).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByRole('navigation')).not.toBeInViewport();
     await expect(page.getByTestId('about-page')).toBeVisible();
     await expect(page.getByTestId('about-edition')).toBeVisible();
     await expect(page.getByRole('heading', { name: /AuraBoot/ })).toBeVisible();
