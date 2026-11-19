@@ -63,6 +63,8 @@ Page 使用 `ResourceType.PAGE/page`，Dashboard 使用 `ResourceType.DASHBOARD/
 
 首次启用使用`POST /api/agent/definitions/{agentPid}/activate`，请求显式提供`providerCode`，要求当前租户配置可用且调用者有`acp.runtime.manage`。停用定义、供应商绑定、插件定制保护标记和首版不可变发布/部署在同一事务完成，失败全部回滚；不自动入职，不增授工具、角色或模型权限。相同供应商的重复启用复用同一发布；已启用后不能用此入口更换供应商。`resume`只恢复已暂停部署；未启用模板的resume/publish返回明确业务拒绝，不再500。后续发布沿用现有publish入口；首次启用不通过通用dynamic update绕过字段writer。
 
+现有 AI 同事详情页（`/p/c/ai_colleague_detail`，`AgentDetailTabs` custom block）向具有运行管理权限的用户提供“首次启用并发布”入口。停用模板必须显式选择当前租户已配置的 AI 服务；配置为空、读取失败和未选择服务均不得提交。等待期间阻止重复提交，失败保留选择并提供错误反馈。成功后刷新定义并保留独立入职操作；停用模板不显示暂停或入职入口，版本页禁止直接发布并提示先启用。服务发现接口返回裸数组，不能经 ApiResponse 归一化客户端读取。
+
 ## Agent 保护、接管与完整恢复
 
 Agent 的 `OVERWRITE_SAFE` 使用锁定的强类型修改状态；读取异常、已跟踪记录的 NULL 标记均拒绝写入，不能按未修改继续。已有未跟踪、用户修改/认领或其它 plugin ID 拥有的定义返回 SKIP，保持内容、评测用例、owner 和基线。同包未修改定义可同步；显式 `OVERWRITE` 仍是操作者选择的替换/接管策略，不会额外授予工具或模型权限。
