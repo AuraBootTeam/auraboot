@@ -89,7 +89,6 @@
     "page-manager",
     "platform-admin",
     "core-decisionops",
-    "platform-admin-ee",
     "org-management",
     "core-announcement",
     "core-aurabot",
@@ -98,7 +97,6 @@
     "portal",
     "connectors",
     "compliance",
-    "ai-employees",
     "req",
     "showcase",
     "asset-management",
@@ -140,7 +138,6 @@
     "pcba-finance",
     "sales-templates",
     "quarry-solution",
-    "d7-knowledge-wiki",
     "dev-pipeline",
     "growth",
     "customer-pcba-solution"
