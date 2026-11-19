@@ -95,6 +95,14 @@
           "resourceType": "page",
           "resourceCode": "d7_knowledge_wiki",
           "action": "read"
+        },
+        {
+          "code": "d7.knowledge.manage",
+          "name:zh-CN": "管理 D7 知识 Wiki",
+          "name:en": "Manage D7 Knowledge Wiki",
+          "resourceType": "page",
+          "resourceCode": "d7_knowledge_wiki",
+          "action": "manage"
         }
       ],
       "roles": [
