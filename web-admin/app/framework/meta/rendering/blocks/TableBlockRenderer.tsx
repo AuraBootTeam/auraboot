@@ -12,6 +12,7 @@ import { dictionaryData } from '~/shared/services/dict-adapter';
  */
 
 import React, { useEffect, useRef, useState } from 'react';
+import { twMerge } from 'tailwind-merge';
 import { useNavigate } from 'react-router';
 import type {
   BlockConfig,
@@ -1179,9 +1180,9 @@ const TableBlockBodyRenderer: React.FC<TableBlockRendererProps> = ({ block, runt
               key={rowIdentity}
               data-testid={`table-mobile-card-${rowIdentity}`}
               onClick={() => handleRowClick(row, index)}
-              className={`rounded-card bg-panel border p-4 shadow-sm transition-colors ${
+              className={twMerge(`rounded-card bg-panel border p-4 shadow-sm transition-colors ${
                 isSelected ? 'border-accent ring-accent/15 ring-2' : 'border-border'
-              } ${selectionConfig?.bind ? 'cursor-pointer' : ''} ${rowClassName(row)}`}
+              } ${selectionConfig?.bind ? 'cursor-pointer' : ''} ${rowClassName(row)}`)}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
