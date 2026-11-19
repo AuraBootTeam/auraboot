@@ -1,17 +1,22 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
-import { ActivateAgentDialog } from '../AgentDetailTabs';
-const { post } = vi.hoisted(() => ({ post: vi.fn() }));
+import { AgentDetailTabs, ActivateAgentDialog, EnrollEmployeeDialog } from '../AgentDetailTabs';
+vi.mock('react-router', async () => vi.importActual('react-router'));
+const { post, get } = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn() }));
 vi.mock('~/shared/services/http-client', () => ({
-  get: vi.fn(),
+  get,
   post,
   put: vi.fn(),
   del: vi.fn(),
 }));
-vi.mock('~/contexts/I18nContext', () => ({
-  useI18n: () => ({ t: (key: string, _params: unknown, fallback: string) => fallback || key }),
-}));
+vi.mock('~/contexts/I18nContext', () => {
+  const t = (key: string, _params: unknown, fallback: string) => fallback || key;
+  return { useI18n: () => ({ t }) };
+});
+vi.mock('~/contexts/AuthContext', () => ({ usePermission: () => false }));
+vi.mock('~/shared/services/organizationService', () => ({ organizationService: { getDepartmentTree: vi.fn(async () => ({ code: '0', data: [{ pid: 'DEPARTMENT', name: 'Acceptance Department', children: [] }] })) } }));
+vi.mock('~/contexts/ToastContext', () => { const toast = { showSuccessToast: vi.fn(), showErrorToast: vi.fn() }; return { useToastContext: () => toast }; });
 const fetchProviders = vi.fn();
 function open(onSuccess = vi.fn(), onClose = vi.fn()) {
   render(
@@ -94,5 +99,36 @@ describe('First template activation', () => {
     );
     expect(screen.getByTestId('confirm-activate-agent')).toBeDisabled();
     expect(post).not.toHaveBeenCalled();
+  });
+});
+
+describe('Enrollment required fields', () => {
+  it('requires both department and position without presenting the position as optional', async () => {
+    post.mockReset(); post.mockResolvedValue({ code: '0' });
+    get.mockResolvedValue({ code: '0', data: { records: [{ pid: 'POSITION', org_pos_name: 'Acceptance Position', org_pos_status: 'active' }] } });
+    const onSuccess = vi.fn();
+    render(<EnrollEmployeeDialog agentPid="TEMPLATE" agentName="Acceptance Colleague" onClose={vi.fn()} onSuccess={onSuccess} />);
+    const dept = await screen.findByTestId('enroll-dept-select');
+    expect(screen.queryByText('(optional)')).not.toBeInTheDocument();
+    expect(screen.getByTestId('enroll-confirm-btn')).toBeDisabled();
+    fireEvent.change(dept, { target: { value: 'DEPARTMENT' } });
+    await screen.findByRole('option', { name: 'Acceptance Position' });
+    expect(screen.getByTestId('enroll-confirm-btn')).toBeDisabled();
+    fireEvent.change(screen.getByTestId('enroll-position-select'), { target: { value: 'POSITION' } });
+    fireEvent.click(screen.getByTestId('enroll-confirm-btn'));
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
+    expect(post).toHaveBeenCalledExactlyOnceWith('/api/agent/definitions/TEMPLATE/enroll-employee', { departmentPid: 'DEPARTMENT', positionPid: 'POSITION' });
+  });
+});
+
+describe('Activation permission boundary', () => {
+  it('keeps activation unavailable to a definition reader without runtime management permission', async () => {
+    get.mockReset();
+    get.mockResolvedValue({ code: '0', data: { pid: 'TEMPLATE', name: 'Disabled colleague', agent_code: 'disabled_colleague', status: 'disabled', agent_type: 'reactive', visibility: 'tenant' } });
+    render(<MemoryRouter initialEntries={['/p/c/ai_colleague_detail?agentPid=TEMPLATE']}><AgentDetailTabs /></MemoryRouter>);
+    expect(await screen.findByTestId('agent-disabled-help')).toHaveTextContent('Ask an administrator');
+    expect(screen.queryByTestId('activate-agent-btn')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('enroll-as-employee-btn')).not.toBeInTheDocument();
+    expect(get.mock.calls.some(([url]) => String(url).endsWith('/org-placement'))).toBe(false);
   });
 });

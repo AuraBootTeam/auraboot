@@ -1030,5 +1030,117 @@
     "zh-CN": "请先使用页面上方的入口，首次启用并发布此模板。",
     "en-US": "Enable and publish this template first using the action above.",
     "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.title",
+    "source": "import",
+    "zh-CN": "办理入职",
+    "en-US": "Enroll as Employee",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.subtitle",
+    "source": "import",
+    "zh-CN": "将 {name} 纳入组织架构",
+    "en-US": "Add {name} to the org chart",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.field.department",
+    "source": "import",
+    "zh-CN": "部门",
+    "en-US": "Department",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.field.position",
+    "source": "import",
+    "zh-CN": "岗位",
+    "en-US": "Position",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.placeholder.department",
+    "source": "import",
+    "zh-CN": "请选择部门",
+    "en-US": "— Select Department —",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.placeholder.position",
+    "source": "import",
+    "zh-CN": "请选择岗位",
+    "en-US": "— Select Position —",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.empty.department",
+    "source": "import",
+    "zh-CN": "尚无可选部门，请先在组织管理中创建部门，再为该同事办理入职。",
+    "en-US": "No departments yet — create one under Organization first, then enrol this colleague.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.empty.position",
+    "source": "import",
+    "zh-CN": "该部门尚无岗位，请先在组织管理中添加岗位，再办理入职。",
+    "en-US": "This department has no positions yet — add one under Organization before enrolling.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.hint.selectDeptFirst",
+    "source": "import",
+    "zh-CN": "请先选择部门，以加载该部门的岗位",
+    "en-US": "Select a department first to load positions",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.loading",
+    "source": "import",
+    "zh-CN": "正在加载…",
+    "en-US": "Loading...",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.confirm",
+    "source": "import",
+    "zh-CN": "确认入职",
+    "en-US": "Enroll",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.enrolling",
+    "source": "import",
+    "zh-CN": "正在办理入职…",
+    "en-US": "Enrolling...",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.success",
+    "source": "import",
+    "zh-CN": "{name} 已作为 AI 员工纳入组织",
+    "en-US": "{name} has been enrolled as a digital employee",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.error.deptRequired",
+    "source": "import",
+    "zh-CN": "请选择部门",
+    "en-US": "Please select a department",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.error.positionRequired",
+    "source": "import",
+    "zh-CN": "请选择岗位",
+    "en-US": "Please select a position",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.error.failed",
+    "source": "import",
+    "zh-CN": "入职失败，请检查部门和岗位后重试。",
+    "en-US": "Enrollment failed. Check the department and position, then retry.",
+    "refType": "ui"
   }
 ]

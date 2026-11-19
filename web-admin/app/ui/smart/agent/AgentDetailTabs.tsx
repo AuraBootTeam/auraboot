@@ -2173,7 +2173,7 @@ function flattenDepts(
   return result;
 }
 
-function EnrollEmployeeDialog({
+export function EnrollEmployeeDialog({
   agentPid,
   agentName,
   onClose,
@@ -2241,11 +2241,15 @@ function EnrollEmployeeDialog({
       );
       return;
     }
+    if (!selectedPosPid) {
+      toast.showErrorToast(t('ai.colleagues.enroll.error.positionRequired', undefined, 'Please select a position'));
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await post(`/api/agent/definitions/${agentPid}/enroll-employee`, {
         departmentPid: selectedDeptPid,
-        positionPid: selectedPosPid || undefined,
+        positionPid: selectedPosPid,
       });
       if (ResultHelper.isSuccess(res)) {
         toast.showSuccessToast(
@@ -2261,7 +2265,7 @@ function EnrollEmployeeDialog({
           t(
             'ai.colleagues.enroll.error.failed',
             undefined,
-            'Enrollment failed. Ensure the agent has a system account.',
+            'Enrollment failed. Check the department and position, then retry.',
           ),
         );
       }
@@ -2367,9 +2371,6 @@ function EnrollEmployeeDialog({
         <div className="mb-6">
           <label className="text-text-2 dark:text-text-3 mb-1.5 block text-sm font-medium">
             {t('ai.colleagues.enroll.field.position', undefined, 'Position')} *
-            <span className="text-text-3 ml-1 text-xs">
-              {t('ai.colleagues.enroll.optional', undefined, '(optional)')}
-            </span>
           </label>
           <div className="relative">
             <select
@@ -3204,10 +3205,10 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
   const isEnrolled = !!placement?.enrolled;
 
   const fetchPlacement = useCallback(async () => {
-    if (!agentPid) return;
+    if (!agentPid || !canManageRuntime) return;
     const res = await get<OrgPlacement>(`/api/agent/definitions/${agentPid}/org-placement`);
     if (ResultHelper.isSuccess(res) && res.data) setPlacement(res.data);
-  }, [agentPid]);
+  }, [agentPid, canManageRuntime]);
 
   useEffect(() => {
     void fetchPlacement();
