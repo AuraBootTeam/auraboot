@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 13c82dd1369bff005633932040fa1203f62ac14bdc7a0d468beec2edd8df7967
+ * Contract SHA-256: 0f35bd512943a9d9365fdc86e4572cb57f4156c4b51dc30f45c191623864e2bf
  */
 export interface paths {
     "/api/activities": {
@@ -2086,6 +2086,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["pipelineTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agent/definitions/{agentPid}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["activateAgent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -24059,6 +24075,9 @@ export interface components {
             /** Format: int64 */
             expectedVersion?: number;
             operationId?: string;
+        };
+        ActivationRequest: {
+            providerCode: string;
         };
         ActiveSessionResponse: {
             /** Format: date-time */
@@ -46054,6 +46073,32 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseMapStringObject"];
+                };
+            };
+        };
+    };
+    activateAgent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agentPid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePublishedRelease"];
                 };
             };
         };

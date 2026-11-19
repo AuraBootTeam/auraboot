@@ -397,6 +397,19 @@
         },
         "type": "object"
       },
+      "ActivationRequest": {
+        "properties": {
+          "providerCode": {
+            "maxLength": 128,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "providerCode"
+        ],
+        "type": "object"
+      },
       "ActiveSessionResponse": {
         "properties": {
           "createdAt": {
@@ -60430,6 +60443,46 @@
         },
         "tags": [
           "agent-runtime-controller"
+        ]
+      }
+    },
+    "/api/agent/definitions/{agentPid}/activate": {
+      "post": {
+        "operationId": "activateAgent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agentPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePublishedRelease"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "core-agent-controller"
         ]
       }
     },
