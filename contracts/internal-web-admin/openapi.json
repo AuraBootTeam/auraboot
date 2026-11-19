@@ -10374,6 +10374,31 @@
         },
         "type": "object"
       },
+      "ApiResponseListPluginHandoverContractSummary": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/PluginHandoverContractSummary"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseListPluginImportResult": {
         "properties": {
           "code": {
@@ -14268,6 +14293,32 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/PluginGenerateResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponsePluginHandoverPreview": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PluginHandoverPreview"
               },
               {
                 "type": "null"
@@ -43070,6 +43121,145 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "PluginHandoverContractSummary": {
+        "properties": {
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "contractId": {
+            "type": "string"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "revision": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "sourcePluginId": {
+            "type": "string"
+          },
+          "targetPluginIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "PluginHandoverPreview": {
+        "properties": {
+          "batchPid": {
+            "type": "string"
+          },
+          "contractDigest": {
+            "type": "string"
+          },
+          "contractId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "executionAvailable": {
+            "type": "boolean"
+          },
+          "expired": {
+            "type": "boolean"
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PluginHandoverPreviewItem"
+            },
+            "type": "array"
+          },
+          "limits": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "plannedMoves": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "previewDigest": {
+            "type": "string"
+          },
+          "sourcePluginPid": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PluginHandoverPreviewItem": {
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "ownershipType": {
+            "type": "string"
+          },
+          "resourcePid": {
+            "type": "string"
+          },
+          "targetPluginPid": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "userModified": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "PluginHandoverPreviewRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "contractDigest": {
+            "minLength": 1,
+            "pattern": "[0-9a-f]{64}",
+            "type": "string"
+          },
+          "contractId": {
+            "maxLength": 128,
+            "minLength": 0,
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "maxLength": 128,
+            "minLength": 0,
+            "type": "string"
+          },
+          "sourcePluginPid": {
+            "maxLength": 64,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "contractDigest",
+          "contractId",
+          "idempotencyKey",
+          "sourcePluginPid"
+        ],
         "type": "object"
       },
       "PluginImportRequest": {
@@ -102685,6 +102875,116 @@
         "summary": "List installed plugins",
         "tags": [
           "Plugin Management"
+        ]
+      }
+    },
+    "/api/plugins/handovers/contracts": {
+      "get": {
+        "operationId": "listPluginHandoverPreviewContracts",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListPluginHandoverContractSummary"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "plugin-handover-preview-controller"
+        ]
+      }
+    },
+    "/api/plugins/handovers/previews": {
+      "post": {
+        "operationId": "createPluginHandoverPreview",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginHandoverPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePluginHandoverPreview"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "plugin-handover-preview-controller"
+        ]
+      }
+    },
+    "/api/plugins/handovers/previews/by-key": {
+      "get": {
+        "operationId": "findPluginHandoverPreviewByKey",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "idempotencyKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePluginHandoverPreview"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "plugin-handover-preview-controller"
+        ]
+      }
+    },
+    "/api/plugins/handovers/previews/{batchPid}": {
+      "get": {
+        "operationId": "findPluginHandoverPreview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batchPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePluginHandoverPreview"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "plugin-handover-preview-controller"
         ]
       }
     },

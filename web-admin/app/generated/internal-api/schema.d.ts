@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 0f35bd512943a9d9365fdc86e4572cb57f4156c4b51dc30f45c191623864e2bf
+ * Contract SHA-256: 90b7d64aea2d42effd4456f0aadb6fe0f302f623a38c854763de1313dbe157f0
  */
 export interface paths {
     "/api/activities": {
@@ -19382,6 +19382,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/plugins/handovers/contracts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPluginHandoverPreviewContracts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/handovers/previews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createPluginHandoverPreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/handovers/previews/{batchPid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["findPluginHandoverPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/handovers/previews/by-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["findPluginHandoverPreviewByKey"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/plugins/hotload": {
         parameters: {
             query?: never;
@@ -27325,6 +27389,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseListPluginHandoverContractSummary: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["PluginHandoverContractSummary"][] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseListPluginImportResult: {
             code?: string;
             context?: unknown;
@@ -28572,6 +28644,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["PluginGenerateResult"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponsePluginHandoverPreview: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["PluginHandoverPreview"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -38638,6 +38718,46 @@ export interface components {
             pluginCode?: string;
             pluginName?: string;
             summary?: string;
+        };
+        PluginHandoverContractSummary: {
+            capabilities?: string[];
+            contractId?: string;
+            digest?: string;
+            /** Format: int32 */
+            revision?: number;
+            sourcePluginId?: string;
+            targetPluginIds?: string[];
+        };
+        PluginHandoverPreview: {
+            batchPid?: string;
+            contractDigest?: string;
+            contractId?: string;
+            createdAt?: string;
+            executionAvailable?: boolean;
+            expired?: boolean;
+            expiresAt?: string;
+            items?: components["schemas"]["PluginHandoverPreviewItem"][];
+            limits?: string[];
+            /** Format: int32 */
+            plannedMoves?: number;
+            previewDigest?: string;
+            sourcePluginPid?: string;
+            status?: string;
+        };
+        PluginHandoverPreviewItem: {
+            action?: string;
+            code?: string;
+            ownershipType?: string;
+            resourcePid?: string;
+            targetPluginPid?: string;
+            type?: string;
+            userModified?: boolean;
+        };
+        PluginHandoverPreviewRequest: {
+            contractDigest: string;
+            contractId: string;
+            idempotencyKey: string;
+            sourcePluginPid: string;
         };
         PluginImportRequest: {
             menus?: {
@@ -75384,6 +75504,94 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["UninstallPreviewResult"];
+                };
+            };
+        };
+    };
+    listPluginHandoverPreviewContracts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseListPluginHandoverContractSummary"];
+                };
+            };
+        };
+    };
+    createPluginHandoverPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginHandoverPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePluginHandoverPreview"];
+                };
+            };
+        };
+    };
+    findPluginHandoverPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batchPid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePluginHandoverPreview"];
+                };
+            };
+        };
+    };
+    findPluginHandoverPreviewByKey: {
+        parameters: {
+            query: {
+                idempotencyKey: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePluginHandoverPreview"];
                 };
             };
         };
