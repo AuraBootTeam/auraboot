@@ -963,7 +963,8 @@ cmd_warm() {
   local name="$1" sd; sd="$(state_dir "$name")" || return 1
   [ -f "$sd/ports" ] || die "no running stack for '$name' (run 'up' first)"
   local fe="$REPO_ROOT/web-admin"
-  local admin_json="$fe/tests/storage/admin.json"
+  local admin_json="${PW_ADMIN_STORAGE_STATE:-${PW_STORAGE_DIR:-tests/storage}/admin.json}"
+  [[ "$admin_json" = /* ]] || admin_json="$fe/$admin_json"
   local env_exports; env_exports="$(cmd_env "$name")"
   eval "$env_exports"
   local evidence_root="$AURA_EVIDENCE_ROOT"
