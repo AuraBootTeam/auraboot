@@ -28,9 +28,9 @@ function createRunnableLayout({ output, rootfs, labels, entrypoint }) {
     writeFileSync(resolve(context, 'Dockerfile'), [
       `FROM ${LINUX_JRE_BASE}`,
       // Use the same supported musl JRE family as the public Compose runtime.
-      // The pinned upstream image still contains zlib affected by CVE-2026-4738.
+      // Repair zlib and the OpenSSL advisories found by the current release scan.
       // Keep signed package verification and fail if the exact repair is absent.
-      'RUN apk add --no-cache zlib=1.4-r0 && apk info -v zlib',
+      'RUN apk add --no-cache zlib=1.4-r0 openssl=3.5.9-r1 libssl3=3.5.9-r1 libcrypto3=3.5.9-r1 && apk info -v zlib openssl libssl3 libcrypto3',
       'COPY rootfs/ /',
       `ENTRYPOINT ${JSON.stringify(entrypoint)}`,
       '',

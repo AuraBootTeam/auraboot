@@ -77,6 +77,7 @@ describe('community branding contract', () => {
 
   it('recognizes only explicit commercial editions', () => {
     expect(isCommercialEdition('standard')).toBe(true);
+    expect(isCommercialEdition(' Business ')).toBe(true);
     expect(isCommercialEdition('Professional')).toBe(true);
     expect(isCommercialEdition('enterprise')).toBe(true);
     expect(isCommercialEdition('community')).toBe(false);

@@ -1,6 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { acquireSavedViewLock, releaseSavedViewLock } from '../saved-view/_saved-view-lock';
 
+const expectedEdition = process.env.BRANDING_EXPECTED_EDITION || 'Standard';
+if (!['Standard', 'Business'].includes(expectedEdition)) throw new Error('Explicit Standard or Business branding target required');
+
 test.describe('Standard deployment branding', () => {
   test('applies the customer identity before authentication, including PWA assets', async ({
     page,
@@ -67,12 +70,12 @@ test.describe('Standard deployment branding', () => {
       'commercial',
     );
     await expect(page.getByRole('heading', { name: /Northstar/ })).toBeVisible();
-    await expect(page.getByTestId('about-edition')).toHaveText('Standard');
+    await expect(page.getByTestId('about-edition')).toHaveText(expectedEdition);
     await expect(page.getByTestId('about-owner-copyright')).toContainText(
       'Northstar Holdings Ltd.',
     );
     await expect(page.getByTestId('about-auraboot-notice')).toContainText(
-      'AuraBoot License Agreement 1.3',
+      'AuraBoot Community License 3.0 (1.0 distribution)',
     );
     await expect(page).toHaveTitle('About Northstar');
     await page.screenshot({ path: testInfo.outputPath('standard-about.png'), fullPage: true });
@@ -117,11 +120,15 @@ test.describe('Standard deployment branding', () => {
 
       const anonymousContext = await browser.newContext({
         baseURL: String(testInfo.project.use.baseURL),
+        locale: 'zh-CN',
       });
       try {
         const anonymousPage = await anonymousContext.newPage();
         await anonymousPage.goto(`/share/${token}`);
-        await expect(anonymousPage.getByText(/^Powered by Northstar · \d+ records$/)).toBeVisible();
+        await expect(anonymousPage.getByTestId('public-shared-view').locator('footer')).toHaveText('Powered by Northstar');
+        await expect(anonymousPage.getByRole('heading', { name: '分享的视图设置' })).toBeVisible();
+        await expect(anonymousPage.getByText('此链接分享视图设置（包括已保存的筛选条件）。业务记录需要登录后按权限访问。')).toBeVisible();
+        await expect(anonymousPage.getByRole('table')).toHaveCount(0);
         await expect(anonymousPage).toHaveTitle('Northstar');
         await anonymousPage.screenshot({
           path: testInfo.outputPath('standard-shared-view.png'),

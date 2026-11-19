@@ -203,7 +203,7 @@ describe('lazy read-only row expansion', () => {
     render(<ListTable {...options} />);
     fireEvent.click(screen.getByRole('button', { name: 'Expand details: RFQ-59' }));
     const detail = await screen.findByTestId('row-expansion-detail');
-    expect(detail).toHaveTextContent('material-a');
+    await waitFor(() => expect(detail).toHaveTextContent('material-a'));
     expect(state.fetch).toHaveBeenCalledWith('/api/tasks/task-59/sources', expect.anything());
   });
 });

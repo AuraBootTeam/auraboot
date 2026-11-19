@@ -19,9 +19,16 @@ function readRegularWebFile(file,limit=Infinity) {
   } finally {closeSync(descriptor);}
 }
 const roots=['packages','web-admin','scripts/application','distribution/application'];
-const files=['VERSION','LICENSE.txt','package.json','pnpm-lock.yaml','pnpm-workspace.yaml'];
+const files=['VERSION','LICENSE.txt','NOTICE','LICENSE-SCOPE.md','LICENSE-LEGACY-2.0.txt',
+  'platform/platform-mybatis-compat/NOTICE.auraboot',
+  'platform/platform-mybatis-compat/licenses/ognl-3.4.17/LICENSE.txt','package.json','pnpm-lock.yaml','pnpm-workspace.yaml'];
 const optional=['.npmrc','tsconfig.json','tsconfig.base.json'];
 const required=[...files,'web-admin/package.json','scripts/application/stage-core-only-artifacts.mjs',
+  'scripts/application/core-web-component.mjs','scripts/application/application-contract.mjs'];
+// Frozen v1 receipts retain their original producer denominator. Current capture
+// and distribution staging still require the expanded 1.0 legal envelope.
+const frozenV1Required=['VERSION','LICENSE.txt','package.json','pnpm-lock.yaml','pnpm-workspace.yaml',
+  'web-admin/package.json','scripts/application/stage-core-only-artifacts.mjs',
   'scripts/application/core-web-component.mjs','scripts/application/application-contract.mjs'];
 export const coreWebShellEntries=Object.freeze(['app','packages','public','scripts','react-router.config.ts',
   'instrumentation.server.mjs','tailwind.config.js','tsconfig.json','vite.config.ts','vitest.config.ts','vitest.setup.ts']);
@@ -180,7 +187,7 @@ function validateInputs(inputs) {
     need(included(entry.path)&&entry.path>previous&&Number.isInteger(entry.mode)&&entry.mode>=0
       &&entry.mode<=0o777&&hash(entry.sha256),'Sorted unique Web input denominator required');previous=entry.path;
   }
-  need(required.every(file=>inputs.files.some(entry=>entry.path===file)),'Complete Web recipe and dependency inputs required');
+  need(frozenV1Required.every(file=>inputs.files.some(entry=>entry.path===file)),'Complete Web recipe and dependency inputs required');
   exact(inputs.toolchain,['node','nodeSha256','pnpm','pnpmEntrySha256','platform','arch']);
   need(hash(inputs.toolchain.nodeSha256)&&hash(inputs.toolchain.pnpmEntrySha256)
     &&Object.values(inputs.toolchain).every(value=>typeof value==='string'&&value),'Exact Web toolchain required');

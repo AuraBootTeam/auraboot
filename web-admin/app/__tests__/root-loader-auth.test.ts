@@ -243,6 +243,17 @@ describe('root loader authentication guard', () => {
     expect(mocks.getUserMenus).not.toHaveBeenCalled();
   });
 
+  it.each([undefined, '   '])('uses Community identity when no explicit edition is supplied (%s)', async (edition) => {
+    vi.stubEnv('EDITION', edition);
+    mocks.getTokenFromRequest.mockResolvedValue(null);
+    const { loader } = await import('~/root');
+    const result = await loader({ request: new Request('http://localhost/login') } as any);
+    expect(result).toMatchObject({
+      edition: 'community',
+      branding: { productName: 'AuraBoot', mode: 'community' },
+    });
+  });
+
   it('injects ICP settings from the BFF runtime environment', async () => {
     vi.stubEnv('ICP_COMPLIANCE_ENABLED', 'true');
     vi.stubEnv('ICP_SITE_TITLE', 'Runtime title');

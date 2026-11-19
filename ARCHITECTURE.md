@@ -120,7 +120,7 @@ Several capabilities exist on top of this open-core architecture and are offered
 - **Observability Pro** — distributed tracing wired into the command pipeline, end-to-end latency budgets per stage
 - **Advanced governance** — extended ABAC policies, field-level masking strategies, cross-organization data-scope delegation
 
-These are extensions of the same contracts described above, not parallel runtimes. The open-source platform remains the truth source for how commands, permissions, plugins, and processes are defined.
+These are extensions of the same contracts described above, not parallel runtimes. The platform source remains the truth source for how commands, permissions, plugins, and processes are defined.
 
 ---
 

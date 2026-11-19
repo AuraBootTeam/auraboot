@@ -23,6 +23,7 @@ function formatEdition(edition: string): string {
   if (normalized === 'enterprise') return 'Enterprise';
   if (normalized === 'professional') return 'Professional';
   if (normalized === 'standard') return 'Standard';
+  if (normalized === 'business') return 'Business';
   return edition || 'Community';
 }
 
@@ -31,6 +32,9 @@ export default function AboutPage() {
   const branding = rootData?.branding ?? COMMUNITY_BRANDING;
   const buildIdentity = rootData?.buildIdentity ?? { version: 'development', revision: 'local' };
   const edition = formatEdition(rootData?.edition ?? 'community');
+  const licenseUrl = /^[a-f0-9]{40}$/.test(buildIdentity.revision)
+    ? `${COMMUNITY_BRANDING.sourceUrl}/blob/${buildIdentity.revision}/LICENSE.txt`
+    : branding.licenseUrl;
   const { t, locale } = useI18n();
   const isZh = locale.startsWith('zh');
   const currentYear = new Date().getFullYear();
@@ -135,7 +139,7 @@ export default function AboutPage() {
               <dt className="text-gray-500 dark:text-gray-400">{labels.license}</dt>
               <dd>
                 <a
-                  href={branding.licenseUrl}
+                  href={licenseUrl}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1.5 font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"

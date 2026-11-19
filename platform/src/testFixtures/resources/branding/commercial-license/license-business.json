@@ -1,0 +1,19 @@
+{
+  "licenseVersion": 2,
+  "customer": "northstar",
+  "edition": "business",
+  "release": "2026.08.09",
+  "platformVersion": "1.0.0",
+  "orderRef": "SO-2026-001",
+  "issuedAt": "2026-08-01T00:00:00Z",
+  "upgradeUntil": "2026-09-01T00:00:00Z",
+  "supportUntil": "2026-09-01T00:00:00Z",
+  "features": [
+    "white_label",
+    "report_export"
+  ],
+  "excludedFeatures": [
+    "license_server"
+  ],
+  "runtimeEnforcement": "offline-signature"
+}
