@@ -57,7 +57,7 @@ Page 使用 `ResourceType.PAGE/page`，Dashboard 使用 `ResourceType.DASHBOARD/
 
 成功导入 receipt 记录 `packageResourcesAdopted`。含接管的导入拒绝通用 import rollback，防止退回旧插件元数据而遗留转交资源；需要恢复时保留接收方并显式审查归属，不提供自动反向接管。
 
-`core-aurabot` 的 `agentTemplates` 仅是提供方无关的配方，只有请求指定 `agentTemplateCodes` 才成为当前导入的 Agent 定义。默认不创建四个员工；模板首次创建为 disabled、不绑定模型或组织身份，启用前由租户配置 provider、工具范围并走既有入职流程。已有认领/修改资源仍按安全策略保留。CLI 接收：`aura plugin publish <receiver-directory> --conflict-strategy overwrite_safe --yes`；选择模板可追加 `--agent-templates aria`。Enterprise 注册表拒绝旧包名，防止跨根目录回退。
+`core-aurabot` 的 `agentTemplates` 仅是提供方无关的配方，只有请求指定 `agentTemplateCodes` 才成为当前导入的 Agent 定义。默认不创建四个员工；模板首次创建为 disabled、不绑定模型或组织身份，由租户显式配置 provider、工具范围、启用并发布不可变版本后，再走既有入职流程。入职前检查有效部署，未发布模板明确拒绝且不创建用户/成员/员工；组织入职/退出与动态字段授权共享 REPEATABLE_READ 写事务，失败整体回滚。已有认领/修改资源仍按安全策略保留。CLI 接收：`aura plugin publish <receiver-directory> --conflict-strategy overwrite_safe --yes`；选择模板可追加 `--agent-templates aria`。Enterprise 注册表拒绝旧包名，防止跨根目录回退。
 
 原 `defaultBootstrap` 通配授权配置不转为新默授权；既有授权保留，新角色按明确权限初始化。真实 PG 合同用例为 `PluginPackageReplacementIntegrationTest`；Enterprise 声明以相同字节的测试 fixture 验证，不代表已执行 D7 页面、内部知识或授权业务的浏览器验收。
 

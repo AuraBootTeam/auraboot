@@ -76,6 +76,14 @@ public class AgentOrganizationServiceImpl implements AgentOrganizationService {
 
         Long tenantId = MetaContext.getCurrentTenantId();
 
+        // Enrollment binds the immutable runtime deployment as well as the blueprint.
+        // Refuse an unpublished template before creating any user or employee rows.
+        try {
+            releaseDeploymentService.requireActive(tenantId, agent.getAgentCode());
+        } catch (IllegalStateException e) {
+            throw new BusinessException("Publish an active Agent release before enrolling as an employee");
+        }
+
         // 1. Resolve user for the service member, provisioning one if the agent has none.
         //    Only AgentTemplateSeeder used to set system_user_id, and only for the system tenant,
         //    so every tenant-created agent arrived here with null and was refused — the enrollment
