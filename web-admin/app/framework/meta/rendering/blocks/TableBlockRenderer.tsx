@@ -1150,11 +1150,18 @@ const TableBlockBodyRenderer: React.FC<TableBlockRendererProps> = ({ block, runt
           data-testid="table-mobile-empty"
           className="border-border bg-panel text-text-2 rounded-card border px-5 py-8 text-center text-sm"
         >
-          {(block as any).empty?.title
-            ? getLocalizedText((block as any).empty.title, locale, t)
-            : t('common.noData') !== 'common.noData'
-              ? t('common.noData')
-              : 'No data'}
+          <div>
+            {(block as any).empty?.title
+              ? getLocalizedText((block as any).empty.title, locale, t)
+              : t('common.noData') !== 'common.noData'
+                ? t('common.noData')
+                : 'No data'}
+          </div>
+          {(block as any).empty?.description && (
+            <div className="mt-2">
+              {getLocalizedText((block as any).empty.description, locale, t)}
+            </div>
+          )}
         </div>
       );
     }

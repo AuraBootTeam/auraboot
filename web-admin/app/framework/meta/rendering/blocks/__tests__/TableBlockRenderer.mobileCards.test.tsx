@@ -119,6 +119,18 @@ const block = {
 describe('TableBlockRenderer mobile cards', () => {
   beforeEach(() => handleActionSpy.mockReset());
 
+  it('preserves configured localized empty guidance on mobile without adding actions', () => {
+    render(<TableBlockRenderer block={{ ...block, empty: {
+      title: { 'zh-CN': '当前没有可查看的记录', en: 'No records' },
+      description: { 'zh-CN': '请返回修改记录并选择一次正式提交。', en: 'Select a formal submission from history.' },
+    } } as any} runtime={runtime([])} />);
+    const empty = screen.getByTestId('table-mobile-empty');
+    expect(empty).toHaveTextContent('当前没有可查看的记录');
+    expect(empty).toHaveTextContent('请返回修改记录并选择一次正式提交。');
+    expect(empty).not.toHaveTextContent('Select a formal submission');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
   it('replaces the wide table with task cards and direct actions on mobile', () => {
     render(<TableBlockRenderer block={block} runtime={runtime([row])} />);
 
