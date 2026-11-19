@@ -108,7 +108,7 @@ export function ProtectedFilePreviewProvider({ children }: { children: ReactNode
       try {
         const file = await readProtectedFile(request.url, {
           expectedContentTypes: ['application/pdf'],
-          requireAttachment: true,
+          requireNamedDisposition: true,
           requireNonEmpty: true,
           signal: lifetime.controller.signal,
           resolveFailure: async (response) =>
@@ -174,7 +174,7 @@ export function ProtectedFilePreviewProvider({ children }: { children: ReactNode
       // Reauthorize the explicit download; the preview's Blob is never its download source.
       await downloadWithAuth(preview.url, {
         expectedContentTypes: ['application/pdf'],
-        requireAttachment: true,
+        requireNamedDisposition: true,
         requireNonEmpty: true,
         signal: preview.lifetime.controller.signal,
         resolveFailure: async (response) =>

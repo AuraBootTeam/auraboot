@@ -24,7 +24,7 @@ export class FileDownloadHttpError extends Error {
 }
 
 export class FileDownloadValidationError extends Error {
-  constructor(readonly code: 'CONTENT_TYPE' | 'ATTACHMENT' | 'EMPTY') {
+  constructor(readonly code: 'CONTENT_TYPE' | 'ATTACHMENT' | 'DISPOSITION' | 'EMPTY') {
     super('The protected file response failed validation');
   }
 }
@@ -32,6 +32,8 @@ export class FileDownloadValidationError extends Error {
 export interface FileDownloadOptions {
   expectedContentTypes?: readonly string[];
   requireAttachment?: boolean;
+  /** Native previewable files use inline; both forms must provide a server filename. */
+  requireNamedDisposition?: boolean;
   requireNonEmpty?: boolean;
   resolveFailure?: (response: Response) => Promise<string>;
   signal?: AbortSignal;
@@ -66,6 +68,12 @@ export async function readProtectedFile(url: string, options: FileDownloadOption
     (!/^attachment(?:;|$)/i.test(disposition?.trim() || '') || !fileName)
   ) {
     throw new FileDownloadValidationError('ATTACHMENT');
+  }
+  if (
+    options.requireNamedDisposition &&
+    (!/^(?:inline|attachment)(?:;|$)/i.test(disposition?.trim() || '') || !fileName?.trim())
+  ) {
+    throw new FileDownloadValidationError('DISPOSITION');
   }
   const blob = await response.blob();
   options.signal?.throwIfAborted();

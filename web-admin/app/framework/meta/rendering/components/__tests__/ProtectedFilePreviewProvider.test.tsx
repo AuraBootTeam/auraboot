@@ -148,30 +148,56 @@ describe('protected command PDF presentation', () => {
     expect(screen.getByTitle('采购合同.pdf').getAttribute('src')).toBe('blob:preview-2');
   });
 
-  it.each(['mime', 'magic', 'empty', 'attachment', 'denied', 'oversize'])(
-    'rejects %s without creating a usable preview',
-    async (defect) => {
-      let value = response();
-      if (defect === 'mime') value = response('%PDF-1.7 fixture', 'text/html');
-      if (defect === 'magic') value = response('<html>not PDF</html>');
-      if (defect === 'empty') value = response('');
-      if (defect === 'attachment')
-        value = response('%PDF-1.7 fixture', 'application/pdf', 200, false);
-      if (defect === 'denied') value = response('', 'application/json', 403);
-      if (defect === 'oversize') {
-        const blob = new NodeBlob(['%PDF-1.7 fixture']);
-        Object.defineProperty(blob, 'size', { value: 33_554_433 });
-        value.blob = async () => blob;
-      }
+  it.each(['inline', 'attachment'])(
+    'previews the named %s PDF returned by the native file endpoint',
+    async (disposition) => {
+      const value = response();
+      value.headers.set('Content-Disposition', `${disposition}; filename="purchase.pdf"`);
       fetchMock.mockResolvedValue(value);
       render(tree());
-      await act(async () => {
-        await expect(open({ url, contentType: 'application/pdf' })).rejects.toThrow();
-      });
-      expect(create).not.toHaveBeenCalled();
-      expect(screen.queryByRole('dialog')).toBeNull();
+      await act(async () => open({ url, contentType: 'application/pdf' }));
+      expect(screen.getByTitle('purchase.pdf').getAttribute('src')).toBe('blob:preview-1');
+      fireEvent.click(screen.getByText('下载 PDF'));
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(create).toHaveBeenCalledTimes(2));
+      expect(screen.queryByRole('alert')).toBeNull();
     },
   );
+
+  it.each([
+    'mime',
+    'magic',
+    'empty',
+    'attachment',
+    'unnamed-inline',
+    'unknown-disposition',
+    'denied',
+    'oversize',
+  ])('rejects %s without creating a usable preview', async (defect) => {
+    let value = response();
+    if (defect === 'mime') value = response('%PDF-1.7 fixture', 'text/html');
+    if (defect === 'magic') value = response('<html>not PDF</html>');
+    if (defect === 'empty') value = response('');
+    if (defect === 'attachment')
+      value = response('%PDF-1.7 fixture', 'application/pdf', 200, false);
+    if (defect === 'unnamed-inline')
+      value.headers.set('Content-Disposition', 'inline; filename="   "');
+    if (defect === 'unknown-disposition')
+      value.headers.set('Content-Disposition', 'form-data; filename="purchase.pdf"');
+    if (defect === 'denied') value = response('', 'application/json', 403);
+    if (defect === 'oversize') {
+      const blob = new NodeBlob(['%PDF-1.7 fixture']);
+      Object.defineProperty(blob, 'size', { value: 33_554_433 });
+      value.blob = async () => blob;
+    }
+    fetchMock.mockResolvedValue(value);
+    render(tree());
+    await act(async () => {
+      await expect(open({ url, contentType: 'application/pdf' })).rejects.toThrow();
+    });
+    expect(create).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
 
   it.each([
     'https://other.invalid/api/file/download/01ARZ3NDEKTSV4RRFFQ69G5FAW',
