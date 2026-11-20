@@ -625,6 +625,7 @@ async function main() {
     { type: 'config', id: 'platform-admin', version: JSON.parse(readFileSync(resolve(platformAdmin, 'plugin.json'), 'utf8')).version, path: platformAdmin },
     { type: 'config', id: 'org-management', version, path: orgManagement },
     { type: 'config', id: 'core-ownership', version, path: coreOwnership },
+    { type: 'config', id: 'agent-control-plane', version: JSON.parse(readFileSync(resolve(repoRoot, 'plugins/agent-control-plane/plugin.json'), 'utf8')).version, path: agentControlPlane },
     { type: 'config', id: 'core-announcement', version: JSON.parse(readFileSync(resolve(coreAnnouncement, 'plugin.json'), 'utf8')).version, path: coreAnnouncement },
     { type: 'config', id: 'core-decisionops', version: '1.0.0', path: coreDecisionops },
     { type: 'config', id: 'showcase', version: '1.0.0', path: showcase },
