@@ -32,7 +32,7 @@ public interface RestEndpointExtension extends ExtensionPoint {
 
     /**
      * Explicit, finite raw-model reads used only to build this route's sanitized projection.
-     * The host accepts this opt-in only for authenticated read-only GET routes, binds it to
+     * The host accepts this opt-in only for authenticated read-only GET/POST routes, binds it to
      * the current tenant/member and route permission, and never lends it to public CRUD.
      * Models outside this set retain the caller's ordinary record/field authorization.
      */

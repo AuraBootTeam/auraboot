@@ -36,7 +36,7 @@ public class PluginRequestContextFactory {
         if(models==null || models.isEmpty() || models.size()>16
                 || models.stream().anyMatch(model->model==null || !model.matches("[A-Za-z_][A-Za-z0-9_]{0,127}"))
                 || isPublic || route==null || route.authPolicy()!=com.auraboot.framework.plugin.extension.AuthPolicy.AUTHENTICATED
-                || !"GET".equals(route.method()) || !route.readOnlyTx() || route.permissionCode()==null || route.permissionCode().isBlank()
+                || !java.util.Set.of("GET","POST").contains(route.method()) || !route.readOnlyTx() || route.permissionCode()==null || route.permissionCode().isBlank()
                 || permissions==null)throw new org.springframework.security.access.AccessDeniedException("Authenticated read-only route declaration is required");
         Long tenant=MetaContext.getCurrentTenantId(),user=MetaContext.getCurrentUserId();
         if(tenant==null || tenant<=0 || user==null || user<=0)throw new org.springframework.security.access.AccessDeniedException("Route projection identity is unavailable");

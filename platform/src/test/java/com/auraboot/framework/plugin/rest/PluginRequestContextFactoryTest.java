@@ -35,7 +35,7 @@ class PluginRequestContextFactoryTest {
         MetaContext.setContext(7L,0L,"public","Public");assertNull(factory.current(false).findActiveTenantUser("owner"));
         verifyNoInteractions(directory);
     }
-    @Test void projectionOptInIsLimitedToAuthenticatedReadOnlyGetRoutes() {
+    @Test void projectionOptInIsLimitedToAuthenticatedReadOnlyRoutes() {
         MetaContext.setContext(7L,17L,"operator","Operator");MetaContext.setMemberId(27L);
         var clock=mock(TenantClock.class);when(clock.getZoneId(7L)).thenReturn(ZoneOffset.UTC);
         var permissions=mock(com.auraboot.framework.permission.service.UserPermissionService.class);
@@ -43,9 +43,11 @@ class PluginRequestContextFactoryTest {
         var factory=new PluginRequestContextFactory(clock,mock(DynamicDataService.class),mock(IdentityDirectoryAccessor.class),permissions);
         var route=new com.auraboot.framework.plugin.extension.RestRoute("GET","/review","probe.review.read",com.auraboot.framework.plugin.extension.AuthPolicy.AUTHENTICATED,true,true,null);
         assertNotNull(factory.current(false,route,java.util.Set.of("owned_quote")).dataAccessor());
+        var preview=new com.auraboot.framework.plugin.extension.RestRoute("POST","/preview","probe.review.read",com.auraboot.framework.plugin.extension.AuthPolicy.AUTHENTICATED,true,true,null);
+        assertNotNull(factory.current(false,preview,java.util.Set.of("owned_quote")).dataAccessor());
         assertThrows(org.springframework.security.access.AccessDeniedException.class,()->factory.current(true,route,java.util.Set.of("owned_quote")));
         for(var invalid:java.util.List.of(
-                new com.auraboot.framework.plugin.extension.RestRoute("POST","/review","probe.review.read",com.auraboot.framework.plugin.extension.AuthPolicy.AUTHENTICATED,true,true,null),
+                new com.auraboot.framework.plugin.extension.RestRoute("POST","/review","probe.review.read",com.auraboot.framework.plugin.extension.AuthPolicy.AUTHENTICATED,true,false,null),
                 new com.auraboot.framework.plugin.extension.RestRoute("GET","/review","probe.review.read",com.auraboot.framework.plugin.extension.AuthPolicy.PUBLIC,true,true,null),
                 new com.auraboot.framework.plugin.extension.RestRoute("GET","/review","probe.review.read",com.auraboot.framework.plugin.extension.AuthPolicy.AUTHENTICATED,true,false,null)))
             assertThrows(org.springframework.security.access.AccessDeniedException.class,()->factory.current(false,invalid,java.util.Set.of("owned_quote")));
