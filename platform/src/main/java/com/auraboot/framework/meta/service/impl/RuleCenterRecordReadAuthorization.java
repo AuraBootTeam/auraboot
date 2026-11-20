@@ -22,10 +22,6 @@ public final class RuleCenterRecordReadAuthorization {
         }
         var result = facade.canOperate(memberId, modelCode, "read", record);
         if (result == null || !result.granted()) {
-            org.slf4j.LoggerFactory.getLogger(RuleCenterRecordReadAuthorization.class)
-                .warn("[snapshot-403-diag] RuleCenter DENY model={} member={} granted={} null={} steps={}",
-                    modelCode, memberId, result != null && result.granted(), result == null,
-                    result == null ? "null" : String.valueOf(result.steps()));
             throw new AccessDeniedException("Access denied: you do not have permission to view this record");
         }
     }
