@@ -99,6 +99,29 @@ test("generated project is separate, excludes dependencies and records explicit 
   );
   tools.prepareProject(f);
 });
+test("explicit DevTools settings preserve source and bind generated identity", (t) => {
+  const f = fixture(t);
+  fs.writeFileSync(path.join(f.source, "project.config.json"), JSON.stringify({ appid: "touristappid", setting: { es6: true } }));
+  const baseline = tools.prepareProject(f);
+  const settings = { appid: "wx0123456789abcdef", projectname: "owned-local-test" };
+  const manifest = tools.prepareProject({ ...f, projectSettings: settings });
+  assert.notEqual(manifest.identity.sha256, baseline.identity.sha256);
+  assert.deepEqual(manifest.projectSettings, settings);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.out, "project.config.json"))), { ...settings, setting: { es6: true } });
+  assert.equal(JSON.parse(fs.readFileSync(path.join(f.source, "project.config.json"))).appid, "touristappid");
+  assert.equal(tools.readProject(f.out).projectSettings.appid, settings.appid);
+  const repeated = tools.prepareProject({ ...f, projectSettings: { projectname: settings.projectname, appid: settings.appid } });
+  assert.equal(repeated.identity.sha256, manifest.identity.sha256);
+  fs.writeFileSync(path.join(f.out, "project.config.json"), JSON.stringify({ ...settings, appid: "wx1111111111111111" }));
+  assert.throws(() => tools.readProject(f.out), /project setting mismatch: appid/);
+});
+test("invalid DevTools overrides reject before creating output", (t) => {
+  const f = fixture(t);
+  for (const projectSettings of [null, [], { appid: "touristappid" }, { appid: 1 }, { projectname: " " }, { setting: { urlCheck: false } }]) {
+    assert.throws(() => tools.prepareProject({ ...f, projectSettings }), /Invalid explicit DevTools/);
+    assert.equal(fs.existsSync(f.out), false);
+  }
+});
 test("generator rejects foreign output, source overlap and production targets", (t) => {
   const f = fixture(t);
   fs.mkdirSync(f.out);

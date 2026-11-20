@@ -35,7 +35,18 @@ function prepareProject({
   mode = "real-stack",
   identity,
   purpose = "test",
+  projectSettings,
 }) {
+  if (projectSettings !== undefined) {
+    if (!projectSettings || typeof projectSettings !== "object" || Array.isArray(projectSettings) ||
+        Object.keys(projectSettings).some((key) => !["appid", "projectname"].includes(key)) ||
+        (projectSettings.appid !== undefined &&
+          (typeof projectSettings.appid !== "string" || !/^wx[0-9a-f]{16}$/.test(projectSettings.appid))) ||
+        (projectSettings.projectname !== undefined &&
+          (typeof projectSettings.projectname !== "string" || !projectSettings.projectname.trim())))
+      throw new Error("Invalid explicit DevTools project settings");
+    projectSettings = { ...projectSettings };
+  }
   source = fs.realpathSync(source);
   out = path.resolve(out);
   let ancestor = out;
@@ -79,6 +90,8 @@ function prepareProject({
     }
   }
   fingerprint(source);
+  if (projectSettings !== undefined)
+    sourceHash.update(JSON.stringify(Object.entries(projectSettings).sort()));
   const sourceIdentity = { ...identity, sha256: sourceHash.digest("hex") };
   if (fs.existsSync(out)) {
     const markerPath = path.join(out, MARKER);
@@ -98,6 +111,11 @@ function prepareProject({
         .split(path.sep)
         .some((part) => excluded.has(part)),
   });
+  if (projectSettings !== undefined) {
+    const projectFile = path.join(out, "project.config.json");
+    const original = JSON.parse(readRegularSource(projectFile));
+    fs.writeFileSync(projectFile, JSON.stringify({ ...original, ...projectSettings }, null, 2) + "\n");
+  }
   const generated = { ...config, dataMode: mode, sourceIdentity };
   fs.writeFileSync(
     path.join(out, "config.js"),
@@ -113,6 +131,7 @@ function prepareProject({
     mode,
     purpose,
     config: generated,
+    ...(projectSettings === undefined ? {} : { projectSettings }),
   };
   fs.writeFileSync(
     path.join(out, MARKER),
@@ -277,6 +296,12 @@ function readProject(project, { expected = {}, mode } = {}) {
       throw new Error(`Project configuration mismatch: ${key}`);
   }
   validateProjectTarget(manifest.config, manifest.mode);
+  if (manifest.projectSettings) {
+    const actual = JSON.parse(readRegularSource(path.join(project, "project.config.json")));
+    for (const [key, value] of Object.entries(manifest.projectSettings)) {
+      if (actual[key] !== value) throw new Error(`DevTools project setting mismatch: ${key}`);
+    }
+  }
   return manifest;
 }
 function portBusy(port, { connect = createConnection, timeoutMs = 2000 } = {}) {
