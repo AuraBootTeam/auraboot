@@ -4,7 +4,7 @@ status: active
 ---
 
 # Controller Permission-Annotation Exemption Registry
-Regenerated 2026-11-14 (CI-anchored by scripts/check-controller-authz.mjs — the counts below now fail the controller-authz gate when they drift). 265 `@RestController` classes; 145 carry `@RequirePermission`; the 100 below do not and rely on `SecurityConfig` (`anyRequest().authenticated()` / explicit `PermitAll`) plus service-layer scoping.
+Regenerated 2026-11-20 (CI-anchored by scripts/check-controller-authz.mjs — the counts below now fail the controller-authz gate when they drift). 266 `@RestController` classes; 145 carry `@RequirePermission`; the controllers listed below do not and rely on `SecurityConfig` (`anyRequest().authenticated()` / explicit `PermitAll`) plus service-layer scoping.
 Policy: this registry is the year-reviewable record of WHY each controller has no `@RequirePermission`. New controllers default to annotated; removals from annotation need an entry here.
 
 ## agent (6)
@@ -199,7 +199,7 @@ Rationale: domain-specific scoping enforced at service layer; A4 census classifi
 - `NotificationController.java`
 - `NotificationSseController.java`
 
-## openplatform (5)
+## openplatform (6)
 
 Rationale: domain-specific scoping enforced at service layer; A4 census classification pending (TBD)
 - `ExternalEventIngressController.java`
@@ -207,6 +207,7 @@ Rationale: domain-specific scoping enforced at service layer; A4 census classifi
 - `OpenPlatformManagementController.java`
 - `OpenPlatformPublicController.java`
 - `OpenPlatformTokenController.java`
+- `SignedIntegrationCallbackController.java` — explicit class-level `@AuthenticatedAccess`; the JWT-exempt callback requires an active tenant-owned installation, current scope, loaded provider artifact, tenant-owned secret and provider signature before installed command execution. Socket-peer rate limits and bounded request bodies apply; payload/query values cannot supply tenant or installation authority.
 
 ## p1demo (1)
 
