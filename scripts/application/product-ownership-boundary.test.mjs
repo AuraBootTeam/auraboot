@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
+import ts from 'typescript';
 
 const ROOT = resolve(dirname(new URL(import.meta.url).pathname), '../..');
 
@@ -234,4 +235,50 @@ test('public source-facade npm exports resolve to typed source files', () => {
   assert.equal(dslRuntime.exports['./shared/*'], './src/shared/*.ts');
   assert.equal(designerSdk.exports['./flow-designer-sdk'], './src/flow-designer-sdk/index.ts');
   assert.equal(designerSdk.exports['./flow-designer-sdk/store/*'], './src/flow-designer-sdk/store/*.ts');
+});
+
+
+test('every public designer facade re-export resolves in the owning Web Shell', () => {
+  const facadeRoot = resolve(ROOT, 'packages/designer-sdk/src');
+  const facadeFiles = files(facadeRoot, (path) => /\.tsx?$/.test(path));
+  const reexports = facadeFiles.flatMap((path) => {
+    const source = readFileSync(path, 'utf8');
+    return [...source.matchAll(/export\s+(?:type\s+)?(?:\*|\{[^}]*\})\s+from\s+['"]([^'"]+)['"]/g)]
+      .map((match) => ({ path, specifier: match[1] }));
+  });
+  assert.ok(reexports.length > 0, 'The public SDK must expose real typed modules');
+  for (const { path, specifier } of reexports) {
+    assert.ok(specifier.startsWith('~/') || specifier.startsWith('.'),
+      `Unexpected facade target: ${specifier}`);
+    const target = specifier.startsWith('~/')
+      ? resolve(ROOT, 'web-admin/app', specifier.slice(2))
+      : resolve(dirname(path), specifier);
+    const candidates = [target + '.ts', target + '.tsx', resolve(target, 'index.ts'), resolve(target, 'index.tsx')];
+    assert.ok(candidates.some((file) => existsSync(file) && statSync(file).isFile()),
+      `${path.slice(ROOT.length + 1)} re-exports a missing module: ${specifier}`);
+  }
+});
+
+
+test('TypeScript resolves public designer exports through the real Web Shell configuration', () => {
+  const configPath = resolve(ROOT, 'web-admin/tsconfig.json');
+  const config = ts.readConfigFile(configPath, ts.sys.readFile);
+  assert.equal(config.error, undefined);
+  const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, dirname(configPath));
+  assert.deepEqual(parsed.errors, []);
+  const facadeRoot = resolve(ROOT, 'packages/designer-sdk/src');
+  const facadeFiles = files(facadeRoot, (path) => /\.tsx?$/.test(path));
+  const program = ts.createProgram(facadeFiles, { ...parsed.options, noEmit: true });
+  const checker = program.getTypeChecker();
+  for (const path of facadeFiles) {
+    const source = program.getSourceFile(path);
+    assert.ok(source, `Missing compiler input: ${path}`);
+    const diagnostics = [...program.getSyntacticDiagnostics(source), ...program.getSemanticDiagnostics(source)];
+    assert.deepEqual(diagnostics.map((item) => ts.flattenDiagnosticMessageText(item.messageText, '\n')), [], path);
+  }
+  const source = program.getSourceFile(resolve(facadeRoot, 'flow-designer-sdk/index.ts'));
+  const exported = checker.getExportsOfModule(checker.getSymbolAtLocation(source)).map((symbol) => symbol.name);
+  for (const name of ['FlowDesigner', 'FlowDesignerProps', 'useFlowStore', 'validateFlow', 'NodeRegistry']) {
+    assert.ok(exported.includes(name), `Missing public typed export: ${name}`);
+  }
 });
