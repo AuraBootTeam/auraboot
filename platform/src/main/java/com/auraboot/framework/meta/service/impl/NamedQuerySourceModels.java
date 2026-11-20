@@ -57,7 +57,12 @@ public class NamedQuerySourceModels {
                     "\"public\".\"ab_permission\"", "\"public\".\"ab_tenant_member\"");
     /** Platform-owned tables that have no tenant model but must still receive a tenant scope. */
     private static final Set<String> TENANT_SCOPED_PLATFORM_SOURCES =
-            Set.of("\"public\".\"ab_named_query\"");
+            Set.of("\"public\".\"ab_named_query\"", "\"public\".\"ab_command_audit_log\"");
+    // ab_command_audit_log (2026-11-20): the command execution audit ledger carries
+    // tenant_id and is not represented by a tenant meta-model. Audit dashboards read it
+    // through named queries that filter tenant_id = #{params.tenantId} explicitly —
+    // same admission rationale as ab_named_query; without it every audit read is
+    // denied as an unresolvable export source (candidates=0).
     /** Marker model code for a platform reference source; protection must skip model checks. */
     public static final String PLATFORM_REFERENCE_MARKER = "platform.reference";
     /** Marker prefix for engine tables under the tenant-bypass prefixes (own tenant_id column). */
