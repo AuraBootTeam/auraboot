@@ -62,7 +62,7 @@ export function buildDrillDownTarget(
     const known = new Map<string, unknown>();
     for (const filter of payload) known.set(filter.field, filter.value);
     for (const rule of config.filters ?? []) {
-      for (const filter of materializeRule(rule, payload)) known.set(filter.field, filter.value);
+      for (const filter of materializeRule(rule, payload)) known.set(filter.fieldCode, filter.value);
     }
     targetPage = targetPage.replace(placeholderRe, (token, field) => {
       const value = known.get(field);
