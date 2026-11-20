@@ -60,6 +60,10 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework:spring-tx'
     implementation 'com.baomidou:mybatis-plus-spring-boot4-starter'
+    // The boot4 starter line no longer pulls the MyBatis core transitively; the platform
+    // mappers still compile and scan against org.apache.ibatis — without this jar the
+    // MyBatis resource check fails at startup ("Expected one compatible MyBatis resource").
+    implementation 'org.mybatis:mybatis'
     agentRuntimeOnly project(':platform-agent')
     runtimeOnly project(':platform-mq-kafka')
     runtimeOnly project(':platform-storage-minio')
