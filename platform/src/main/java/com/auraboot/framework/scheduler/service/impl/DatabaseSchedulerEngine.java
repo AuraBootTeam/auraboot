@@ -64,6 +64,9 @@ public class DatabaseSchedulerEngine implements SchedulerEngine {
     private static final java.time.Duration CLAIM_TTL = java.time.Duration.ofSeconds(60);
     private static final String CLAIM_KEY_PREFIX = "aura:sched:claim:";
 
+    @Value("${aura.scheduler.claim-key-prefix:${REDIS_KEY_PREFIX:aura:}sched:claim:}")
+    private String claimKeyPrefix = CLAIM_KEY_PREFIX;
+
     private boolean claimTrigger(ScheduledTask task) {
         if (claimRedis == null) {
             return true; // single-instance: nothing to compete with
@@ -72,7 +75,7 @@ public class DatabaseSchedulerEngine implements SchedulerEngine {
             String holder = java.net.InetAddress.getLocalHost().getHostName()
                     + "-" + ProcessHandle.current().pid();
             Boolean won = claimRedis.opsForValue().setIfAbsent(
-                    CLAIM_KEY_PREFIX + task.getPid(), holder, claimDuration(task));
+                    claimKeyPrefix + task.getPid(), holder, claimDuration(task));
             return Boolean.TRUE.equals(won);
         } catch (Exception e) {
             // Fail open: Redis unavailability must not silently disable all

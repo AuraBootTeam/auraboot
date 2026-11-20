@@ -12,6 +12,9 @@ import org.springframework.scheduling.TaskScheduler;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
+import java.util.Map;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.core.env.MapPropertySource;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -42,6 +45,29 @@ class DatabaseSchedulerIntervalClaimTest {
         callback.run();
         verify(values).setIfAbsent(eq("aura:sched:claim:claim-cadence-test"),anyString(),eq(Duration.ofSeconds(5)));
         verify(executor).execute(task);
+    }
+    @Test void managedEnvironmentPrefixSeparatesIndependentRuntimeClaims() {
+        try(var context=new AnnotationConfigApplicationContext()) {
+            context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("owned-runtime",Map.of("REDIS_KEY_PREFIX","aura:quote:7:")));
+            context.registerBean(DatabaseSchedulerEngine.class,()->engine);context.refresh();
+            var task=task(5000);var callback=register(task);
+            when(values.setIfAbsent(anyString(),anyString(),any(Duration.class))).thenReturn(true);
+            callback.run();
+            verify(values).setIfAbsent(eq("aura:quote:7:sched:claim:claim-cadence-test"),anyString(),eq(Duration.ofSeconds(5)));
+            verify(executor).execute(task);
+        }
+    }
+    @Test void explicitClusterPrefixOverridesTheManagedEnvironmentDefault() {
+        try(var context=new AnnotationConfigApplicationContext()) {
+            context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("cluster",Map.of(
+                    "REDIS_KEY_PREFIX","aura:quote:7:","aura.scheduler.claim-key-prefix","stable:cluster:sched:claim:")));
+            context.registerBean(DatabaseSchedulerEngine.class,()->engine);context.refresh();
+            var task=task(5000);var callback=register(task);
+            when(values.setIfAbsent(anyString(),anyString(),any(Duration.class))).thenReturn(true);
+            callback.run();
+            verify(values).setIfAbsent(eq("stable:cluster:sched:claim:claim-cadence-test"),anyString(),eq(Duration.ofSeconds(5)));
+            verify(executor).execute(task);
+        }
     }
     @Test void duplicateOrUnknownClaimsDoNotRunHandlers() {
         var task=task(5000);var callback=register(task);
