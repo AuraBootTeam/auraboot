@@ -16,6 +16,22 @@ import static org.mockito.Mockito.when;
 class IndependentTransactionAccessorImplTest {
 
     @Test
+    void ordinaryBuyerCheckpointStartsItsOwnCoherentReadSnapshot() {
+        PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
+        when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        com.auraboot.framework.application.tenant.MetaContext.setContext(7L, 9L, "buyer", "buyer");
+        var accessor = new IndependentTransactionAccessorImpl(transactions, mock(DynamicDataService.class));
+        accessor.requiresNew(db -> "read allocations");
+        var definition = org.mockito.ArgumentCaptor.forClass(org.springframework.transaction.TransactionDefinition.class);
+        verify(transactions).getTransaction(definition.capture());
+        assertThat(definition.getValue().getPropagationBehavior())
+                .isEqualTo(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        assertThat(definition.getValue().getIsolationLevel())
+                .isEqualTo(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        assertThat(definition.getValue().isReadOnly()).isFalse();
+    }
+
+    @Test
     void requiresNew_commitsTheBoundedCallbackAndSuppliesDynamicDataAccess() {
         PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
         DynamicDataService dynamicData = mock(DynamicDataService.class);
