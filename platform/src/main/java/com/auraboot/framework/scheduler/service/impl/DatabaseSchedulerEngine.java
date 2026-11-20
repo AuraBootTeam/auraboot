@@ -64,7 +64,7 @@ public class DatabaseSchedulerEngine implements SchedulerEngine {
     private static final java.time.Duration CLAIM_TTL = java.time.Duration.ofSeconds(60);
     private static final String CLAIM_KEY_PREFIX = "aura:sched:claim:";
 
-    private boolean claimTrigger(String taskPid) {
+    private boolean claimTrigger(ScheduledTask task) {
         if (claimRedis == null) {
             return true; // single-instance: nothing to compete with
         }
@@ -72,16 +72,24 @@ public class DatabaseSchedulerEngine implements SchedulerEngine {
             String holder = java.net.InetAddress.getLocalHost().getHostName()
                     + "-" + ProcessHandle.current().pid();
             Boolean won = claimRedis.opsForValue().setIfAbsent(
-                    CLAIM_KEY_PREFIX + taskPid, holder, CLAIM_TTL);
+                    CLAIM_KEY_PREFIX + task.getPid(), holder, claimDuration(task));
             return Boolean.TRUE.equals(won);
         } catch (Exception e) {
             // Fail open: Redis unavailability must not silently disable all
             // scheduled tasks; duplicate suppression simply degrades until it
             // recovers (same exposure as before this guard existed).
             log.warn("Trigger claim unavailable for task {} ({}); proceeding without cross-instance guard",
-                    taskPid, e.getMessage());
+                    task.getPid(), e.getMessage());
             return true;
         }
+    }
+
+    private Duration claimDuration(ScheduledTask task) {
+        // The distributed duplicate guard must not turn a short configured interval into a one-minute cooldown.
+        if ("interval".equals(task.getTaskType()) && task.getIntervalMs() != null && task.getIntervalMs() > 0) {
+            return Duration.ofMillis(Math.min(CLAIM_TTL.toMillis(), task.getIntervalMs()));
+        }
+        return CLAIM_TTL;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -140,7 +148,7 @@ public class DatabaseSchedulerEngine implements SchedulerEngine {
         }
 
         Runnable runnable = () -> {
-            if (!claimTrigger(task.getPid())) {
+            if (!claimTrigger(task)) {
                 log.debug("Task tick claimed by another instance: pid={}", task.getPid());
                 return;
             }
