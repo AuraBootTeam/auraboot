@@ -287,7 +287,15 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
     @Override
     public boolean canAccessRecord(Long tenantId, String modelCode, Long userId,
                                    Map<String, Object> record) {
-        return canAccessRecord(tenantId, modelCode, "read", userId, record);
+        boolean verdict = canAccessRecord(tenantId, modelCode, "read", userId, record);
+        if (!verdict && "orb_source_snapshot".equals(modelCode)) {
+            org.slf4j.LoggerFactory.getLogger(DataPermissionEngineImpl.class)
+                .warn("[snapshot-403-diag] legacy read DENY model={} recordId={} base={} requiredReads={}",
+                    modelCode, record == null ? null : record.get("pid"),
+                    baseCanAccessRecord(tenantId, modelCode, "read", userId, record),
+                    requiredReadAllows(modelCode, record));
+        }
+        return verdict;
     }
 
     @Override
