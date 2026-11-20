@@ -24,7 +24,7 @@ dependencyManagement {
     dependencies {
         dependency 'com.github.ben-manes.caffeine:caffeine:3.3.1'
         dependency 'com.google.http-client:google-http-client-jackson2:1.47.1'
-        dependency 'io.netty:netty-resolver-dns-native-macos:4.2.19.Final'
+        dependency 'io.netty:netty-resolver-dns-native-macos:4.2.21.Final'
         dependency 'org.postgresql:postgresql:42.7.14'
         dependency 'org.checkerframework:checker-qual:3.55.1'
     }
@@ -63,7 +63,7 @@ dependencies {
     // The boot4 starter line no longer pulls the MyBatis core transitively; the platform
     // mappers still compile and scan against org.apache.ibatis — without this jar the
     // MyBatis resource check fails at startup ("Expected one compatible MyBatis resource").
-    implementation 'org.mybatis:mybatis:3.5.19'
+    implementation 'org.mybatis:mybatis:3.6.0'
     agentRuntimeOnly project(':platform-agent')
     runtimeOnly project(':platform-mq-kafka')
     runtimeOnly project(':platform-storage-minio')

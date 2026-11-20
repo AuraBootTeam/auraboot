@@ -7,7 +7,7 @@ import java.util.zip.ZipFile
 plugins {
     id 'java-library'
     id 'maven-publish'
-    id 'com.gradleup.shadow' version '9.2.2'
+    id 'com.gradleup.shadow' version '9.6.1'
 }
 
 group = 'com.auraboot'
@@ -20,7 +20,7 @@ configurations {
     relocatedInputs
 }
 dependencies {
-    originalMybatis 'org.mybatis:mybatis:3.5.19'
+    originalMybatis 'org.mybatis:mybatis:3.6.0'
     relocatedInputs 'ognl:ognl:3.4.17'
     relocatedInputs 'org.javassist:javassist:3.33.0-GA'
     testImplementation platform('org.junit:junit-bom:6.0.3')
@@ -116,7 +116,7 @@ def provenance = tasks.register('generateCarrierProvenance') {
         new File(dir, 'inputs.json').text = JsonOutput.prettyPrint(JsonOutput.toJson([
             carrier: "com.auraboot:mybatis-compat:${project.version}",
             backport: 'mybatis-3.5.19-ognl-3.4.17-auraboot.1',
-            original: 'org.mybatis:mybatis:3.5.19',
+            original: 'org.mybatis:mybatis:3.6.0',
             policy: 'Unmodified MyBatis classes; replaced relocated OGNL and Javassist; AuraBoot vendor build, not an upstream release',
             inputs: records,
         ])) + '\n'
@@ -124,7 +124,7 @@ def provenance = tasks.register('generateCarrierProvenance') {
         new File(dir, 'sbom.cdx.json').text = JsonOutput.prettyPrint(JsonOutput.toJson([
             bomFormat: 'CycloneDX', specVersion: '1.6', version: 1,
             metadata: [component: [type: 'library', group: 'com.auraboot', name: 'mybatis-compat', version: project.version.toString(),
-                pedigree: [ancestors: [[type: 'library', group: 'org.mybatis', name: 'mybatis', version: '3.5.19']]]]],
+                pedigree: [ancestors: [[type: 'library', group: 'org.mybatis', name: 'mybatis', version: '3.6.0']]]]],
             components: records.findAll { !it.coordinate.startsWith('org.mybatis:') }.collect { item ->
                 def parts = item.coordinate.split(':')
                 [type: 'library', group: parts[0], name: parts[1], version: parts[2],
