@@ -529,6 +529,10 @@ async function main() {
     resolve(repoRoot, 'plugins/core-ownership'),
     resolve(output, 'config/core-ownership'),
   );
+  const agentControlPlane = copyArtifact(
+    resolve(repoRoot, 'plugins/agent-control-plane'),
+    resolve(output, 'config/agent-control-plane'),
+  );
   const coreAnnouncement = copyArtifact(
     resolve(repoRoot, 'plugins/core-announcement'),
     resolve(output, 'config/core-announcement'),
