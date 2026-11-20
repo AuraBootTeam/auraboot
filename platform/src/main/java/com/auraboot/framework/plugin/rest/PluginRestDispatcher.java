@@ -132,7 +132,10 @@ public class PluginRestDispatcher {
                              boolean isPublic) throws IOException {
         ServletPluginHttpRequest req = new ServletPluginHttpRequest(httpReq, m.pathVars());
         try {
-            BufferingPluginHttpResponse buffered = pipeline.execute(m, req, contextFactory.current(isPublic));
+            var models=m.extension().tenantProjectionReadModels(m.route());
+            if(models==null)throw new AccessDeniedException("Invalid route projection declaration");
+            var context=models.isEmpty()?contextFactory.current(isPublic):contextFactory.current(isPublic,m.route(),models);
+            BufferingPluginHttpResponse buffered = pipeline.execute(m, req, context);
             buffered.flushTo(httpRes);
         } catch (ValidationException e) {
             writeError(httpRes, HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
