@@ -501,7 +501,7 @@ export const ListTable = React.memo(function ListTable({
   })();
   const getRowClassName = (rowId: string) =>
     cn(
-      'group cursor-pointer text-text-2 transition-colors hover:bg-hover focus-visible:shadow-focus focus-visible:outline-none',
+      'group cursor-pointer text-text-2 transition-colors hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent',
       selectedIds.has(rowId) && 'bg-accent-weak',
       previewRecordId === rowId && 'bg-accent-weak/50',
     );
