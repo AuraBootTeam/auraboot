@@ -302,7 +302,13 @@ describe('Joined card groups keep source and offer drafts independent', () => {
     fireEvent.change(within(first.getByRole('group',{name:'Beta'})).getByRole('textbox',{name:'Proposed quantity'}),{target:{value:'30.000001'}});
     fireEvent.change(first.getByRole('searchbox',{name:'Search suppliers'}),{target:{value:'Alpha'}});
     expect(Array.from(groups[0].querySelectorAll('fieldset')).some(el=>(el as Element).getAttribute('aria-label')==='Beta')).toBe(false);
+    fireEvent.change(first.getByRole('searchbox',{name:'Search suppliers'}),{target:{value:'no-match'}});
+    expect(groups[0].querySelectorAll('[data-testid=card-grid-card]')).toHaveLength(0);
+    expect(groups[0].querySelector('[data-testid=card-group-search-empty]')).toHaveTextContent('No matching results. Adjust your search.');
+    expect(groups[2].querySelector('[data-testid=card-group-search-empty]')).toBeNull();
+    expect(state.getFieldValue('joined','allocations')[1].proposedQty).toBe('30.000001');
     fireEvent.change(first.getByRole('searchbox',{name:'Search suppliers'}),{target:{value:''}});
+    expect(groups[0].querySelector('[data-testid=card-group-search-empty]')).toBeNull();
     expect(within(first.getByRole('group',{name:'Beta'})).getByRole('textbox',{name:'Proposed quantity'})).toHaveValue('30.000001');
     fireEvent.click(groups[0].querySelector('summary')!);fireEvent.click(groups[0].querySelector('summary')!);
     act(refresh);
