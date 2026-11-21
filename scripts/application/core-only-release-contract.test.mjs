@@ -337,7 +337,9 @@ test('core schema audit keeps provider-neutral automation storage in core', () =
 
 test('release OCI is built on a pinned Linux JRE and requires a real image builder', () => {
   assert.match(oci, /eclipse-temurin:21-jre-alpine@sha256:b6ea71e690a72ba240b3d1b5c477410014862f9ea2cc73ab40e41ff21b03ba1c/);
-  assert.match(oci, /apk add --no-cache zlib=1\.4-r0 openssl=3\.5\.9-r1 libssl3=3\.5\.9-r1 libcrypto3=3\.5\.9-r1 && apk info -v zlib openssl libssl3 libcrypto3/);
+  assert.match(oci, /apk add --no-cache zlib=1\.4-r0 openssl=3\.5\.9-r1 libssl3=3\.5\.9-r1 libcrypto3=3\.5\.9-r1 gnutls=3\.8\.14-r0 && apk info -v zlib openssl libssl3 libcrypto3 gnutls/);
+  assert.match(oci, /apk add --no-cache[^\n]*gnutls=3\.8\.14-r0/);
+  assert.match(readFileSync(resolve(root, 'platform/Dockerfile'), 'utf8'), /apk add --no-cache[^\n]*gnutls=3\.8\.14-r0/);
   assert.doesNotMatch(oci, /--allow-unauthenticated|--allow-untrusted|trusted=yes/);
   assert.doesNotMatch(oci, /execFileSync\('container'/);
   assert.match(oci, /self-hosted Linux CI Docker builder \(linux\/amd64\)/);
