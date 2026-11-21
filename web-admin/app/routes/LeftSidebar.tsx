@@ -180,6 +180,7 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
             data-testid="sidebar-collapse-toggle"
             aria-expanded={!collapsed}
             className={`rounded-md p-1.5 transition-colors ${tokenized ? 'text-text-3 hover:bg-hover hover:text-text' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}`}
+            aria-label={t(collapsed ? 'sidebar.expand' : 'sidebar.collapse')}
             title={t(collapsed ? 'sidebar.expand' : 'sidebar.collapse')}
           >
             {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
