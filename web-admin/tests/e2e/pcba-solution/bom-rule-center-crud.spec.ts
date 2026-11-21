@@ -145,13 +145,18 @@ test('engineering maintains header aliases and exact MPN alternatives with a con
         return (await readDynamicRecord(page, 'bom_conversion_task_pcba', taskId)).bom_task_status;
       },
         { timeout: 90_000, intervals: [1000, 2000] }).toBe('completed');
+      await expect.poll(async () => {
+        const job = await page.request.get(`/api/async-tasks/${asyncTaskCode}`);
+        expect(job.ok()).toBe(true);
+        return String((await job.json()).data.status).toLowerCase();
+      }, { timeout: 15_000 }).toBe('completed');
       const raw = await queryDynamicRecords(page, 'bom_raw_line_pcba', [{ fieldName: 'bom_raw_task_id', operator: 'EQ', value: taskId }]);
       expect(raw).toHaveLength(1);
       expect(raw[0].bom_raw_mpn).toBe(mpn);
       await page.reload({ waitUntil: 'domcontentloaded' });
       await expect(page.locator('main')).toContainText('BOM 匹配已完成');
       await page.getByRole('row').filter({ hasText: 'C1' }).click();
-      const drawer = page.getByTestId('review-drawer-tab-compare');
+      const drawer = page.getByTestId('review-drawer');
       const candidates = drawer.locator('button[data-testid^="candidate-list-item-"]');
       await expect(candidates).toHaveCount(limit);
       await expect(candidates.first()).toContainText(`${marker}-0`);
