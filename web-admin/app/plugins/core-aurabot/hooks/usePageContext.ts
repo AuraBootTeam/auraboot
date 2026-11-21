@@ -45,7 +45,7 @@ export function deriveContextFromRoute(
   params: Record<string, string | undefined>,
 ): PageContext {
   // /p/:pageKey/view/:recordPid → detail
-  if (pathname.match(/^\/p\/[^/]+\/view\/[^/]+/)) {
+  if (pathname.match(/^\/p\/(?:c\/)?[^/]+\/view\/[^/]+/)) {
     const pageKey = params.pageKey || '';
     const recordPid = params.recordPid ?? params.recordId;
     return {
@@ -58,7 +58,7 @@ export function deriveContextFromRoute(
   }
 
   // /p/:pageKey/edit/:recordPid → form (edit)
-  if (pathname.match(/^\/p\/[^/]+\/edit\/[^/]+/)) {
+  if (pathname.match(/^\/p\/(?:c\/)?[^/]+\/edit\/[^/]+/)) {
     const pageKey = params.pageKey || '';
     const recordPid = params.recordPid ?? params.recordId;
     return {
@@ -71,7 +71,7 @@ export function deriveContextFromRoute(
   }
 
   // /p/:pageKey/new → form (create)
-  if (pathname.match(/^\/p\/[^/]+\/new/)) {
+  if (pathname.match(/^\/p\/(?:c\/)?[^/]+\/new/)) {
     const pageKey = params.pageKey || '';
     return {
       pageType: 'form',
@@ -82,7 +82,7 @@ export function deriveContextFromRoute(
   }
 
   // /p/:pageKey → list
-  if (pathname.match(/^\/p\/[^/]+$/)) {
+  if (pathname.match(/^\/p\/(?:c\/)?[^/]+$/)) {
     const pageKey = params.pageKey || '';
     return {
       pageType: 'list',
