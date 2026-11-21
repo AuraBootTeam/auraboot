@@ -22,6 +22,160 @@ import {
 
 test.use({ locale: 'zh-CN' });
 
+test('engineering maintains header aliases and exact MPN alternatives with a configurable display limit', async ({ page: admin, browser }, info) => {
+  test.setTimeout(180_000);
+  const marker = `ALIASMPN${Date.now()}`;
+  const mpn = 'CC0603KRX7R9BB104';
+  const header = `供应商型号 ${marker}`;
+  await admin.goto('/home', { waitUntil: 'domcontentloaded' });
+  const engineer = makeQuoteRoleUser('alias-mpn-engineer', marker.toLowerCase(), ['bom_engineering']);
+  await ensureQuoteRoleUser(admin, engineer);
+  for (let index = 0; index < 7; index++) {
+    const part = index === 0 ? mpn : `GRM188R71H104KA${index}3D`;
+    const material = await executeCommand(admin, 'bom:create_material', {
+      bom_mm_material_code: `${marker}-${index}`, bom_mm_material_name: '贴片电容',
+      bom_mm_spec_model: `${part} 100nF ±10% 50V X7R 0603`,
+      bom_mm_category: 'capacitor', bom_mm_package: '0603', bom_mm_mpn: part,
+      bom_mm_brand: index === 0 ? 'YAGEO' : 'Murata', bom_mm_unit: 'PCS', bom_mm_enabled: true,
+    });
+    expect(material.success).toBe(true);
+  }
+  const actor = await openQuoteRolePage(browser, engineer);
+  const page = actor.page;
+  const field = (name: string) => page.getByTestId(`form-field-${name}`);
+  const aliasRows = () => queryDynamicRecords(page, 'bom_header_alias', [
+    { fieldName: 'bom_ha_alias', operator: 'EQ', value: header },
+  ]);
+  async function menu(model: string) {
+    await page.goto('/home', { waitUntil: 'domcontentloaded' });
+    await ensureSidebarExpanded(page);
+    const sidebar = page.getByTestId('sidebar');
+    const link = sidebar.locator(`a[href="/p/${model}"]`);
+    if (!(await link.isVisible())) {
+      const center = sidebar.getByRole('button', { name: '规则中心', exact: true });
+      if (!(await center.isVisible())) await sidebar.getByRole('button', { name: 'BOM转化工具', exact: true }).click();
+      await center.click();
+    }
+    await link.click();
+    await expect(page.locator('main')).not.toContainText(/Page Unavailable|Access forbidden/);
+  }
+  async function save(command: string) {
+    const payload = await submit(page, command);
+    expect(payload).toBeTruthy();
+  }
+  try {
+    await menu('bom_header_alias');
+    await expect(page.locator('main').getByRole('button', { name: '新建', exact: true })).toBeVisible();
+    await page.screenshot({ path: info.outputPath('alias-engineering-list.png'), fullPage: true });
+    await page.locator('main').getByRole('button', { name: '新建', exact: true }).click();
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await expect(field('bom_ha_alias')).toContainText(/必填|不能为空|请输入|请填写|required/i);
+    await field('bom_ha_alias').getByRole('textbox').fill(header);
+    await field('bom_ha_system_field').getByRole('combobox').first().click();
+    await page.getByRole('option', { name: 'MPN/原料号', exact: true }).click();
+    const enabled = field('bom_ha_enabled').getByRole('switch');
+    if ((await enabled.getAttribute('aria-checked')) !== 'true') await enabled.click();
+    await save('bom:create_header_alias');
+    await expect.poll(async () => (await aliasRows()).length).toBe(1);
+    await searchBusinessList(page, '/p/bom_header_alias', header);
+    const aliasRow = page.getByRole('row').filter({ hasText: header });
+    await expect(aliasRow).toHaveCount(1);
+    await page.screenshot({ path: info.outputPath('alias-created.png'), fullPage: true });
+    await clickRowActionByLocator(page, aliasRow, 'edit', '编辑');
+    await field('bom_ha_remark').getByRole('textbox').fill('Supplier column contains manufacturer MPN');
+    await save('bom:update_header_alias');
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    expect((await aliasRows())[0].bom_ha_remark).toBe('Supplier column contains manufacturer MPN');
+    await page.screenshot({ path: info.outputPath('alias-updated.png'), fullPage: true });
+
+    const account = await executeCommand(page, 'crm:create_account', { crm_acc_name: marker }, undefined, 'create');
+    const customerId = String(account.recordId ?? account.pid ?? account.id ?? '');
+    expect(customerId).toBeTruthy();
+    const project = await executeCommand(page, 'bom:create_project', {
+      bom_project_name: marker, bom_project_customer_id: customerId, bom_pcba_code: marker,
+      bom_project_quality_level: 'industrial',
+    }, undefined, 'create');
+    const projectId = String(project.recordId ?? project.pid ?? project.projectId ?? '');
+    expect(projectId).toBeTruthy();
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+      ['物料名称', '规格', '位号', '数量', header],
+      ['贴片电容', '100nF ±10% 50V X7R 0603', 'C1', 1, mpn],
+    ]), 'BOM');
+    const file = info.outputPath('supplier-mpn.xlsx');
+    fs.writeFileSync(file, XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
+    const taskIds: string[] = [];
+    async function convert(limit: number) {
+      await page.goto('/home', { waitUntil: 'domcontentloaded' });
+      await ensureSidebarExpanded(page);
+      await page.getByTestId('sidebar').locator('a[href="/p/bom_conversion_task_pcba_workbench"]').click();
+      await page.getByTestId('toolbar-btn-upload_bom').click();
+      for (const [name, id] of [['bom_task_customer_id', customerId], ['bom_task_project_id', projectId]]) {
+        await page.getByTestId(`select-trigger-${name}`).click();
+        await page.locator(`[role="option"][data-value="${id}"]`).first().click();
+      }
+      const uploaded = page.waitForResponse(r => r.url().includes('/api/file/upload') && r.request().method() === 'POST');
+      await field('bom_task_raw_file_id').locator('input[type="file"]').first().setInputFiles(file);
+      expect((await uploaded).ok()).toBe(true);
+      const admission = page.waitForResponse(r => decodeURIComponent(r.url()).includes('/api/meta/commands/execute/bom:start_conversion') && r.request().method() === 'POST');
+      await page.getByTestId('form-btn-start_conversion').click();
+      const response = await admission;
+      expect(new URL(response.url()).origin).toBe(new URL(page.url()).origin);
+      expect(String((await response.json()).code)).toBe('0');
+      await page.waitForURL(/\/p\/bom_conversion_task_pcba_workbench\/view\/[^/?#]+/);
+      const taskId = new URL(page.url()).pathname.split('/').at(-1)!;
+      taskIds.push(taskId);
+      await expect.poll(async () => (await readDynamicRecord(page, 'bom_conversion_task_pcba', taskId)).bom_task_status,
+        { timeout: 90_000, intervals: [1000, 2000] }).toBe('completed');
+      const raw = await queryDynamicRecords(page, 'bom_raw_line_pcba', [{ fieldName: 'bom_raw_task_id', operator: 'EQ', value: taskId }]);
+      expect(raw).toHaveLength(1);
+      expect(raw[0].bom_raw_mpn).toBe(mpn);
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await expect(page.locator('main')).toContainText('BOM 匹配已完成');
+      await page.getByRole('row').filter({ hasText: 'C1' }).click();
+      const drawer = page.getByTestId('review-drawer-tab-compare');
+      const candidates = drawer.locator('button[data-testid^="candidate-list-item-"]');
+      await expect(candidates).toHaveCount(limit);
+      await expect(candidates.first()).toContainText(`${marker}-0`);
+      await expect(candidates.nth(1)).not.toContainText(`${marker}-0`);
+      await page.screenshot({ path: info.outputPath(`mpn-exact-alternatives-${limit}.png`), fullPage: true });
+      fs.writeFileSync(info.outputPath('engineering-alias-mpn-evidence.json'), JSON.stringify({ marker, header, taskIds, raw, limit }, null, 2));
+      await page.getByRole('button', { name: /关闭复核浮层|Close Review/i }).click();
+    }
+    await convert(5);
+    const settings = await queryDynamicRecords(page, 'bom_setting', [{ fieldName: 'bom_setting_key', operator: 'EQ', value: 'matcher_v2_policy_json' }]);
+    expect(settings).toHaveLength(1);
+    const initialPolicy = String(settings[0].bom_setting_value);
+    async function configure(raw: string) {
+      await menu('bom_setting');
+      await searchBusinessList(page, '/p/bom_setting', 'matcher_v2_policy_json');
+      await clickRowActionByLocator(page, page.getByRole('row').filter({ hasText: 'matcher_v2_policy_json' }), 'edit', '编辑');
+      await field('bom_setting_value').getByRole('textbox').fill(raw);
+      await save('bom:update_setting');
+      const saved = await readDynamicRecord(page, 'bom_setting', String(settings[0].pid));
+      expect(saved.bom_setting_value).toBe(raw);
+    }
+    try {
+      await configure(JSON.stringify({ ...JSON.parse(initialPolicy), candidateDisplayLimit: 3 }));
+      await convert(3);
+    } finally {
+      await configure(initialPolicy);
+    }
+    await menu('bom_header_alias');
+    await searchBusinessList(page, '/p/bom_header_alias', header);
+    await clickRowActionByLocator(page, page.getByRole('row').filter({ hasText: header }), 'delete', '删除');
+    await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+    await page.screenshot({ path: info.outputPath('alias-delete-confirm.png'), fullPage: true });
+    await page.getByTestId('confirm-cancel').click();
+    expect(await aliasRows()).toHaveLength(1);
+    await clickRowActionByLocator(page, page.getByRole('row').filter({ hasText: header }), 'delete', '删除');
+    await page.getByTestId('confirm-ok').click();
+    await expect.poll(async () => (await aliasRows()).length).toBe(0);
+  } finally {
+    await actor.context.close();
+  }
+});
+
 test.afterEach(async ({ page }) => {
   await cleanupTrackedFixtureRows(page);
 });
