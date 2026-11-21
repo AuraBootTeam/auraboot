@@ -320,9 +320,13 @@ public class DynamicDataAccessorImpl implements DataAccessor {
         } catch (AccessDeniedException | com.auraboot.framework.exception.PermissionDeniedException denied) {
             // CATCH: public plugin boundary — translate host authorization types
             // into the stable, transport-neutral DataAccessor contract.
-            log.warn("Plugin data authorization rejected command={} tenant={} user={}",
-                    MetaContext.getAuthorizedCommandCode(), MetaContext.exists() ? MetaContext.getCurrentTenantId() : null,
-                    MetaContext.exists() ? MetaContext.getCurrentUserId() : null, denied);
+            var dbgFrames = new StringBuilder();
+            for (var frame : denied.getStackTrace()) {
+                dbgFrames.append(" | ").append(frame.getClassName()).append('#').append(frame.getMethodName());
+                if (dbgFrames.length() > 1400) break;
+            }
+            log.warn("DBGDENY command={} deniedMsg={} frames={}",
+                    MetaContext.getAuthorizedCommandCode(), denied.getMessage(), dbgFrames);
             throw new DataAccessorException(DataAccessErrorCode.PERMISSION_DENIED, denied);
         }
     }
