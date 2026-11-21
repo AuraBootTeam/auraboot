@@ -57,8 +57,13 @@ public class AutomationCommandEventBridge {
             return;
         }
         if (actorId == null || actorId <= 0) {
-            throw new org.springframework.security.access.AccessDeniedException(
-                    "AUTOMATION_EVENT_ACTOR_UNAVAILABLE: a positive command actor is required");
+            // Machine-identity commands (installed integrations run as user 0) have no human
+            // actor to resolve membership against; automation rules are human-actor semantics.
+            // Skip quietly — this listener is @Async, so throwing here would only surface as an
+            // uncaught-exception log storm on every machine command completion.
+            log.debug("Skipping automation dispatch for machine-identity command completion: command={}",
+                    event.getCommandCode());
+            return;
         }
         // This committed host event starts new work: resolve live membership, not worker identity
         // or a business payload field. Domain contexts are cleared/restored by the shared scope.
