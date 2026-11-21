@@ -144,7 +144,7 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
   return (
     <>
       <LoadingOverlay visible={busy} label={t('common.loading')} />
-      <div className="toolbar-block flex space-x-2">
+      <div className="toolbar-block flex flex-wrap items-center gap-2">
         {buttons.map((button) => {
           if (!hasButtonPermissions(button, hasPermission)) {
             return null;

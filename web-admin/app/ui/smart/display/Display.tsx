@@ -9,6 +9,9 @@ interface DisplayProps {
   statusColor?: Record<string, string>;
   className?: string;
   appearance?: 'boxed' | 'plain';
+  size?: 'small' | 'medium' | 'large' | 'xlarge';
+  weight?: 'normal' | 'bold' | 'light';
+  align?: 'left' | 'center' | 'right';
   readOnly?: boolean;
   disabled?: boolean;
   [key: string]: any;
@@ -22,6 +25,9 @@ const Display: React.FC<DisplayProps> = ({
   statusColor,
   className = '',
   appearance = 'boxed',
+  size,
+  weight,
+  align,
 }) => {
   // 格式化显示值
   const formatValue = (val: any): string => {
@@ -85,13 +91,17 @@ const Display: React.FC<DisplayProps> = ({
   const displayValue = formatValue(value);
   const statusClass = getStatusColorClass(value);
 
+  const valueSize = { small: 'text-xs leading-5', medium: 'text-sm leading-5', large: 'text-xl leading-7', xlarge: 'text-2xl leading-8' }[size || 'medium'];
+  const valueWeight = { normal: 'font-normal', bold: 'font-semibold', light: 'font-light' }[weight || 'normal'];
+  const textAlign = { left: 'text-left', center: 'text-center', right: 'text-right' }[align || 'left'];
+
   return (
-    <div className={`space-y-1 ${className}`}>
-      {label && <label className="text-text-2 block text-sm font-medium">{label}</label>}
+    <div className={`min-w-0 space-y-1 ${align ? textAlign : ''} ${className}`}>
+      {label && <label className={`text-text-2 block font-medium ${size ? 'text-xs' : 'text-sm'}`}>{label}</label>}
       <div
         className={appearance === 'plain'
-          ? 'text-text break-words whitespace-pre-wrap text-sm leading-5'
-          : `rounded-control border px-3 py-2 text-sm ${statusClass || 'border-border bg-subtle text-text'}`}
+          ? `text-text break-words whitespace-pre-wrap ${valueSize} ${weight ? valueWeight : ''}`
+          : `rounded-control border px-3 py-2 ${valueSize} ${weight ? valueWeight : ''} ${statusClass || 'border-border bg-subtle text-text'}`}
       >
         {displayValue}
       </div>

@@ -410,20 +410,12 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
               </div>
             )}
 
-            {/* Title */}
-            <h3 className={`text-text mb-1 break-words font-semibold ${compact ? 'text-sm' : 'text-base'}`}>{title}</h3>
-
-            {/* Description */}
-            {description && (
-              <p className="text-text-2 mb-3 line-clamp-2 text-sm">{description}</p>
-            )}
-
-            {/* Badge */}
-            {badge && (
-              <span className="rounded-pill border-border mb-3 self-start border px-2 py-0.5 text-xs">
-                {badge}
-              </span>
-            )}
+            <div className={`flex items-start justify-between gap-3 ${compact ? 'mb-3' : 'mb-1'}`}>
+              <h3 className={`text-text min-w-0 break-words font-semibold ${compact ? 'text-sm' : 'text-base'}`}>{title}</h3>
+              {compact && badge && <span className="rounded-pill border-border bg-subtle shrink-0 border px-2 py-0.5 text-xs text-text-2">{badge}</span>}
+            </div>
+            {description && <p className="text-text-2 mb-3 line-clamp-2 text-sm">{description}</p>}
+            {!compact && badge && <span className="rounded-pill border-border mb-3 self-start border px-2 py-0.5 text-xs">{badge}</span>}
 
             {/* Declared fields; without a form array they are display-only. */}
             {visibleFields.length > 0 && (
@@ -490,7 +482,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
     const parentFields = (group: Group, fields: FieldConfig[], summary: boolean) => {
       if (!group.parent || !parentConfig) return null;
       const row = group.parent;
-      return <div style={{display: 'grid', gridTemplateColumns: compact && summary ? 'repeat(auto-fit, minmax(min(100%, 6rem), 1fr))' : 'repeat(auto-fit, minmax(min(100%, 12rem), 1fr))', gap: '0.75rem', pointerEvents: summary ? 'none' : undefined}} data-testid={summary ? 'card-group-summary' : 'card-group-fields'}>
+      return <div style={{display: 'grid', gridTemplateColumns: compact ? 'repeat(auto-fit, minmax(min(100%, 6rem), 1fr))' : 'repeat(auto-fit, minmax(min(100%, 12rem), 1fr))', gap: '0.75rem', pointerEvents: summary ? 'none' : undefined}} data-testid={summary ? 'card-group-summary' : 'card-group-fields'}>
         {fields.map(field => {
           const ctx = { ...runtime.getContext(), row } as any;
           if (field.visibleWhen && !runtime.getEvaluator().evaluateCondition(field.visibleWhen, ctx)) return null;
@@ -513,12 +505,14 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
         : group.entries;
       const searchLabel = getLocalizedText(cfg.searchPlaceholder || { 'zh-CN': '搜索', en: 'Search' }, locale, t);
       return <>
-        {parentFields(group, parentConfig?.fields || [], false)}
-        {cfg.searchFields?.length && group.entries.length > 0 ? <div className="my-3 flex justify-end">
+        <div className={compact ? 'flex flex-wrap items-end justify-between gap-3' : undefined}>
+        <div className={compact ? 'min-w-0 flex-1' : undefined}>{parentFields(group, parentConfig?.fields || [], false)}</div>
+        {cfg.searchFields?.length && group.entries.length > 0 ? <div className={compact ? 'shrink-0' : 'my-3 flex justify-end'}>
           <input type="search" aria-label={searchLabel} placeholder={searchLabel} value={search}
             className="rounded-control border-border bg-panel text-text max-w-full border px-3 py-2 text-sm"
             onChange={event => setGroupSearch(current => ({ ...current, [key]: event.target.value }))} />
         </div> : null}
+        </div>
         {group.entries.length === 0 && parentConfig?.emptyText ? <p className="text-text-2 py-3 text-sm">{getLocalizedText(parentConfig.emptyText, locale, t)}</p> : null}
         <div data-testid="card-grid-tracks" className={`mt-3 grid gap-3 ${columnsClass}`} style={{ ...columnsStyle, alignItems: compact ? 'start' : undefined }}>
           {entries.map(({ row, index: originalIndex }) => renderCard(row, originalIndex))}
@@ -526,13 +520,13 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
       </>;
     };
     return (
-      <div data-testid="card-grid-block" className="space-y-6">
+      <div data-testid="card-grid-block" className={compact ? "space-y-4" : "space-y-6"}>
         {selectionHint}
         {Array.from(groups.entries()).map(([key, group], index) => cfg.collapsibleGroups === true ? (
           <details key={key} data-testid="card-grid-group" open={cfg.groupsDefaultOpen !== false}
             style={{ scrollMarginBlockStart: 'calc(var(--workspace-header-height, 3.5rem) + 1rem)' }}
             className={`rounded-lg border border-border ${compact ? 'group overflow-hidden' : 'p-3'} ${cfg.groupWarningField && (group.parent?.[cfg.groupWarningField] === true || group.entries.some(({ row }) => row[cfg.groupWarningField] === true)) ? 'bg-amber-50' : 'bg-surface'}`}>
-            <summary className={`cursor-pointer select-none text-sm font-semibold text-text ${compact ? 'list-none p-4' : ''}`}>
+            <summary className={`cursor-pointer select-none text-sm font-semibold text-text ${compact ? 'list-none p-3' : ''}`}>
               <div data-testid="card-group-heading" style={compact ? { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 24rem), 1fr))', gap: '1rem' } : undefined}>
                 <div className="min-w-0">
                   <span data-testid="card-group-title">{compact && <span aria-hidden="true" className="mr-2 inline-block transition-transform group-open:rotate-90">›</span>}{group.title}</span>
@@ -543,7 +537,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
                 {parentFields(group, parentConfig?.summaryFields || [], true)}
               </div>
             </summary>
-            <div className={compact ? 'border-t border-border bg-subtle p-4' : 'mt-3'}>{groupCards(key, group)}</div>
+            <div className={compact ? 'border-t border-border bg-subtle p-3' : 'mt-3'}>{groupCards(key, group)}</div>
           </details>
         ) : (
           <section key={key} data-testid="card-grid-group"
