@@ -131,4 +131,20 @@ class CommandAutoSetExecutorTest {
         assertTrue(sql.getValue().contains("~ '^[0-9]+$'"),
                 "seq aggregation must exclude non-numeric suffixes so one dirty row cannot abort the transaction");
     }
+    @Test
+    void strictNativeCodeGenerationPropagatesDatabaseFailureWithoutUuidFallback() {
+        DynamicDataMapper mapper=mock(DynamicDataMapper.class);
+        MetaModelService models=mock(MetaModelService.class);
+        TenantClock clock=mock(TenantClock.class);
+        when(models.getTableName("supplier")).thenReturn("mt_supplier");
+        when(clock.businessDate(any())).thenReturn(LocalDate.of(2026,11,19));
+        when(mapper.selectByQuery(anyString(),any())).thenThrow(new IllegalStateException("sequence unavailable"));
+        var codes=new CommandAutoSetExecutor(mapper,models,clock,null,new CommandSpelEvaluator());
+        MetaContext.setContext(42L,7L,"buyer","Buyer");
+        try {
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                    ()->codes.generateRequiredAutoCode("supplier","supplier_code",Map.of("pattern","S-{yyyyMMdd}-{seq}")));
+        } finally {MetaContext.clear();}
+    }
+
 }

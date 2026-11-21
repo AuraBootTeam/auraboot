@@ -1505,7 +1505,7 @@ actionRegistry.register('state.clearRequestKey', (context) => {
  * state.set - 设置状态
  * 更新指定作用域的状态值
  */
-actionRegistry.register('state.set', ({ stateManager, scopeId, args }) => {
+actionRegistry.register('state.set', ({ stateManager, scopeId, args, expressionEvaluator, expressionContext }) => {
   if (!stateManager || !scopeId) {
     console.error('[ActionRegistry] state.set: missing stateManager or scopeId');
     return;
@@ -1516,8 +1516,12 @@ actionRegistry.register('state.set', ({ stateManager, scopeId, args }) => {
     return;
   }
 
-  // 批量更新状态
-  Object.entries(args).forEach(([key, value]) => {
+  // Resolve the complete snapshot once, retaining numeric, boolean and object values.
+  // Storing templates would turn later arithmetic or native versions into NaN.
+  const values = expressionEvaluator && expressionContext
+    ? expressionEvaluator.evaluateObject(args, expressionContext)
+    : args;
+  Object.entries(values).forEach(([key, value]) => {
     stateManager.updateState(scopeId, key, value);
   });
 });

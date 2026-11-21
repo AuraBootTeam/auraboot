@@ -7,6 +7,37 @@ afterEach(() => {
   localStorage.clear();
 });
 describe('explicit command file downloads', () => {
+  it('a cancelled read cannot trigger a late browser download when transport ignores abort', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      'URL',
+      Object.assign(class extends URL {}, {
+        createObjectURL: vi.fn(() => 'blob:cancelled'),
+        revokeObjectURL: vi.fn(),
+      }),
+    );
+    let finish!: (blob: Blob) => void;
+    const bytes = new Promise<Blob>((resolve) => {
+      finish = resolve;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, headers: new Headers(), blob: () => bytes }),
+    );
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const controller = new AbortController();
+    const pending = downloadWithAuth('/api/file/download/file-1', { signal: controller.signal });
+    await Promise.resolve();
+    controller.abort();
+    finish(new Blob(['already delivered bytes']));
+    try {
+      await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+      expect(click).not.toHaveBeenCalled();
+    } finally {
+      vi.runAllTimers();
+      vi.useRealTimers();
+    }
+  });
   it('requires an opt-in and never downloads an unrelated record id', () => {
     expect(resolveCommandFileDownload({ fileId: 'file-1' })).toBeUndefined();
     expect(

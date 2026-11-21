@@ -1,4 +1,5 @@
 import { BlockRenderer } from '@auraboot/runtime-kernel';
+import { LayoutRenderer } from '~/framework/meta/rendering/layout';
 import React from 'react';
 import type { ColumnConfig } from '~/framework/meta/schemas/types';
 import { getLegacyCompatibleRecordPid } from '~/framework/meta/utils/publicRecordId';
@@ -247,8 +248,16 @@ export function renderListPageResults(
       {skipListData ? (
         miscListBlocks.length > 0 &&
         runtime && (
-          <div className="flex flex-col gap-4 p-4" data-testid="list-misc-blocks">
-            {miscListBlocks.map((block: any, idx: number) => (
+          <div className={schema.layout?.type === 'grid' ? 'p-4' : 'flex flex-col gap-4 p-4'} data-testid="list-misc-blocks">
+            {schema.layout?.type === 'grid' ? (
+              <LayoutRenderer
+                layout={schema.layout}
+                blocks={miscListBlocks}
+                renderBlock={(block) => (
+                  <BlockRenderer block={block} runtime={runtime} areaId="list-misc" />
+                )}
+              />
+            ) : miscListBlocks.map((block: any, idx: number) => (
               <BlockRenderer
                 key={block.id || `misc-list-${idx}`}
                 block={block}

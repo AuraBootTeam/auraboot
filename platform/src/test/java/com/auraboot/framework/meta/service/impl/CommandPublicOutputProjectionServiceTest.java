@@ -177,6 +177,50 @@ class CommandPublicOutputProjectionServiceTest {
         context.setTargetRecordReadable(true); context.setBusinessGrantDecision(null);
         assertThatThrownBy(() -> service.project(context, "order_lines", internal())).isInstanceOf(AccessDeniedException.class);
     }
+    private void structuredOwner() {
+        when(owner.publicBusinessResourceFields()).thenReturn(Map.of("order_lines",Set.of("name","brand")));
+        when(owner.publicBusinessResourceStructuredFields()).thenReturn(Map.of("order_lines",Set.of("name")));
+        when(metadata.getModelFields("order_lines")).thenReturn(List.of(
+                FieldDefinition.builder().code("name").columnName("name_col").dataType("jsonb").build(),field("brand","brand_col")));
+    }
+    @Test void explicitlyDeclaredStructuredSourcesAreFrozenAtomicFieldsWithoutInternalFacts() {
+        structuredOwner();prepare();
+        var nested=new HashMap<String,Object>(Map.of("address","Original","phone","123"));
+        var output=service.project(context,"order_lines",Map.of("name",nested,"brand","Visible","internal_cost",99));
+        assertThat(output).containsOnlyKeys("name","brand");nested.put("address","Changed");
+        assertThat((Map<?,?>)output.get("name")).isEqualTo(Map.of("address","Original","phone","123"));
+        assertThatThrownBy(()->((Map<String,Object>)output.get("name")).put("phone","forged")).isInstanceOf(UnsupportedOperationException.class);
+        assertThat(context.getPublicOutputProjection().models().get("order_lines").structured()).containsExactly("name");
+        assertThatThrownBy(()->service.project(context,"order_lines",Map.of("name",new Object()))).isInstanceOf(AccessDeniedException.class);
+    }
+    @Test void hiddenStructuredSourceDoesNotReturnItsRawObjectOrGrantRootVisibility() {
+        structuredOwner();when(fields.getFieldPermissions(30L,"order_lines")).thenReturn(new FieldPermissionSet(Set.of("brand"),Set.of(),Set.of("name")));
+        prepare();assertThat(service.project(context,"order_lines",Map.of("name",Map.of("private","secret"),"brand","Visible"))).containsOnlyKeys("brand");
+        when(owner.businessResourceModels()).thenReturn(Set.of("orders"));
+        when(owner.publicBusinessResourceFields()).thenReturn(Map.of("orders",Set.of("title","cost")));
+        when(owner.publicBusinessResourceStructuredFields()).thenReturn(Map.of("orders",Set.of("cost")));
+        when(metadata.getModelFields("orders")).thenReturn(List.of(field("title","title_col"),FieldDefinition.builder().code("cost").dataType("jsonb").build()));
+        when(fields.getFieldPermissions(30L,"orders")).thenReturn(FieldPermissionSet.allAllowed(Set.of("title","cost")));
+        prepare();assertThat(service.project(context,"orders",Map.of("title","Visible","cost",Map.of("private",42)))).containsOnlyKeys("title");
+    }
+    @Test void structuredInventoryCannotAddAHiddenModelAnUndeclaredFieldOrAScalarType() {
+        structuredOwner();
+        for(var inventory:List.of(Map.of("foreign",Set.of("name")),Map.of("order_lines",Set.of("internal_cost")),
+                Map.of("order_lines",Set.of("brand")),Map.of("order_lines",Set.<String>of()))) {
+            when(owner.publicBusinessResourceStructuredFields()).thenReturn(inventory);
+            assertThatThrownBy(this::prepare).isInstanceOf(AccessDeniedException.class);
+        }
+    }
+    @Test void structuredPolicyAndDetailMasksCannotFallBackToUnmaskedRawFacts() {
+        structuredOwner();
+        when(policies.getFieldMaskRules(7L,"order_lines",20L)).thenReturn(List.of(FieldMaskRule.builder().fieldCode("name_col").maskType("partial").build()));
+        assertThatThrownBy(this::prepare).isInstanceOf(AccessDeniedException.class);
+        when(policies.getFieldMaskRules(7L,"order_lines",20L)).thenReturn(List.of());
+        var mask=new FieldMaskConfig();mask.setFieldCode("name_col");mask.setMaskType("FULL");
+        when(masks.getEffectiveConfigs("order_lines",20L,"export")).thenReturn(List.of(mask));
+        assertThatThrownBy(this::prepare).isInstanceOf(AccessDeniedException.class);
+        verify(policies,never()).applyFieldMasking(anyList(),anyList());
+    }
     @Test void a_document_json_source_is_an_atomic_field_dependency_not_an_unrestricted_public_object() {
         when(metadata.getModelFields("order_lines")).thenReturn(List.of(
                 FieldDefinition.builder().code("name").columnName("name_col").dataType("jsonb").build()));

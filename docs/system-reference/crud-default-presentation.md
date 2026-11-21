@@ -2,6 +2,7 @@
 type: system-reference
 status: active
 created: 2026-10-27
+updated: 2026-11-20
 ---
 
 # Generated CRUD default presentation
@@ -70,3 +71,16 @@ Explicit personal column widths remain exact during viewport fill. Only columns 
 A scalar `file` field stores a file identifier in its existing string column. A native `file` field with explicit `extension.multiple: true` stores the attachment collection in PostgreSQL JSONB. DDL generation, structured write binding and JSON-string read normalization use the same multiple-file predicate. Display component selection does not change the storage contract: selecting `fileattachment` on a generic JSON field does not grant file-relation mutation authority.
 
 Project and acceptance template attachment fields declare native multiple files. An existing model with a mismatched physical column requires the normal explicit schema comparison and publication workflow; startup does not alter a user table. File upload, business update, relation authorization and permitted download remain separate checks. A storage integration test with an internal command permit does not prove browser or user permission behavior.
+
+
+## Protected PDF returned by an explicit command
+
+The ordinary `type: command` action adapter can opt into `preview: { fileIdField: "fileId", contentType: "application/pdf" }`. It cannot combine preview with automatic `download`. The shared FormDialog provider hosts this transient presentation; a missing host or malformed preview configuration fails before command dispatch. This option does not extend the workbench string-verb dispatcher or change existing downloads/file fields.
+
+The command still sends its exact target and reviewed version through the normal pipeline. Use `includeRecordPayload: false` and an explicit payload for a technical document command; preview never grants model writes. The page may use its existing `commandRequestByCommand` identity policy for uncertain replies. A successful command refreshes its source before showing the returned file, while keeping the page open.
+
+Preview accepts only a same-origin `/api/file/download/{ULID}` reference and a named, nonempty PDF no larger than 32 MiB. The native file endpoint returns `inline` for previewable PDFs; either `inline` or `attachment` must carry a server filename. It reads through the authenticated BFF cookie, checks MIME and `%PDF-` bytes, and renders a transient Blob in the existing FilePreviewModal. The explicit download requests the original protected URL again, so the server rechecks current file/root authorization rather than serving the preview's cached Blob as a download. Existing callers requiring an attachment retain that stricter option.
+
+The protected provider explicitly marks its validated PDF Blob for the browser's native PDF renderer. That mode requires a Blob URL and the exact PDF MIME; arbitrary URLs, missing MIME and ordinary callers retain the historical iframe sandbox. A sandboxed frame cannot host Chrome's native PDF renderer. The opt-in is not available through page metadata and does not authorize HTML or other uploaded content.
+
+Closing, leaving the source route, changing the authenticated identity, parent cancellation or unmount aborts the read and releases the Blob URL. Retained openers and late bytes cannot replace a newer identity's preview. Close focus returns to the still-connected initiating action only in its original route and identity. Existing presentations without this opt-in retain their behavior. Hermetic lifecycle/dispatch checks do not qualify a product menu, server configuration or downloaded business artifact; each product needs its own browser evidence.

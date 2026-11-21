@@ -21,6 +21,8 @@ public final class BusinessResourcePermissionContract {
                     .stream().anyMatch(values::containsKey)
                 || context.getRulesByType()!=null && context.getRulesByType().values().stream().anyMatch(rules->rules!=null && !rules.isEmpty()))
             throw new AccessDeniedException("Command identity differs from the business owner contract");
+        @SuppressWarnings("unchecked") var settings=(Map<String,Object>)params;
+        BusinessTenantSecretContract.requireMetadata(settings,BusinessTenantSecretContract.references(owner));
         Set<String> expected=boundary.permissions();
         Object raw=context.getExecConfig()==null?null:context.getExecConfig().get("permissions");
         if(expected.isEmpty() || expected.size()>128 || expected.stream().anyMatch(code->code.isBlank()

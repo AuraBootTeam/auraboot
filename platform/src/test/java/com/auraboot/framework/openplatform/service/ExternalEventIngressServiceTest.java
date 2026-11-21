@@ -16,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -265,7 +266,8 @@ class ExternalEventIngressServiceTest {
     private String businessBody(){return "{\"occurredAt\":\"2026-11-10T00:00:00Z\",\"data\":{\"order\":{\"orderId\":\"300001\"}}}";}
     @Test void businessProviderNormalizesWithoutExternalEventIdentityOrIdempotencyHeader() {
         businessProvider();var result=service.accept(principal,"erp",null,businessBody());
-        assertEquals(java.util.Map.of("recordPid","accepted-pid"),result.publicReceipt());
+        assertNotNull(result.eventId());
+        assertEquals(java.util.Map.of("eventId",result.eventId(),"recordPid","accepted-pid"),result.publicReceipt());
         var envelope=ArgumentCaptor.forClass(IntegrationEventEnvelope.class);verify(accessor).enqueue(envelope.capture());
         assertEquals("external.erp.order.snapshot.v2",envelope.getValue().eventType());
         assertEquals(0,envelope.getValue().sequence());
@@ -335,7 +337,7 @@ class ExternalEventIngressServiceTest {
                 new OpenApiIdempotencyMapper.StoredResponse(digest,"completed",202,"{\"eventId\":\"retained-event-1\",\"accepted\":true}",null,null,null,null));
         when(installed.verifyAcceptedReplay(eq(principal),eq("erp"),any())).thenReturn(new InstalledIntegrationService.Acceptance("original-pid",true));
         var result=service.accept(principal,"erp","explicit-key-1",body);
-        assertEquals(java.util.Map.of("recordPid","original-pid"),result.publicReceipt());
+        assertEquals(java.util.Map.of("eventId","retained-event-1","recordPid","original-pid"),result.publicReceipt());
         assertEquals("retained-event-1",result.eventId());assertTrue(result.duplicate());
         var envelope=ArgumentCaptor.forClass(IntegrationEventEnvelope.class);
         verify(installed).verifyAcceptedReplay(eq(principal),eq("erp"),envelope.capture());

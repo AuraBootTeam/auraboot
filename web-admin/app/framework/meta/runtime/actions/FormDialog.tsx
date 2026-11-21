@@ -28,6 +28,7 @@ import {
 import { createPortal, flushSync } from 'react-dom';
 import { useLocation } from 'react-router';
 import { useAuth } from '~/contexts/AuthContext';
+import { ProtectedFilePreviewProvider } from '~/framework/meta/rendering/components/ProtectedFilePreviewProvider';
 import { useModalFocusTrap } from '~/hooks/useModalFocusTrap';
 import { cancelCurrentFormDialog, registerFormDialogScope } from './formDialogLifecycle';
 import type { ResolvedPromptPresentation } from './promptPresentation';
@@ -215,10 +216,12 @@ export function FormDialogProvider({ children }: { children: ReactNode }) {
     };
   }, [scope]);
   return (
-    <SharedFormDialogContext.Provider value={true}>
-      {children}
-      <FormDialogHost key={scope} />
-    </SharedFormDialogContext.Provider>
+    <ProtectedFilePreviewProvider>
+      <SharedFormDialogContext.Provider value={true}>
+        {children}
+        <FormDialogHost key={scope} />
+      </SharedFormDialogContext.Provider>
+    </ProtectedFilePreviewProvider>
   );
 }
 

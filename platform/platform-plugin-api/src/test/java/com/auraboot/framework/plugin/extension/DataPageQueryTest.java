@@ -8,6 +8,30 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class DataPageQueryTest {
+    @Test void freezesFiniteHalfOpenTimeIntervalsAndPreservesOldConstructors() {
+        var from=java.time.Instant.parse("2026-10-31T16:00:00Z");
+        var until=java.time.Instant.parse("2026-11-30T16:00:00Z");
+        var ranges=new HashMap<>(Map.of("submitted_at",new DataPageQuery.TimeRange(from,until)));
+        var query=new DataPageQuery(Map.of("supplier","A"),Map.of(),List.of(),1,20,"",ranges);
+        ranges.clear();assertThat(query.timeRanges().get("submitted_at")).isEqualTo(new DataPageQuery.TimeRange(from,until));
+        assertThatThrownBy(()->query.timeRanges().clear()).isInstanceOf(UnsupportedOperationException.class);
+        assertThat(new DataPageQuery(Map.of(),Map.of(),List.of(),1,20).timeRanges()).isEmpty();
+        assertThat(new DataPageQuery(Map.of(),Map.of(),List.of(),1,20,"search").timeRanges()).isEmpty();
+    }
+    @Test void rejectsReversedEmptyUnboundedAndOverlappingTimeFilters() {
+        var from=java.time.Instant.parse("2026-11-01T00:00:00Z");var until=from.plusSeconds(1);
+        assertThatThrownBy(()->new DataPageQuery.TimeRange(from,from)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(()->new DataPageQuery.TimeRange(until,from)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(()->new DataPageQuery.TimeRange(null,until)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(()->new DataPageQuery.TimeRange(from,null)).isInstanceOf(NullPointerException.class);
+        var range=new DataPageQuery.TimeRange(from,until);
+        assertThatThrownBy(()->new DataPageQuery(Map.of("at",from),Map.of(),List.of(),1,20,"",Map.of("at",range)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(()->new DataPageQuery(Map.of(),Map.of("at",List.of(from)),List.of(),1,20,"",Map.of("at",range)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(()->new DataPageQuery(Map.of(),Map.of(),List.of(),1,20,"",Map.of("at;drop",range)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
     @Test void exactNullIsAnImmutableDimensionRatherThanAnOmittedFilter() {
         var filters = new HashMap<String, Object>();
         filters.put("owner_id", null);
