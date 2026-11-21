@@ -157,7 +157,8 @@ test('engineering maintains header aliases and exact MPN alternatives with a con
       await expect(page.locator('main')).toContainText('BOM 匹配已完成');
       await page.getByRole('row').filter({ hasText: 'C1' }).click();
       const drawer = page.getByTestId('review-drawer');
-      const candidates = drawer.locator('button[data-testid^="candidate-list-item-"]');
+      const candidates = drawer.getByTestId('review-drawer-candidate-list')
+        .locator('button[data-testid^="review-drawer-candidate-"]');
       await expect(candidates).toHaveCount(limit);
       await expect(candidates.first()).toContainText(`${marker}-0`);
       await expect(candidates.nth(1)).not.toContainText(`${marker}-0`);
