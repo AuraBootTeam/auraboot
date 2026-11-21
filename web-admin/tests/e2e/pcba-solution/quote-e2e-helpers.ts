@@ -393,7 +393,13 @@ export async function openQuoteRolePage(
   browser: Browser,
   user: QuoteRoleUser,
 ): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await browser.newContext({ locale: 'zh-CN', storageState: { cookies: [], origins: [] } });
+  const baseURL = requireRuntimeUrl('base');
+  const context = await browser.newContext({
+    baseURL,
+    locale: 'zh-CN',
+    extraHTTPHeaders: { Referer: `${baseURL}/` },
+    storageState: { cookies: [], origins: [] },
+  });
   const page = await context.newPage();
   await loginViaUI(page, user.email, user.password);
   return { context, page };
