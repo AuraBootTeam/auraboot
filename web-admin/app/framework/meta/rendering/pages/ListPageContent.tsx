@@ -166,9 +166,18 @@ function ListPageContentInner(props: PageContentProps) {
 
 /** Page-level async-task context is shared by every action handler. */
 export function ListPageContent(props: PageContentProps) {
+  // Generic DSL list pages honor a schema-declared reload channel so page-level
+  // custom blocks can request a data refresh without a host page behind them.
+  // Host pages pass richer listExtensions explicitly; a schema extension must
+  // not require a host to be useful (the reload listener already exists in
+  // useListQueryActions — only this plumbing was missing).
+  const schemaReloadEventName = props.schema.extension?.reloadEventName;
+  const listExtensions =
+    props.listExtensions ??
+    (schemaReloadEventName ? { reloadEventName: schemaReloadEventName } : undefined);
   return (
     <AsyncTaskModalProvider>
-      <ListPageContentInner {...props} />
+      <ListPageContentInner {...props} listExtensions={listExtensions} />
     </AsyncTaskModalProvider>
   );
 }
