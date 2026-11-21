@@ -131,7 +131,13 @@
   background: var(--ux-section-soft);
 }
 
+.detail-body-section[data-section-layout='rows'] .toolbar-block {
+  padding: 16px 20px;
+  border-top: 1px solid var(--ux-section-border, var(--color-border));
+}
+
 @media (max-width: 760px) {
+  .detail-body-section[data-section-layout='rows'] .toolbar-block,
   .detail-body-section__header,
   .detail-body-section__body,
   [data-ux-profile] .card-grid-group__summary,
