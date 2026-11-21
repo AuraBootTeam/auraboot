@@ -529,6 +529,10 @@ async function main() {
     resolve(repoRoot, 'plugins/core-ownership'),
     resolve(output, 'config/core-ownership'),
   );
+  const coreAurabot = copyArtifact(
+    resolve(repoRoot, 'plugins/core-aurabot'),
+    resolve(output, 'config/core-aurabot'),
+  );
   const agentControlPlane = copyArtifact(
     resolve(repoRoot, 'plugins/agent-control-plane'),
     resolve(output, 'config/agent-control-plane'),
@@ -625,6 +629,7 @@ async function main() {
     { type: 'config', id: 'platform-admin', version: JSON.parse(readFileSync(resolve(platformAdmin, 'plugin.json'), 'utf8')).version, path: platformAdmin },
     { type: 'config', id: 'org-management', version, path: orgManagement },
     { type: 'config', id: 'core-ownership', version, path: coreOwnership },
+    { type: 'config', id: 'core-aurabot', version: JSON.parse(readFileSync(resolve(repoRoot, 'plugins/core-aurabot/plugin.json'), 'utf8')).version, path: coreAurabot },
     { type: 'config', id: 'agent-control-plane', version: JSON.parse(readFileSync(resolve(repoRoot, 'plugins/agent-control-plane/plugin.json'), 'utf8')).version, path: agentControlPlane },
     { type: 'config', id: 'core-announcement', version: JSON.parse(readFileSync(resolve(coreAnnouncement, 'plugin.json'), 'utf8')).version, path: coreAnnouncement },
     { type: 'config', id: 'core-decisionops', version: '1.0.0', path: coreDecisionops },
