@@ -416,6 +416,46 @@ class FileServiceImplTest {
     }
 
     @Test
+    void uploadFile_mp4ContentMislabeledOctetStream_acceptedByContent() {
+        // A real MP4 carries a "ftyp" box at byte offset 4; the browser-reported
+        // MIME is irrelevant once the container signature is recognised.
+        byte[] mp4 = withPrefix(new byte[]{0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x6D, 0x70, 0x34}, "clip");
+        MultipartFile good = new MockMultipartFile(
+                "file", "blob.dat", "application/octet-stream", mp4);
+
+        when(storageProvider.upload(anyString(), any(), anyLong(), any()))
+                .thenReturn("/uploads/blob.dat");
+        when(storageProvider.type()).thenReturn(StorageType.LOCAL);
+
+        var resp = fileService.uploadFile(good, 42L);
+
+        assertThat(resp).isNotNull();
+        verify(fileMapper).insert(any(FileEntity.class));
+    }
+
+    @Test
+    void uploadFile_mp4ExtensionWithoutContainerSignature_rejected() {
+        // The ".mp4" extension alone does not whitelist anything: content without
+        // the ftyp container signature and without an allowed MIME stays rejected.
+        MultipartFile bad = new MockMultipartFile(
+                "file", "clip.mp4", "application/octet-stream", "not-a-real-container".getBytes());
+
+        assertThatThrownBy(() -> fileService.uploadFile(bad, 1L))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void uploadFile_executableDisguisedAsMp4_rejectedByContent() {
+        // An executable renamed to clip.mp4 and labelled video/mp4: the bytes win.
+        byte[] exe = withPrefix(new byte[]{0x4D, 0x5A, (byte) 0x90, 0x00}, "this-is-an-exe");
+        MultipartFile bad = new MockMultipartFile(
+                "file", "clip.mp4", "video/mp4", exe);
+
+        assertThatThrownBy(() -> fileService.uploadFile(bad, 1L))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
     void uploadFiles_iteratesAndReturnsList() {
         MultipartFile a = new MockMultipartFile("a", "a.png", "image/png", "a".getBytes());
         MultipartFile b = new MockMultipartFile("b", "b.png", "image/png", "b".getBytes());
