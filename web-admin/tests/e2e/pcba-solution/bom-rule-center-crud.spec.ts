@@ -72,6 +72,7 @@ test('engineering maintains header aliases and exact MPN alternatives with a con
     expect(identity.permissionCodes).toContain('bom.cap.manage');
     await menu('bom_header_alias');
     await expect(page.locator('main').getByRole('button', { name: '新建', exact: true })).toBeVisible();
+    await expect(page.locator('[data-testid^="table-row-"]').first()).toBeVisible();
     await page.screenshot({ path: info.outputPath('alias-engineering-list.png'), fullPage: true });
     await page.locator('main').getByRole('button', { name: '新建', exact: true }).click();
     await page.getByRole('button', { name: '保存', exact: true }).click();
@@ -92,6 +93,8 @@ test('engineering maintains header aliases and exact MPN alternatives with a con
     await save('bom:update_header_alias');
     await page.reload({ waitUntil: 'domcontentloaded' });
     expect((await aliasRows())[0].bom_ha_remark).toBe('Supplier column contains manufacturer MPN');
+    await searchBusinessList(page, '/p/bom_header_alias', header);
+    await expect(page.getByRole('row').filter({ hasText: header })).toContainText('Supplier column contains manufacturer MPN');
     await page.screenshot({ path: info.outputPath('alias-updated.png'), fullPage: true });
 
     const account = await executeCommand(page, 'crm:create_account', { crm_acc_name: marker }, undefined, 'create');
@@ -127,11 +130,20 @@ test('engineering maintains header aliases and exact MPN alternatives with a con
       await page.getByTestId('form-btn-start_conversion').click();
       const response = await admission;
       expect(new URL(response.url()).origin).toBe(new URL(page.url()).origin);
-      expect(String((await response.json()).code)).toBe('0');
+      const admitted = await response.json();
+      expect(String(admitted.code)).toBe('0');
+      const asyncTaskCode = String(admitted.data?.data?.taskCode ?? '');
+      expect(asyncTaskCode).not.toBe('');
       await page.waitForURL(/\/p\/bom_conversion_task_pcba_workbench\/view\/[^/?#]+/);
       const taskId = new URL(page.url()).pathname.split('/').at(-1)!;
       taskIds.push(taskId);
-      await expect.poll(async () => (await readDynamicRecord(page, 'bom_conversion_task_pcba', taskId)).bom_task_status,
+      await expect.poll(async () => {
+        const job = await page.request.get(`/api/async-tasks/${asyncTaskCode}`);
+        expect(job.ok()).toBe(true);
+        const state = (await job.json()).data;
+        if (String(state.status).toLowerCase() === 'failed') throw new Error(`BOM worker failed: ${state.errorMessage ?? state.message ?? 'see async task evidence'}`);
+        return (await readDynamicRecord(page, 'bom_conversion_task_pcba', taskId)).bom_task_status;
+      },
         { timeout: 90_000, intervals: [1000, 2000] }).toBe('completed');
       const raw = await queryDynamicRecords(page, 'bom_raw_line_pcba', [{ fieldName: 'bom_raw_task_id', operator: 'EQ', value: taskId }]);
       expect(raw).toHaveLength(1);
