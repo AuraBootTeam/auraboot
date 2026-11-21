@@ -44,7 +44,14 @@ public class ExternalEventIngressService {
         this.installedIntegrations = installedIntegrations;
     }
 
-    @Transactional
+    /**
+     * The ingress admission unit wraps exactly one domain command execution, and the command
+     * pipeline requires a coherent REPEATABLE_READ snapshot (the caller's transaction is
+     * preserved, never suspended — CommandExecutionTransaction). A default-isolation
+     * transaction here fails that resource isolation contract for every machine integration,
+     * so the admission unit itself opens at the same coherent level.
+     */
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public IngressResult accept(MachinePrincipal principal, String sourceCode,
                                 String idempotencyKey, String rawBody) {
         if (!SOURCE_CODE.matcher(sourceCode).matches()) {
