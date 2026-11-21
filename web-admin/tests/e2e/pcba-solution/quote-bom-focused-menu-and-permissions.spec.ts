@@ -278,7 +278,8 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
         ],
         'bom_engineering permissions',
       );
-      expectExcludes(snapshot.permissionCodes, BOM_ADMIN_PERMISSIONS, 'bom_engineering permissions');
+      expectIncludes(snapshot.permissionCodes, ['bom.cap.manage'], 'bom_engineering rule maintenance');
+      expectExcludes(snapshot.permissionCodes, ['qo.cap.manage'], 'bom_engineering quote permissions');
       expectIncludes(
         snapshot.menuPaths,
         [...QUOTE_MENU_PATHS, ...BUSINESS_MENU_PATHS, BOM_MATERIAL_LIBRARY_PATH, BOM_FORMAT_PROFILE_PATH],
