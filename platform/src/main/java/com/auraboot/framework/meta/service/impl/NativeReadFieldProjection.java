@@ -70,11 +70,16 @@ public class NativeReadFieldProjection {
         NativeHumanActor.requireCompleteIdentity();
         if (records.isEmpty()) return records;
         if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
-                || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
-                || MetaContext.hasCommandPermitScopeFor(model.getCode())) throw denied();
+                || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active())
+            return records;
+        // A model inside the command's permit scope is read under that command's own
+        // admission (its permission code and target scope verified at entry) — the human
+        // grant projection is redundant here and must not deny the read.
+        if (MetaContext.hasCommandPermitScopeFor(model.getCode())) return records;
         // Background execution without a human member retains its separate authorization path.
         if (!MetaContext.exists() || MetaContext.getCurrentMemberId() == null) return records;
-        if (coherentSnapshot()) return authorization.withReadProjectionSnapshot(() -> projectInSnapshot(model, records));
+        if (coherentSnapshot() || CommandExecutionTransaction.insideCommandTransaction())
+            return authorization.withReadProjectionSnapshot(() -> projectInSnapshot(model, records));
         // Starting a new transaction here could combine an already-loaded row with newer grants.
         // Physical callers must enter readWithinSnapshot before selecting the record.
         throw denied();

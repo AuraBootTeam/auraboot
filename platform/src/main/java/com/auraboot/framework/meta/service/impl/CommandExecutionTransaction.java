@@ -17,6 +17,13 @@ import java.util.function.Supplier;
 @RequiredArgsConstructor
 @lombok.extern.slf4j.Slf4j
 public class CommandExecutionTransaction {
+    private static final ThreadLocal<Boolean> IN_COMMAND_TRANSACTION = new ThreadLocal<>();
+
+    /** True while a command's own (contractually REPEATABLE_READ) transaction is active on this thread. */
+    public static boolean insideCommandTransaction() {
+        return Boolean.TRUE.equals(IN_COMMAND_TRANSACTION.get());
+    }
+
     private final PlatformTransactionManager transactions;
     private final ExtensionRegistry extensions;
 
@@ -100,6 +107,7 @@ public class CommandExecutionTransaction {
             // and template-begun transactions do not populate it by themselves.
             TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(isolation.jdbcLevel());
         }
+        IN_COMMAND_TRANSACTION.set(Boolean.TRUE);
         try {
             return template.execute(status -> {
                 if (dryRun) status.setRollbackOnly();
@@ -108,6 +116,7 @@ public class CommandExecutionTransaction {
                 return operation.get();
             });
         } finally {
+            IN_COMMAND_TRANSACTION.remove();
             TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(previousIsolation);
         }
     }
