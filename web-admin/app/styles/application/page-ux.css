@@ -1,0 +1,141 @@
+/* Shared page families opt in through DSL extension.uxProfile. */
+[data-ux-profile] {
+  --ux-canvas: color-mix(in srgb, var(--color-accent) 4%, var(--color-bg));
+  --ux-section-border: color-mix(in srgb, var(--color-accent) 11%, var(--color-panel));
+  --ux-section-muted: color-mix(in srgb, var(--color-accent) 3%, var(--color-panel));
+  --ux-section-soft: color-mix(in srgb, var(--color-accent) 1.5%, var(--color-panel));
+  background-color: var(--ux-canvas);
+}
+
+[data-ux-profile] .page-ux-header .text-text-3 {
+  color: var(--color-text-2);
+}
+
+[data-ux-profile] .page-ux-body {
+  padding: 0;
+}
+
+[data-ux-profile] .page-ux-tabs,
+[data-ux-profile] .page-ux-list-panel {
+  border: 1px solid var(--ux-section-border);
+  border-radius: var(--radius-card-lg);
+  background: var(--color-panel);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+
+[data-ux-profile] table thead,
+[data-ux-profile] table thead tr {
+  background: var(--ux-section-muted);
+}
+
+[data-ux-profile] table th,
+[data-ux-profile] table td {
+  border-color: var(--ux-section-border);
+}
+
+.detail-body-sections {
+  display: grid;
+  min-width: 0;
+  gap: 20px;
+}
+
+.detail-body-section {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--ux-section-border, var(--color-border));
+  border-radius: var(--radius-card-lg);
+  background: var(--color-panel);
+  box-shadow: var(--shadow-card);
+}
+
+.detail-body-section__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 20px;
+  padding: 17px 20px;
+  border-bottom: 1px solid var(--ux-section-border, var(--color-border));
+}
+
+.detail-body-section__header h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 650;
+}
+
+.detail-body-section__header p {
+  margin: 0;
+  color: var(--color-text-2);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.detail-body-section__body {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+  padding: 20px;
+}
+
+.detail-body-section[data-section-layout='rows'] > .detail-body-section__body {
+  gap: 0;
+  padding: 0;
+}
+
+.detail-body-section[data-section-layout='rows'] .card-grid-groups > .card-grid-group {
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--ux-section-border, var(--color-border));
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.detail-body-section[data-section-layout='rows'] .card-grid-groups > .card-grid-group:last-child {
+  border-bottom: 0;
+}
+
+[data-ux-profile] .card-grid-group__summary {
+  padding: 16px 20px;
+  background: var(--ux-section-muted);
+}
+
+[data-ux-profile] .card-grid-group__summary label {
+  color: var(--color-text-2);
+  font-size: 12px;
+}
+
+[data-ux-profile] .card-grid-group__body {
+  padding: 16px 20px;
+  border-color: var(--ux-section-border);
+  background: var(--ux-section-soft);
+}
+
+[data-ux-profile] .card-grid-group[data-warning='true'] > .card-grid-group__summary {
+  background: var(--color-status-amber-bg);
+}
+
+[data-ux-profile] .card-grid-card {
+  border-color: var(--ux-section-border);
+  background: var(--color-panel);
+  box-shadow: var(--shadow-card);
+}
+
+[data-ux-profile] section.card-grid-group {
+  padding: 16px;
+  border: 1px solid var(--ux-section-border);
+  border-radius: var(--radius-card);
+  background: var(--ux-section-soft);
+}
+
+@media (max-width: 760px) {
+  .detail-body-section__header,
+  .detail-body-section__body,
+  [data-ux-profile] .card-grid-group__summary,
+  [data-ux-profile] .card-grid-group__body {
+    padding: 14px;
+  }
+}

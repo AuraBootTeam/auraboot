@@ -1,5 +1,7 @@
 import { createPortal } from 'react-dom';
 import { DetailActionButtons } from './DetailActionButtons';
+import { DetailBodySections } from './DetailBodySections';
+import { resolvePageUxProfile } from '../../layout/pageUxPresentation';
 import type { DetailPresentation } from '../detail/DetailPresentationContext';
 import { WorkspaceTabCount } from '../detail/WorkspaceTabCount';
 import { WorkspaceObjectSummary } from '../detail/WorkspaceObjectSummary';
@@ -160,15 +162,17 @@ export function renderDetailPageView({
   showDefaultEditAction,
   shareDialogOpen,
 }: RenderDetailPageViewArgs) {
+  const uxProfile = resolvePageUxProfile(schema?.extension);
   // Show loading while record is being fetched
   if (recordLoading) {
-    return <LoadingSpinner />;
+    return uxProfile ? <div data-ux-profile={uxProfile} className="min-h-[calc(100vh-56px)] w-full"><LoadingSpinner /></div> : <LoadingSpinner />;
   }
 
   if (recordError) {
     return (
       <div
         className="mx-auto w-full px-2 py-3"
+        data-ux-profile={uxProfile}
         data-testid={deriveTestId('detail', schema?.modelCode || tableName, 'container')}
       >
         <div className="rounded-card bg-panel p-8 shadow-sm">
@@ -301,13 +305,14 @@ export function renderDetailPageView({
               }
             : undefined
       }
+      data-ux-profile={uxProfile}
       data-testid={deriveTestId('detail', schema?.modelCode || tableName, 'container')}
     >
       <div className="min-w-0">
         {/* Page Header with title + toolbar buttons (hidden in print) */}
         <div
           className={
-            presentation ? 'print-hide border-border mb-4 border-b pb-4' : 'print-hide pb-6'
+            presentation ? 'page-ux-header print-hide border-border mb-4 border-b pb-4' : 'page-ux-header print-hide pb-6'
           }
           data-print="hide"
         >
@@ -468,7 +473,7 @@ export function renderDetailPageView({
           )}
           {/* Content: Tabs mode or Direct mode */}
           {tabs.length > 0 ? (
-            <div>
+            <div className="page-ux-tabs">
               {persistentHeaderBlocks.length > 0 && (
                 <div
                   className={workspace ? 'mb-5 space-y-3' : 'space-y-3 p-6 pb-0'}
@@ -679,8 +684,12 @@ export function renderDetailPageView({
               </div>
             </div>
           ) : (
-            <div className={presentation ? 'space-y-4' : 'space-y-4 p-5'}>
-              {workspace && schema.extension?.detailBodyOrder === 'schema' ? (
+            <div className={presentation ? 'page-ux-body space-y-4' : 'page-ux-body space-y-4 p-5'}>
+              {schema.extension?.detailBodyGroups && runtime ? (
+                <DetailBodySections groups={schema.extension.detailBodyGroups} blocks={workspaceContentBlocks}
+                  runtime={runtime} renderBlock={renderWorkspaceBlock} hasPermission={hasPermission}
+                  evaluateVisibleWhen={evaluateVisibleWhen} locale={locale} t={t} />
+              ) : workspace && schema.extension?.detailBodyOrder === 'schema' ? (
                 <>
                   {persistentHeaderBlocks.length > 0 && (
                     <div data-testid="detail-persistent-header">

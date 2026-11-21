@@ -99,6 +99,11 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   const cardActions: ButtonConfig[] =
     Array.isArray(cfg.cardActions) ? cfg.cardActions : [];
   const compact = cfg.compact === true;
+  const initialOpenCount = cfg.groupsDefaultOpenCount;
+  if (initialOpenCount !== undefined && (!Number.isInteger(initialOpenCount) || initialOpenCount < 0)) {
+    throw new Error('Card group initial open count must be a nonnegative integer');
+  }
+  const blockHeading = block.title ? <h2 className="col-span-full text-text text-base font-semibold">{getLocalizedText(block.title, locale, t)}</h2> : null;
   const autoFitColumns = cfg.autoFitColumns === true;
   const autoFillColumns = cfg.autoFillColumns === true;
   const minCardWidth = Number.isFinite(cfg.minCardWidth) && cfg.minCardWidth >= 180 && cfg.minCardWidth <= 640
@@ -357,7 +362,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
             key={rowKey}
             data-testid="card-grid-card"
             style={{ scrollMarginBlockStart: 'calc(var(--workspace-header-height, 3.5rem) + 1rem)' }}
-            className={`rounded-card border-border bg-panel flex flex-col border shadow-sm ${compact ? 'p-3' : 'p-4'}`}
+            className={`card-grid-card rounded-card border-border bg-panel flex flex-col border shadow-sm ${compact ? 'p-3' : 'p-4'}`}
           >
             {selectionRule && (
               <label className="mb-3 flex items-center gap-2 text-sm">
@@ -514,19 +519,21 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
         </div> : null}
         </div>
         {group.entries.length === 0 && parentConfig?.emptyText ? <p className="text-text-2 py-3 text-sm">{getLocalizedText(parentConfig.emptyText, locale, t)}</p> : null}
-        <div data-testid="card-grid-tracks" className={`mt-3 grid gap-3 ${columnsClass}`} style={{ ...columnsStyle, alignItems: compact ? 'start' : undefined }}>
+        <div data-testid="card-grid-tracks" className={`card-grid-tracks mt-3 grid gap-3 ${columnsClass}`} style={{ ...columnsStyle, alignItems: compact ? 'start' : undefined }}>
           {entries.map(({ row, index: originalIndex }) => renderCard(row, originalIndex))}
         </div>
       </>;
     };
     return (
-      <div data-testid="card-grid-block" className={compact ? "space-y-4" : "space-y-6"}>
+      <div data-testid="card-grid-block" className={`card-grid-groups ${compact ? "space-y-4" : "space-y-6"}`}>
+        {blockHeading}
         {selectionHint}
         {Array.from(groups.entries()).map(([key, group], index) => cfg.collapsibleGroups === true ? (
-          <details key={key} data-testid="card-grid-group" open={cfg.groupsDefaultOpen !== false}
+          <details key={key} data-testid="card-grid-group" open={cfg.groupsDefaultOpen !== false && (initialOpenCount === undefined || index < initialOpenCount)}
             style={{ scrollMarginBlockStart: 'calc(var(--workspace-header-height, 3.5rem) + 1rem)' }}
-            className={`rounded-lg border border-border ${compact ? 'group overflow-hidden' : 'p-3'} ${cfg.groupWarningField && (group.parent?.[cfg.groupWarningField] === true || group.entries.some(({ row }) => row[cfg.groupWarningField] === true)) ? 'bg-amber-50' : 'bg-surface'}`}>
-            <summary className={`cursor-pointer select-none text-sm font-semibold text-text ${compact ? 'list-none p-3' : ''}`}>
+            data-warning={Boolean(cfg.groupWarningField && (group.parent?.[cfg.groupWarningField] === true || group.entries.some(({ row }) => row[cfg.groupWarningField] === true)))}
+            className={`card-grid-group rounded-lg border border-border ${compact ? 'group overflow-hidden' : 'p-3'} ${cfg.groupWarningField && (group.parent?.[cfg.groupWarningField] === true || group.entries.some(({ row }) => row[cfg.groupWarningField] === true)) ? 'bg-amber-50' : 'bg-panel'}`}>
+            <summary className={`card-grid-group__summary cursor-pointer select-none text-sm font-semibold text-text ${compact ? 'list-none p-3' : ''}`}>
               <div data-testid="card-group-heading" style={compact ? { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 24rem), 1fr))', gap: '1rem' } : undefined}>
                 <div className="min-w-0">
                   <span data-testid="card-group-title">{compact && <span aria-hidden="true" className="mr-2 inline-block transition-transform group-open:rotate-90">›</span>}{group.title}</span>
@@ -537,10 +544,10 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
                 {parentFields(group, parentConfig?.summaryFields || [], true)}
               </div>
             </summary>
-            <div className={compact ? 'border-t border-border bg-subtle p-3' : 'mt-3'}>{groupCards(key, group)}</div>
+            <div className={compact ? 'card-grid-group__body border-t border-border bg-subtle p-3' : 'card-grid-group__body mt-3'}>{groupCards(key, group)}</div>
           </details>
         ) : (
-          <section key={key} data-testid="card-grid-group"
+          <section key={key} className="card-grid-group" data-testid="card-grid-group"
             style={{ scrollMarginBlockStart: 'calc(var(--workspace-header-height, 3.5rem) + 1rem)' }}
             aria-labelledby={group.title ? `${block.id}-group-${index}` : undefined}>
             {group.title && <h2 id={`${block.id}-group-${index}`}
@@ -553,6 +560,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
     );
   }
   return <div data-testid="card-grid-block" className={`grid gap-4 ${columnsClass}`} style={columnsStyle}>
+    {blockHeading}
     {selectionHint}
     {rows.map(renderCard)}
   </div>;

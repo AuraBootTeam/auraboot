@@ -203,7 +203,7 @@ describe('Card-grid draft form fields', () => {
   });
 });
 
-function setupJoinedGroups(duplicate = false, pendingParents = false, compact = false, formOnly = false) {
+function setupJoinedGroups(duplicate = false, pendingParents = false, compact = false, formOnly = false, initialOpenCount?: number) {
   let parentsReady = !pendingParents;
   const state = new ScopedStateManager({} as any);state.createScope('joined', { form: pendingParents ? { demands: [] } : {} });
   const parents = [
@@ -231,7 +231,7 @@ function setupJoinedGroups(duplicate = false, pendingParents = false, compact = 
   } as any;
   render(<CardGridBlockRenderer runtime={runtime} block={{
     id: 'joined',blockType: 'card-grid',dataSource: 'offers',field: 'allocations',titleField: 'supplierName',
-    groupByField: 'sourcePid',groupTitleField: 'sourceLabel',collapsibleGroups: true,groupsDefaultOpen: true,compact,groupDescriptionField: 'remainingQty',
+    groupByField: 'sourcePid',groupTitleField: 'sourceLabel',collapsibleGroups: true,groupsDefaultOpen: true,groupsDefaultOpenCount: initialOpenCount,compact,groupDescriptionField: 'remainingQty',
     searchFields: ['supplierName'],searchPlaceholder: 'Search suppliers',
     groupRows: { ...(formOnly ? {} : {dataSource: 'parents'}),field: 'demands',identityField: 'sourcePid',titleField: 'sourceLabel',
       summaryFields: [{ field: 'remainingQty',label: 'Remaining',component: 'SmartInput',readOnly: true }],
@@ -242,6 +242,18 @@ function setupJoinedGroups(duplicate = false, pendingParents = false, compact = 
 }
 
 describe('Joined card groups keep source and offer drafts independent', () => {
+  it('opens only the configured initial groups without losing other source drafts', () => {
+    const {state} = setupJoinedGroups(false, false, false, false, 1);
+    const groups = Array.from(document.querySelectorAll('details'));
+    expect(groups).toHaveLength(3);
+    expect(groups.map(group=>group.open)).toEqual([true,false,false]);
+    fireEvent.click(groups[1].querySelector('summary')!);
+    const input = within(groups[1] as HTMLElement).getByRole('textbox',{name:'Purchase target'});
+    fireEvent.change(input,{target:{value:'75'}});
+    expect(state.getScope('joined')!.form!.demands![1].quantity).toBe('75');
+    expect(state.getScope('joined')!.form!.demands![0].quantity).toBe('100');
+  });
+
   it('groups an explicit form-only preview without fetching or overwriting its parent snapshot', () => {
     const {state,reads,refresh} = setupJoinedGroups(false,false,true,true);
     expect(reads).not.toContain('parents');

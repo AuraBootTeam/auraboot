@@ -1,3 +1,4 @@
+import { resolvePageUxProfile } from '../../layout/pageUxPresentation';
 import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';
 import { AsyncTaskModalHost } from '~/framework/meta/rendering/components/AsyncTaskModalContext';
 import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
@@ -68,6 +69,7 @@ export function renderListPage(model: ListPageModel) {
     setBulkActionResult,
   } = model;
 
+  const uxProfile = resolvePageUxProfile(schema?.extension);
   const pageHeader = (
     <ListPageHeader
       title={(() => {
@@ -154,7 +156,7 @@ export function renderListPage(model: ListPageModel) {
 
   // Error handling — local errors only (schema loading errors handled by DynamicPageRenderer)
   if (error) {
-    return (
+    const errorView = (
       <ListErrorState
         title={listPageTitle}
         buttons={actionBlock?.buttons || []}
@@ -175,6 +177,7 @@ export function renderListPage(model: ListPageModel) {
         }}
       />
     );
+    return uxProfile ? <div data-ux-profile={uxProfile} className="min-h-[calc(100vh-3.5rem)] w-full">{errorView}</div> : errorView;
   }
 
   return (
@@ -182,6 +185,7 @@ export function renderListPage(model: ListPageModel) {
       <div
         className="bg-subtle min-h-[calc(100vh-3.5rem)] w-full px-4 py-5 sm:px-6 lg:px-8"
         style={workspace ? { backgroundColor: '#F7F7F8' } : undefined}
+        data-ux-profile={uxProfile}
         data-testid="dynamic-list"
         data-model-code={modelCode}
         data-ready={(skipListData ? Boolean(model.runtime) && isCustomListDataReady(schema, dataSourceManager) : dataReady) && !loading && !viewsLoading && listQuerySettled}
@@ -190,7 +194,7 @@ export function renderListPage(model: ListPageModel) {
       >
         {pageHeader}
         <div
-          className={`rounded-card border-border bg-panel relative overflow-hidden border ${workspace ? '' : 'shadow-sm'}`}
+          className={`page-ux-list-panel rounded-card border-border bg-panel relative overflow-hidden border ${workspace ? '' : 'shadow-sm'}`}
         >
           {renderListPageFeedback(model, pageHeader)}
 

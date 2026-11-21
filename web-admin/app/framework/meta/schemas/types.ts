@@ -42,10 +42,23 @@ export interface WorkspaceShellConfig {
   };
 }
 
+export type PageUxProfile = 'work-list' | 'configuration' | 'lifecycle-detail';
+
+/** Present existing blocks as semantic sections without changing the page runtime. */
+export interface DetailBodyGroupConfig {
+  id: string;
+  title?: LocalizedText;
+  description?: LocalizedText;
+  blockIds: string[];
+  layout?: 'stack' | 'rows';
+}
+
 /** Open page extensions with typed shared presentation options. */
 export interface PageExtensionConfig {
   [key: string]: any;
   workspaceShell?: WorkspaceShellConfig;
+  uxProfile?: PageUxProfile | string;
+  detailBodyGroups?: DetailBodyGroupConfig[];
   detailHeaderLayout?: LayoutConfig;
   detailBodyOrder?: 'schema';
 }
@@ -154,6 +167,8 @@ export interface BlockConfig {
   /** Accessible native disclosure groups retain mounted row inputs when closed. */
   collapsibleGroups?: boolean;
   groupsDefaultOpen?: boolean;
+  /** Optional initial number of open groups; omitted retains the existing all/none behavior. */
+  groupsDefaultOpenCount?: number;
   groupDescriptionField?: string;
   /** Boolean row fact: highlight a group if any member requires attention. */
   groupWarningField?: string;
