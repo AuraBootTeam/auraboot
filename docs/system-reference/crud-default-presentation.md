@@ -2,7 +2,7 @@
 type: system-reference
 status: active
 created: 2026-10-27
-updated: 2026-11-20
+updated: 2026-11-21
 ---
 
 # Generated CRUD default presentation
@@ -30,6 +30,14 @@ A list can set `extension.filterFormInitiallyVisible: true` to show its ordinary
 A list can opt into `extension.filterLayout: "inline"` to place its existing filter fields and query/reset actions beside keyword search. This reuses submitted-filter serialization and field renderers; other pages retain the expanded filter panel. Tabs with counts use the configured API list source and submitted query, including date ranges and keywords; native lists retain their native count endpoint.
 
 A detail can pair `extension.headerStatusField` with `extension.headerStatusDictCode` when an API projection has a business status that differs from the model dictionary. The explicit dictionary is preloaded and used by the existing header badge. Without an override, the field metadata dictionary is used. These properties affect presentation only.
+
+## Opt-in layered page sections
+
+`extension.uxProfile` accepts `work-list`, `configuration` or `lifecycle-detail` to declare a shared page family. These opt-in families use theme-based canvas, panel, table-heading and material-summary surfaces. Missing or unknown profiles preserve the default presentation; generated CRUD does not require a profile.
+
+Direct detail bodies without tabs or an aside can declare `extension.detailBodyGroups`. Each group contains a unique `id`, existing `blockIds`, optional localized `title`/`description`, and optional `layout` (`stack` or `rows`). Unknown or repeated block references are rejected. Ungrouped blocks retain their position; grouped children keep their original runtime, form scope, identity, permissions and visibility expressions. Sections re-evaluate visibility on context changes and omit an empty shell. The `rows` layout joins existing material groups and insets their existing toolbar; it does not create business actions or modify inputs.
+
+Collapsible card grids can declare a nonnegative integer `groupsDefaultOpenCount` to initially open only that many groups. `groupsDefaultOpen: false` still closes every group; omitting the count preserves the existing all/none behavior. Collapsing a group keeps its inputs mounted and does not discard or reassign drafts.
 
 ## User journey
 
