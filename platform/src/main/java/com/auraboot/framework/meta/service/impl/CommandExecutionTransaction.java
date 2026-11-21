@@ -93,11 +93,22 @@ public class CommandExecutionTransaction {
             }
             template.setIsolationLevel(isolation.jdbcLevel());
         }
-        return template.execute(status -> {
-            if (dryRun) status.setRollbackOnly();
-            // Boundary phases may suspend this transaction for their own isolated authorization.
-            // Handler-local projection caches must start after those boundaries, not around them.
-            return operation.get();
-        });
+        Integer previousIsolation = TransactionSynchronizationManager.getCurrentTransactionIsolationLevel();
+        if (isolation != null) {
+            // Maintain the isolation ThreadLocal for the transaction this template begins:
+            // coherent-read gates (native field projection, serializable resolvers) read it,
+            // and template-begun transactions do not populate it by themselves.
+            TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(isolation.jdbcLevel());
+        }
+        try {
+            return template.execute(status -> {
+                if (dryRun) status.setRollbackOnly();
+                // Boundary phases may suspend this transaction for their own isolated authorization.
+                // Handler-local projection caches must start after those boundaries, not around them.
+                return operation.get();
+            });
+        } finally {
+            TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(previousIsolation);
+        }
     }
 }

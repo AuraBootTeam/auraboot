@@ -36,11 +36,18 @@ public class NativeReadFieldProjection {
                 || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
                 || MetaContext.hasCommandPermitScopeFor(modelCode)) return operation.get();
         if (coherentSnapshot()) return operation.get();
-        // A weak write snapshot cannot be repaired after its own mutations or row reads.
-        // Keep the owning transaction intact and require its caller to establish isolation.
-        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
-                && !org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly())
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
+            // An authenticated human execution inside a write-capable transaction reads with
+            // the actor's own ordinary authority — requireDomainAction has already passed, and
+            // the owning transaction's view is exactly what handler-side validation (related
+            // row existence, ownership) must run against. This is the plain accessor path for
+            // secondary declared target models, whose command permit scope registers only the
+            // primary model. Unauthenticated write transactions still fail closed.
+            if (MetaContext.exists() && MetaContext.getCurrentMemberId() != null) return operation.get();
+            // A weak write snapshot cannot be repaired after its own mutations or row reads.
+            // Keep the owning transaction intact and require its caller to establish isolation.
             throw denied();
+        }
         return snapshot().execute(status -> operation.get());
     }
 
