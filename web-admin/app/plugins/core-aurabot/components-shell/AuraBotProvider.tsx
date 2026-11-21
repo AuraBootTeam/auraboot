@@ -494,6 +494,16 @@ export const AuraBotCtx = createContext<AuraBotContextValue | null>(null);
 // Route-based PageContext derivation
 // ============================================================================
 
+/**
+ * /p/:pageKey routes carry the PAGE key ({model_code}_list on lists); scene
+ * tables key by bare model code. Keep in lockstep with usePageContext.ts's
+ * deriveContextFromRoute — two derivation sites exist (provider + hook); a
+ * consolidation is platform debt.
+ */
+function toModelCode(pageKey: string): string {
+  return pageKey.replace(/_(list|form|detail)$/, '');
+}
+
 function derivePageContextFromRoute(
   pathname: string,
   params: Record<string, string | undefined>,
@@ -510,49 +520,49 @@ function derivePageContextFromRoute(
   }
 
   // /p/:pageKey/view/:recordPid → detail
-  if (pathname.match(/^\/p\/[^/]+\/view\/[^/]+/)) {
+  if (pathname.match(/^\/p\/(?:c\/)?[^/]+\/view\/[^/]+/)) {
     const pageKey = params.pageKey || '';
     const recordPid = params.recordPid ?? params.recordId;
     return {
       pageType: 'detail',
       pageKey,
-      modelCode: pageKey,
+      modelCode: toModelCode(pageKey),
       recordPid,
       breadcrumb: [pageKey],
     };
   }
 
   // /p/:pageKey/edit/:recordPid → form (edit)
-  if (pathname.match(/^\/p\/[^/]+\/edit\/[^/]+/)) {
+  if (pathname.match(/^\/p\/(?:c\/)?[^/]+\/edit\/[^/]+/)) {
     const pageKey = params.pageKey || '';
     const recordPid = params.recordPid ?? params.recordId;
     return {
       pageType: 'form',
       pageKey,
-      modelCode: pageKey,
+      modelCode: toModelCode(pageKey),
       recordPid,
       breadcrumb: [pageKey],
     };
   }
 
   // /p/:pageKey/new → form (create)
-  if (pathname.match(/^\/p\/[^/]+\/new/)) {
+  if (pathname.match(/^\/p\/(?:c\/)?[^/]+\/new/)) {
     const pageKey = params.pageKey || '';
     return {
       pageType: 'form',
       pageKey,
-      modelCode: pageKey,
+      modelCode: toModelCode(pageKey),
       breadcrumb: [pageKey],
     };
   }
 
   // /p/:pageKey → list
-  if (pathname.match(/^\/p\/[^/]+$/)) {
+  if (pathname.match(/^\/p\/(?:c\/)?[^/]+$/)) {
     const pageKey = params.pageKey || '';
     return {
       pageType: 'list',
       pageKey,
-      modelCode: pageKey,
+      modelCode: toModelCode(pageKey),
       breadcrumb: [pageKey],
     };
   }
