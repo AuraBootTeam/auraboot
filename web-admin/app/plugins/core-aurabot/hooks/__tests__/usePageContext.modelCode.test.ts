@@ -30,6 +30,18 @@ describe('usePageContext deriveContextFromRoute modelCode', () => {
     expect(form.modelCode).toBe('crm_lead_common');
   });
 
+  it('handles the workspace route shape /p/c/:pageKey', () => {
+    const list = deriveContextFromRoute('/p/c/crm_lead_common_list', { pageKey: 'crm_lead_common_list' });
+    expect(list.pageType).toBe('list');
+    expect(list.modelCode).toBe('crm_lead_common');
+    const detail = deriveContextFromRoute('/p/c/crm_lead_common_list/view/01ABC', {
+      pageKey: 'crm_lead_common_list',
+      recordPid: '01ABC',
+    });
+    expect(detail.pageType).toBe('detail');
+    expect(detail.modelCode).toBe('crm_lead_common');
+  });
+
   it('leaves page keys without a kind suffix untouched', () => {
     const context = deriveContextFromRoute('/p/crm_sales_home', { pageKey: 'crm_sales_home' });
     expect(context.modelCode).toBe('crm_sales_home');
