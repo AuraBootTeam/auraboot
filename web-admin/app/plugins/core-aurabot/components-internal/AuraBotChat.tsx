@@ -1038,6 +1038,7 @@ export function AuraBotChat() {
               onClick={handleAttachClick}
               disabled={isLoading}
               className="flex-shrink-0 rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-gray-700"
+              aria-label={t('aurabot.chat.attach_image', undefined, 'Attach image')}
               title={t('aurabot.chat.attach_image', undefined, 'Attach image')}
               data-testid="aurabot-attach-image"
             >
@@ -1086,6 +1087,7 @@ export function AuraBotChat() {
                   ? 'bg-blue-600 text-white hover:bg-blue-700'
                   : 'cursor-not-allowed bg-gray-200 text-gray-400'
               } `}
+              aria-label={t('aurabot.chat.send', undefined, '发送 (Cmd+Enter)')}
               title={t('aurabot.chat.send', undefined, '发送 (Cmd+Enter)')}
             >
               <SendIcon className="h-5 w-5" />
