@@ -18,6 +18,7 @@ import {
   cleanupRows,
   fixtureJournal,
   cleanupTrackedFixtureRows,
+  fetchRoleSnapshot,
 } from './quote-e2e-helpers';
 
 test.use({ locale: 'zh-CN' });
@@ -42,6 +43,7 @@ test('engineering maintains header aliases and exact MPN alternatives with a con
   }
   const actor = await openQuoteRolePage(browser, engineer);
   const page = actor.page;
+  await page.setViewportSize({ width: 1440, height: 1000 });
   const field = (name: string) => page.getByTestId(`form-field-${name}`);
   const aliasRows = () => queryDynamicRecords(page, 'bom_header_alias', [
     { fieldName: 'bom_ha_alias', operator: 'EQ', value: header },
@@ -64,6 +66,10 @@ test('engineering maintains header aliases and exact MPN alternatives with a con
     expect(payload).toBeTruthy();
   }
   try {
+    const identity = await fetchRoleSnapshot(page);
+    expect(identity.roleCodes).toContain('bom_engineering');
+    expect(identity.roleCodes).not.toContain('tenant_admin');
+    expect(identity.permissionCodes).toContain('bom.cap.manage');
     await menu('bom_header_alias');
     await expect(page.locator('main').getByRole('button', { name: '新建', exact: true })).toBeVisible();
     await page.screenshot({ path: info.outputPath('alias-engineering-list.png'), fullPage: true });
@@ -171,6 +177,9 @@ test('engineering maintains header aliases and exact MPN alternatives with a con
     await clickRowActionByLocator(page, page.getByRole('row').filter({ hasText: header }), 'delete', '删除');
     await page.getByTestId('confirm-ok').click();
     await expect.poll(async () => (await aliasRows()).length).toBe(0);
+  } catch (error) {
+    await page.screenshot({ path: info.outputPath('engineering-failure.png'), fullPage: true });
+    throw error;
   } finally {
     await actor.context.close();
   }
