@@ -203,7 +203,7 @@ describe('Card-grid draft form fields', () => {
   });
 });
 
-function setupJoinedGroups(duplicate = false, pendingParents = false, compact = false, formOnly = false, initialOpenCount?: number) {
+function setupJoinedGroups(duplicate = false, pendingParents = false, compact = false, formOnly = false, initialOpenCount?: number, stretchCards?: boolean) {
   let parentsReady = !pendingParents;
   const state = new ScopedStateManager({} as any);state.createScope('joined', { form: pendingParents ? { demands: [] } : {} });
   const parents = [
@@ -231,7 +231,7 @@ function setupJoinedGroups(duplicate = false, pendingParents = false, compact = 
   } as any;
   render(<CardGridBlockRenderer runtime={runtime} block={{
     id: 'joined',blockType: 'card-grid',dataSource: 'offers',field: 'allocations',titleField: 'supplierName',
-    groupByField: 'sourcePid',groupTitleField: 'sourceLabel',collapsibleGroups: true,groupsDefaultOpen: true,groupsDefaultOpenCount: initialOpenCount,compact,groupDescriptionField: 'remainingQty',
+    groupByField: 'sourcePid',groupTitleField: 'sourceLabel',collapsibleGroups: true,groupsDefaultOpen: true,groupsDefaultOpenCount: initialOpenCount,compact,stretchCards,groupDescriptionField: 'remainingQty',
     searchFields: ['supplierName'],searchPlaceholder: 'Search suppliers',
     groupRows: { ...(formOnly ? {} : {dataSource: 'parents'}),field: 'demands',identityField: 'sourcePid',titleField: 'sourceLabel',
       summaryFields: [{ field: 'remainingQty',label: 'Remaining',component: 'SmartInput',readOnly: true }],
@@ -242,6 +242,16 @@ function setupJoinedGroups(duplicate = false, pendingParents = false, compact = 
 }
 
 describe('Joined card groups keep source and offer drafts independent', () => {
+  it('opts into row-height alignment without changing drafts or disclosure behavior', () => {
+    const {state} = setupJoinedGroups(false, false, true, false, undefined, true);
+    const first: HTMLElement = screen.getAllByTestId('card-grid-group')[0];
+    expect(first.querySelector<HTMLElement>('[data-testid="card-grid-tracks"]')!.style.alignItems).toBe('stretch');
+    const quantity = within(within(first).getByRole('group',{name:'Beta'})).getByRole('textbox',{name:'Proposed quantity'});
+    fireEvent.change(quantity,{target:{value:'31'}});
+    fireEvent.click(first.querySelector('summary')!);fireEvent.click(first.querySelector('summary')!);
+    expect(quantity).toHaveValue('31');
+    expect(state.getFieldValue('joined','allocations').map((row:any)=>row.proposedQty)).toEqual(['60','31','80']);
+  });
   it('opens only the configured initial groups without losing other source drafts', () => {
     const {state} = setupJoinedGroups(false, false, false, false, 1);
     const groups = Array.from(document.querySelectorAll('details'));

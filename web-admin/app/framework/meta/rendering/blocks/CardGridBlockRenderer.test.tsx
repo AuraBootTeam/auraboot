@@ -190,6 +190,12 @@ describe('CardGridBlockRenderer', () => {
       .toBe('repeat(auto-fit, minmax(min(100%, 20rem), 1fr))');
   });
 
+  it('rejects a nonboolean row stretch setting instead of silently changing layout', () => {
+    const runtime = makeRuntime({ data: sampleRows });
+    expect(() => render(<CardGridBlockRenderer runtime={runtime as any}
+      block={{ ...baseBlock, stretchCards: 'true' } as any} />)).toThrow('Card row stretch setting must be a boolean');
+  });
+
   it('renders a card badge through its declared dictionary', () => {
     const runtime = makeRuntime({ data: [{ pid: 'r1', name: '蜜蜂', status: 'published' }] });
     render(

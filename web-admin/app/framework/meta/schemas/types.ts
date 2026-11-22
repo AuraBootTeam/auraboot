@@ -162,6 +162,8 @@ export interface BlockConfig {
   autoFitColumns?: boolean;
   /** Reserve unused adaptive tracks so a short row does not stretch each card. */
   autoFillColumns?: boolean;
+  /** Match grouped card heights within a row; compact cards keep natural height when omitted. */
+  stretchCards?: boolean;
   /** Optional adaptive-card minimum in logical pixels, bounded to 180..640. */
   minCardWidth?: number;
   /** Accessible native disclosure groups retain mounted row inputs when closed. */

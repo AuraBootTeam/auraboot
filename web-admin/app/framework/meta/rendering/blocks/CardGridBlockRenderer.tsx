@@ -99,6 +99,9 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   const cardActions: ButtonConfig[] =
     Array.isArray(cfg.cardActions) ? cfg.cardActions : [];
   const compact = cfg.compact === true;
+  if (cfg.stretchCards !== undefined && typeof cfg.stretchCards !== 'boolean') {
+    throw new Error('Card row stretch setting must be a boolean');
+  }
   const initialOpenCount = cfg.groupsDefaultOpenCount;
   if (initialOpenCount !== undefined && (!Number.isInteger(initialOpenCount) || initialOpenCount < 0)) {
     throw new Error('Card group initial open count must be a nonnegative integer');
@@ -531,7 +534,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
         </div>
         {group.entries.length === 0 && parentConfig?.emptyText ? <p className="text-text-2 py-3 text-sm">{getLocalizedText(parentConfig.emptyText, locale, t)}</p> : null}
         {group.entries.length > 0 && entries.length === 0 ? <p role="status" data-testid="card-group-search-empty" className="text-text-2 py-3 text-sm">{getLocalizedText({ 'zh-CN': '没有匹配结果，请调整搜索条件。', en: 'No matching results. Adjust your search.' }, locale, t)}</p> : null}
-        <div data-testid="card-grid-tracks" className={`card-grid-tracks mt-3 grid gap-3 ${columnsClass}`} style={{ ...columnsStyle, alignItems: compact ? 'start' : undefined }}>
+        <div data-testid="card-grid-tracks" className={`card-grid-tracks mt-3 grid gap-3 ${columnsClass}`} style={{ ...columnsStyle, alignItems: cfg.stretchCards === true ? 'stretch' : compact ? 'start' : undefined }}>
           {entries.map(({ row, index: originalIndex }) => renderCard(row, originalIndex))}
         </div>
       </>;
