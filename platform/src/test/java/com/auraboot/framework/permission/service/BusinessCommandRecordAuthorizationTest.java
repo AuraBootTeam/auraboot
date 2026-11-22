@@ -60,6 +60,74 @@ class BusinessCommandRecordAuthorizationTest {
         MetaContext.clear(); TransactionSynchronizationManager.clear();
     }
 
+    private record OwnedTarget(com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext context,
+                               com.auraboot.framework.plugin.extension.BusinessResourceAuthorization owner) { }
+
+    private OwnedTarget ownedTarget() {
+        var definition=permission(CODE);definition.setAction("write");
+        definition.setExtension(Map.of("domainModels",Map.of("source",List.of("read")),
+                "commandEffects",Map.of(MODEL,List.of("update"))));
+        when(snapshots.resolvePermissionDefinition(100L,CODE)).thenReturn(definition);
+        var command=new com.auraboot.framework.meta.entity.CommandDefinition();command.setCode("receipt:artifact");command.setModelCode(MODEL);
+        var request=new com.auraboot.framework.meta.dto.CommandExecuteRequest();request.setTargetRecordId("receipt-pid");
+        var context=com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext.builder()
+                .tenantId(100L).userId(1L).commandCode(command.getCode()).command(command).request(request)
+                .execConfig(new java.util.HashMap<>(Map.of("type","custom","permissions",List.of(CODE),"handlerParams",
+                        Map.of("targetRecordAuthorization","business","targetRecordAction","update","dslPersistence",false))))
+                .build();
+        context.setAuthorizationVerdict(com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict.authorized(CODE));
+        var owner=mock(com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.class,CALLS_REAL_METHODS);
+        when(owner.businessBoundary()).thenReturn(new com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.Boundary(
+                command.getCode(),MODEL,"update",java.util.Set.of(CODE)));
+        grants(grant(11,101,CODE));guards(CODE,new PermissionPolicyService.ConditionGuard(11L,null));
+        when(scopes.resolveObjectBoundScopeForRole(5L,101L,MODEL,"update",MODEL)).thenReturn(DataScopeCondition.all());
+        return new OwnedTarget(context,owner);
+    }
+
+    @Test void declaredOwnerTargetCanBeEvaluatedBeforeAPermitWithoutCreatingNativeAuthority() {
+        var fixture=ownedTarget();var row=record(1,"Shanghai");
+        assertThat(authorization.resolveOwnedTarget(fixture.context(),fixture.owner(),row).result().granted()).isTrue();
+        assertThat(MetaContext.hasCommandPermitScope()).isFalse();
+        assertThat(MetaContext.getAuthorizedCommandCode()).isNull();assertThat(MetaContext.getCommandAuthority()).isNull();
+        assertThat(authorization.resolveNative(5L,List.of(CODE),MODEL,row,"update").result().granted()).isFalse();
+    }
+
+    @Test void declaredTargetRetainsDenyScopeConditionsAndFieldPolicies() throws Exception {
+        var fixture=ownedTarget();var row=record(1,"Shanghai");
+        var denied=grant(11,101,CODE);denied.setGrantType("deny");grants(denied);
+        assertThat(authorization.resolveOwnedTarget(fixture.context(),fixture.owner(),row).result().granted()).isFalse();
+        var allowed=grant(11,101,CODE);grants(allowed);
+        when(scopes.resolveObjectBoundScopeForRole(5L,101L,MODEL,"update",MODEL)).thenReturn(DataScopeCondition.none());
+        assertThat(authorization.resolveOwnedTarget(fixture.context(),fixture.owner(),row).result().granted()).isFalse();
+        when(scopes.resolveObjectBoundScopeForRole(5L,101L,MODEL,"update",MODEL)).thenReturn(DataScopeCondition.all());
+        guards(CODE,guard(11,"Beijing"));
+        assertThat(authorization.resolveOwnedTarget(fixture.context(),fixture.owner(),row).result().granted()).isFalse();
+        guards(CODE,new PermissionPolicyService.ConditionGuard(11L,null));
+        allowed.setFieldScopeJson("{\"version\":2,\"models\":{\"receipt\":{\"readFields\":[\"warehouse\"],\"writeFields\":[]}}}");
+        var result=authorization.resolveOwnedTarget(fixture.context(),fixture.owner(),row);
+        assertThat(result.result().granted()).isTrue();assertThat(result.canRead("warehouse")).isTrue();
+        assertThat(result.canRead("city")).isFalse();assertThat(result.canWrite("warehouse")).isFalse();
+    }
+
+    @Test void targetAdmissionCannotSubstituteTheOwnerIdentityRecordOrDeclaredEffect() {
+        var fixture=ownedTarget();var row=record(1,"Shanghai");
+        fixture.context().getCommand().setModelCode("other");
+        assertThatThrownBy(()->authorization.resolveOwnedTarget(fixture.context(),fixture.owner(),row))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        fixture.context().getCommand().setModelCode(MODEL);fixture.context().getRequest().setTargetRecordId("other-pid");
+        assertThatThrownBy(()->authorization.resolveOwnedTarget(fixture.context(),fixture.owner(),row))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        fixture.context().getRequest().setTargetRecordId("receipt-pid");
+        MetaContext.setContext(101L,1L,"actor-pid","actor");
+        assertThatThrownBy(()->authorization.resolveOwnedTarget(fixture.context(),fixture.owner(),row))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        MetaContext.setContext(100L,1L,"actor-pid","actor");MetaContext.setMemberId(5L);
+        var definition=permission(CODE);definition.setAction("write");
+        definition.setExtension(Map.of("domainModels",Map.of("source",List.of("read")),"commandEffects",Map.of(MODEL,List.of("read"))));
+        when(snapshots.resolvePermissionDefinition(100L,CODE)).thenReturn(definition);
+        assertThat(authorization.resolveOwnedTarget(fixture.context(),fixture.owner(),row).result().granted()).isFalse();
+    }
+
     @Test void retiredGeneratedModelBindingsRemainFieldConstraintsWithoutSupplyingOperationAuthority() {
         var definition = permission(CODE); definition.setResourceCode("domain"); definition.setAction("write");
         definition.setExtension(Map.of("domainModels", Map.of(MODEL, List.of("read", "update"))));

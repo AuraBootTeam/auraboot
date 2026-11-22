@@ -49,9 +49,13 @@ public final class DomainPermissionPolicy {
 
     /** Published technical effects lend no independent model authority outside the admitted command. */
     private static boolean currentCommandEffect(Permission permission, String model, String action) {
+        return declaresCommandEffect(permission, model, action) && currentCommandAuthority(permission);
+    }
+
+    /** Declaration inspection only; this does not admit a command or grant native model authority. */
+    static boolean declaresCommandEffect(Permission permission, String model, String action) {
         Object actions = commandEffects(permission).get(model);
-        return actions instanceof List<?> values && (action == null || values.contains(action))
-                && currentCommandAuthority(permission);
+        return actions instanceof List<?> values && (action == null || values.contains(action));
     }
 
     private static boolean currentCommandAuthority(Permission permission) {

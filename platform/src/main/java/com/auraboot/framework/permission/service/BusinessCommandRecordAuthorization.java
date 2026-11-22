@@ -148,6 +148,26 @@ public class BusinessCommandRecordAuthorization {
         return resolveInternal(member, codes, model, record, domain ? action : null);
     }
 
+    /** Evaluate a code-owned target before the execution permit exists; no authority scope is opened. */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public BusinessGrantDecision resolveOwnedTarget(
+            com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext context,
+            com.auraboot.framework.plugin.extension.BusinessResourceAuthorization owner,
+            Map<String,Object> record) {
+        if (context == null || owner == null || context.getRequest() == null || context.getCommand() == null
+                || !Objects.equals(context.getTenantId(), MetaContext.getCurrentTenantId())
+                || !Objects.equals(context.getUserId(), MetaContext.getCurrentUserId())
+                || record == null || !Objects.equals(context.getRequest().getTargetRecordId(), record.get("pid")))
+            throw new org.springframework.security.access.AccessDeniedException("Business owner target context differs");
+        var codes = com.auraboot.framework.plugin.pf4j.BusinessResourcePermissionContract.require(context, owner);
+        String duty = context.getAuthorizationVerdict().permissionCode();
+        if (DomainPermissionPolicy.models(snapshots.resolvePermissionDefinition(MetaContext.getCurrentTenantId(), duty)).isEmpty())
+            throw new org.springframework.security.access.AccessDeniedException("An admitted domain duty is required");
+        var boundary = owner.businessBoundary();
+        return resolveInternal(MetaContext.getCurrentMemberId(), codes, boundary.rootModel(), record,
+                boundary.targetAction(), false, duty);
+    }
+
     /** Resolve a complete generated model-read grant for an artifact reader, without an execution permit. */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public BusinessGrantDecision resolveModelRead(Long memberId, String model, Map<String,Object> record) {
@@ -228,6 +248,12 @@ public class BusinessCommandRecordAuthorization {
     private BusinessGrantDecision resolveInternal(Long memberId, List<String> declaredPermissions,
                                                   String recordModel, Map<String, Object> record, String nativeAction,
                                                   boolean ordinaryModelAction) {
+        return resolveInternal(memberId, declaredPermissions, recordModel, record, nativeAction, ordinaryModelAction, null);
+    }
+
+    private BusinessGrantDecision resolveInternal(Long memberId, List<String> declaredPermissions,
+                                                  String recordModel, Map<String, Object> record, String nativeAction,
+                                                  boolean ordinaryModelAction, String ownerTargetDuty) {
         if (com.auraboot.framework.application.security.MachineDataAccessContext.isActive()
                 || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
                 || !MetaContext.exists() || memberId == null
@@ -253,12 +279,12 @@ public class BusinessCommandRecordAuthorization {
         // The complete decision uses the same database snapshot, including membership and policy
         // rows. Shared caches must not splice a stale grant into a freshly changed scope.
         var projection=readProjection.get();
-        if(projection!=null) { projection.verify();return evaluateSnapshot(memberId,declaredPermissions,recordModel,record,nativeAction,ordinaryModelAction); }
-        return snapshots.withFreshReads(() -> evaluateSnapshot(memberId, declaredPermissions, recordModel, record, nativeAction, ordinaryModelAction));
+        if(projection!=null) { projection.verify();return evaluateSnapshot(memberId,declaredPermissions,recordModel,record,nativeAction,ordinaryModelAction,ownerTargetDuty); }
+        return snapshots.withFreshReads(() -> evaluateSnapshot(memberId, declaredPermissions, recordModel, record, nativeAction, ordinaryModelAction,ownerTargetDuty));
     }
 
     private BusinessGrantDecision evaluateSnapshot(Long member, List<String> codes, String model, Map<String, Object> record,
-                                                  String nativeAction, boolean ordinaryModelAction) {
+                                                  String nativeAction, boolean ordinaryModelAction, String ownerTargetDuty) {
         var tenant = MetaContext.getCurrentTenantId();
         List<EvaluationStep> trace = new ArrayList<>();
         List<BusinessGrantDecision.Grant> matched = new ArrayList<>();
@@ -280,9 +306,10 @@ public class BusinessCommandRecordAuthorization {
             var permission = snapshots.resolvePermissionDefinition(tenant, code);
             boolean modelRead = "read".equals(nativeAction);
             boolean documentEffect = com.auraboot.framework.meta.security.DocumentArtifactCommandScope.permits(permission, model, record, nativeAction);
-            boolean domain = DomainPermissionPolicy.owns(permission, model) || documentEffect;
+            boolean ownerEffect = code.equals(ownerTargetDuty) && DomainPermissionPolicy.declaresCommandEffect(permission, model, nativeAction);
+            boolean domain = DomainPermissionPolicy.owns(permission, model) || documentEffect || ownerEffect;
             if (!DomainPermissionPolicy.models(permission).isEmpty() && !DomainPermissionPolicy.permits(permission, model, nativeAction)
-                    && !DomainPermissionPolicy.isCurrentCommandMutation(permission, model, nativeAction) && !documentEffect) {
+                    && !DomainPermissionPolicy.isCurrentCommandMutation(permission, model, nativeAction) && !documentEffect && !ownerEffect) {
                 trace.add(step(EvaluationVerdict.DENY, "Domain level does not own this model/action", code, null, null));
                 continue;
             }

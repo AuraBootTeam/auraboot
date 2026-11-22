@@ -334,7 +334,7 @@ public class CommandTargetScopePhase implements CommandPhase {
             var result = nativeContract != null
                     ? businessAuthorization.resolveNative(member, codes, modelCode, record, action)
                     : domains != null && ctx.getAuthorizationVerdict() != null && domains.isDomain(ctx.getAuthorizationVerdict().permissionCode())
-                        ? businessAuthorization.resolveForAction(member, codes, modelCode, record, action)
+                        ? businessAuthorization.resolveOwnedTarget(ctx, owner, record)
                         : businessAuthorization.resolve(member, codes, modelCode, record);
             if (result == null || !result.result().granted()) return false;
             if (com.auraboot.framework.meta.security.NativeBusinessCommandContract.declaresTransition(ctx))
