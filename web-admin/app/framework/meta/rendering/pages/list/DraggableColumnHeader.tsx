@@ -63,6 +63,8 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
             ? parseInt(column.width, 10) || 100
             : 100;
 
+  const compactHeader = compact || currentWidth < 160;
+
   const handleSortClick = useCallback(
     (e: React.MouseEvent) => {
       if (!sortable) return;
@@ -127,7 +129,7 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
     <th
       scope="col"
       ref={setNodeRef}
-      className={`group/th bg-subtle text-text-2 relative ${compact ? 'px-3' : 'px-6'} py-3 text-xs font-medium tracking-wider uppercase ${
+      className={`group/th bg-subtle text-text-2 relative ${compactHeader ? 'px-3' : 'px-6'} py-3 text-xs font-medium tracking-wider uppercase ${
         column.align === 'right'
           ? 'text-right'
           : column.align === 'center'
@@ -152,7 +154,7 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
           <span
             {...attributes}
             {...listeners}
-            className={`${compact ? 'absolute top-1/2 left-0.5 -translate-y-1/2' : 'flex-shrink-0'} cursor-grab opacity-0 transition-opacity group-hover/th:opacity-60 hover:opacity-100 active:cursor-grabbing`}
+            className={`${compactHeader ? 'absolute top-1/2 left-0.5 -translate-y-1/2' : 'flex-shrink-0'} cursor-grab opacity-0 transition-opacity group-hover/th:opacity-60 hover:opacity-100 active:cursor-grabbing`}
             aria-label={t('table.reorderColumn')}
             onClick={(e) => e.stopPropagation()}
           >
@@ -190,7 +192,7 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
           </span>
           {sortable && (
             <span
-              className={`${compact && !sortInfo ? 'absolute top-1/2 right-5 -translate-y-1/2' : ''} transition-opacity ${sortInfo ? 'opacity-100' : 'opacity-0 group-hover/th:opacity-40'}`}
+              className={`${compactHeader && !sortInfo ? 'absolute top-1/2 right-5 -translate-y-1/2' : ''} transition-opacity ${sortInfo ? 'opacity-100' : 'opacity-0 group-hover/th:opacity-40'}`}
             >
               <SortIndicator direction={sortInfo?.direction} priority={sortInfo?.priority} />
             </span>
