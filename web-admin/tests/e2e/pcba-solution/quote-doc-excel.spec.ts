@@ -49,6 +49,8 @@ test.describe('Quote pricing + document excel (QO-04 / QO-07 / XLS-Q) @smoke', (
       filePolicyRole = await unwrap(await admin.request.post('/api/roles', { data: {
         code: `e2e_doc_fields_${uid}`, name: `Document fields ${uid}`, type: 'custom',
         description: 'Owned document field-policy fixture; original sales role is unchanged',
+        roleScope: 'tenant', scopeType: source.scopeType,
+        defaultDataScopeType: source.defaultDataScopeType,
       } }));
       await unwrap(await admin.request.post(`/api/roles/${source.pid}/copy-permissions`, {
         data: { targetRolePid: filePolicyRole.pid },

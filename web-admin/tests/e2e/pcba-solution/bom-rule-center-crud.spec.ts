@@ -33,13 +33,8 @@ test('engineering maintains header aliases and exact MPN alternatives with a con
   await ensureQuoteRoleUser(admin, engineer);
   for (let index = 0; index < 7; index++) {
     const part = index === 0 ? mpn : `GRM188R71H104KA${index}3D`;
-    const material = await executeCommand(admin, 'bom:create_material', {
-      bom_mm_material_code: `${marker}-${index}`, bom_mm_material_name: '贴片电容',
-      bom_mm_spec_model: `${part} 100nF ±10% 50V X7R 0603`,
-      bom_mm_category: 'capacitor', bom_mm_package: '0603', bom_mm_mpn: part,
-      bom_mm_brand: index === 0 ? 'YAGEO' : 'Murata', bom_mm_unit: 'PCS', bom_mm_enabled: true,
-    });
-    expect(material.success).toBe(true);
+    await createRecallableMaterial(admin, `${marker}-${index}`, 'capacitor',
+      `${part} 100nF ±10% 50V X7R 0603`, '0603', index === 0 ? 'YAGEO' : 'Murata', part);
   }
   const actor = await openQuoteRolePage(browser, engineer);
   const page = actor.page;
@@ -208,13 +203,14 @@ test.afterEach(async ({ page }) => {
 });
 
 /** Creates an independent, recallable fixture through the production material writer. */
-async function createRecallableMaterial(page: Page, code: string, category: string, spec: string, packageCode: string, brand = '') {
+async function createRecallableMaterial(page: Page, code: string, category: string, spec: string, packageCode: string, brand = '', mpn = '') {
   const journal = fixtureJournal(page);
   const result = await executeCommand(page, 'bom:create_material', {
     bom_mm_material_code: code,
     bom_mm_material_name: category === 'resistor' ? '贴片电阻' : '贴片电容',
     bom_mm_spec_model: spec, bom_mm_category: category, bom_mm_package: packageCode,
     bom_mm_unit: 'PCS', bom_mm_brand: brand, bom_mm_enabled: true,
+    ...(mpn ? { bom_mm_mpn: mpn } : {}),
   });
   expect(result.success).toBe(true);
   const rows = await queryDynamicRecords(page, 'bom_material_master', [

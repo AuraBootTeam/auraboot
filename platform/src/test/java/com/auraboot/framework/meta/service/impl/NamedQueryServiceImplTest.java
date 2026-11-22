@@ -41,6 +41,22 @@ import static org.mockito.Mockito.when;
 
 class NamedQueryServiceImplTest {
 
+    @Test
+    void publicQueryReadsKeepRootAuthorizationAndRowsInOneRepeatableReadSnapshot() {
+        var expected = java.util.Set.of("testQuery", "executeQuery", "exportData");
+        var checked = new java.util.HashSet<String>();
+        for (var method : NamedQueryServiceImpl.class.getDeclaredMethods()) {
+            if (!expected.contains(method.getName())) continue;
+            var boundary = method.getAnnotation(org.springframework.transaction.annotation.Transactional.class);
+            assertThat(boundary).as(method.getName()).isNotNull();
+            assertThat(boundary.readOnly()).isTrue();
+            assertThat(boundary.isolation())
+                    .isEqualTo(org.springframework.transaction.annotation.Isolation.REPEATABLE_READ);
+            checked.add(method.getName());
+        }
+        assertThat(checked).isEqualTo(expected);
+    }
+
     private final NamedQueryMapper namedQueryMapper = mock(NamedQueryMapper.class);
     private final NamedQueryFieldMapper namedQueryFieldMapper = mock(NamedQueryFieldMapper.class);
     private final NamedQueryVersionMapper namedQueryVersionMapper = mock(NamedQueryVersionMapper.class);
