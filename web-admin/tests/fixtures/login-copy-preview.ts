@@ -2,9 +2,13 @@
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { COMMUNITY_BRANDING } from '../../app/config/branding';
+import { BFF_URL } from '../helpers/environments';
 const seed = JSON.parse(readFileSync(new URL('../../../platform/src/main/resources/seed/i18n-base.json', import.meta.url), 'utf8'));
-const port = Number(process.env.BFF_PORT);
-if (!port) throw new Error('BFF_PORT must be explicitly configured for this isolated preview');
+const target = new URL(BFF_URL);
+const port = Number(target.port);
+if (target.protocol !== 'http:' || !['localhost', '127.0.0.1'].includes(target.hostname) || !port || port === 3500) {
+  throw new Error('Select an isolated loopback BFF URL through the central test environment contract; the shared host default is not allowed');
+}
 const stateFile = process.env.LOGIN_COPY_PREVIEW_STATE;
 createServer((req, res) => {
   res.setHeader('Content-Type', 'application/json');
