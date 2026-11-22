@@ -7,6 +7,7 @@ import { useAuth } from '~/contexts/AuthContext';
 import type { BlockConfig, DetailTabConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { BlockRenderer } from '@auraboot/runtime-kernel';
+import { LayoutRenderer } from '../layout/LayoutRenderer';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 
 export interface TabsBlockRendererProps {
@@ -59,7 +60,15 @@ export const TabsBlockRenderer: React.FC<TabsBlockRendererProps> = ({ block, run
 
       {/* Tab content */}
       <div className="mt-4">
-        {tabs[activeTab]?.blocks?.map((nestedBlock: BlockConfig, index: number) => (
+        {tabs[activeTab]?.layout ? (
+          <LayoutRenderer
+            layout={tabs[activeTab].layout}
+            blocks={tabs[activeTab].blocks || []}
+            renderBlock={(nestedBlock: BlockConfig) => (
+              <BlockRenderer block={nestedBlock} runtime={runtime} areaId={`tab-${activeTab}`} />
+            )}
+          />
+        ) : tabs[activeTab]?.blocks?.map((nestedBlock: BlockConfig, index: number) => (
           <BlockRenderer
             key={nestedBlock.id || index}
             block={nestedBlock}

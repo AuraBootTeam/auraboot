@@ -39,6 +39,27 @@ describe('TabsBlockRenderer mobile behavior', () => {
     access.allowed = true;
   });
 
+  it('applies the declared tab grid and stacks the same blocks below its compact breakpoint', () => {
+    const original = Object.getOwnPropertyDescriptor(window, 'innerWidth');
+    const runtime = { getContext: () => ({ locale: 'en' }) } as any;
+    const block = { id: 'grid-tabs', blockType: 'tabs', tabs: [{ key: 'one', label: 'One',
+      layout: { type: 'grid', cols: 12, compactCols: 1, compactBreakpoint: 900 },
+      blocks: [{ id: 'query', blockType: 'form', layout: { col: 0, colSpan: 5 } },
+        { id: 'actions', blockType: 'toolbar', layout: { col: 5, colSpan: 7 } }],
+    }] } as any;
+    try {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1280 });
+      const wide = render(<TabsBlockRenderer runtime={runtime} block={block} />);
+      expect(screen.getByTestId('grid-item-query')).toHaveStyle({ gridColumn: '1 / span 5' });
+      expect(screen.getByTestId('grid-item-actions')).toHaveStyle({ gridColumn: '6 / span 7' });
+      wide.unmount();
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 800 });
+      render(<TabsBlockRenderer runtime={runtime} block={block} />);
+      expect(screen.getByTestId('grid-item-query')).toHaveStyle({ gridColumn: 'span 1', gridRow: 'auto' });
+      expect(screen.getByTestId('grid-item-actions')).toHaveStyle({ gridColumn: 'span 1', gridRow: 'auto' });
+    } finally { if (original) Object.defineProperty(window, 'innerWidth', original); }
+  });
+
   it('keeps three business tabs horizontally scrollable and touch friendly', () => {
     const runtime = {
       getContext: () => ({ locale: 'zh-CN', t: (key: string) => key }),
