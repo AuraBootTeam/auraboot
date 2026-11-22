@@ -61,7 +61,7 @@ class BusinessArtifactAccessGuardTest {
         allowed = new BusinessGrantDecision(PermissionResult.allow(List.of()), 7L,20L,30L,"orders",PID,
                 List.of(new BusinessGrantDecision.Grant(1L, 2L, "orders.export", BusinessGrantDecision.Fields.legacy())));
         denied = new BusinessGrantDecision(PermissionResult.deny("denied", List.of()),7L,20L,30L,"orders",PID,List.of());
-        when(authorization.resolve(eq(30L), anyList(), eq("orders"), eq(root))).thenReturn(allowed);
+        when(authorization.resolveOwnedArtifact(any(), same(owner), eq(root))).thenReturn(allowed);
         when(authorization.resolveModelRead(30L, "orders", root)).thenReturn(denied);
         when(metadata.getModelFields("orders")).thenReturn(List.of(FieldDefinition.builder().code("export_file").dataType("file").build()));
         when(metadata.getModelDefinition("orders")).thenReturn(Optional.of(com.auraboot.framework.meta.dto.ModelDefinition.builder().code("orders").status("published").build()));
@@ -84,7 +84,7 @@ class BusinessArtifactAccessGuardTest {
         when(owner.businessCurrentArtifactFields()).thenReturn(Set.of("export_file"));
         var current=new java.util.HashMap<String,Object>(root);current.put("export_file",file.getPid());
         when(data.getByIdForAuthorization("orders",PID)).thenReturn(current);
-        when(authorization.resolve(eq(30L),anyList(),eq("orders"),eq(current))).thenReturn(allowed);
+        when(authorization.resolveOwnedArtifact(any(), same(owner), eq(current))).thenReturn(allowed);
         when(authorization.resolveModelRead(30L,"orders",current)).thenReturn(denied);
         guard.authorize(file);
         current.put("export_file","01ARZ3NDEKTSV4RRFFQ69G5FAX");
@@ -101,7 +101,7 @@ class BusinessArtifactAccessGuardTest {
     }
     @Test void creator_is_checked_against_current_authorization() {
         guard.authorize(file);
-        when(authorization.resolve(eq(30L), anyList(), eq("orders"), eq(root))).thenReturn(denied);
+        when(authorization.resolveOwnedArtifact(any(), same(owner), eq(root))).thenReturn(denied);
         assertThatThrownBy(() -> guard.authorize(file)).isInstanceOf(AccessDeniedException.class);
     }
     @Test void currentIntrinsicActorGateAlsoAppliesToPreviouslyGeneratedBytesAndModelReaders() {
@@ -113,13 +113,13 @@ class BusinessArtifactAccessGuardTest {
         guard.authorize(file);
         enabled.set(false);
         assertThatThrownBy(()->guard.authorize(file)).isInstanceOf(AccessDeniedException.class);
-        when(authorization.resolve(eq(30L),anyList(),eq("orders"),eq(root))).thenReturn(denied);
+        when(authorization.resolveOwnedArtifact(any(), same(owner), eq(root))).thenReturn(denied);
         when(authorization.resolveModelRead(30L,"orders",root)).thenReturn(allowed);
         assertThatThrownBy(()->guard.authorize(file)).isInstanceOf(AccessDeniedException.class);
     }
     @Test void a_valid_model_reader_does_not_need_the_generation_permission_or_creator_identity() {
         file.setCreatedBy(999L);
-        when(authorization.resolve(eq(30L), anyList(), eq("orders"), eq(root))).thenReturn(denied);
+        when(authorization.resolveOwnedArtifact(any(), same(owner), eq(root))).thenReturn(denied);
         when(authorization.resolveModelRead(30L, "orders", root)).thenReturn(allowed);
         guard.authorize(file);
         verify(projection).prepare(any(), same(owner));
@@ -155,11 +155,12 @@ class BusinessArtifactAccessGuardTest {
                 "handlerParams", Map.of("targetRecordAuthorization", "business", "targetRecordAction", "update", "dslPersistence", false))));
         var alternate = new BusinessGrantDecision(PermissionResult.allow(List.of()), 7L,20L,30L,"orders",PID,
                 List.of(new BusinessGrantDecision.Grant(4L, 5L, alternatives.getLast(), BusinessGrantDecision.Fields.legacy())));
-        when(authorization.resolve(eq(30L), anyList(), eq("orders"), eq(root))).thenAnswer(invocation ->
-                invocation.<List<String>>getArgument(1).contains(alternatives.getLast()) ? alternate : denied);
+        when(authorization.resolveOwnedArtifact(any(), same(owner), eq(root))).thenAnswer(invocation ->
+                ((List<?>)invocation.<com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext>getArgument(0)
+                        .getExecConfig().get("permissions")).contains(alternatives.getLast()) ? alternate : denied);
         guard.authorize(file);
-        verify(authorization).resolve(30L, alternatives, "orders", root);
-        when(authorization.resolve(eq(30L), anyList(), eq("orders"), eq(root))).thenReturn(denied);
+        verify(authorization).resolveOwnedArtifact(argThat(context->alternatives.equals(context.getExecConfig().get("permissions"))),same(owner),eq(root));
+        when(authorization.resolveOwnedArtifact(any(), same(owner), eq(root))).thenReturn(denied);
         assertThatThrownBy(() -> guard.authorize(file)).isInstanceOf(AccessDeniedException.class);
     }
     @Test void hidden_file_reference_and_its_mask_block_bytes_even_when_other_sources_are_visible() {

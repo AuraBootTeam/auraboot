@@ -154,18 +154,48 @@ public class BusinessCommandRecordAuthorization {
             com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext context,
             com.auraboot.framework.plugin.extension.BusinessResourceAuthorization owner,
             Map<String,Object> record) {
-        if (context == null || owner == null || context.getRequest() == null || context.getCommand() == null
-                || !Objects.equals(context.getTenantId(), MetaContext.getCurrentTenantId())
-                || !Objects.equals(context.getUserId(), MetaContext.getCurrentUserId())
-                || record == null || !Objects.equals(context.getRequest().getTargetRecordId(), record.get("pid")))
-            throw new org.springframework.security.access.AccessDeniedException("Business owner target context differs");
-        var codes = com.auraboot.framework.plugin.pf4j.BusinessResourcePermissionContract.require(context, owner);
+        var codes = ownedTargetCodes(context, owner, record);
         String duty = context.getAuthorizationVerdict().permissionCode();
         if (DomainPermissionPolicy.models(snapshots.resolvePermissionDefinition(MetaContext.getCurrentTenantId(), duty)).isEmpty())
             throw new org.springframework.security.access.AccessDeniedException("An admitted domain duty is required");
         var boundary = owner.businessBoundary();
         return resolveInternal(MetaContext.getCurrentMemberId(), codes, boundary.rootModel(), record,
                 boundary.targetAction(), false, duty);
+    }
+
+    /** A stamped artifact consumes declared reads, not a command execution or a root mutation permit. */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public BusinessGrantDecision resolveOwnedArtifact(
+            com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext context,
+            com.auraboot.framework.plugin.extension.BusinessResourceAuthorization owner,
+            Map<String,Object> record) {
+        var codes = ownedTargetCodes(context, owner, record);
+        if (owner.businessArtifactFields().isEmpty())
+            throw new org.springframework.security.access.AccessDeniedException("An artifact owner is required");
+        String model = owner.businessBoundary().rootModel();Long member = MetaContext.getCurrentMemberId();
+        var grants = new LinkedHashMap<List<Object>, BusinessGrantDecision.Grant>();
+        var trace = new ArrayList<EvaluationStep>();
+        for (String code : codes) {
+            boolean domain = !DomainPermissionPolicy.models(snapshots.resolvePermissionDefinition(MetaContext.getCurrentTenantId(), code)).isEmpty();
+            var result = resolveInternal(member, List.of(code), model, record, domain ? "read" : null, false, domain ? code : null);
+            trace.addAll(result.result().steps());
+            if (result.result().granted()) for (var grant : result.grants())
+                grants.put(List.of(grant.grantId(), grant.roleId(), grant.permissionCode()), grant);
+        }
+        return decision(grants.isEmpty() ? denied("No complete artifact read grant permits this target", trace)
+                : PermissionResult.allow(List.copyOf(trace)), member, model, record, List.copyOf(grants.values()));
+    }
+
+    private List<String> ownedTargetCodes(
+            com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext context,
+            com.auraboot.framework.plugin.extension.BusinessResourceAuthorization owner,
+            Map<String,Object> record) {
+        if (context == null || owner == null || context.getRequest() == null || context.getCommand() == null
+                || !Objects.equals(context.getTenantId(), MetaContext.getCurrentTenantId())
+                || !Objects.equals(context.getUserId(), MetaContext.getCurrentUserId())
+                || record == null || !Objects.equals(context.getRequest().getTargetRecordId(), record.get("pid")))
+            throw new org.springframework.security.access.AccessDeniedException("Business owner target context differs");
+        return com.auraboot.framework.plugin.pf4j.BusinessResourcePermissionContract.require(context, owner);
     }
 
     /** Resolve a complete generated model-read grant for an artifact reader, without an execution permit. */

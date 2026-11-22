@@ -128,6 +128,35 @@ class BusinessCommandRecordAuthorizationTest {
         assertThat(authorization.resolveOwnedTarget(fixture.context(),fixture.owner(),row).result().granted()).isFalse();
     }
 
+    @Test void ownedArtifactUsesDeclaredReadScopeWithoutMutationOrExecutionAuthority() {
+        var fixture=ownedTarget();var row=record(1,"Shanghai");
+        when(fixture.owner().businessArtifactFields()).thenReturn(Map.of("contract_file",1024));
+        var definition=permission(CODE);definition.setAction("write");
+        definition.setExtension(Map.of("domainModels",Map.of("source",List.of("read")),"commandEffects",Map.of(MODEL,List.of("read"))));
+        when(snapshots.resolvePermissionDefinition(100L,CODE)).thenReturn(definition);
+        when(scopes.resolveObjectBoundScopeForRole(5L,101L,MODEL,"read",MODEL)).thenReturn(DataScopeCondition.all());
+        assertThat(authorization.resolveOwnedArtifact(fixture.context(),fixture.owner(),row).result().granted()).isTrue();
+        assertThat(authorization.resolveOwnedTarget(fixture.context(),fixture.owner(),row).result().granted()).isFalse();
+        assertThat(authorization.resolveNative(5L,List.of(CODE),MODEL,row,"update").result().granted()).isFalse();
+        assertThat(MetaContext.hasCommandPermitScope()).isFalse();assertThat(MetaContext.getCommandAuthority()).isNull();
+        assertThat(MetaContext.getAuthorizedCommandCode()).isNull();
+        when(scopes.resolveObjectBoundScopeForRole(5L,101L,MODEL,"read",MODEL)).thenReturn(DataScopeCondition.none());
+        assertThat(authorization.resolveOwnedArtifact(fixture.context(),fixture.owner(),row).result().granted()).isFalse();
+    }
+
+    @Test void artifactDeclarationsCannotReplaceAReadEffectOrAnEffectiveGrant() {
+        var fixture=ownedTarget();var row=record(1,"Shanghai");
+        assertThatThrownBy(()->authorization.resolveOwnedArtifact(fixture.context(),fixture.owner(),row))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        when(fixture.owner().businessArtifactFields()).thenReturn(Map.of("contract_file",1024));
+        assertThat(authorization.resolveOwnedArtifact(fixture.context(),fixture.owner(),row).result().granted()).isFalse();
+        var definition=permission(CODE);definition.setAction("write");
+        definition.setExtension(Map.of("domainModels",Map.of("source",List.of("read")),"commandEffects",Map.of(MODEL,List.of("read"))));
+        when(snapshots.resolvePermissionDefinition(100L,CODE)).thenReturn(definition);
+        var denied=grant(11,101,CODE);denied.setGrantType("deny");grants(denied);
+        assertThat(authorization.resolveOwnedArtifact(fixture.context(),fixture.owner(),row).result().granted()).isFalse();
+    }
+
     @Test void retiredGeneratedModelBindingsRemainFieldConstraintsWithoutSupplyingOperationAuthority() {
         var definition = permission(CODE); definition.setResourceCode("domain"); definition.setAction("write");
         definition.setExtension(Map.of("domainModels", Map.of(MODEL, List.of("read", "update"))));
