@@ -1334,33 +1334,33 @@
   },
   {
     "key": "auth.feature.aiAgent",
-    "zh-CN": "配置即 AI",
-    "en-US": "Config is AI"
+    "zh-CN": "AI 业务助手",
+    "en-US": "AI assistant"
   },
   {
     "key": "auth.feature.aiAgent.desc",
-    "zh-CN": "Agent 在租户内调用全部业务命令",
-    "en-US": "Agents call every business command in your tenant"
+    "zh-CN": "在权限范围内查询数据、整理草稿和办理业务",
+    "en-US": "Query data, prepare drafts and carry out authorized actions"
   },
   {
     "key": "auth.feature.dataModel",
-    "zh-CN": "建模即数据",
-    "en-US": "Models are data"
+    "zh-CN": "数据模型",
+    "en-US": "Data models"
   },
   {
     "key": "auth.feature.dataModel.desc",
-    "zh-CN": "动态模型 + 字段级权限审计",
-    "en-US": "Dynamic models + field-level permission audit"
+    "zh-CN": "定义业务对象、字段和关联关系",
+    "en-US": "Define business objects, fields and relationships"
   },
   {
     "key": "auth.feature.designer",
-    "zh-CN": "拖拽即页面",
-    "en-US": "Pages by drag"
+    "zh-CN": "业务页面",
+    "en-US": "Business pages"
   },
   {
     "key": "auth.feature.designer.desc",
-    "zh-CN": "可视化设计器,零代码上线",
-    "en-US": "Visual designer, ship with zero code"
+    "zh-CN": "用现成组件搭建页面，按业务需要微调",
+    "en-US": "Build pages with existing components and adjust them to your needs"
   },
   {
     "key": "auth.feature.multiPlatform",
@@ -1384,13 +1384,13 @@
   },
   {
     "key": "auth.feature.workflow",
-    "zh-CN": "画布即流程",
-    "en-US": "Canvas is flow"
+    "zh-CN": "规则与审批",
+    "en-US": "Rules and approvals"
   },
   {
     "key": "auth.feature.workflow.desc",
-    "zh-CN": "BPMN 编排 + 规则引擎自动执行",
-    "en-US": "BPMN orchestration + rules engine auto-run"
+    "zh-CN": "配置审批流程、判断条件和处理时限",
+    "en-US": "Set approval steps, conditions and time limits"
   },
   {
     "key": "auth.forgotPassword",
@@ -1539,43 +1539,43 @@
   },
   {
     "key": "auth.badge",
-    "zh-CN": "AI 原生 · 企业应用运行时",
-    "en-US": "AI-native application runtime"
+    "zh-CN": "企业应用平台",
+    "en-US": "Business application platform"
   },
   {
     "key": "auth.headline.pre",
-    "zh-CN": "配置即应用,",
-    "en-US": "Configuration ships the app."
+    "zh-CN": "内置成体系，",
+    "en-US": "Built-in essentials,"
   },
   {
     "key": "auth.headline.em",
-    "zh-CN": "AI 即战力",
-    "en-US": "AI"
+    "zh-CN": "定制有空间",
+    "en-US": "room to customize"
   },
   {
     "key": "auth.headline.post",
     "zh-CN": "",
-    "en-US": "is the workforce."
+    "en-US": ""
   },
   {
     "key": "auth.lead",
-    "zh-CN": "把每个业务能力沉淀为命令——人能点、AI 能调、全端可交付。",
-    "en-US": "Every business capability becomes a command — clicked by people, called by AI, delivered to every device."
+    "zh-CN": "把工程经验做进底座，让人和 AI 专注业务。",
+    "en-US": "Engineering experience, built into the foundation. Let people and AI focus on the business."
   },
   {
     "key": "auth.pillar.model",
-    "zh-CN": "模型驱动",
-    "en-US": "Model-driven"
+    "zh-CN": "数据与页面",
+    "en-US": "Data and pages"
   },
   {
     "key": "auth.pillar.command",
-    "zh-CN": "命令治理",
-    "en-US": "Command-governed"
+    "zh-CN": "规则与流程",
+    "en-US": "Rules and workflows"
   },
   {
     "key": "auth.pillar.plugin",
-    "zh-CN": "全端交付",
-    "en-US": "Omni-channel delivery"
+    "zh-CN": "插件与扩展",
+    "en-US": "Plugins and extensions"
   },
   {
     "key": "auth.ssoLogin",
@@ -6793,5 +6793,65 @@
     "key": "roleGrantFields.enableObjectPreview",
     "zh-CN": "为已选职责启用此对象；仍受记录范围约束，只允许选中的字段。",
     "en-US": "Enable this object under the selected duty. Record scope still applies; only selected fields are allowed."
+  },
+  {
+    "key": "auth.capability.build",
+    "zh-CN": "搭得快，改得动",
+    "en-US": "Build faster, adapt easily"
+  },
+  {
+    "key": "auth.capability.build.desc",
+    "zh-CN": "AI、Skills 与 DSL 协同搭建，现成组件复用，设计器随时微调。",
+    "en-US": "Build with AI, Skills and DSL. Reuse components and refine pages in the designer."
+  },
+  {
+    "key": "auth.capability.workflow",
+    "zh-CN": "有规则，有闭环",
+    "en-US": "Set rules, follow through"
+  },
+  {
+    "key": "auth.capability.workflow.desc",
+    "zh-CN": "规则引擎、审批、SLA 与自动化协同，串起业务处理全过程。",
+    "en-US": "Connect rules, approvals, SLA tracking and automation from submission to completion."
+  },
+  {
+    "key": "auth.capability.insight",
+    "zh-CN": "看全局，查明细",
+    "en-US": "See the big picture, explore the details"
+  },
+  {
+    "key": "auth.capability.insight.desc",
+    "zh-CN": "看板掌握进展，报告梳理结果，关键数据追到原始单据。",
+    "en-US": "Track progress in dashboards, review reports and trace key figures to source records."
+  },
+  {
+    "key": "auth.capability.agent",
+    "zh-CN": "懂业务，能办事",
+    "en-US": "Understand the work, get it done"
+  },
+  {
+    "key": "auth.capability.agent.desc",
+    "zh-CN": "Agent 连接知识、工具和业务命令，在权限与确认机制下执行任务。",
+    "en-US": "Connect knowledge, tools and business commands. Execute tasks with permissions and confirmation."
+  },
+  {
+    "key": "auth.capability.extend",
+    "zh-CN": "可复用，能扩展",
+    "en-US": "Reuse the essentials, extend what matters"
+  },
+  {
+    "key": "auth.capability.extend.desc",
+    "zh-CN": "从按钮、组件到页面和业务命令，按需定制，通过插件与 API 连接系统。",
+    "en-US": "Customize buttons, components, pages and commands. Connect systems through plugins and APIs."
+  },
+  {
+    "key": "auth.capability.security",
+    "zh-CN": "分权限，可追溯",
+    "en-US": "Control access, trace actions"
+  },
+  {
+    "key": "auth.capability.security.desc",
+    "zh-CN": "多租户与细粒度权限管理访问范围，审计与 Trace 记录执行过程。",
+    "en-US": "Scope access by tenant and permission. Review execution with audit records and traces."
   }
 ]
