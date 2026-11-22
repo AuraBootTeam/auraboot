@@ -40,6 +40,8 @@ public class CommandAuthorizationPhase implements CommandPhase {
     private final UserPermissionService userPermissionService;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.auraboot.framework.permission.service.DomainCommandAuthorization domains;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.plugin.pf4j.ExtensionRegistry extensions;
     private final RecordShareService recordShareService;
     private final ObjectProvider<DynamicDataService> dynamicDataServiceProvider;
 
@@ -84,7 +86,7 @@ public class CommandAuthorizationPhase implements CommandPhase {
         }
 
         if (domains != null && requiredPermissions.stream().anyMatch(domains::isDomain)
-                && (requiredPermissions.size() != 1 || ctx.getUserId() == null
+                && ((requiredPermissions.size() != 1 && !declaresBusinessAlternatives(ctx, requiredPermissions)) || ctx.getUserId() == null
                     || !java.util.Objects.equals(ctx.getUserId(), MetaContext.getCurrentUserId())
                     || !java.util.Objects.equals(ctx.getTenantId(), MetaContext.getCurrentTenantId()))) {
             applyVerdict(ctx, CommandAuthorizationVerdict.denied(requiredPermissions));
@@ -137,6 +139,28 @@ public class CommandAuthorizationPhase implements CommandPhase {
         applyVerdict(ctx, CommandAuthorizationVerdict.denied(requiredPermissions));
         throw new BusinessException(ResponseCode.FORBIDDEN,
                 "Command permission denied: required one of " + String.join(", ", requiredPermissions));
+    }
+
+    /** Alternatives must come from the immutable resource owner, never mutable command metadata alone. */
+    private boolean declaresBusinessAlternatives(CommandPipelineContext ctx, List<String> permissions) {
+        if (extensions == null || ctx.getCommand() == null || ctx.getRequest() == null
+                || permissions.size() < 2 || permissions.size() > 128
+                || new java.util.HashSet<>(permissions).size() != permissions.size()
+                || !permissions.stream().allMatch(domains::isDomain)) return false;
+        var owner = extensions.getBusinessResourceOwner(ctx.getCommandCode()).orElse(null);
+        if (!(owner instanceof com.auraboot.framework.plugin.extension.BusinessResourceAuthorization resource)
+                || resource.businessActorAuthorization() == null) return false;
+        var boundary = resource.businessBoundary();
+        Object raw = ctx.getExecConfig().get("handlerParams");
+        return boundary != null && boundary.commandCode().equals(ctx.getCommandCode())
+                && ctx.getCommandCode().equals(ctx.getCommand().getCode())
+                && boundary.rootModel().equals(ctx.getCommand().getModelCode())
+                && boundary.permissions().equals(new java.util.HashSet<>(permissions))
+                && raw instanceof java.util.Map<?, ?> params
+                && "custom".equals(ctx.getExecConfig().get("type"))
+                && "business".equals(params.get("targetRecordAuthorization"))
+                && boundary.targetAction().equals(params.get("targetRecordAction"))
+                && Boolean.FALSE.equals(params.get("dslPersistence"));
     }
 
     /**

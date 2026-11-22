@@ -335,4 +335,76 @@ class CommandAuthorizationPhaseTest {
                 .execConfig(execConfig)
                 .build();
     }
+
+    private CommandAuthorizationPhase businessAlternatives(CommandPipelineContext ctx) {
+        var domains = org.mockito.Mockito.mock(com.auraboot.framework.permission.service.DomainCommandAuthorization.class);
+        var registry = org.mockito.Mockito.mock(com.auraboot.framework.plugin.pf4j.ExtensionRegistry.class);
+        var handler = org.mockito.Mockito.mock(com.auraboot.framework.plugin.extension.CommandHandlerExtension.class,
+                org.mockito.Mockito.withSettings().extraInterfaces(com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.class));
+        var resource = (com.auraboot.framework.plugin.extension.BusinessResourceAuthorization) handler;
+        org.mockito.Mockito.lenient().when(domains.isDomain(org.mockito.ArgumentMatchers.anyString())).thenReturn(true);
+        org.mockito.Mockito.lenient().when(domains.authorize(org.mockito.ArgumentMatchers.anyString())).thenReturn(false);
+        org.mockito.Mockito.lenient().when(registry.getBusinessResourceOwner(ctx.getCommandCode())).thenReturn(java.util.Optional.of(handler));
+        org.mockito.Mockito.lenient().when(resource.businessBoundary()).thenReturn(new com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.Boundary(
+                ctx.getCommandCode(), "purchase_order", "update", java.util.Set.of("buyer.use", "supplier.use")));
+        org.mockito.Mockito.lenient().when(resource.businessActorAuthorization()).thenReturn(
+                org.mockito.Mockito.mock(com.auraboot.framework.plugin.extension.BusinessActorAuthorization.class));
+        var command = new CommandDefinition(); command.setCode(ctx.getCommandCode()); command.setModelCode("purchase_order"); ctx.setCommand(command);
+        ctx.getExecConfig().put("type", "custom");
+        ctx.getExecConfig().put("handlerParams", Map.of("targetRecordAuthorization", "business", "targetRecordAction", "update", "dslPersistence", false));
+        var phase = phase();
+        org.springframework.test.util.ReflectionTestUtils.setField(phase, "domains", domains);
+        org.springframework.test.util.ReflectionTestUtils.setField(phase, "extensions", registry);
+        return phase;
+    }
+
+    @Test void immutableBusinessAlternativesRecordOnlyTheActuallyGrantedDomain() {
+        var ctx = contextWithPermissions(List.of("buyer.use", "supplier.use"), 42L);
+        var phase = businessAlternatives(ctx);
+        var domains = (com.auraboot.framework.permission.service.DomainCommandAuthorization)
+                org.springframework.test.util.ReflectionTestUtils.getField(phase, "domains");
+        when(domains.authorize("buyer.use")).thenReturn(false);
+        when(domains.authorize("supplier.use")).thenReturn(true);
+        MetaContext.setContext(1L, 42L, "actor", "Test actor");
+        try {
+            phase.execute(ctx);
+            assertThat(ctx.getAuthorizationVerdict().permissionCode()).isEqualTo("supplier.use");
+            verifyNoInteractions(userPermissionService, recordShareService);
+        } finally { MetaContext.clear(); }
+    }
+
+    @Test void businessAlternativesCannotBypassEitherDomainDenial() {
+        var ctx = contextWithPermissions(List.of("buyer.use", "supplier.use"), 42L);
+        var phase = businessAlternatives(ctx);
+        MetaContext.setContext(1L, 42L, "actor", "Test actor");
+        try {
+            assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(BusinessException.class);
+            assertThat(ctx.getAuthorizationVerdict().isAuthorized()).isFalse();
+            verifyNoInteractions(userPermissionService, recordShareService);
+        } finally { MetaContext.clear(); }
+    }
+
+    @Test void mutableOrUnownedAlternativesNeverReachDomainAuthorization() {
+        for (String mutation : List.of("owner", "actor", "permissions", "model", "action", "persistence", "tenant", "user")) {
+            var ctx = contextWithPermissions(List.of("buyer.use", "supplier.use"), 42L);
+            var phase = businessAlternatives(ctx);
+            var registry = (com.auraboot.framework.plugin.pf4j.ExtensionRegistry)
+                    org.springframework.test.util.ReflectionTestUtils.getField(phase, "extensions");
+            var domains = (com.auraboot.framework.permission.service.DomainCommandAuthorization)
+                    org.springframework.test.util.ReflectionTestUtils.getField(phase, "domains");
+            if (mutation.equals("owner")) when(registry.getBusinessResourceOwner(ctx.getCommandCode())).thenReturn(java.util.Optional.empty());
+            if (mutation.equals("actor")) when(((com.auraboot.framework.plugin.extension.BusinessResourceAuthorization)
+                    registry.getBusinessResourceOwner(ctx.getCommandCode()).orElseThrow()).businessActorAuthorization()).thenReturn(null);
+            if (mutation.equals("permissions")) ctx.getExecConfig().put("permissions", List.of("buyer.use", "other.use"));
+            if (mutation.equals("model")) ctx.getCommand().setModelCode("other_model");
+            if (mutation.equals("action")) ctx.getExecConfig().put("handlerParams", Map.of("targetRecordAuthorization", "business", "targetRecordAction", "delete", "dslPersistence", false));
+            if (mutation.equals("persistence")) ctx.getExecConfig().put("handlerParams", Map.of("targetRecordAuthorization", "business", "targetRecordAction", "update", "dslPersistence", true));
+            MetaContext.setContext(mutation.equals("tenant") ? 2L : 1L, mutation.equals("user") ? 43L : 42L, "actor", "Test actor");
+            try {
+                assertThatThrownBy(() -> phase.execute(ctx)).as(mutation).isInstanceOf(BusinessException.class);
+                verify(domains, never()).authorize(org.mockito.ArgumentMatchers.anyString());
+                verifyNoInteractions(userPermissionService, recordShareService);
+            } finally { MetaContext.clear(); }
+        }
+    }
 }
