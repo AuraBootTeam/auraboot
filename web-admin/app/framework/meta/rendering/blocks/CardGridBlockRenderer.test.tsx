@@ -118,6 +118,19 @@ const sampleRows = [
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+describe('card-grid configured read failures', () => {
+  it('uses authored feedback without leaking the native error and retries only its own read', () => {
+    const runtime=makeRuntime({state:{error:new Error('private transport detail'),data:null}});
+    runtime._dataSourceManager.reload.mockResolvedValue(undefined);
+    render(<CardGridBlockRenderer runtime={runtime as any} block={{...baseBlock,states:{error:{title:{'zh-CN':'同步状态读取失败'},description:{'zh-CN':'请重试，若仍失败请联系管理员。'}},retry:{title:{'zh-CN':'重试读取'}}}} as any} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('同步状态读取失败');
+    expect(screen.getByRole('alert')).not.toHaveTextContent('private transport detail');
+    fireEvent.click(screen.getByRole('button',{name:'重试读取'}));
+    expect(runtime._dataSourceManager.reload).toHaveBeenCalledExactlyOnceWith('templates');
+    expect(mockHandleAction).not.toHaveBeenCalled();
+  });
+});
+
 describe('CardGridBlockRenderer', () => {
   beforeEach(() => {
     mockHandleAction.mockReset();

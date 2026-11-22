@@ -252,6 +252,8 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   if (dataSourceState?.error || parentState?.error) {
     const sourceError = (dataSourceState?.error || parentState?.error) as Error & {status?:unknown;statusCode?:unknown;code?:unknown};
     const status = Number(sourceError.status ?? sourceError.statusCode ?? sourceError.code);
+    const stateConfig = cfg.states?.[String(status)] ?? cfg.states?.error;
+    const failedSourceId = parentState?.error ? parentConfig?.dataSource : dataSourceId;
     const message =
       status === 403
         ? rootT('forbidden', resolveErrorLocale(locale))
@@ -264,7 +266,16 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
         data-testid="card-grid-error"
         className="rounded-control bg-status-red-bg text-status-red border border-status-red p-3 text-sm"
       >
-        {message || t('common.loadError')}
+        {stateConfig ? <>
+          <p className="font-semibold">{getLocalizedText(stateConfig.title, locale, t)}</p>
+          {stateConfig.description && <p className="mt-1">{getLocalizedText(stateConfig.description, locale, t)}</p>}
+          {failedSourceId && <button type="button" data-testid="card-grid-error-retry"
+            disabled={Boolean(dataSourceState?.loading || parentState?.loading)}
+            className="border-border bg-panel text-text mt-3 rounded-md border px-3 py-1.5 text-sm font-medium"
+            onClick={() => { void dataSourceManager.reload(failedSourceId).catch((failure: unknown) => console.error('Card grid read retry failed', failure)); }}>
+            {cfg.states?.retry?.title ? getLocalizedText(cfg.states.retry.title, locale, t) : t('common.retry')}
+          </button>}
+        </> : message || t('common.loadError')}
       </div>
     );
   }
