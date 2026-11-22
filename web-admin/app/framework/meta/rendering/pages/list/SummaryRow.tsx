@@ -14,6 +14,7 @@
  * Spec: auraboot-enterprise/docs/standards/core/ux-design-system.md §3.
  */
 import React, { useMemo } from 'react';
+import { COMPACT_COLUMN_WIDTH } from './responsiveColumnWidths';
 import type { ColumnConfig } from '~/framework/meta/schemas/types';
 import {
   aggregateColumn,
@@ -133,7 +134,7 @@ export function SummaryRow({
             return (
               <td
                 key={column.field}
-                className={`text-text-3 ${compact ? 'px-3' : 'px-6'} py-2 whitespace-nowrap ${
+                className={`text-text-3 ${compact || width < COMPACT_COLUMN_WIDTH ? 'px-3' : 'px-6'} py-2 whitespace-nowrap ${
                   isLabelCell ? 'text-left' : ''
                 }`}
                 style={{ width: `${width}px`, maxWidth: `${width}px` }}
@@ -147,7 +148,7 @@ export function SummaryRow({
           return (
             <td
               key={column.field}
-              className={`${compact ? 'px-3' : 'px-6'} py-2 whitespace-nowrap tabular-nums ${alignClass}`}
+              className={`${compact || width < COMPACT_COLUMN_WIDTH ? 'px-3' : 'px-6'} py-2 whitespace-nowrap tabular-nums ${alignClass}`}
               style={{ width: `${width}px`, maxWidth: `${width}px` }}
               data-testid={`summary-cell-${column.field}`}
               data-aggregate={cell.kind}

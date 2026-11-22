@@ -1,5 +1,8 @@
 import type { ColumnConfig } from '~/framework/meta/schemas/types';
 
+/** Compact padding leaves room for business labels, status dots and full timestamps. */
+export const COMPACT_COLUMN_WIDTH = 200;
+
 function hasFixedWidth(column: ColumnConfig, saved: Record<string, number>): boolean {
   const value = Number(saved[column.field] ?? column.width);
   return Number.isFinite(value) && value > 0;
@@ -32,15 +35,17 @@ export function fitDefaultColumnWidths(
   const total = columns.reduce((sum, column) => sum + widths[column.field], 0);
   const deficit = total - availableDataWidth;
   if (deficit <= 0) return widths;
-  const flexible = columns.filter(column => !hasFixedWidth(column, savedWidths));
+  const flexible = columns.filter((column) => !hasFixedWidth(column, savedWidths));
   const capacity = (column: ColumnConfig) =>
     Math.max(0, widths[column.field] - defaultColumnFloor(column));
   const totalCapacity = flexible.reduce((sum, column) => sum + capacity(column), 0);
   if (totalCapacity <= 0) return widths;
   const reduction = Math.min(deficit, totalCapacity);
   for (const column of flexible) {
-    widths[column.field] = Math.max(Math.min(widths[column.field], defaultColumnFloor(column)),
-      Math.floor(widths[column.field] - reduction * capacity(column) / totalCapacity));
+    widths[column.field] = Math.max(
+      Math.min(widths[column.field], defaultColumnFloor(column)),
+      Math.floor(widths[column.field] - (reduction * capacity(column)) / totalCapacity),
+    );
   }
   return widths;
 }

@@ -12,6 +12,7 @@ import React, { useCallback } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { SortIndicator } from './SortIndicator';
+import { COMPACT_COLUMN_WIDTH } from './responsiveColumnWidths';
 import { ColumnResizeHandle } from '~/framework/smart/components/view/ColumnResizeHandle';
 import type { ColumnConfig } from '~/framework/meta/schemas/types';
 
@@ -63,7 +64,7 @@ export const DraggableColumnHeader = React.memo(function DraggableColumnHeader({
             ? parseInt(column.width, 10) || 100
             : 100;
 
-  const compactHeader = compact || currentWidth < 160;
+  const compactHeader = compact || currentWidth < COMPACT_COLUMN_WIDTH;
 
   const handleSortClick = useCallback(
     (e: React.MouseEvent) => {
