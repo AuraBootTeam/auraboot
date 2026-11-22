@@ -3,7 +3,7 @@ import { createWriteStream, readFileSync, statSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { test, expect } from '../../fixtures';
 import { ensureQuoteRoleUser, makeQuoteRoleUser, openQuoteRolePage, openQuoteDetailFromList,
-  seedBomPriceManualReviewQuote, seedDownloadableQuote, openPgClient, type QuoteRoleUser } from './quote-e2e-helpers';
+  seedBomPriceManualReviewQuote, seedQuoteForCorrectedBomUpload, seedDownloadableQuote, openPgClient, type QuoteRoleUser } from './quote-e2e-helpers';
 import { saveWorkbookDownload } from './workbook-download-evidence';
 import { validateQuoteWorkbook } from './quote-workbook-assertions';
 
@@ -344,9 +344,10 @@ test('quote sharing release gate: multiple members, role access and revocation t
     expect(foreignCapabilities.status()).toBe(200);
     const declared = (await foreignCapabilities.json()).data.flatMap((group: { capabilities: Array<{ code: string; granted: boolean; conventionDerived: boolean }> }) => group.capabilities)
       .filter((capability: { conventionDerived: boolean }) => !capability.conventionDerived);
-    const fixtureLevels = ['qo.cap.read', 'qo.cap.write'];
+    const fixtureLevels = ['crm.cap.account', 'bom.cap.read', 'bom.cap.write', 'qo.cap.read', 'qo.cap.write'];
     for (const code of fixtureLevels) expect(declared.some((capability: { code: string }) => capability.code === code), code).toBe(true);
-    // Configure only the new fixture's Quote duties. Replaying wildcard-derived
+    // Configure only the CRM/BOM/Quote duties used to create this fixture's own
+    // quote and linked project. Replaying wildcard-derived
     // capabilities from unrelated products may reference uninstalled definitions.
     const explicitRead = await foreign.page.request.put(capabilityUrl, { data: fixtureLevels });
     expect(explicitRead.status()).toBe(200);
@@ -394,7 +395,7 @@ test('quote sharing release gate: multiple members, role access and revocation t
     }), contentType: 'application/json' });
     // A valid own-record read prevents an uninitialized foreign product or a
     // blanket-deny session from masquerading as tenant isolation.
-    const foreignOwned = await seedBomPriceManualReviewQuote(foreign.page);
+    const foreignOwned = await seedQuoteForCorrectedBomUpload(foreign.page);
     const ownRead = await foreign.page.request.get(`/api/dynamic/qo_quote_common/${foreignOwned.quoteId}`);
     expect(ownRead.status()).toBe(200);
     expect((await ownRead.json()).data.qo_quote_code).toBe(foreignOwned.quoteCode);
