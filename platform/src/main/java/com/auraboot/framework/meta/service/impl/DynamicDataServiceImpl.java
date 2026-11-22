@@ -1011,6 +1011,13 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         // 检查表是否存在，如果不存在则自动创建
         ensureTableExists(modelCode);
 
+        // Match the host schema's initial lock version before required-field validation.
+        // submittedInput remains the caller's original payload for immutable-field authorization.
+        if (model.getFields().stream().anyMatch(field -> "row_version".equals(field.getCode()))) {
+            data = new HashMap<>(data);
+            data.putIfAbsent("row_version", 1);
+        }
+
         // Normalize temporal string values to typed objects (LocalDate/Instant) before validation
         payloadTemporalNormalizer.normalize(data, model);
         // 使用验证服务的严格模式进行验证
