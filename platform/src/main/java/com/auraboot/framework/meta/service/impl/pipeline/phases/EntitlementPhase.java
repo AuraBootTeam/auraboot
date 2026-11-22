@@ -53,6 +53,19 @@ public class EntitlementPhase implements CommandPhase {
         }
 
         String entitlementPluginId = resolveEntitlementPluginId(ctx, modelCode);
+        String requiredFeature = ctx.getCommand().getRequiredFeature();
+        if (entitlementPluginId == null) {
+            // Tenant-authored native models have no plugin license. This gate
+            // abstains; command, model, record and field authorization still apply.
+            if (requiredFeature != null && !requiredFeature.isEmpty()) {
+                ctx.recordPhaseDecision(
+                        CommandPermitPlan.PhaseDecision.deny(REASON_FEATURE_ENTITLEMENT_REQUIRED, name()));
+                throw new BusinessException(ResponseCode.FORBIDDEN,
+                        "Feature entitlement requires a plugin owner: " + requiredFeature);
+            }
+            ctx.recordPhaseDecision(CommandPermitPlan.PhaseDecision.abstain(name()));
+            return;
+        }
 
         if (!entitlementChecker.isPluginActive(entitlementPluginId)) {
             // A gate: entitlement can refuse, but never grants. Record the refusal for the permit
@@ -63,7 +76,6 @@ public class EntitlementPhase implements CommandPhase {
                     "Plugin entitlement required for command: " + ctx.getCommandCode());
         }
 
-        String requiredFeature = ctx.getCommand().getRequiredFeature();
         if (requiredFeature != null && !requiredFeature.isEmpty()) {
             if (!entitlementChecker.hasFeature(entitlementPluginId, requiredFeature)) {
                 ctx.recordPhaseDecision(
@@ -85,6 +97,10 @@ public class EntitlementPhase implements CommandPhase {
             Model model = metaModelMapper.findCurrentByCodeForTenant(ctx.getTenantId(), modelCode);
             if (model != null) {
                 pluginPid = model.getPluginPid();
+                if (!StringUtils.hasText(pluginPid) && ctx.getTenantId() != null
+                        && java.util.Objects.equals(ctx.getTenantId(), model.getTenantId())) {
+                    return null;
+                }
             }
         }
         if (StringUtils.hasText(pluginPid)) {

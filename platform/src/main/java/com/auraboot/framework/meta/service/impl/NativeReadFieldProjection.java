@@ -42,8 +42,9 @@ public class NativeReadFieldProjection {
             // the owning transaction's view is exactly what handler-side validation (related
             // row existence, ownership) must run against. This is the plain accessor path for
             // secondary declared target models, whose command permit scope registers only the
-            // primary model. Unauthenticated write transactions still fail closed.
-            if (MetaContext.exists() && MetaContext.getCurrentMemberId() != null) return operation.get();
+            // primary model. Unrelated ambient transactions still fail closed.
+            if (MetaContext.exists() && MetaContext.getCurrentMemberId() != null
+                    && CommandExecutionTransaction.insideCommandTransaction()) return operation.get();
             // A weak write snapshot cannot be repaired after its own mutations or row reads.
             // Keep the owning transaction intact and require its caller to establish isolation.
             throw denied();

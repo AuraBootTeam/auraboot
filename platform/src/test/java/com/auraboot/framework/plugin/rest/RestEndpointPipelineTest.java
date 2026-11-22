@@ -165,4 +165,41 @@ class RestEndpointPipelineTest {
         verify(idempotency, never()).recordScopedOutcome(
                 anyString(), anyString(), anyMap(), anyMap(), anyLong());
     }
+
+    @Test
+    void readOnlyRoutes_requestOneCoherentReadSnapshot() {
+        PlatformTransactionManager manager = mock(PlatformTransactionManager.class);
+        when(manager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        RestEndpointPipeline subject = new RestEndpointPipeline(manager, idempotency, schemaValidator, effectExecutor);
+        RecordingExt ext = new RecordingExt();
+        RestRoute route = new RestRoute("GET", "/echo", "probe.echo.read", null, false, true, null);
+
+        subject.execute(match(route, ext), req("GET", null, null), ctx());
+
+        ArgumentCaptor<TransactionDefinition> definition = ArgumentCaptor.forClass(TransactionDefinition.class);
+        verify(manager).getTransaction(definition.capture());
+        assertThat(definition.getValue().isReadOnly()).isTrue();
+        assertThat(definition.getValue().getIsolationLevel()).isEqualTo(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        assertThat(ext.ran).isTrue();
+    }
+
+    @Test
+    void idempotentReadRoute_preservesWritableClaimTransaction() {
+        PlatformTransactionManager manager = mock(PlatformTransactionManager.class);
+        when(manager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        RestEndpointPipeline subject = new RestEndpointPipeline(manager, idempotency, schemaValidator, effectExecutor);
+        RecordingExt ext = new RecordingExt();
+        RestRoute route = new RestRoute("GET", "/echo", "probe.echo.read", null, true, true, null);
+        when(idempotency.claimScopedIdempotency(eq("read-key"), anyString(), anyMap(), eq(7L)))
+                .thenReturn(null);
+
+        subject.execute(match(route, ext), req("GET", null, "read-key"), ctx());
+
+        ArgumentCaptor<TransactionDefinition> definition = ArgumentCaptor.forClass(TransactionDefinition.class);
+        verify(manager).getTransaction(definition.capture());
+        assertThat(definition.getValue().isReadOnly()).isFalse();
+        assertThat(definition.getValue().getIsolationLevel()).isEqualTo(TransactionDefinition.ISOLATION_DEFAULT);
+        verify(idempotency).claimScopedIdempotency(eq("read-key"), anyString(), anyMap(), eq(7L));
+        verify(idempotency).recordScopedOutcome(eq("read-key"), anyString(), anyMap(), anyMap(), eq(7L));
+    }
 }

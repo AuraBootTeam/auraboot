@@ -160,6 +160,53 @@ class EntitlementPhaseTest {
                 .isEqualTo(CommandPermitPlan.Decision.DENY);
     }
 
+    @Test
+    void tenantOwnedNativeModelDoesNotInventAPluginFromItsPrefix() {
+        EntitlementPhase phase = new EntitlementPhase(entitlementChecker, pluginRecordMapper, metaModelMapper);
+        CommandPipelineContext ctx = context("e2et_team_note", null);
+        Model nativeModel = new Model();
+        nativeModel.setTenantId(1L);
+        when(metaModelMapper.findCurrentByCodeForTenant(1L, "e2et_team_note")).thenReturn(nativeModel);
+
+        phase.execute(ctx);
+
+        org.mockito.Mockito.verifyNoInteractions(entitlementChecker, pluginRecordMapper);
+        assertThat(ctx.getPhaseDecisions()).singleElement()
+                .extracting(CommandPermitPlan.PhaseDecision::decision)
+                .isEqualTo(CommandPermitPlan.Decision.ABSTAIN);
+    }
+
+    @Test
+    void ownerlessNativeModelCannotSatisfyAnExplicitPluginFeature() {
+        EntitlementPhase phase = new EntitlementPhase(entitlementChecker, pluginRecordMapper, metaModelMapper);
+        CommandPipelineContext ctx = context("e2et_team_note", "advanced");
+        Model nativeModel = new Model();
+        nativeModel.setTenantId(1L);
+        when(metaModelMapper.findCurrentByCodeForTenant(1L, "e2et_team_note")).thenReturn(nativeModel);
+
+        assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(BusinessException.class);
+
+        assertThat(ctx.getPhaseDecisions()).singleElement().satisfies(decision -> {
+            assertThat(decision.decision()).isEqualTo(CommandPermitPlan.Decision.DENY);
+            assertThat(decision.reasonCode()).isEqualTo(EntitlementPhase.REASON_FEATURE_ENTITLEMENT_REQUIRED);
+        });
+    }
+
+    @Test
+    void ownerlessModelFromAnotherTenantDoesNotBecomeANativeEntitlementExemption() {
+        EntitlementPhase phase = new EntitlementPhase(entitlementChecker, pluginRecordMapper, metaModelMapper);
+        CommandPipelineContext ctx = context("e2et_team_note", null);
+        Model otherTenantModel = new Model();
+        otherTenantModel.setTenantId(2L);
+        when(metaModelMapper.findCurrentByCodeForTenant(1L, "e2et_team_note")).thenReturn(otherTenantModel);
+
+        assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(BusinessException.class);
+
+        assertThat(ctx.getPhaseDecisions()).singleElement()
+                .extracting(CommandPermitPlan.PhaseDecision::decision)
+                .isEqualTo(CommandPermitPlan.Decision.DENY);
+    }
+
     private CommandPipelineContext context(String modelCode, String requiredFeature) {
         CommandDefinition command = new CommandDefinition();
         command.setModelCode(modelCode);

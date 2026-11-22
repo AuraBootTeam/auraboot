@@ -16,11 +16,13 @@ import {
   type QuoteRoleUser,
   type RoleSnapshot,
   openPgClient,
+  readDynamicRecord,
 } from './quote-e2e-helpers';
 
 /**
  * Approved domain model: sales/procurement/engineering have BOM write + Quote write.
- * Only domain managers may maintain shared materials/rules or trigger live sync.
+ * Engineering additionally has default BOM management for shared materials/rules.
+ * Sales and procurement retain their ordinary business-write level.
  * Navigation assignments remain independent from business grants.
  */
 const QUOTE_MENU_PATH = '/p/qo_quote_common';
@@ -386,11 +388,34 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
       expect(projectId, 'allowed project creation must persist a real record').toBeTruthy();
       fixture.rows.push({ model: 'req_requirement_set_pcba_bom', pid: projectId });
       await expectCommandNotDenied(page, 'qo_quote_common:import_corrected_bom', {}, fixture.quoteId, 'update');
-      // Domain write does not grant shared-library management or live connector sync.
-      await expectCommandDenied(page, 'bom:create_material', {
-        bom_mm_material_code: `X-${uid}-eng`,
-      });
-      await expectCommandDenied(page, 'bom:create_validation_rule', {});
+      // Prove the default engineering management grant with real, disabled
+      // fixtures. Invalid payloads alone would only prove validation was reached.
+      for (const entry of [
+        {
+          command: 'bom:create_material', model: 'bom_material_master',
+          payload: {
+            bom_mm_material_code: `X-${uid}-eng`, bom_mm_material_name: '工程权限验证电阻',
+            bom_mm_spec_model: '10kΩ ±1% 0603', bom_mm_category: 'resistor',
+            bom_mm_package: '0603', bom_mm_enabled: false,
+          },
+        },
+        {
+          command: 'bom:create_validation_rule', model: 'bom_validation_rule',
+          payload: {
+            bom_vr_category: 'resistor', bom_vr_check_item: 'resistance',
+            bom_vr_missing_severity: 'yellow', bom_vr_enabled: false,
+            bom_vr_remark: `Engineering permission fixture ${uid}`,
+          },
+        },
+      ]) {
+        const created = await expectCommandNotDenied(page, entry.command, entry.payload);
+        const record = (created.body as any).data?.data ?? (created.body as any).data;
+        const pid = String(record?.recordId ?? record?.recordPid ?? record?.pid ?? '');
+        if (pid) fixture.rows.push({ model: entry.model, pid });
+        expect(created.status, `${entry.command} succeeds for engineering`).toBe(200);
+        expect(pid, `${entry.command} returns its persisted record`).toBeTruthy();
+        expect(await readDynamicRecord(page, entry.model, pid)).toMatchObject(entry.payload);
+      }
     });
 
     await withRolePage(browser, users.noBusinessRole, async (page) => {
