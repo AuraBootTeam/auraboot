@@ -145,8 +145,7 @@ public class CommandAuthorizationPhase implements CommandPhase {
     private boolean declaresBusinessAlternatives(CommandPipelineContext ctx, List<String> permissions) {
         if (extensions == null || ctx.getCommand() == null || ctx.getRequest() == null
                 || permissions.size() < 2 || permissions.size() > 128
-                || new java.util.HashSet<>(permissions).size() != permissions.size()
-                || !permissions.stream().allMatch(domains::isDomain)) return false;
+                || new java.util.HashSet<>(permissions).size() != permissions.size()) return false;
         var owner = extensions.getBusinessResourceOwner(ctx.getCommandCode()).orElse(null);
         if (!(owner instanceof com.auraboot.framework.plugin.extension.BusinessResourceAuthorization resource)
                 || resource.businessActorAuthorization() == null) return false;

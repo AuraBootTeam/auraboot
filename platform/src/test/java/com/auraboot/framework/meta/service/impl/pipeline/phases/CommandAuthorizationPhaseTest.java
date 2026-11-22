@@ -384,6 +384,23 @@ class CommandAuthorizationPhaseTest {
         } finally { MetaContext.clear(); }
     }
 
+    @Test void immutableMixedDutyUsesTheExistingNonDomainPermissionCheck() {
+        var ctx = contextWithPermissions(List.of("buyer.use", "supplier.use"), 42L);
+        var phase = businessAlternatives(ctx);
+        var domains = (com.auraboot.framework.permission.service.DomainCommandAuthorization)
+                org.springframework.test.util.ReflectionTestUtils.getField(phase, "domains");
+        when(domains.authorize("supplier.use")).thenReturn(null);
+        when(userPermissionService.hasPermission(42L, "supplier.use")).thenReturn(true);
+        MetaContext.setContext(1L, 42L, "actor", "Test actor");
+        try {
+            phase.execute(ctx);
+            assertThat(ctx.getAuthorizationVerdict().permissionCode()).isEqualTo("supplier.use");
+            verify(userPermissionService).hasPermission(42L, "supplier.use");
+            verify(userPermissionService, never()).hasPermission(42L, "buyer.use");
+            verifyNoInteractions(recordShareService);
+        } finally { MetaContext.clear(); }
+    }
+
     @Test void mutableOrUnownedAlternativesNeverReachDomainAuthorization() {
         for (String mutation : List.of("owner", "actor", "permissions", "model", "action", "persistence", "tenant", "user")) {
             var ctx = contextWithPermissions(List.of("buyer.use", "supplier.use"), 42L);
