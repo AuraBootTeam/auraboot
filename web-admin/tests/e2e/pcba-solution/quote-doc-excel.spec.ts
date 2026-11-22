@@ -222,7 +222,11 @@ test.describe('Quote pricing + document excel (QO-04 / QO-07 / XLS-Q) @smoke', (
       // an administrator. Rejection must leave the business-owned history intact.
       const rejectedDelete = await admin.request.delete(`/api/dynamic/ab_document_artifact/${artifactHistory[0].pid}`);
       expect(rejectedDelete.status()).toBe(403);
-      expect(String((await rejectedDelete.json()).context)).toContain('model.ab_document_artifact.delete');
+      // Native permit phases can reject before model permissions; preserve the
+      // structured denial and document history instead of pinning phase order.
+      expect(await rejectedDelete.json()).toMatchObject({
+        code: '403', context: { detail: expect.stringContaining('ab_document_artifact') },
+      });
       expect(await queryDynamicRecords(page, 'ab_document_artifact', [
         { fieldName: 'ab_da_source_record_pid', operator: 'EQ', value: created.quoteId },
       ])).toHaveLength(4);
