@@ -396,7 +396,7 @@ test.describe('Quote/BOM per-role menu smoke @smoke', () => {
         expect(leaves.filter(menu => menu.systemGroup).map(menu => menu.code).sort(),
           'Current product scope must not expose administrative leaves to business roles')
           .toEqual(contract.roleCode === 'qo_procurement' && auditInCurrentProduct ? ['audit_log_view'] : []);
-        const problems = await traverseMenus(page, leaves, collector.setMenu, true);
+        const problems = await traverseMenus(page, leaves, collector.setMenu, contract.roleCode !== 'bom_engineering');
         expect
           .soft(problems, `${contract.user.key} traversal problems:\n${problems.join('\n')}`)
           .toEqual([]);
