@@ -27,6 +27,39 @@ function Root({ children }: { children?: React.ReactNode }) {
   );
 }
 describe('shared FormDialog presentation', () => {
+  it('renders an existing image without collecting it, reports image failure, and preserves inputs', async () => {
+    render(<Root />);
+    let pending!: Promise<Record<string, unknown>>;
+    act(() => {
+      pending = promptInputForm(
+        [{ field: 'title', type: 'text', defaultValue: 'Existing title' }],
+        'Edit',
+        undefined,
+        'Save',
+        { record: { imageFilePid: '01J00000000000000000000001' } },
+        { locale: 'en' },
+        {
+          summary: {
+            columns: 1,
+            fields: [{ field: 'imageFilePid', label: 'Current image', renderAs: 'file-image' }],
+          },
+        },
+      );
+    });
+    const settled = pending.catch(() => null);
+    const image = await screen.findByRole('img', { name: 'Current image' });
+    expect(image).toHaveAttribute('src', '/api/file/download/01J00000000000000000000001');
+    expect(screen.queryByTestId('form-dialog-field-imageFilePid')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByTestId('form-dialog-field-title'), {
+      target: { value: 'Edited title' },
+    });
+    fireEvent.error(image);
+    expect(screen.getByRole('status')).toHaveTextContent('The current image could not be loaded');
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    expect(screen.getByTestId('form-dialog-field-title')).toHaveValue('Edited title');
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    expect(await settled).toEqual({ title: 'Edited title' });
+  });
   it('preserves business line breaks in the frozen summary without submitting its contents', async () => {
     render(<Root />);
     const comparison = '范围：锚地甲\n\n风速：严格 > 10 m/s\n有效期：本次批准后生效';

@@ -21,8 +21,8 @@ import type { LinkageRule } from '~/framework/meta/schemas/linkage-types';
 // Single source: the published DSL contract (packages/dsl-types, >=0.0.2).
 // The renderer consumes the record form through ResolvedLocalizedText /
 // getLocalizedText — derived views, not a second definition.
-import type { LocalizedText as ContractLocalizedText } from '@auraboot/dsl-types';
-export type LocalizedText = ContractLocalizedText;
+import type { LocalizedText } from '@auraboot/dsl-types';
+export type { LocalizedText } from '@auraboot/dsl-types';
 /** Record-form view for consumers that require a locale map (not a bare string). */
 export type ResolvedLocalizedText = Exclude<LocalizedText, string>;
 
@@ -531,7 +531,13 @@ export interface CommandInputPresentation {
   closeOnBackdrop?: boolean;
   summary?: {
     columns?: 1 | 2;
-    fields: Array<{ field: string; label?: string | LocalizedText; dictCode?: string }>;
+    fields: Array<{
+      field: string;
+      label?: string | LocalizedText;
+      dictCode?: string;
+      /** Read-only image from a public file PID; never an input or an arbitrary URL. */
+      renderAs?: 'file-image';
+    }>;
   };
 }
 

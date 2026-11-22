@@ -6,6 +6,7 @@ export interface ResolvedPromptSummaryItem {
   label: string | Record<string, string>;
   value: string | Record<string, string>;
   dictCode?: string;
+  renderAs?: 'file-image';
 }
 export interface ResolvedPromptPresentation {
   waitForResult?: boolean;
@@ -115,15 +116,25 @@ export function snapshotPromptPresentation(
                   typeof field.field !== 'string' ||
                   !field.field.trim() ||
                   ['__proto__', 'prototype', 'constructor'].includes(field.field) ||
+                  (field.renderAs !== undefined && field.renderAs !== 'file-image') ||
+                  (field.renderAs === 'file-image' && field.dictCode !== undefined) ||
                   (field.dictCode !== undefined &&
                     (typeof field.dictCode !== 'string' || !field.dictCode.trim()))
                 )
                   throw new Error('Invalid command input summary field');
+                const value = primitive(record[field.field]);
+                if (
+                  field.renderAs === 'file-image' &&
+                  value !== '—' &&
+                  !/^[0-9A-HJKMNP-TV-Z]{26}$/.test(value)
+                )
+                  throw new Error('Invalid command input image reference');
                 return {
                   field: field.field,
                   label: field.label ? localize(field.label) : field.field,
-                  value: primitive(record[field.field]),
+                  value,
                   ...(field.dictCode ? { dictCode: field.dictCode } : {}),
+                  ...(field.renderAs ? { renderAs: field.renderAs } : {}),
                 };
               }),
             },

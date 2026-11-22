@@ -3,6 +3,32 @@ import { snapshotPromptPresentation } from '../promptPresentation';
 import { currentFormDialogScope, registerFormDialogScope } from '../formDialogLifecycle';
 import type { CommandInputPresentation } from '~/framework/meta/schemas/types';
 describe('readonly command prompt snapshot', () => {
+  it('accepts only file PIDs for a readonly image, preserves omission, and freezes the identity', () => {
+    const record = { imageFilePid: '01J00000000000000000000001' };
+    const presentation = {
+      summary: { fields: [{ field: 'imageFilePid', renderAs: 'file-image' as const }] },
+    };
+    const result = snapshotPromptPresentation('Edit', presentation, { record });
+    record.imageFilePid = '01J00000000000000000000002';
+    expect(result.presentation?.summary?.items[0]).toMatchObject({
+      value: '01J00000000000000000000001',
+      renderAs: 'file-image',
+    });
+    expect(
+      snapshotPromptPresentation('Edit', presentation, {}).presentation?.summary?.items[0].value,
+    ).toBe('—');
+    for (const value of [
+      'https://external.test/image.png',
+      '/api/file/download/other',
+      '../private',
+      '<img src=x>',
+      'not-a-pid',
+    ]) {
+      expect(() =>
+        snapshotPromptPresentation('Edit', presentation, { record: { imageFilePid: value } }),
+      ).toThrow('Invalid command input image reference');
+    }
+  });
   it('captures title and readonly values without retaining mutable record references', () => {
     const record = { title: 'Case A', status: 'new', secret: { nested: true } };
     const snapshot = snapshotPromptPresentation(
@@ -50,6 +76,8 @@ describe('readonly command prompt snapshot', () => {
     { closeOnBackdrop: 'no' },
     { summary: { columns: 3, fields: [] } },
     { summary: { fields: [{ field: '__proto__' }] } },
+    { summary: { fields: [{ field: 'image', renderAs: 'html' }] } },
+    { summary: { fields: [{ field: 'image', renderAs: 'file-image', dictCode: 'status' }] } },
   ])('rejects invalid runtime presentation %j', (config) => {
     expect(() =>
       snapshotPromptPresentation('Title', config as CommandInputPresentation, {}),

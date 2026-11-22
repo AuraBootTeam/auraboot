@@ -47,6 +47,23 @@ import type { UploadedFilesInputConfig } from '../../schemas/types';
 import type { FileUploadState } from '~/ui/smart/display/FileAttachmentField';
 import UPLOAD_TEXT from '~/ui/smart/display/StagedFileAttachmentField.i18n.json';
 
+/** A display-only snapshot. Existing file identities never enter staged upload values. */
+function PromptFileImage({ pid, label }: { pid: string; label: string }) {
+  const { locale, t } = useI18n();
+  const [failed, setFailed] = useState(false);
+  if (pid === '—') return <span>—</span>;
+  if (failed)
+    return <p role="status">{getLocalizedText(FORM_DIALOG_TEXT.imageUnavailable, locale, t)}</p>;
+  return (
+    <img
+      src={`/api/file/download/${pid}`}
+      alt={label}
+      className="border-border bg-surface max-h-32 max-w-full rounded border object-contain"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 interface VisibilityRule {
   field: string;
   operator?: 'equals' | 'notEquals' | 'in' | 'notIn' | 'empty' | 'notEmpty';
@@ -853,7 +870,15 @@ function FormDialogHost() {
                     className="text-text mt-1 text-sm [overflow-wrap:anywhere] break-words whitespace-pre-wrap"
                     data-summary-field={item.field}
                   >
-                    {getLocalizedText(item.value, locale, t)}
+                    {item.renderAs === 'file-image' ? (
+                      <PromptFileImage
+                        key={String(item.value)}
+                        pid={String(item.value)}
+                        label={getLocalizedText(item.label, locale, t)}
+                      />
+                    ) : (
+                      getLocalizedText(item.value, locale, t)
+                    )}
                   </dd>
                 </div>
               ))}

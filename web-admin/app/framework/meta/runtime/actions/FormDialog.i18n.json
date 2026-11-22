@@ -1,4 +1,8 @@
 {
+  "imageUnavailable": {
+    "zh-CN": "当前图片暂时无法加载，请关闭并刷新后重试。",
+    "en-US": "The current image could not be loaded. Close and refresh to retry."
+  },
   "invalidTextFormat": {
     "zh-CN": "格式不正确，请检查输入内容。",
     "en-US": "Check the format of this value."

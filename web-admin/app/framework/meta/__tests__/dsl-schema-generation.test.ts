@@ -16,7 +16,14 @@ describe('DSL Generated Schema', () => {
     expect(schema.$ref).toBe('#/definitions/DslSchema');
   });
 
-  it('includes card, workspace presentation and rule types in the 63-definition combined contract', () => {
+  it('declares readonly file-image summaries without adding command inputs', () => {
+    const fields = defs.CommandInputPresentation.properties!.summary.properties!.fields.items;
+    expect(fields.properties.renderAs.const).toBe('file-image');
+    expect(fields.additionalProperties).toBe(false);
+    expect(defs.CommandInputFieldConfig.properties).not.toHaveProperty('renderAs');
+  });
+
+  it('includes card, workspace presentation and rule types in the 65-definition combined contract', () => {
     expect(Object.keys(defs).sort()).toEqual([
       'ActionDef',
       'AuthoritativeSourceConfig',
@@ -27,6 +34,8 @@ describe('DSL Generated Schema', () => {
       'BusinessActivityRecordMapping',
       'BusinessActivitySnapshotField',
       'ButtonConfig',
+      'CardDraftRows',
+      'CardGroupRows',
       'CardImageViewport',
       'CardRowSelection',
       'ColumnConfig',
