@@ -25,8 +25,8 @@
     "en-US": "Retry or remove each failed file before submitting. Successful files are retained."
   },
   "staging": {
-    "zh-CN": "上传不会保存本条业务记录；提交表单时才建立业务关联。",
-    "en-US": "Uploading does not save this record. Business references are created only when the form is submitted."
+    "zh-CN": "文件上传后，请点击保存使修改生效。",
+    "en-US": "After uploading, save the form to apply your changes."
   },
   "invalid": {
     "zh-CN": "附件配置或初始值无效，请联系管理员。",
