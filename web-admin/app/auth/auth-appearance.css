@@ -115,3 +115,14 @@
 @media (prefers-reduced-motion: reduce) {
   .auth-fx-beams span, .auth-fx-aurora span { animation: none; }
 }
+
+/* The same six capability cards serve default and configurable login layouts. */
+.auth-capabilities { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 1.5rem; margin: 1.75rem 0 0; padding: 0; list-style: none; }
+.auth-capability { display: flex; align-items: flex-start; gap: 0.75rem; min-width: 0; padding: 1rem 0; border-top: 1px solid #dce4d7; }
+.auth-capability-icon { flex: none; width: 1.25rem; height: 1.25rem; margin-top: 0.15rem; color: var(--auth-accent, #35745b); }
+.auth-capability h2 { margin: 0; font-size: 0.9375rem; line-height: 1.5; font-weight: 650; color: inherit; }
+.auth-capability p { margin: 0.375rem 0 0; font-size: 0.8125rem; line-height: 1.7; color: #52604d; overflow-wrap: anywhere; }
+.dark .auth-capability, [data-auth-theme="dark"] .auth-capability { border-color: #374151; }
+.dark .auth-capability p, [data-auth-theme="dark"] .auth-capability p { color: #c0c9c3; }
+.dark .auth-capability-icon, [data-auth-theme="dark"] .auth-capability-icon { color: #a4c08b; }
+@media (max-width: 1199px) { .auth-capabilities { column-gap: 1rem; } }
