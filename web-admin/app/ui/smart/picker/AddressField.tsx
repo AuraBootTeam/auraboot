@@ -241,7 +241,7 @@ export const AddressField: React.FC<AddressFieldProps> = ({
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {/* Province */}
           <div className="min-w-0 space-y-1">
             <label htmlFor={`${controlId}-province`} className="text-text-2 text-xs font-medium">
