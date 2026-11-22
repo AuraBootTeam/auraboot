@@ -223,6 +223,17 @@ async function createRecallableMaterial(page: Page, code: string, category: stri
   return rows[0];
 }
 
+async function chooseMappedCustomer(page: Page, name: string, pid: string) {
+  const input = page.getByTestId('select-trigger-bom_cpm_customer_id');
+  await input.click();
+  await input.fill(name);
+  const option = page.locator(`[role="option"][data-value="${pid}"]`);
+  await expect(option).toHaveText(name);
+  await option.click();
+  await expect(input).toHaveValue(name);
+  await expect(page.locator('input[type="hidden"][name="bom_cpm_customer_id"]')).toHaveValue(pid);
+}
+
 type Choice = { field: string; label: string; value: string };
 type RuleCase = {
   model: string;
@@ -380,7 +391,8 @@ for (const c of cases) {
     expect(await records(), 'invalid form must not write a record').toEqual([]);
     await info.attach('rule-required-browser', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     await info.attach('rule-required-persistence', { body: JSON.stringify({ model: c.model, marker, createRequests, records: [] }), contentType: 'application/json' });
-    await field(c.key).getByRole('textbox').fill(keyValue);
+    if (customerPid) await chooseMappedCustomer(page, marker, customerPid);
+    else await field(c.key).getByRole('textbox').fill(keyValue);
     for (const value of [c.text, ...(c.extraTexts || [])].filter(Boolean))
       await field(value!.field).getByRole('textbox').fill(fixtureText(value!.value));
     for (const choice of [c.select, c.extraSelect, ...(c.choices || [])].filter(Boolean)) {
@@ -414,7 +426,7 @@ for (const c of cases) {
       // Customer identity is a scope, not a one-record-per-customer limit.
       await searchBusinessList(page, `/p/${c.model}`, marker);
       await page.locator('main').getByRole('button', { name: '新建', exact: true }).click();
-      await field(c.key).getByRole('textbox').fill(keyValue);
+      await chooseMappedCustomer(page, marker, customerPid);
       for (const value of c.extraTexts || [])
         await field(value.field).getByRole('textbox').fill(`${fixtureText(value.value)}-SECOND`);
       await field(c.select!.field).getByRole('combobox').first().click();
@@ -428,6 +440,8 @@ for (const c of cases) {
       await searchBusinessList(page, `/p/${c.model}`, marker);
       const secondRow = page.getByRole('row').filter({ hasText: 'GATE-PN-RAW-SECOND' });
       await expect(secondRow).toHaveCount(1);
+      await expect(secondRow).toContainText(marker);
+      await expect(secondRow).not.toContainText(customerPid);
       await page.screenshot({ path: info.outputPath('multiple-parts.png') });
       await clickRowActionByLocator(page, secondRow, 'delete', '删除');
       await page.getByTestId('confirm-ok').click();
@@ -476,6 +490,10 @@ for (const c of cases) {
       await expect(denied.page.getByTestId('toolbar-btn-edit')).toHaveCount(0);
       await expect(denied.page.getByTestId('toolbar-btn-delete')).toHaveCount(0);
       await expect(denied.page.locator('main input:not([readonly]):not([disabled]), main textarea:not([readonly]):not([disabled]), main [contenteditable="true"]')).toHaveCount(0);
+      if (customerPid) {
+        await expect(readerKey).toContainText(marker);
+        await expect(readerKey).not.toContainText(customerPid);
+      }
       await denied.page.screenshot({ path: info.outputPath('rule-reader-detail.png'), fullPage: true });
       await denied.page.goto(`/p/${c.model}/new?commandCode=bom:create_${c.command}`, {
         waitUntil: 'domcontentloaded',
@@ -508,8 +526,11 @@ for (const c of cases) {
     let row = page.getByRole('row').filter({ hasText: marker });
     await expect(row).toHaveCount(1);
     await expect(row).toContainText(marker);
+    if (customerPid) await expect(row).not.toContainText(customerPid);
     await clickRowActionByLocator(page, row, 'edit', '编辑');
-    await expect(field(c.key).getByRole('textbox')).toHaveValue(keyValue);
+    if (customerPid) {
+      await expect(page.getByTestId('select-trigger-bom_cpm_customer_id')).toHaveValue(marker);
+    } else await expect(field(c.key).getByRole('textbox')).toHaveValue(keyValue);
     await field(c.remark).getByRole('textbox').fill('rule-gate-edited');
     await submit(page, `bom:update_${c.command}`);
     await expect.poll(async () => (await records())[0]?.[c.remark]).toBe('rule-gate-edited');
@@ -1545,7 +1566,7 @@ test('B18-03 part map: mapping applies to a new conversion, prior snapshots stay
 
   await page.goto('/p/bom_customer_part_map', { waitUntil: 'domcontentloaded' });
   await page.locator('main').getByRole('button', { name: '新建', exact: true }).first().click();
-  await field('bom_cpm_customer_id').getByRole('textbox').fill(customerId);
+  await chooseMappedCustomer(page, marker, customerId);
   await field('bom_cpm_customer_pn_raw').getByRole('textbox').fill(customerPn);
   await field('bom_cpm_customer_pn_norm').getByRole('textbox').fill(customerPn);
   await field('bom_cpm_material_code').getByRole('textbox').fill(mappedMaterial);
@@ -1584,7 +1605,7 @@ test('B18-03 part map: mapping applies to a new conversion, prior snapshots stay
 
   await page.goto('/p/bom_customer_part_map', { waitUntil: 'domcontentloaded' });
   await page.locator('main').getByRole('button', { name: '新建', exact: true }).first().click();
-  await field('bom_cpm_customer_id').getByRole('textbox').fill(customerId);
+  await chooseMappedCustomer(page, marker, customerId);
   await field('bom_cpm_customer_pn_raw').getByRole('textbox').fill(customerPn);
   await field('bom_cpm_customer_pn_norm').getByRole('textbox').fill(customerPn);
   await field('bom_cpm_material_code').getByRole('textbox').fill(`${mappedMaterial}DUP`);
@@ -1606,6 +1627,8 @@ test('B18-03 part map: mapping applies to a new conversion, prior snapshots stay
   expect(finalMappings, 'duplicate mapping is rejected without creating another row').toHaveLength(1);
   expect(finalMappings[0].bom_cpm_status).toBe('active');
   expect(finalMappings[0].bom_cpm_material_code).toBe(mappedMaterial);
+  await expect(page.getByTestId('select-trigger-bom_cpm_customer_id')).toHaveValue(marker);
+  await expect(page.locator('main')).not.toContainText(customerId);
   await page.screenshot({ path: info.outputPath('B18-03-duplicate-safe-error.png') });
   await info.attach('B18-03-part-map-evidence', {
     body: JSON.stringify({
