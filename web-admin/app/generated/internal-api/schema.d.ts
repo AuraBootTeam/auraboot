@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 90b7d64aea2d42effd4456f0aadb6fe0f302f623a38c854763de1313dbe157f0
+ * Contract SHA-256: 0d2490971d264dc054b6f9f4b7cf8d07e0ab64bd173d8bc1f113d63f72d1d517
  */
 export interface paths {
     "/api/activities": {
@@ -7650,54 +7650,6 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["ingest"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/dataquality/expectations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["createSuite"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/dataquality/expectations/{suitePid}/run": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["runValidation"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/dataquality/expectations/{suitePid}/runs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["listRuns_1"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -23990,27 +23942,6 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        AbDataQualityValidationRun: {
-            datasetName?: string;
-            deletedFlag?: boolean;
-            /** Format: int32 */
-            failed?: number;
-            /** Format: date-time */
-            finishedAt?: string;
-            /** Format: int64 */
-            id?: number;
-            /** Format: int32 */
-            passed?: number;
-            pid?: string;
-            resultsJson?: string;
-            /** Format: date-time */
-            startedAt?: string;
-            suitePid?: string;
-            /** Format: int64 */
-            tenantId?: number;
-            /** Format: int32 */
-            totalExpectations?: number;
-        };
         AbSemanticPreagg: {
             /** Format: date-time */
             createdAt?: string;
@@ -54790,80 +54721,6 @@ export interface operations {
                     "*/*": {
                         [key: string]: unknown;
                     };
-                };
-            };
-        };
-    };
-    createSuite: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-        };
-    };
-    runValidation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                suitePid: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-        };
-    };
-    listRuns_1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                suitePid: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["AbDataQualityValidationRun"][];
                 };
             };
         };

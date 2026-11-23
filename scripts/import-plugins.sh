@@ -184,6 +184,9 @@ for selected_plugin in "${PLUGINS[@]}"; do
     selected_name="${selected_plugin%/}"
     selected_name="${selected_name##*/}"
     case "$selected_name" in
+        dataquality-observability|com.auraboot.dataquality-observability)
+            echo "ERROR: retired plugin dataquality-observability; no replacement; GE validation support has been retired" >&2
+            exit 2 ;;
         airflow-observability|com.auraboot.airflow-observability)
             echo "ERROR: retired plugin airflow-observability; no replacement; Core webhook support is unchanged" >&2
             exit 2 ;;
