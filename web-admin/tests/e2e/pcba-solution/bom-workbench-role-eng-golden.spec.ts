@@ -315,6 +315,11 @@ test.describe('BOM workbench deep golden as bom_engineering @smoke', () => {
       // 5. regenerate + download the standard BOM as the role; parse the workbook.
       // The drawer is still open (modal) — use its own regenerate-and-download action,
       // which drives the same bom:regenerate_export command.
+      const previousRevisions = await queryDynamicRecords(adminPage, 'bom_export_revision', [
+        { fieldName: 'bom_er_task_id', operator: 'EQ', value: created.taskId },
+      ]);
+      expect(previousRevisions).toHaveLength(1);
+      const previousRevision = previousRevisions[0];
       step = 'download export';
       const downloadPromise = page.waitForEvent('download', { timeout: 45_000 });
       const regeneratePromise = page.waitForResponse(
@@ -353,6 +358,29 @@ test.describe('BOM workbench deep golden as bom_engineering @smoke', () => {
       expect(exportedTask.bom_task_export_file_id).toBe(exportFileId);
       expect(String(exportedTask.bom_task_edited_after_completion)).toBe('false');
       await attachRoleStage('engineering-exported', '');
+      const nextRevisions = await queryDynamicRecords(adminPage, 'bom_export_revision', [
+        { fieldName: 'bom_er_task_id', operator: 'EQ', value: created.taskId },
+      ]);
+      expect(nextRevisions).toHaveLength(previousRevisions.length + 1);
+      expect(nextRevisions.find(revision => revision.pid === previousRevision.pid)).toEqual(previousRevision);
+      const nextRevision = nextRevisions.find(revision => revision.bom_er_file_id === exportFileId);
+      expect(nextRevision).toBeDefined();
+      expect(Number(nextRevision!.bom_er_revision_no)).toBeGreaterThan(Number(previousRevision.bom_er_revision_no));
+      const oldDownload = await page.request.get(`/api/file/download/${previousRevision.bom_er_file_id}`);
+      expect(oldDownload.ok(), 'the original immutable export remains downloadable').toBe(true);
+      expect(XLSX.read(await oldDownload.body(), { type: 'buffer' }).SheetNames).toEqual(['BOM', '变更记录']);
+      await page.getByRole('button', { name: /关闭复核浮层|Close Review/i }).click();
+      await page.getByRole('tab', { name: '导出版本', exact: true }).click();
+      const previousArtifact = page.getByTestId(`artifact-timeline-item-${previousRevision.pid}`);
+      const nextArtifact = page.getByTestId(`artifact-timeline-item-${nextRevision!.pid}`);
+      await expect(previousArtifact).toContainText(String(previousRevision.bom_er_filename));
+      await expect(previousArtifact).toContainText(`Rev ${previousRevision.bom_er_revision_no}`);
+      await expect(nextArtifact).toContainText(String(nextRevision!.bom_er_filename));
+      await expect(nextArtifact).toContainText(`Rev ${nextRevision!.bom_er_revision_no}`);
+      await expect(previousArtifact).toBeVisible();
+      await expect(nextArtifact).toBeVisible();
+      await testInfo.attach('engineering-export-revisions', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+      await testInfo.attach('engineering-retained-export-proof', { body: JSON.stringify({ previousRevision, nextRevision, oldDownloadStatus: oldDownload.status() }), contentType: 'application/json' });
 
       // 6. hard gates: no console runtime errors, no forbidden API responses as the role
       expect(consoleIssues, `console issues:\n${consoleIssues.join('\n')}`).toEqual([]);

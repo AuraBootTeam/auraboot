@@ -122,6 +122,7 @@ test.describe('PCBA quote customer view golden', () => {
       expect(filters).toContainEqual({ fieldName: 'qo_qca_quote_id', operator: 'EQ', value: quotePid });
       const attachmentRow = page.getByRole('row').filter({ hasText: originalName });
       await expect(attachmentRow).toContainText('签回报价');
+      await expect(attachmentRow.getByRole('cell').first()).not.toContainText(/\d{4}-\d{2}-\d{2}T/);
       await expect(attachmentRow).toContainText('已接收');
       await expect(attachmentRow).not.toContainText(fileId);
       await expect(attachmentRow).not.toContainText(/关联记录不存在|无权访问/);
