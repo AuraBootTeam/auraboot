@@ -146,15 +146,21 @@ describe('DSL command preview composition', () => {
     expect(view.result.current.error).toBeTruthy();
   });
 
-  it.each([false, true])('reports a preview failure once when inline reporting is %s', async (inline) => {
-    const view = setup(undefined, inline);
-    mocks.fetch.mockResolvedValueOnce({ code: '400', context: { detail: 'Contract template unavailable' } });
-    await act(async () => view.result.current.handleAction(action, record));
-    expect(view.result.current.error).toBe('Contract template unavailable');
-    expect(mocks.preview).not.toHaveBeenCalled();
-    if (inline) expect(view.showToast).not.toHaveBeenCalled();
-    else expect(view.showToast).toHaveBeenCalledWith('Contract template unavailable', 'error');
-  });
+  it.each([false, true])(
+    'reports a preview failure once when inline reporting is %s',
+    async (inline) => {
+      const view = setup(undefined, inline);
+      mocks.fetch.mockResolvedValueOnce({
+        code: '400',
+        context: { detail: 'Contract template unavailable' },
+      });
+      await act(async () => view.result.current.handleAction(action, record));
+      expect(view.result.current.error).toBe('Contract template unavailable');
+      expect(mocks.preview).not.toHaveBeenCalled();
+      if (inline) expect(view.showToast).not.toHaveBeenCalled();
+      else expect(view.showToast).toHaveBeenCalledWith('Contract template unavailable', 'error');
+    },
+  );
 
   it('preserves notifications for other detail commands with inline preview reporting enabled', async () => {
     const view = setup(undefined, true);
