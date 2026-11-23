@@ -119,7 +119,10 @@ function domSafeValue(value: string): string {
 function resolveLinkHref(column: ColumnConfig, row: any, value: unknown): string | undefined {
   const config = renderConfig(column);
   if (config.to !== undefined) {
-    if (typeof config.to !== 'string' || !config.to.startsWith('/') || config.to.startsWith('//')) return undefined;
+    if (
+      typeof config.to !== 'string' || !config.to.startsWith('/') || config.to.startsWith('//')
+      || /[\\\u0000-\u001f]/.test(config.to)
+    ) return undefined;
     const fields = [...config.to.matchAll(/\{(\w+)\}/g)].map((match: RegExpMatchArray) => match[1]);
     if (fields.some((field: string) => !Object.hasOwn(row || {}, field)
       || !['string', 'number'].includes(typeof row[field]) || String(row[field]).trim() === '')) return undefined;

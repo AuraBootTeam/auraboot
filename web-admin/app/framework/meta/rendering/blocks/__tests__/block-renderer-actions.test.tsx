@@ -699,7 +699,7 @@ describe('TableBlockRenderer', () => {
     }
   });
 
-  it.each(['https://unexpected.example/{pid}', '//unexpected.example/{pid}', 'javascript:alert(1)'])(
+  it.each(['https://unexpected.example/{pid}', '//unexpected.example/{pid}', 'javascript:alert(1)', '/\\unexpected.example/{pid}', '/\nunexpected.example/{pid}'])(
     'does not turn a configured local target into an external or executable link: %s', (to) => {
       const runtime = makeRuntime({ getDataSourceManager: () => ({
         getData: () => [{ pid: 'one', bill: 'PO-001' }], has: () => true, register: vi.fn(),
