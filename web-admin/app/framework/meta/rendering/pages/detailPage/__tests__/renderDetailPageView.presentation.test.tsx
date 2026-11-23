@@ -98,6 +98,7 @@ describe('detail permission recovery', () => {
       </MemoryRouter>,
     );
     expect(screen.getByRole('link', { name: label })).toHaveAttribute('href', '/home');
+    expect(screen.getByRole('heading', { name: locale === 'en' ? 'Cannot access this record' : '无法访问此记录' })).toBeInTheDocument();
     expect(screen.queryByText('Actual event subject')).not.toBeInTheDocument();
   });
 
@@ -108,6 +109,29 @@ describe('detail permission recovery', () => {
       </MemoryRouter>,
     );
     expect(screen.getByRole('link')).toHaveAttribute('href', '/p/case');
+    expect(screen.getByRole('heading', { name: 'Record not found' })).toBeInTheDocument();
+  });
+
+  it.each([
+    ['en', 'Unable to load record', 'This record could not be loaded. Reopen it later; if the problem persists, contact your administrator.'],
+    ['zh-CN', '记录加载失败', '暂时无法加载此记录，请稍后重新打开；如果持续失败，请联系管理员。'],
+  ])('distinguishes server read failures from missing records in %s', (locale, title, message) => {
+    render(<MemoryRouter>{renderDetailPageView({
+      ...args(null), locale, recordError: 'Internal system error',
+    })}</MemoryRouter>);
+    expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
+    expect(screen.getByText(message)).toBeInTheDocument();
+    expect(screen.queryByText('Internal system error')).not.toBeInTheDocument();
+    expect(screen.queryByText('Actual event subject')).not.toBeInTheDocument();
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/p/case');
+  });
+
+  it('retains an actionable read error instead of claiming the record does not exist', () => {
+    render(<MemoryRouter>{renderDetailPageView({
+      ...args(null), recordError: 'The address service is unavailable. Contact the administrator.',
+    })}</MemoryRouter>);
+    expect(screen.getByRole('heading', { name: 'Unable to load record' })).toBeInTheDocument();
+    expect(screen.getByText('The address service is unavailable. Contact the administrator.')).toBeInTheDocument();
   });
 
   it('closes a denied modal without navigating its host', () => {

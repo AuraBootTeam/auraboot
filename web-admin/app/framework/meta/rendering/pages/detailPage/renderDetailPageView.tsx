@@ -188,7 +188,13 @@ export function renderDetailPageView({
                     locale,
                     t,
                   )
-                : resolveDetailMissingRecordTitle(locale, t)}
+                : recordNotFound
+                  ? resolveDetailMissingRecordTitle(locale, t)
+                  : getLocalizedText(
+                      { 'zh-CN': '记录加载失败', en: 'Unable to load record' },
+                      locale,
+                      t,
+                    )}
             </h2>
             <p className="text-text-2 text-sm">
               {recordAccessDenied
@@ -209,7 +215,16 @@ export function renderDetailPageView({
                       locale,
                       t,
                     )
-                  : recordError}
+                  : /^(internal (system|server) error|request failed with status code 5\d\d)[.!]?$/i.test(recordError.trim())
+                    ? getLocalizedText(
+                        {
+                          'zh-CN': '暂时无法加载此记录，请稍后重新打开；如果持续失败，请联系管理员。',
+                          en: 'This record could not be loaded. Reopen it later; if the problem persists, contact your administrator.',
+                        },
+                        locale,
+                        t,
+                      )
+                    : recordError}
             </p>
             {presentation ? (
               <button
