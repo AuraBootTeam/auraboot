@@ -385,3 +385,11 @@ This is an internal operator surface; public provider protocols are unchanged.
 `InstalledIntegrationRecoveryPersistenceIT` uses real PostgreSQL mappers, transactions and concurrent
 operators to prove audit rollback and serialization. Its provider/command metadata are controlled fixtures;
 HTTP role admission and actual provider business effects require target-runtime verification separately.
+
+The main-line recovery schema is installed by migration `20261123203000`.
+A copy of a test database that has already applied `20261121140000` needs a
+reviewed migration payload retaining the original applied SQL bytes. The forward
+migration checks that exact successful ledger entry and preserves the existing
+table and audit rows. Use the existing reviewed-history process for unapplied
+migrations that precede the copy's installed tip. Keep Flyway validation enabled
+and use the ordinary main-line payload for fresh installs and current main upgrades.

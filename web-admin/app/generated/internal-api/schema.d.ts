@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 0d2490971d264dc054b6f9f4b7cf8d07e0ab64bd173d8bc1f113d63f72d1d517
+ * Contract SHA-256: 917310ac22e4b30cf607987c27374ba335aa9cd936087d1ab1066e6f873ce86a
  */
 export interface paths {
     "/api/activities": {
@@ -1373,6 +1373,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["rebuild"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/open-platform/installations/{installation}/event-sources/{source}/events/{event}/recovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["plan"];
+        put?: never;
+        post: operations["authorizeReceiptRecovery"];
         delete?: never;
         options?: never;
         head?: never;
@@ -20480,6 +20496,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/public/integration-callbacks/{tenant}/{installation}/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["receive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/query-builder/execute": {
         parameters: {
             query?: never;
@@ -28547,6 +28579,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponsePlan: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["Plan"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponsePlatformAiScoreResult: {
             code?: string;
             context?: unknown;
@@ -28831,6 +28871,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["ResourceOwnerDTO"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseResult: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["Result"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -38523,6 +38571,17 @@ export interface components {
             totalRecords?: number;
             valueField?: string;
         };
+        Plan: {
+            bindingSha256?: string;
+            commandSha256?: string;
+            envelopeSha256?: string;
+            /** Format: int32 */
+            expectedReplayCount?: number;
+            previousCommandSha256?: string;
+            previousProviderSha256?: string;
+            providerSha256?: string;
+            requestPid?: string;
+        };
         PlannedOrderDto: {
             /** Format: int32 */
             leadTimeDays?: number;
@@ -39872,6 +39931,18 @@ export interface components {
             suggestedDecision?: "DELETE" | "KEEP_AND_DETACH" | "SKIP";
             /** @enum {string} */
             type?: "MODEL" | "FIELD" | "MODEL_FIELD_BINDING" | "COMMAND" | "BINDING_RULE" | "PERMISSION" | "ROLE" | "ROLE_PERMISSION" | "MENU" | "PAGE" | "DASHBOARD" | "DICT" | "NAMED_QUERY" | "AGENT_DEFINITION" | "DICT_ITEM" | "SAVED_VIEW" | "NOTIFICATION_TEMPLATE" | "I18N" | "PUBLIC_RESOURCE" | "PUBLIC_QUERY";
+        };
+        Result: {
+            eventId?: string;
+            reason?: string;
+            recoveryPid?: string;
+            /** Format: int32 */
+            replayCount?: number;
+            /** Format: date-time */
+            requestedAt?: string;
+            requestedBy?: string;
+            requestPid?: string;
+            status?: string;
         };
         ResultContract: {
             actionability?: string;
@@ -45042,6 +45113,58 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseMapStringObject"];
+                };
+            };
+        };
+    };
+    plan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event: string;
+                installation: string;
+                source: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePlan"];
+                };
+            };
+        };
+    };
+    authorizeReceiptRecovery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event: string;
+                installation: string;
+                source: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Decision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseResult"];
                 };
             };
         };
@@ -76923,6 +77046,32 @@ export interface operations {
                 };
                 content: {
                     "application/javascript": string;
+                };
+            };
+        };
+    };
+    receive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+                installation: string;
+                tenant: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

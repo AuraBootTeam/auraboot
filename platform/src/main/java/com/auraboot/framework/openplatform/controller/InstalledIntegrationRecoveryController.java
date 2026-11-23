@@ -5,6 +5,7 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.openplatform.service.InstalledIntegrationRecoveryService;
 import com.auraboot.framework.openplatform.service.InstalledIntegrationRecoveryContracts.*;
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +26,7 @@ public class InstalledIntegrationRecoveryController {
         catch(IllegalStateException failure){return ResponseEntity.status(409).body(ApiResponse.error(409,failure.getMessage()));}
     }
     @PostMapping
+    @Operation(operationId = "authorizeReceiptRecovery")
     public ResponseEntity<ApiResponse<Result>> authorize(@PathVariable String installation,@PathVariable String source,
                                                         @PathVariable String event,@Valid @RequestBody Decision decision) {
         try {return ResponseEntity.ok(ApiResponse.success(service.authorize(MetaContext.getCurrentTenantId(),installation,source,event,
