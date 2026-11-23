@@ -256,15 +256,15 @@ export const OrganizationSelect: React.FC<OrganizationSelectProps> = ({
       label={labelText}
       required={requiredValue}
       error={meta.showError ? st(meta.meta.error) : undefined}
-      className={`relative space-y-2 ${className}`}
+      className={`relative ${className}`}
     >
       <div className="relative" data-testid={`organization-select-${name}`}>
         <div
           data-testid={`organization-select-trigger-${name}`}
-          className={`rounded-control border-border-strong w-full border px-3 py-2 shadow-sm ${disabledValue ? 'bg-subtle cursor-not-allowed' : 'bg-panel hover:border-border-strong cursor-pointer'} ${selectedOrganizations.length > 0 ? 'text-text' : 'text-text-2'} focus-visible:shadow-focus focus:outline-none`}
+          className={`rounded-control border-border-strong flex min-h-[var(--ds-control-field)] w-full items-center border px-3 py-1 text-sm shadow-card ${disabledValue ? 'bg-subtle cursor-not-allowed' : 'bg-panel hover:border-border-strong cursor-pointer'} ${selectedOrganizations.length > 0 ? 'text-text' : 'text-text-2'} focus-visible:shadow-focus focus:outline-none`}
           onClick={() => !disabledValue && setIsOpen(!isOpen)}
         >
-          <div className="flex items-center justify-between">
+          <div className="flex w-full items-center justify-between">
             <div className="flex min-w-0 flex-1 items-center space-x-2">
               <Building2 className="text-text-3 h-4 w-4 flex-shrink-0" />
               {multiple && selectedOrganizations.length > 0 ? (
