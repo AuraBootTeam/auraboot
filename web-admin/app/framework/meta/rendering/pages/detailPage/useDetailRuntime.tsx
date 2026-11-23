@@ -124,6 +124,7 @@ export function useDetailRuntime({
     t,
     token: token || undefined,
     showToast,
+    renderPreviewErrorInline: true,
   });
 
   // Evaluate visibleWhen against both the record and the reactive page state.

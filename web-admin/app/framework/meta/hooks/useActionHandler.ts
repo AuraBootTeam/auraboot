@@ -470,6 +470,9 @@ export interface UseActionHandlerOptions {
   // Toast (可选)
   showToast?: (message: string, type: 'success' | 'error' | 'warning' | 'info') => void;
 
+  /** The host renders the returned preview error in an accessible inline alert. */
+  renderPreviewErrorInline?: boolean;
+
   // 错误回调 (可选)
   onError?: (error: Error) => void;
 }
@@ -517,6 +520,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
     t,
     token,
     showToast,
+    renderPreviewErrorInline,
     onError,
   } = options;
   const effectiveShowToast = showToast ?? runtime?.getShowToast?.();
@@ -1559,7 +1563,9 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
         const errorObject = err instanceof Error ? err : new Error(errorMessage);
         console.error(`[useActionHandler] Action execution failed (${button.code}):`, err);
         setError(errorMessage);
-        notifyToast(errorMessage, 'error');
+        if (!(renderPreviewErrorInline && actionDef.type === 'command' && actionDef.preview)) {
+          notifyToast(errorMessage, 'error');
+        }
         if (onError) onError(errorObject);
       } finally {
         submissionFeedback.finalize();
@@ -1576,6 +1582,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       t,
       token,
       notifyToast,
+      renderPreviewErrorInline,
       onError,
       executeCommand,
       resolveNavigateTo,

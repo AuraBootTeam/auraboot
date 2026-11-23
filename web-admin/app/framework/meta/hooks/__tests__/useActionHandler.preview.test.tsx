@@ -28,8 +28,9 @@ const action = {
   },
 } as ButtonConfig;
 const completed = () => ({ code: '0', data: { phaseReached: 'completed', data: { fileId } } });
-function setup(refresh?: () => Promise<void>) {
+function setup(refresh?: () => Promise<void>, renderPreviewErrorInline = false) {
   const navigate = vi.fn();
+  const showToast = vi.fn();
   const runtime = {
     getContext: () => ({ record, form: record, state: {}, global: {} }),
     getSchema: () => ({
@@ -54,6 +55,7 @@ function setup(refresh?: () => Promise<void>) {
   } as unknown as SchemaRuntime;
   return {
     navigate,
+    showToast,
     ...renderHook(() =>
       useActionHandler({
         runtime,
@@ -62,6 +64,8 @@ function setup(refresh?: () => Promise<void>) {
         context: { record, ...(refresh ? { loadData: refresh } : {}) },
         locale: 'zh-CN',
         t: ((key: string) => key) as any,
+        showToast,
+        renderPreviewErrorInline,
       }),
     ),
   };
@@ -140,6 +144,28 @@ describe('DSL command preview composition', () => {
     await act(async () => view.result.current.handleAction(action, record));
     expect(mocks.preview).not.toHaveBeenCalled();
     expect(view.result.current.error).toBeTruthy();
+  });
+
+  it.each([false, true])('reports a preview failure once when inline reporting is %s', async (inline) => {
+    const view = setup(undefined, inline);
+    mocks.fetch.mockResolvedValueOnce({ code: '400', context: { detail: 'Contract template unavailable' } });
+    await act(async () => view.result.current.handleAction(action, record));
+    expect(view.result.current.error).toBe('Contract template unavailable');
+    expect(mocks.preview).not.toHaveBeenCalled();
+    if (inline) expect(view.showToast).not.toHaveBeenCalled();
+    else expect(view.showToast).toHaveBeenCalledWith('Contract template unavailable', 'error');
+  });
+
+  it('preserves notifications for other detail commands with inline preview reporting enabled', async () => {
+    const view = setup(undefined, true);
+    const update = {
+      ...action,
+      action: { type: 'command', command, operationType: 'UPDATE', payload: {} },
+    } as ButtonConfig;
+    mocks.fetch.mockResolvedValueOnce({ code: '400', context: { detail: 'The action failed' } });
+    await act(async () => view.result.current.handleAction(update, record));
+    expect(view.result.current.error).toBe('The action failed');
+    expect(view.showToast).toHaveBeenCalledWith('The action failed', 'error');
   });
 
   it('uncertain command retry retains the original key and reviewed version', async () => {
