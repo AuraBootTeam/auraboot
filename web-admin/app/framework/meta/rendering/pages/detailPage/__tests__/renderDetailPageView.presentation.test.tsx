@@ -178,4 +178,37 @@ describe('detail header business status', () => {
       expect(screen.getByText('All suppliers replied')).toBeInTheDocument();
     },
   );
+
+  it.each([
+    ['blue', 'blue'], ['green', 'green'], ['gray', 'gray'],
+    ['amber', 'amber'], ['red', 'red'], ['#10b981', 'green'], ['unsupported', 'gray'],
+  ])('uses the declared dictionary color %s for the header status', (color, tone) => {
+    const base = args(null);
+    render(<MemoryRouter>{renderDetailPageView({
+      ...base,
+      schema: { ...base.schema, extension: { ...base.schema.extension,
+        headerStatusField: 'progress', headerStatusDictCode: 'business_status',
+      } },
+      recordData: { subject: 'Event', progress: 'ready' },
+      enrichField: (field: any) => field,
+      getDictItems: () => [{ value: 'ready', label: 'All replied', extension: { color } }],
+    } as Parameters<typeof renderDetailPageView>[0])}</MemoryRouter>);
+    const status = screen.getByTestId('detail-header-status');
+    expect(status).toHaveTextContent('All replied');
+    expect(status).toHaveClass(`bg-status-${tone}-bg`, `text-status-${tone}`);
+  });
+
+  it('retains the existing accent appearance when the dictionary declares no color', () => {
+    const base = args(null);
+    render(<MemoryRouter>{renderDetailPageView({
+      ...base,
+      schema: { ...base.schema, extension: { ...base.schema.extension,
+        headerStatusField: 'progress', headerStatusDictCode: 'business_status',
+      } },
+      recordData: { subject: 'Event', progress: 'ready' },
+      enrichField: (field: any) => field,
+      getDictItems: () => [{ value: 'ready', label: 'All replied' }],
+    } as Parameters<typeof renderDetailPageView>[0])}</MemoryRouter>);
+    expect(screen.getByTestId('detail-header-status')).toHaveClass('text-accent', 'bg-accent-weak');
+  });
 });

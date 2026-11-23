@@ -33,6 +33,7 @@ import { prepareDetailRuntimeBlock } from './detailBlockValues';
 import { DetailBlockRenderer } from './DetailBlockRenderer';
 import { FallbackDetailView } from './FallbackDetailView';
 import { resolveWorkspaceShell } from '~/shared/layout/workspaceShell';
+import { resolveStatusTone } from '~/framework/meta/runtime/renderers/statusTone';
 import type { useDetailPageState } from './useDetailPageState';
 import type { useDetailRuntime } from './useDetailRuntime';
 import type { useDetailLayout } from './useDetailLayout';
@@ -357,19 +358,30 @@ export function renderDetailPageView({
                       {headerTitle}
                     </h2>
                   )}
-                  {schema.extension?.headerStatusField && (
-                    <span className="text-accent bg-accent-weak rounded px-2 py-1 text-xs">
-                      {(() => {
-                        const field = enrichField({
-                          field: schema.extension.headerStatusField,
-                        } as FieldConfig);
-                        const item = (getDictItems(schema.extension?.headerStatusDictCode || field.dictCode || '') || []).find(
-                          (item) => String(item.value) === String(headerRecord[field.field]),
-                        );
-                        return item ? getLocalizedText(item.label as any, locale, t) : '—';
-                      })()}
-                    </span>
-                  )}
+                  {schema.extension?.headerStatusField && (() => {
+                    const field = enrichField({
+                      field: schema.extension.headerStatusField,
+                    } as FieldConfig);
+                    const item = (getDictItems(schema.extension?.headerStatusDictCode || field.dictCode || '') || []).find(
+                      (item) => String(item.value) === String(headerRecord[field.field]),
+                    );
+                    const color = item?.extension?.color;
+                    const tones = {
+                      gray: 'bg-status-gray-bg text-status-gray',
+                      blue: 'bg-status-blue-bg text-status-blue',
+                      amber: 'bg-status-amber-bg text-status-amber',
+                      green: 'bg-status-green-bg text-status-green',
+                      red: 'bg-status-red-bg text-status-red',
+                    };
+                    const toneClass = typeof color === 'string' && color.trim()
+                      ? tones[resolveStatusTone(color)]
+                      : 'text-accent bg-accent-weak';
+                    return (
+                      <span data-testid="detail-header-status" className={`${toneClass} rounded px-2 py-1 text-xs`}>
+                        {item ? getLocalizedText(item.label as any, locale, t) : '—'}
+                      </span>
+                    );
+                  })()}
                 </div>
                 {headerSubtitle ? (
                   <p className="text-text-3 mt-2 break-words text-sm" title={headerSubtitle}>
