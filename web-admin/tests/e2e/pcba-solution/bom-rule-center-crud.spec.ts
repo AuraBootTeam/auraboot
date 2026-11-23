@@ -483,17 +483,19 @@ for (const c of cases) {
       await expect(denied.page).toHaveURL(new RegExp(`/p/${c.model}/view/${saved.pid}$`));
       const readerKey = denied.page.getByTestId(`form-field-${c.key}`);
       await expect(readerKey).toBeVisible();
-      await expect.poll(() => readerKey.evaluate(element => [
-        element.textContent,
-        ...Array.from(element.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea')).map(input => input.value),
-      ].join(' '))).toMatch(new RegExp(`${marker}|${keyValue}`));
+      if (customerPid) {
+        // This reader has BOM rule access, but no CRM customer read permission.
+        await expect(readerKey).toContainText('无权读取来源');
+        await expect(readerKey).not.toContainText(customerPid);
+      } else {
+        await expect.poll(() => readerKey.evaluate(element => [
+          element.textContent,
+          ...Array.from(element.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea')).map(input => input.value),
+        ].join(' '))).toMatch(new RegExp(`${marker}|${keyValue}`));
+      }
       await expect(denied.page.getByTestId('toolbar-btn-edit')).toHaveCount(0);
       await expect(denied.page.getByTestId('toolbar-btn-delete')).toHaveCount(0);
       await expect(denied.page.locator('main input:not([readonly]):not([disabled]), main textarea:not([readonly]):not([disabled]), main [contenteditable="true"]')).toHaveCount(0);
-      if (customerPid) {
-        await expect(readerKey).toContainText(marker);
-        await expect(readerKey).not.toContainText(customerPid);
-      }
       await denied.page.screenshot({ path: info.outputPath('rule-reader-detail.png'), fullPage: true });
       await denied.page.goto(`/p/${c.model}/new?commandCode=bom:create_${c.command}`, {
         waitUntil: 'domcontentloaded',

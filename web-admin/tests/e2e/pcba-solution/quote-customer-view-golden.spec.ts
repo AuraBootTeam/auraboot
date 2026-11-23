@@ -108,12 +108,15 @@ test.describe('PCBA quote customer view golden', () => {
       ]);
       expect(records, 'attachment record keeps the original filename').toHaveLength(1);
       expect(String(records[0].qo_qca_file_id)).toBe(fileId);
-      const listed = page.waitForResponse(response =>
-        new URL(response.url()).pathname === '/api/dynamic/qo_quote_customer_attachment_common/list'
-        && response.request().method() === 'GET');
+      const attachmentResponses: import('@playwright/test').Response[] = [];
+      page.on('response', response => {
+        if (new URL(response.url()).pathname === '/api/dynamic/qo_quote_customer_attachment_common/list'
+            && response.request().method() === 'GET') attachmentResponses.push(response);
+      });
       await openQuoteDetailFromList(page, created);
       await page.getByRole('tab', { name: '报价Excel', exact: true }).click();
-      const listResponse = await listed;
+      await expect.poll(() => attachmentResponses.length, { timeout: 20_000 }).toBeGreaterThan(0);
+      const listResponse = attachmentResponses.at(-1)!;
       expect(listResponse.status()).toBe(200);
       const filters = JSON.parse(new URL(listResponse.url()).searchParams.get('filters') || '[]');
       expect(filters).toContainEqual({ fieldName: 'qo_qca_quote_id', operator: 'EQ', value: quotePid });

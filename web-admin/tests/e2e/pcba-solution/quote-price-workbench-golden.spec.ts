@@ -83,6 +83,10 @@ test.describe('PCBA quote BOM price workbench golden', () => {
         expect(text, `no ISO-T raw time in list row: ${text}`).not.toMatch(/^\d{4}-\d{2}-\d{2}T/);
       }
 
+      await info.attach('q04-01-quote-list-creator-time', {
+        body: await page.screenshot({ fullPage: true }), contentType: 'image/png',
+      });
+
       // BOM 价格工作台:列顺序与 SoT 页面合同一致,状态列为字典标签
       const priceRow = await openWorkbench(page, created);
       await expect(priceRow).toContainText(created.mpn);
@@ -109,6 +113,7 @@ test.describe('PCBA quote BOM price workbench golden', () => {
       const bodyText = await page.locator('main').innerText();
       expect(bodyText).not.toContain('"current_price_status"');
       expect(bodyText).not.toContain('pending_reason');
+      await priceRow.getByRole('cell').last().scrollIntoViewIfNeeded();
       await info.attach('q04-01-workbench-contract', {
         body: await page.screenshot({ fullPage: true }),
         contentType: 'image/png',
