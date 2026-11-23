@@ -22,23 +22,38 @@ public record CommandPublicOutputProjectionPlan(BusinessTargetAuthorization targ
 
     public record ModelFields(Set<String> declared, Set<String> readable,
             List<BusinessResultProjectionPlan.PolicyMask> policyMasks,
-            List<BusinessResultProjectionPlan.DetailMask> detailMasks) {
+            List<BusinessResultProjectionPlan.DetailMask> detailMasks,
+            @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_EMPTY)
+            Set<String> structured) {
+        public ModelFields(Set<String> declared, Set<String> readable,
+                List<BusinessResultProjectionPlan.PolicyMask> policyMasks,
+                List<BusinessResultProjectionPlan.DetailMask> detailMasks) {
+            this(declared,readable,policyMasks,detailMasks,Set.of());
+        }
         public ModelFields {
             declared = Set.copyOf(declared);
             readable = Set.copyOf(readable);
             policyMasks = List.copyOf(policyMasks);
             detailMasks = List.copyOf(detailMasks);
-            if (declared.isEmpty() || !declared.containsAll(readable)) throw BusinessResultProjectionPlan.denied();
+            structured = structured == null ? Set.of() : Set.copyOf(structured);
+            var structuredFields=structured;
+            if (declared.isEmpty() || !declared.containsAll(readable) || !declared.containsAll(structured)
+                    || policyMasks.stream().anyMatch(mask -> structuredFields.contains(mask.field()))
+                    || detailMasks.stream().anyMatch(mask -> structuredFields.contains(mask.field()))) throw BusinessResultProjectionPlan.denied();
         }
     }
 
     /** Hash only the effective public view, not raw records, role IDs, or grant source IDs. */
     public String fingerprint() {
         Map<String, Object> canonical = new TreeMap<>();
-        models.forEach((model, fields) -> canonical.put(model, Map.of(
-                "declared", fields.declared().stream().sorted().toList(),
-                "readable", fields.readable().stream().sorted().toList(),
-                "policyMasks", fields.policyMasks(), "detailMasks", fields.detailMasks())));
+        models.forEach((model, fields) -> {
+            Map<String,Object> view=new TreeMap<>();
+            view.put("declared",fields.declared().stream().sorted().toList());view.put("readable",fields.readable().stream().sorted().toList());
+            view.put("policyMasks",fields.policyMasks());view.put("detailMasks",fields.detailMasks());
+            // Preserve existing scalar/document fingerprints and stored provenance byte semantics.
+            if(!fields.structured().isEmpty())view.put("structured",fields.structured().stream().sorted().toList());
+            canonical.put(model,view);
+        });
         try {
             String json = new ObjectMapper().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
                     .writeValueAsString(Map.of("version", 1, "models", canonical));

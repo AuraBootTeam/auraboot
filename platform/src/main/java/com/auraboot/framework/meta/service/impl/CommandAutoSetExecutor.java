@@ -107,48 +107,55 @@ public class CommandAutoSetExecutor {
      */
     private String generateAutoCode(String modelCode, String fieldCode, Map<String, Object> config) {
         try {
-            // Security: validate fieldCode and tableName to prevent SQL injection
-            Long tenantId = MetaContext.getCurrentTenantId();
-            CommandExecutorUtils.validateSqlIdentifier(fieldCode, "autoCode fieldCode");
-            String tableName = metaModelService.getTableName(modelCode);
-            CommandExecutorUtils.validateSqlIdentifier(tableName, "autoCode tableName");
-            String datePrefix = tenantClock.businessDate(MetaContext.getCurrentTenantId())
-                    .format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-
-            // Determine code prefix: prefer pattern config, fallback to field-name derivation
-            String codePrefix = extractPrefixFromPattern(config);
-            if (codePrefix == null) {
-                codePrefix = deriveCodePrefix(fieldCode);
-            }
-            String fullPrefix = codePrefix + "-" + datePrefix + "-";
-
-            // Use MAX to get the highest existing sequence number. Only pure-numeric
-            // suffixes may enter the CAST: fallback or imported values sharing the
-            // prefix would otherwise abort the MAX(...) query — and with it the
-            // caller's transaction — and brick every subsequent create in the tenant.
-            String seqExpr = "SUBSTRING(" + fieldCode + " FROM " + (fullPrefix.length() + 1) + ")";
-            String sql = "SELECT MAX(CAST(" + seqExpr + " AS INTEGER)) as max_seq FROM " + tableName
-                    + " WHERE tenant_id = #{params.tenantId} AND " + fieldCode + " LIKE #{params.prefix}"
-                    + " AND " + seqExpr + " ~ '^[0-9]+$'";
-            Map<String, Object> params = Map.of("tenantId", tenantId, "prefix", fullPrefix + "%");
-            List<Map<String, Object>> result = dynamicDataMapper.selectByQuery(sql, params);
-            long nextSeq = 1;
-            if (result != null && !result.isEmpty() && result.get(0) != null) {
-                Map<String, Object> row = result.get(0);
-                Object maxSeq = row.get("max_seq");
-                if (maxSeq == null) maxSeq = row.get("MAX_SEQ");
-                if (maxSeq == null) maxSeq = row.get("maxSeq");
-                if (maxSeq instanceof Number) {
-                    nextSeq = ((Number) maxSeq).longValue() + 1;
-                }
-            }
-
-            return fullPrefix + String.format("%03d", nextSeq);
+            return generateRequiredAutoCode(modelCode, fieldCode, config);
         } catch (Exception e) {
             log.warn("Failed to generate auto code for {}.{}, using UUID fallback: {}",
                     modelCode, fieldCode, e.getMessage());
             return UniqueIdGenerator.generate();
         }
+    }
+
+    /** Shared strict path for business handlers; an unavailable sequence must never become an opaque fallback ID. */
+    public String generateRequiredAutoCode(String modelCode, String fieldCode, Map<String,Object> config) {
+        Long currentTenant=MetaContext.getCurrentTenantId();
+        if(currentTenant==null || currentTenant<=0) throw new SecurityException("AUTO_CODE_TENANT_REQUIRED");
+        // Security: validate fieldCode and tableName to prevent SQL injection
+        Long tenantId = MetaContext.getCurrentTenantId();
+        CommandExecutorUtils.validateSqlIdentifier(fieldCode, "autoCode fieldCode");
+        String tableName = metaModelService.getTableName(modelCode);
+        CommandExecutorUtils.validateSqlIdentifier(tableName, "autoCode tableName");
+        String datePrefix = tenantClock.businessDate(MetaContext.getCurrentTenantId())
+                .format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+
+        // Determine code prefix: prefer pattern config, fallback to field-name derivation
+        String codePrefix = extractPrefixFromPattern(config);
+        if (codePrefix == null) {
+            codePrefix = deriveCodePrefix(fieldCode);
+        }
+        String fullPrefix = codePrefix + "-" + datePrefix + "-";
+
+        // Use MAX to get the highest existing sequence number. Only pure-numeric
+        // suffixes may enter the CAST: fallback or imported values sharing the
+        // prefix would otherwise abort the MAX(...) query — and with it the
+        // caller's transaction — and brick every subsequent create in the tenant.
+        String seqExpr = "SUBSTRING(" + fieldCode + " FROM " + (fullPrefix.length() + 1) + ")";
+        String sql = "SELECT MAX(CAST(" + seqExpr + " AS INTEGER)) as max_seq FROM " + tableName
+                + " WHERE tenant_id = #{params.tenantId} AND " + fieldCode + " LIKE #{params.prefix}"
+                + " AND " + seqExpr + " ~ '^[0-9]+$'";
+        Map<String, Object> params = Map.of("tenantId", tenantId, "prefix", fullPrefix + "%");
+        List<Map<String, Object>> result = dynamicDataMapper.selectByQuery(sql, params);
+        long nextSeq = 1;
+        if (result != null && !result.isEmpty() && result.get(0) != null) {
+            Map<String, Object> row = result.get(0);
+            Object maxSeq = row.get("max_seq");
+            if (maxSeq == null) maxSeq = row.get("MAX_SEQ");
+            if (maxSeq == null) maxSeq = row.get("maxSeq");
+            if (maxSeq instanceof Number) {
+                nextSeq = ((Number) maxSeq).longValue() + 1;
+            }
+        }
+
+        return fullPrefix + String.format("%03d", nextSeq);
     }
 
     private String extractPrefixFromPattern(Map<String, Object> config) {

@@ -46,6 +46,14 @@ public final class CommandIdempotencyIntent {
             if (ctx.getArtifactRootBinding() != null && !ctx.getArtifactRootBinding().isEmpty())
                 intent.put("artifactRootBinding", immutableValue(ctx.getArtifactRootBinding()));
         }
+        var secrets=ctx.getBusinessTenantSecrets();
+        if(secrets!=null && !secrets.isEmpty()) {
+            var order=java.util.Comparator.comparing(com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.TenantSecretReference::serviceType)
+                .thenComparing(com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.TenantSecretReference::providerCode)
+                .thenComparing(com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.TenantSecretReference::field);
+            intent.put("businessTenantSecrets",secrets.stream().sorted(order).map(reference->Map.of(
+                "serviceType",reference.serviceType(),"providerCode",reference.providerCode(),"field",reference.field())).toList());
+        }
         return Collections.unmodifiableMap(intent);
     }
 

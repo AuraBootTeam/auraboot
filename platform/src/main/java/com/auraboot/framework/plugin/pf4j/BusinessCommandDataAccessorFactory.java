@@ -72,7 +72,10 @@ public class BusinessCommandDataAccessorFactory {
                 || !Objects.equals(owner.resourceReadIsolation(), invocationOwner.resourceReadIsolation())
                 || !Objects.equals(owner.independentBusinessReadModels(), invocationOwner.independentBusinessReadModels())
                 || !Objects.equals(owner.publicBusinessResourceFields(), invocationOwner.publicBusinessResourceFields())
+                || !Objects.equals(owner.publicBusinessResourceStructuredFields(), invocationOwner.publicBusinessResourceStructuredFields())
+                || !Objects.equals(owner.businessTenantSecrets(), invocationOwner.businessTenantSecrets())
                 || !Objects.equals(owner.businessArtifactFields(), invocationOwner.businessArtifactFields())
+                || !Objects.equals(owner.businessCurrentArtifactFields(), invocationOwner.businessCurrentArtifactFields())
                 || !Objects.equals(owner.businessSourceFileFields(), invocationOwner.businessSourceFileFields())
                 || !Objects.equals(owner.businessArtifactRootBindingFields(), invocationOwner.businessArtifactRootBindingFields())
                 || !Objects.equals(owner.businessArtifactIntentBindingFields(), invocationOwner.businessArtifactIntentBindingFields())
@@ -119,7 +122,10 @@ public class BusinessCommandDataAccessorFactory {
         private record OutputSource(Map<String,Object> raw, Map<String,Object> projected) {}
         private final Map<SourceKey,OutputSource> outputSources = new HashMap<>();
         private Map<String,Set<String>> publicDeclarations;
+        private Map<String,Set<String>> structuredDeclarations;
         private Map<String,Integer> artifactFields;
+        private Set<BusinessResourceAuthorization.TenantSecretReference> tenantSecrets;
+        private Set<String> currentArtifactFields;
         private Map<String,Integer> sourceFileFields;
         private final Map<String,byte[]> sourceBytes = new HashMap<>();
         private final Map<String,String> sourcePids = new HashMap<>();
@@ -164,13 +170,20 @@ public class BusinessCommandDataAccessorFactory {
             if (deletableModels != null && !deletableModels.equals(owner.businessDeletableResourceModels())) throw denied();
             if (!Objects.equals(inputContract, owner.businessInputContract())
                     || !Objects.equals(readIsolation, owner.resourceReadIsolation())) throw denied();
+            if(tenantSecrets!=null) {
+                if(!tenantSecrets.equals(BusinessTenantSecretContract.references(owner))
+                        || !tenantSecrets.equals(context.getBusinessTenantSecrets()))throw denied();
+                if(!tenantSecrets.isEmpty())BusinessResourcePermissionContract.require(context,owner);
+            }
             if (context.getPublicOutputProjection() != outputPlan
                     || sourceFileFields != null && !sourceFileFields.equals(owner.businessSourceFileFields())
                     || artifactFields != null && !artifactFields.equals(owner.businessArtifactFields())
+                    || currentArtifactFields != null && !currentArtifactFields.equals(owner.businessCurrentArtifactFields())
                     || artifactBindingFields != null && !artifactBindingFields.equals(owner.businessArtifactRootBindingFields())
                     || artifactIntentFields != null && !artifactIntentFields.equals(owner.businessArtifactIntentBindingFields())
                     || artifactBinding != null && !artifactBinding.equals(context.getArtifactRootBinding())
-                    || publicDeclarations != null && !publicDeclarations.equals(owner.publicBusinessResourceFields())) throw denied();
+                    || publicDeclarations != null && !publicDeclarations.equals(owner.publicBusinessResourceFields())
+                    || structuredDeclarations != null && !structuredDeclarations.equals(owner.publicBusinessResourceStructuredFields())) throw denied();
             if (readIsolation != null) {
                 try { if (connection.getTransactionIsolation() != readIsolation.jdbcLevel()) throw denied(); }
                 catch (SQLException failure) { throw new IllegalStateException("Cannot validate business source isolation", failure); }
@@ -230,7 +243,16 @@ public class BusinessCommandDataAccessorFactory {
             pagedLimits = Map.copyOf(owner.pagedBusinessResourceRowLimits());
             publicDeclarations = owner.publicBusinessResourceFields().entrySet().stream().collect(
                     java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey, entry -> Set.copyOf(entry.getValue())));
+            structuredDeclarations = owner.publicBusinessResourceStructuredFields().entrySet().stream().collect(
+                    java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey, entry -> Set.copyOf(entry.getValue())));
+            if(!publicDeclarations.keySet().containsAll(structuredDeclarations.keySet())
+                    || structuredDeclarations.entrySet().stream().anyMatch(entry -> entry.getValue().isEmpty()
+                        || !publicDeclarations.get(entry.getKey()).containsAll(entry.getValue())))throw denied();
+            tenantSecrets=BusinessTenantSecretContract.references(owner);
+            if(!tenantSecrets.equals(context.getBusinessTenantSecrets()))throw denied();
             artifactFields = Map.copyOf(owner.businessArtifactFields());
+            currentArtifactFields=Set.copyOf(owner.businessCurrentArtifactFields());
+            if(!artifactFields.keySet().containsAll(currentArtifactFields))throw denied();
             sourceFileFields = Map.copyOf(owner.businessSourceFileFields());
             if (sourceFileFields.size() > 8 || sourceFileFields.values().stream().anyMatch(limit -> limit < 1 || limit > 67_108_864)
                     || sourceFileFields.values().stream().mapToLong(Integer::longValue).sum() > 67_108_864
@@ -250,6 +272,8 @@ public class BusinessCommandDataAccessorFactory {
                         || !Objects.equals(outputPlan.target(), witness)
                         || !publicDeclarations.keySet().equals(outputPlan.models().keySet())
                         || publicDeclarations.entrySet().stream().anyMatch(entry -> !entry.getValue().equals(outputPlan.models().get(entry.getKey()).declared()))
+                        || publicDeclarations.keySet().stream().anyMatch(model -> !structuredDeclarations.getOrDefault(model,Set.of())
+                            .equals(outputPlan.models().get(model).structured()))
                         || !dependencies.containsAll(publicDeclarations.keySet())
                         || readIsolation != BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ
                             && readIsolation != BusinessResourceAuthorization.ReadIsolation.SERIALIZABLE) throw denied();
@@ -270,6 +294,25 @@ public class BusinessCommandDataAccessorFactory {
         }
 
         public DataAccessor accessor() { return accessor; }
+
+        /** Keep only the compiled exact selectors, bounded by this physical invocation lifetime. */
+        public TenantSecretAccessor tenantSecretAccessor(Map<String,Object> settings) {
+            verify();
+            if(tenantSecrets.isEmpty())return null;
+            BusinessTenantSecretContract.requireMetadata(settings,tenantSecrets);
+            if(!(settings.get(TenantSecretAccessor.SETTINGS_KEY) instanceof TenantSecretAccessor source))throw denied();
+            return (service,provider,field)->{
+                try {
+                    verify();
+                    if(++operations>10_000)throw denied();
+                    if(tenantSecrets.stream().noneMatch(reference->Objects.equals(service,reference.serviceType())
+                            && Objects.equals(provider,reference.providerCode()) && Objects.equals(field,reference.field())))throw denied();
+                    String result=source.readCloudSecret(service,provider,field);
+                    verify();return result;
+                }catch(AccessDeniedException | SecurityException denied){reject();throw denied;}
+            };
+        }
+
 
         /** Enforce the reviewed result envelope before the transport can serialize it. */
         public Map<String, Object> projectResult(Object result) {
@@ -409,7 +452,7 @@ public class BusinessCommandDataAccessorFactory {
                 @Override public DataPage queryPage(String model, DataPageQuery query) {
                     return operation(() -> {
                     requireCallback();
-                    if (query.page() != 1 || !query.anyOfFilters().isEmpty() || !query.sorts().isEmpty()
+                    if (query.page() != 1 || !query.timeRanges().isEmpty() || !query.anyOfFilters().isEmpty() || !query.sorts().isEmpty()
                             || !query.keyword().isEmpty()) throw denied();
                     var rows = query(model, query.exactFilters(), query.size());
                     return new DataPage(rows, rows.size(), 1, query.size());
@@ -464,7 +507,7 @@ public class BusinessCommandDataAccessorFactory {
             model(model);
             Integer limit = pagedLimits.get(model);
             if (limit == null || pagedReadsDirty || query == null || query.exactFilters().isEmpty()
-                    || query.exactFilters().size() > 32 || !query.anyOfFilters().isEmpty()
+                    || query.exactFilters().size() > 32 || !query.timeRanges().isEmpty() || !query.anyOfFilters().isEmpty()
                     || !query.sorts().isEmpty() || !query.keyword().isEmpty()) throw denied();
             var request = new BusinessResourceAuthorization.Request(BusinessResourceAuthorization.Action.QUERY,
                     model, null, null, null, query.exactFilters());
@@ -720,7 +763,7 @@ public class BusinessCommandDataAccessorFactory {
                                 new com.auraboot.framework.file.support.GeneratedArtifactMultipartFile(filename, contentType, bytes), user,
                                 com.auraboot.framework.file.security.BusinessArtifactAuthorization.capture(outputPlan, field,
                                         artifactBinding.entrySet().stream().filter(entry -> artifactBindingFields.contains(entry.getKey()))
-                                                .collect(java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey,Map.Entry::getValue))));
+                                                .collect(java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey,Map.Entry::getValue)),tenantSecrets));
                         if (saved == null || saved.getId() == null || saved.getPid() == null
                                 || !saved.getPid().matches("[0-9A-HJKMNP-TV-Z]{26}")
                                 || !tenant.equals(saved.getTenantId()) || !user.equals(saved.getCreatedBy())

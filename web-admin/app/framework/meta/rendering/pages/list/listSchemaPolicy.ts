@@ -111,8 +111,14 @@ export function collectListMiscBlocks(
     'form-buttons',
     'form-section',
   ]);
+  const headerActions = schema.blocks.find((block: any) =>
+    block.blockType === 'toolbar' || block.blockType === 'form-buttons');
   return schema.blocks.filter((block: any) => {
     if (isContentTabsBlock(block)) return true;
+    // The first toolbar belongs to list chrome; additional grid toolbars belong
+    // to their declared body cells rather than disappearing during specialization.
+    if (skipListData && schema.layout?.type === 'grid' && block !== headerActions
+      && block.blockType === 'toolbar') return true;
     if (skipListData && block.blockType === 'table' && typeof block.dataSource === 'string') {
       const source = schema.dataSources?.[block.dataSource];
       return (

@@ -33,6 +33,9 @@ function createHttp({
   timeout = 15000,
 }) {
   return async function request(method, path, data, options = {}) {
+    const binary = options.responseType === "arraybuffer";
+    if ((options.responseType !== undefined && !binary) || (binary && method !== "GET"))
+      throw error("INVALID_RESPONSE");
     const base = baseUrl();
     const issued = session.snapshot();
     if (options.authRequired && !issued.token) throw error("SESSION_EXPIRED");
@@ -89,7 +92,9 @@ function createHttp({
             throw error("SESSION_EXPIRED");
           }
           if (statusCode === 403) throw error("FORBIDDEN");
-          const result = decode(res);
+          if (binary && (statusCode !== 200 || Object.prototype.toString.call(res.data) !== "[object ArrayBuffer]"))
+            throw error("INVALID_RESPONSE");
+          const result = binary ? { data: res.data, header: headers } : decode(res);
           resolve(options.commit ? options.commit(result) : result);
           return;
         } catch (e) {
@@ -109,6 +114,7 @@ function createHttp({
           method,
           data,
           timeout,
+          ...(binary ? { responseType: "arraybuffer", redirect: "manual" } : {}),
           header: {
             "Content-Type": "application/json",
             traceparent: context.traceparent,

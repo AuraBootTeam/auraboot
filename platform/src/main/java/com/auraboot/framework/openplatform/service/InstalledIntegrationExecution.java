@@ -110,6 +110,7 @@ public final class InstalledIntegrationExecution {
     public static void finishSettings(Map<String,Object> settings) {
         if (CURRENT.get() == null) return;
         for (String key : java.util.List.of("__independentTransactionAccessor","__asyncTaskAccessor",
+                com.auraboot.framework.plugin.extension.NativeBusinessCodeAccessor.SETTINGS_KEY,
                 com.auraboot.framework.plugin.extension.CommandDispatcherAccessor.SETTINGS_KEY,"__tenantRoleAssignmentAccessor","__verifiedPhoneGrantAccessor",
                 "__biTemporalAccessor","__aiProviderAccessor","__fileAccessor","__recordShareAccessor",
                 com.auraboot.framework.plugin.extension.AnnouncementAcknowledgementAccessor.SETTINGS_KEY,

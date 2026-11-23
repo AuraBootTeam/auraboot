@@ -36,7 +36,7 @@ public class ExternalIngressNormalizer {
         }
         var policy = registry.requestNormalizer(source).orElseThrow(() -> new IllegalStateException("Ingress normalizer is unavailable"));
         var prepared = policy.normalize(request, new RequestDefaults(UUID.randomUUID().toString(), Instant.now()));
-        String fingerprint = codec.sha256(canonical(request));
+        String fingerprint = codec.sha256(canonical(policy.fingerprintInput(request)));
         var identities = new TreeMap<>(prepared.stableIdentities());
         if (header != null) identities.put("header", header);
         // A previously committed identity remains a conflict even when the changed body is invalid.
@@ -85,6 +85,9 @@ public class ExternalIngressNormalizer {
 
     /** Canonical object ordering; array order, explicit nulls, types and omitted fields remain significant. */
     public String canonical(Map<String, Object> value) { return encode(sorted(value)); }
+    public Map<String,Object> fingerprintInput(String source,Map<String,Object> request) {
+        return registry.requestNormalizer(source).orElseThrow().fingerprintInput(request);
+    }
     private Object sorted(Object value) {
         if (value instanceof Map<?, ?> map) {
             var result = new TreeMap<String, Object>(); map.forEach((key, item) -> result.put((String)key, sorted(item))); return result;

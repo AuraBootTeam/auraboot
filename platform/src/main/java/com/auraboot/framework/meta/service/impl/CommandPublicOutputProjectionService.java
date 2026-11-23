@@ -75,7 +75,12 @@ public class CommandPublicOutputProjectionService {
     private CommandPublicOutputProjectionPlan capture(CommandPipelineContext context, BusinessResourceAuthorization owner) {
         var declarations = Map.copyOf(owner.publicBusinessResourceFields());
         if (!owner.businessResourceModels().containsAll(declarations.keySet())) throw BusinessResultProjectionPlan.denied();
-        return capture(context, declarations);
+        var structured=owner.publicBusinessResourceStructuredFields();
+        if(structured==null || !declarations.keySet().containsAll(structured.keySet()))throw BusinessResultProjectionPlan.denied();
+        structured.forEach((model,fields)->{
+            if(fields==null || fields.isEmpty() || !declarations.get(model).containsAll(fields))throw BusinessResultProjectionPlan.denied();
+        });
+        return capture(context, declarations, false, structured);
     }
 
     private CommandPublicOutputProjectionPlan capture(CommandPipelineContext context, Map<String,Set<String>> declarations) {
@@ -84,6 +89,11 @@ public class CommandPublicOutputProjectionService {
 
     private CommandPublicOutputProjectionPlan capture(CommandPipelineContext context, Map<String,Set<String>> declarations,
             boolean documentSourceFields) {
+        return capture(context,declarations,documentSourceFields,Map.of());
+    }
+
+    private CommandPublicOutputProjectionPlan capture(CommandPipelineContext context, Map<String,Set<String>> declarations,
+            boolean documentSourceFields, Map<String,Set<String>> structuredDeclarations) {
         CommandResultProjectionService.requireActor(context);
         if (declarations.size() > 16) throw BusinessResultProjectionPlan.denied();
         Map<String, CommandPublicOutputProjectionPlan.ModelFields> result = new LinkedHashMap<>();
@@ -93,6 +103,7 @@ public class CommandPublicOutputProjectionService {
             Set<String> declared = Set.copyOf(entry.getValue());
             if (declared.isEmpty() || declared.size() > 128) throw BusinessResultProjectionPlan.denied();
             declared.forEach(BusinessResourceAuthorization::identifier);
+            Set<String> structured=Set.copyOf(structuredDeclarations.getOrDefault(model,Set.of()));
             var definitions = metadata.getModelFields(model);
             if (definitions == null) throw BusinessResultProjectionPlan.denied();
             Map<String, Set<String>> aliases = new HashMap<>();
@@ -111,7 +122,9 @@ public class CommandPublicOutputProjectionService {
             Set<String> readable = new LinkedHashSet<>();
             for (String field : declared) {
                 String type = types.get(field);
-                if (type == null || type.isBlank() || !documentSourceFields && Set.of("json", "jsonb", "object", "array", "list").contains(type))
+                boolean structuredType=Set.of("json", "jsonb", "object", "array", "list").contains(type==null?"":type);
+                if (type == null || type.isBlank() || structured.contains(field) && !structuredType
+                        || !documentSourceFields && structuredType && !structured.contains(field))
                     throw BusinessResultProjectionPlan.denied();
                 if (permission.viewableFields().contains(field) && !permission.hiddenFields().contains(field)
                         && (!model.equals(context.getBusinessTargetAuthorization().modelCode())
@@ -141,7 +154,7 @@ public class CommandPublicOutputProjectionService {
                     detailMasks.add(new BusinessResultProjectionPlan.DetailMask(canonical, config.getMaskType(), config.getMaskPattern(), config.getReplacementChar()));
                 }
             }
-            result.put(model, new CommandPublicOutputProjectionPlan.ModelFields(declared, readable, policyMasks, detailMasks.stream().distinct().toList()));
+            result.put(model, new CommandPublicOutputProjectionPlan.ModelFields(declared, readable, policyMasks, detailMasks.stream().distinct().toList(),structured));
         }
         return new CommandPublicOutputProjectionPlan(context.getBusinessTargetAuthorization(), context.getBusinessGrantDecision(), result);
     }
@@ -177,7 +190,8 @@ public class CommandPublicOutputProjectionService {
             if (!internal.containsKey(field)) continue;
             Object value = internal.get(field);
             if (!document && !(value == null || value instanceof String || value instanceof Boolean || value instanceof Number
-                    || value instanceof java.time.temporal.TemporalAccessor || value instanceof java.util.Date))
+                    || value instanceof java.time.temporal.TemporalAccessor || value instanceof java.util.Date
+                    || fieldPlan.structured().contains(field) && (value instanceof Map || value instanceof List)))
                 throw BusinessResultProjectionPlan.denied();
             output.put(field, value);
         }

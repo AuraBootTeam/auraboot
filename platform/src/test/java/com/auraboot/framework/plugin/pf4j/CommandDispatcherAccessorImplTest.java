@@ -101,4 +101,15 @@ class CommandDispatcherAccessorImplTest {
 
         assertThat(MetaContext.exists()).isFalse();
     }
+    @Test void correlatedDispatchPreservesTheDurableOperationKeyAndRejectsMissingKeys() {
+        CommandExecutor executor=mock(CommandExecutor.class);
+        var accessor=new CommandDispatcherAccessorImpl(executor);
+        accessor.execute("supplier:sync","supplier","supplier-1",Map.of(),"approved-registration-1");
+        var request=ArgumentCaptor.forClass(CommandExecuteRequest.class);
+        verify(executor).execute(eq("supplier:sync"),request.capture());
+        assertThat(request.getValue().getClientRequestId()).isEqualTo("approved-registration-1");
+        for(String key:java.util.Arrays.asList(null," ","x".repeat(129)))
+            assertThatThrownBy(()->accessor.execute("supplier:sync","supplier","supplier-1",Map.of(),key)).isInstanceOf(IllegalArgumentException.class);
+    }
+
 }

@@ -287,3 +287,32 @@ test("an invalid server trace header cannot leak business text through the log a
   );
   assert.doesNotMatch(JSON.stringify(f.printed), /Sensitive Customer/);
 });
+test('binary GET retains protected session and trace while bypassing only the JSON envelope', async () => {
+  const f = setup(), bytes = new Uint8Array([37,80,68,70,45]).buffer;
+  const pending = f.request('GET','/api/file/download/private',undefined,{responseType:'arraybuffer',authRequired:true,route:'/api/file/download/:id'});
+  assert.equal(f.calls[0].responseType,'arraybuffer'); assert.equal(f.calls[0].redirect,'manual');
+  assert.equal(f.calls[0].header.Authorization,'Bearer old-token');
+  f.calls[0].success({statusCode:200,header:{'Content-Type':'application/pdf'},data:bytes});
+  assert.deepEqual(await pending,{data:bytes,header:{'Content-Type':'application/pdf'}});
+  assert.doesNotMatch(JSON.stringify(f.printed),/private|old-token|%PDF/);
+});
+for (const statusCode of [200,401,403]) test(`binary stale ${statusCode} cannot release bytes or erase replacement identity`,async()=>{
+  const f=setup(),pending=f.request('GET','/file',undefined,{responseType:'arraybuffer'});
+  const rejected=assert.rejects(pending,{code:'SESSION_CHANGED'});f.session.replace('replacement');
+  f.calls[0].success({statusCode,data:new ArrayBuffer(5)});await rejected;
+  assert.equal(f.storage.get('token'),'replacement');assert.equal(f.calls.length,1);
+});
+for(const statusCode of [301,302,404,500]) test(`binary ${statusCode} is rejected without JSON decoding or retry`,async()=>{
+  const f=setup(),pending=f.request('GET','/file',undefined,{responseType:'arraybuffer'});
+  f.calls[0].success({statusCode,data:new ArrayBuffer(5)});
+  await assert.rejects(pending,{code:'INVALID_RESPONSE'});assert.equal(f.calls.length,1);
+});
+test('binary mode rejects invalid response shapes and write methods before transport',async()=>{
+  for(const data of ['%PDF-',{},new Uint8Array(5)]){
+    const f=setup(),pending=f.request('GET','/file',undefined,{responseType:'arraybuffer'});
+    f.calls[0].success({statusCode:200,data});await assert.rejects(pending,{code:'INVALID_RESPONSE'});
+  }
+  const f=setup();await assert.rejects(f.request('POST','/file',{}, {responseType:'arraybuffer'}),{code:'INVALID_RESPONSE'});
+  await assert.rejects(f.request('GET','/file',undefined,{responseType:'json'}),{code:'INVALID_RESPONSE'});
+  assert.equal(f.calls.length,0);
+});

@@ -209,4 +209,45 @@ class InstalledIntegrationCommandFingerprintTest {
         params.put("tenantSecretFields","*");current.put("process",node.toString());
         assertTrue(InstalledIntegrationCommandFingerprint.beforeProcessReadAdditions(json,current,"process",java.util.Set.of(),Map.of(),true).isEmpty());
     }
+    @Test void exactCreateSecretAndReadContractAdditionPreservesOnlyTheKnownProcessPredecessor() throws Exception {
+        var original=commands(config("own"));
+        var root=(ObjectNode)json.readTree(original.get("process"));
+        var params=(ObjectNode)root.get("handlerParams");
+        var grant=params.putObject("installedMachineData").putObject("native_receipt");
+        grant.putArray("read").add("pid").add("quantity");original.put("process",root.toString());
+        grant.putArray("create").add("quantity").add("source_ref");
+        params.put("tenantSecretRead",true);params.putArray("tenantSecretServiceTypes").add("integration");params.putArray("tenantSecretFields").add("password");
+        var withoutPolicy=new LinkedHashMap<>(original);withoutPolicy.put("process",root.toString());
+        params.putArray("receiptReadContracts").addObject().put("connectionPid","own-connection");
+        var current=new LinkedHashMap<>(original);current.put("process",root.toString());
+        var declaration=new com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension.CompletedProcessCapabilityAddition(
+                Map.of("native_receipt",java.util.Set.of("quantity","source_ref")),java.util.Set.of("integration"),java.util.Set.of("password"),java.util.Set.of("receiptReadContracts"));
+        var expected=InstalledIntegrationCommandFingerprint.scoped(json,original,"own");
+        var candidates=InstalledIntegrationCommandFingerprint.beforeProcessCapabilityAddition(json,current,"process",declaration);
+        assertEquals(2,candidates.size());
+        assertTrue(candidates.stream().anyMatch(c->expected.equals(InstalledIntegrationCommandFingerprint.scoped(json,c,"own"))));
+        assertTrue(candidates.stream().anyMatch(c->InstalledIntegrationCommandFingerprint.scoped(json,withoutPolicy,"own")
+                .equals(InstalledIntegrationCommandFingerprint.scoped(json,c,"own"))));
+        for(String mutation:List.of("extra-create","missing-create","extra-secret","other-service","old-read","undeclared-setting","handler","accept","result","selected-binding","invalid-policy")) {
+            var changed=new LinkedHashMap<>(current);var value=(ObjectNode)json.readTree(changed.get("process"));var hp=(ObjectNode)value.get("handlerParams");
+            switch(mutation) {
+                case "extra-create" -> ((ArrayNode)hp.at("/installedMachineData/native_receipt/create")).add("arbitrary");
+                case "missing-create" -> ((ArrayNode)hp.at("/installedMachineData/native_receipt/create")).remove(0);
+                case "extra-secret" -> ((ArrayNode)hp.get("tenantSecretFields")).add("arbitrary");
+                case "other-service" -> hp.putArray("tenantSecretServiceTypes").add("other");
+                case "old-read" -> ((ArrayNode)hp.at("/installedMachineData/native_receipt/read")).add("arbitrary");
+                case "undeclared-setting" -> hp.put("undeclared",true);
+                case "handler" -> value.put("handler","different");
+                case "accept" -> changed.put("accept",changed.get("accept").replace("business.write","business.admin"));
+                case "result" -> changed.put("result",changed.get("result").replace("fixed-handler","different"));
+                case "selected-binding" -> ((ObjectNode)hp.at("/installedIntegration/bindings/0")).put("revision",2);
+                case "invalid-policy" -> hp.put("receiptReadContracts","unbounded");
+            }
+            changed.put("process",value.toString());
+            assertFalse(InstalledIntegrationCommandFingerprint.beforeProcessCapabilityAddition(json,changed,"process",declaration).stream()
+                    .anyMatch(c->expected.equals(InstalledIntegrationCommandFingerprint.scoped(json,c,"own"))),mutation);
+        }
+        assertTrue(InstalledIntegrationCommandFingerprint.beforeProcessCapabilityAddition(json,current,"process",null).isEmpty());
+    }
+
 }

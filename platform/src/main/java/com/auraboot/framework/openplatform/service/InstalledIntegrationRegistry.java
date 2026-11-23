@@ -139,5 +139,22 @@ public class InstalledIntegrationRegistry {
         return matches.getFirst().completedReceiptProcessSecretReadAddition();
     }
 
+    public Optional<ExternalEventIngressExtension.CompletedProcessCapabilityAddition> completedReceiptProcessCapabilityAddition(
+            Registration current,String expectedArtifact) {
+        var matches=new ArrayList<ExternalEventIngressExtension>();
+        for(var extension:plugins.getExtensionsOfType(ExternalEventIngressExtension.class)) {
+            var declared=Objects.requireNonNull(extension.registration());
+            if(!current.sourceCode().equals(declared.sourceCode()))continue;
+            var artifact=plugins.observeLoadedArtifact(extension.getClass()).orElseThrow(InstalledIntegrationRegistry::denied);
+            if(!current.equals(declared) || !current.providerPluginId().equals(artifact.pluginId())
+                    || !Objects.equals(expectedArtifact,artifact.digest()))throw denied();
+            matches.add(extension);
+        }
+        if(matches.size()!=1)throw denied();
+        var addition=matches.getFirst().completedReceiptProcessCapabilityAddition();
+        if(addition==null)throw denied();
+        return addition;
+    }
+
     private static SecurityException denied() { return new SecurityException("Installed integration provider denied"); }
 }

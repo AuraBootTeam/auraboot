@@ -46,6 +46,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -498,6 +500,25 @@ class HandlerPhaseTest {
                 null,null,"po-1",com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.ScopeGrade.ALL,0L));
         ctx.setAuthorizationVerdict(com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict.authorized("pr.purchase.manage"));
         phase.execute(ctx);
+    }
+
+    @Test
+    void execute_combinesExplicitRelatedDeleteAndUpdateWithoutDiscardingEitherBoundary() {
+        MetaContext.setContext(1L,2L,"buyer-pid","Buyer");
+        var recording=new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(recording));
+        when(metaModelService.getModelDefinition("pr_purchase_order")).thenReturn(Optional.empty());
+        var ctx=buildContext(BUSINESS_COMMAND_CODE,"pr_purchase_order",Map.of("type","custom","handler",PLUGIN_HANDLER_CODE,
+                "handlerParams",Map.of("tenantProjectionRead",true,"relatedUpdateAuthorization",true,
+                        "relatedDeleteAuthorization",true,"targetRecordAuthorization","handler")));
+        ctx.setTargetRecordReadable(true);
+        ctx.setPermitPlan(new com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan(
+                com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.Decision.PERMIT,
+                null,null,"po-1",com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.ScopeGrade.ALL,0L));
+        ctx.setAuthorizationVerdict(com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict.authorized("pr.purchase.manage"));
+        phase.execute(ctx);
+        assertThat(recording.capturedContext.get().dataAccessor())
+                .isInstanceOf(com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.class);
     }
 
     @Test
@@ -1093,6 +1114,8 @@ class HandlerPhaseTest {
     private static final class RecordingBusinessHandler extends RecordingPluginHandler
             implements com.auraboot.framework.plugin.extension.BusinessResourceAuthorization {
         final AtomicReference<CommandContext> seen=new AtomicReference<>();
+        java.util.Set<TenantSecretReference> secrets=java.util.Set.of();
+        public java.util.Set<TenantSecretReference> businessTenantSecrets(){return secrets;}
         RecordingBusinessHandler(){super(PLUGIN_HANDLER_CODE);}
         public Boundary businessBoundary(){return new Boundary(BUSINESS_COMMAND_CODE,"pr_purchase_order","update",java.util.Set.of("inventory.receipt.confirm"));}
         public java.util.Set<String> businessResourceModels(){return java.util.Set.of("pr_purchase_order");}
@@ -1108,7 +1131,8 @@ class HandlerPhaseTest {
         var accessor=mock(com.auraboot.framework.plugin.extension.DataAccessor.class);
         ReflectionTestUtils.setField(phase,"businessResources",factory);
         var ctx=buildContext(BUSINESS_COMMAND_CODE,"pr_purchase_order",Map.of("type","custom","handler",PLUGIN_HANDLER_CODE,
-                "handlerParams",Map.of("targetRecordAuthorization","business","targetRecordAction","update","dslPersistence",false,"tenantProjectionRead",true)));
+                "handlerParams",Map.of("targetRecordAuthorization","business","targetRecordAction","update","dslPersistence",false,"tenantProjectionRead",true,
+                    "tenantSecretRead",true,"tenantSecretServiceTypes",List.of("integration"),"tenantSecretFields",List.of("definition"))));
         when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
         when(factory.open(ctx,handler)).thenReturn(scope);when(scope.accessor()).thenReturn(accessor);
         when(scope.projectResult(any())).thenReturn(Map.of("status","confirmed"));
@@ -1116,9 +1140,34 @@ class HandlerPhaseTest {
         assertThat(handler.seen.get().settings().get(CommandHandlerExtension.DATA_ACCESSOR_KEY)).isSameAs(accessor);
         assertThat(handler.seen.get().settings()).doesNotContainKeys(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY,
                 CommandHandlerExtension.FILE_ACCESSOR_KEY,CommandHandlerExtension.INDEPENDENT_TRANSACTION_ACCESSOR_KEY,
-                CommandHandlerExtension.ASYNC_TASK_ACCESSOR_KEY,com.auraboot.framework.plugin.extension.TenantRoleAssignmentAccessor.SETTINGS_KEY);
+                CommandHandlerExtension.ASYNC_TASK_ACCESSOR_KEY,com.auraboot.framework.plugin.extension.TenantRoleAssignmentAccessor.SETTINGS_KEY,
+                com.auraboot.framework.plugin.extension.TenantSecretAccessor.SETTINGS_KEY);
         assertThat(ctx.getHandlerResults()).containsEntry("status","confirmed").doesNotContainKey("secret_cost");
         verify(scope).projectResult(Map.of("status","confirmed","secret_cost",7));verify(scope).close();
+    }
+
+    @Test void businessHandlersReceiveTheScopeConstrainedSecretInsteadOfTheUnboundedHostReader() {
+        var handler=new RecordingBusinessHandler();
+        handler.secrets=java.util.Set.of(new com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.TenantSecretReference("integration","contract","definition"));
+        var factory=mock(com.auraboot.framework.plugin.pf4j.BusinessCommandDataAccessorFactory.class);
+        var scope=mock(com.auraboot.framework.plugin.pf4j.BusinessCommandDataAccessorFactory.Scope.class);
+        var accessor=mock(com.auraboot.framework.plugin.extension.DataAccessor.class);
+        var secret=mock(com.auraboot.framework.plugin.extension.TenantSecretAccessor.class);
+        ReflectionTestUtils.setField(phase,"businessResources",factory);
+        var ctx=buildContext(BUSINESS_COMMAND_CODE,"pr_purchase_order",Map.of("type","custom","handler",PLUGIN_HANDLER_CODE,
+            "handlerParams",Map.of("targetRecordAuthorization","business","targetRecordAction","update","dslPersistence",false,
+                "tenantSecretRead",true,"tenantSecretServiceTypes",List.of("integration"),"tenantSecretFields",List.of("definition"))));
+        ctx.setBusinessTenantSecrets(handler.secrets);
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+        when(factory.open(ctx,handler)).thenReturn(scope);when(scope.accessor()).thenReturn(accessor);
+        when(scope.tenantSecretAccessor(anyMap())).thenAnswer(call->{
+            Map<String,Object> settings=call.getArgument(0);
+            assertThat(settings.get(com.auraboot.framework.plugin.extension.TenantSecretAccessor.SETTINGS_KEY))
+                .isInstanceOf(com.auraboot.framework.plugin.pf4j.TenantSecretAccessorImpl.class).isNotSameAs(secret);return secret;
+        });
+        when(scope.projectResult(any())).thenReturn(Map.of("status","confirmed"));
+        phase.execute(ctx);assertThat(handler.seen.get().tenantSecretAccessor()).isSameAs(secret);
+        verify(scope).tenantSecretAccessor(anyMap());verifyNoInteractions(cloudConfigService);
     }
 
     @Test void businessModeCannotDispatchAnUnconstrainedAsyncTask() {

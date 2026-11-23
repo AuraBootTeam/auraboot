@@ -165,4 +165,24 @@ class InstalledIntegrationRegistryTest {
         when(plugins.getExtensionsOfType(ExternalEventIngressExtension.class)).thenReturn(List.of(provider,provider));
         assertThrows(SecurityException.class,()->registry.completedReceiptProcessSecretReadAddition(registration,digest));
     }
+    @Test void terminalCapabilityPredecessorIsPinnedToOneExactCurrentProvider() {
+        var provider=mock(ExternalEventIngressExtension.class);when(provider.registration()).thenReturn(registration);
+        var addition=new ExternalEventIngressExtension.CompletedProcessCapabilityAddition(Map.of("native_receipt",Set.of("quantity","source_ref")),
+                Set.of("integration"),Set.of("password"),Set.of("receiptReadContracts"));
+        when(provider.completedReceiptProcessCapabilityAddition()).thenReturn(Optional.of(addition));
+        String digest="sha256:"+"a".repeat(64);
+        when(plugins.getExtensionsOfType(ExternalEventIngressExtension.class)).thenReturn(List.of(provider));
+        when(plugins.observeLoadedArtifact(provider.getClass())).thenReturn(Optional.of(
+                new AuraPluginManager.LoadedPluginArtifact(registration.providerPluginId(),Path.of("provider.jar"),digest)));
+        var registry=new InstalledIntegrationRegistry(plugins);
+        assertEquals(Optional.of(addition),registry.completedReceiptProcessCapabilityAddition(registration,digest));
+        assertThrows(SecurityException.class,()->registry.completedReceiptProcessCapabilityAddition(registration,"sha256:"+"b".repeat(64)));
+        when(plugins.getExtensionsOfType(ExternalEventIngressExtension.class)).thenReturn(List.of(provider,provider));
+        assertThrows(SecurityException.class,()->registry.completedReceiptProcessCapabilityAddition(registration,digest));
+        assertThrows(IllegalArgumentException.class,()->new ExternalEventIngressExtension.CompletedProcessCapabilityAddition(
+                Map.of("native_receipt",Set.of("tenant_id")),Set.of("integration"),Set.of("password"),Set.of()));
+        assertThrows(IllegalArgumentException.class,()->new ExternalEventIngressExtension.CompletedProcessCapabilityAddition(
+                Map.of("native_receipt",Set.of("quantity")),Set.of("integration"),Set.of("password"),Set.of("installedIntegration")));
+    }
+
 }
