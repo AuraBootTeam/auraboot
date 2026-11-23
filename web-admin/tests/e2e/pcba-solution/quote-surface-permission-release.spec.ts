@@ -381,7 +381,20 @@ test('formal approval center: menu, approve with audit fields, reject, search an
   expect(decodeURIComponent(response.url())).toContain('qo_quote_formal_version');
   await expect(ui.getByRole('heading',{name:'正式报价版本审批',exact:true})).toBeVisible();
   const search=ui.getByTestId('list-search-input').first();
+  const filteredList=ui.waitForResponse(r=>
+    r.url().includes('/api/dynamic/qo_quote_common/list') &&
+    r.request().method()==='GET' && new URL(r.url()).searchParams.get('keyword')===marker);
   await search.fill(marker);await search.press('Enter');
+  const filteredResponse=await filteredList;
+  expect(filteredResponse.status()).toBe(200);
+  const filteredBody=await filteredResponse.json();
+  expect(String(filteredBody.code)).toBe('0');
+  expect(filteredBody.data.records.map((record:{pid:unknown})=>String(record.pid)).sort())
+    .toEqual(fixtures.map(quote=>String(quote.pid)).sort());
+  // Search synchronizes the route asynchronously. A later route commit correctly
+  // cancels route-scoped forms, so finish that navigation before opening one.
+  await expect(ui).toHaveURL(url=>url.searchParams.get('keyword')===marker);
+  await expect(ui.getByTestId('dynamic-list')).toHaveAttribute('data-ready','true');
   const approveRow=ui.getByRole('row').filter({hasText:String(fixtures[0].qo_quote_code)});
   await expect(approveRow).toContainText('待审批');
   await approveRow.getByTestId('row-action-more').click();

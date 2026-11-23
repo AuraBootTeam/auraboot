@@ -13,6 +13,7 @@ import io.micrometer.observation.annotation.Observed;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 
@@ -85,6 +86,11 @@ public class RestEndpointPipeline {
         final String[] phase = {"init"};
         final TransactionTemplate tx = new TransactionTemplate(txManager);
         tx.setReadOnly(route.readOnlyTx() && !scopedIdempotency);
+        if (tx.isReadOnly()) {
+            // Physical rows and their current field grants must share one MVCC view.
+            // Keep writable/idempotency-claim transactions on their existing isolation.
+            tx.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        }
 
         try {
             BufferingPluginHttpResponse buf = tx.execute(status -> {

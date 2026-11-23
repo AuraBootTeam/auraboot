@@ -147,6 +147,7 @@ test.describe('PCBA quote BOM price yunhan adoption', () => {
       await expect(priceRow).toContainText(/云汉|Yunhan/, { timeout: 20_000 });
       const rowCells = (await tableCellTexts(priceRow)).join(' ');
       expect(rowCells).toContain('0.0264');
+      await test.info().attach('yunhan-adopted-price', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     } finally {
       await cleanupRows(page, created);
     }

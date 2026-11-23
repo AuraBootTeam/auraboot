@@ -312,11 +312,11 @@ export function ReviewDrawerEvidenceRail({
           </summary>
           <div className="border-border space-y-3 border-t p-3">
             {exportFields.length > 0 && (
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="grid min-w-0 gap-3">
                 {exportFields.map((field: any) => {
                   const key = String(field.key || field.field || field.label);
                   return (
-                    <section key={key} className="rounded-card border-border bg-subtle border p-3">
+                    <section key={key} className="rounded-card border-border bg-subtle min-w-0 border p-3">
                       <div className="text-text-2 text-xs">
                         {getLocalizedText(field.label || key, locale, t)}
                       </div>
@@ -331,11 +331,11 @@ export function ReviewDrawerEvidenceRail({
             {exportRows.length > 0 && (
               <ol className="rounded-card border-border divide-border bg-panel divide-y border">
                 {exportRows.map((row: any, index: number) => (
-                  <li key={String(row.pid ?? index)} className="text-text-2 px-3 py-2 text-sm">
-                    <span className="font-mono font-semibold">
+                  <li key={String(row.pid ?? index)} className="text-text-2 min-w-0 px-3 py-2 text-sm">
+                    <span className="block font-mono font-semibold [overflow-wrap:anywhere]">
                       {formatValue(readPath(row, 'bom_er_filename'), String(row.pid ?? index))}
                     </span>
-                    <span className="text-text-2 ml-2 text-xs">
+                    <span className="text-text-2 mt-1 block text-xs">
                       Rev {formatValue(readPath(row, 'bom_er_revision_no'))}
                     </span>
                   </li>
