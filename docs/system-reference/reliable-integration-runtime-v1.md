@@ -358,3 +358,38 @@ A producer adapter may omit an optional derived effect only when the owner has n
 installed in that tenant. Once selected, missing consumers and processing failures retain
 normal reliable delivery/receipt rollback and retry behavior. This check does not authorize
 writes, broaden model scopes or retroactively enqueue facts produced before selection.
+
+## Explicit recovery of failed accepted receipts
+
+`GET /api/admin/open-platform/installations/{installation}/event-sources/{source}/events/{event}/recovery`
+returns a payload-free recovery plan for one tenant-scoped accepted receipt with a failed outbox and open dead letter.
+The current installation, scope, provider, command and machine-data declarations must still be trusted.
+The stored original envelope and binding must match their receipt hashes exactly.
+
+A tenant administrator can submit that exact plan plus a nonblank `reason` to `POST` on the same route.
+The decision includes `requestPid`, `envelopeSha256`, `bindingSha256`,
+`previousCommandSha256`, `previousProviderSha256`, `commandSha256`, `providerSha256`
+and `expectedReplayCount`. Tenant and operator identity come exclusively from the authenticated context.
+The transaction locks the outbox, compare-and-swaps the accepted receipt's command/provider hashes,
+and appends an audit row to `ab_installed_integration_recovery`. Audit failure rolls back the change.
+It does not modify the original event, payload, binding, request PID, delivery state or business records,
+and does not enqueue work. Use the existing attributed dead-letter replay operation after authorization.
+
+An identical decision by the same operator returns the same audit result, including after completion.
+A changed reason/operator, stale replay version or fingerprint, revoked grant, altered envelope/binding,
+foreign tenant or completed receipt without an existing matching decision cannot authorize recovery.
+Ordinary ingress, consumption and result reads retain their strict fingerprint checks.
+This is an internal operator surface; public provider protocols are unchanged.
+
+`InstalledIntegrationRecoveryServiceTest` covers trust, stale decisions and exact retries.
+`InstalledIntegrationRecoveryPersistenceIT` uses real PostgreSQL mappers, transactions and concurrent
+operators to prove audit rollback and serialization. Its provider/command metadata are controlled fixtures;
+HTTP role admission and actual provider business effects require target-runtime verification separately.
+
+The main-line recovery schema is installed by migration `20261123203000`.
+A copy of a test database that has already applied `20261121140000` needs a
+reviewed migration payload retaining the original applied SQL bytes. The forward
+migration checks that exact successful ledger entry and preserves the existing
+table and audit rows. Use the existing reviewed-history process for unapplied
+migrations that precede the copy's installed tip. Keep Flyway validation enabled
+and use the ordinary main-line payload for fresh installs and current main upgrades.

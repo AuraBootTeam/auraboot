@@ -857,4 +857,33 @@ class InstalledIntegrationServiceTest {
             assertThrows(SecurityException.class,()->service.consume(event()),state);
         }
     }
+    @Test void exactCreateCapabilityPredecessorNeverMigratesAcceptedWorkOrIgnoresOtherChanges() throws Exception {
+        var root=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(metadata.get(process).getExecutionConfig());
+        var params=(com.fasterxml.jackson.databind.node.ObjectNode)root.get("handlerParams");
+        params.putObject("installedMachineData").putObject("native_receipt").putArray("read").add("pid").add("quantity");
+        metadata.get(process).setExecutionConfig(root.toString());
+        service.accept(principal,source,event());var original=acceptedReceipt();
+        var completed=receiptWith(original,"completed","request-pid",original.bindingSha256(),original.commandSha256());
+        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(completed);when(receipts.claim(any())).thenReturn(0);
+        ((com.fasterxml.jackson.databind.node.ObjectNode)params.at("/installedMachineData/native_receipt")).putArray("create").add("quantity").add("source_ref");
+        params.put("tenantSecretRead",true);params.putArray("tenantSecretFields").add("password");params.putArray("tenantSecretServiceTypes").add("integration");
+        params.putArray("receiptReadContracts").addObject().put("connectionPid","own-connection");
+        metadata.get(process).setExecutionConfig(root.toString());upgradeProvider();clearInvocations(executor);
+        assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"));
+        var addition=new ExternalEventIngressExtension.CompletedProcessCapabilityAddition(Map.of("native_receipt",Set.of("quantity","source_ref")),
+                Set.of("integration"),Set.of("password"),Set.of("receiptReadContracts"));
+        when(registry.completedReceiptProcessCapabilityAddition(eq(registration),anyString())).thenReturn(Optional.of(addition));
+        when(executor.execute(eq(result),any())).thenReturn(CommandExecuteResult.builder().phaseReached("completed").data(Map.of("recordPid","request-pid","state","completed")).build());
+        assertEquals("request-pid",service.result(principal,source,"evt-1").get("recordPid"));clearInvocations(executor);
+        assertTrue(service.accept(principal,source,event()).duplicate());service.consume(event());verifyNoInteractions(executor);
+        for(String state:List.of("accepted","accepting","failed")) {
+            when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(receiptWith(original,state,"request-pid",original.bindingSha256(),original.commandSha256()));
+            assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"),state);
+            assertThrows(SecurityException.class,()->service.consume(event()),state);
+        }
+        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(completed);
+        params.put("undeclared",true);metadata.get(process).setExecutionConfig(root.toString());
+        assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"));
+    }
+
 }

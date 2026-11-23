@@ -68,6 +68,33 @@ class BusinessArtifactAccessGuardTest {
         when(projection.prepare(any(), same(owner))).thenReturn(plan);
     }
     @AfterEach void clear() { MetaContext.clear(); }
+    @Test void changedTenantSecretSelectorsRetireArtifactsWithoutGrantingAnotherProvider() throws Exception {
+        var reference=new BusinessResourceAuthorization.TenantSecretReference("integration","contract","definition");
+        var plan=plan(fields(Set.of("name","brand"),List.of()));
+        file.setArtifactAuthorization(BusinessArtifactAuthorization.capture(plan,"export_file",Map.of(),Set.of(reference)).encode());
+        when(owner.businessTenantSecrets()).thenReturn(Set.of(reference));
+        definition.setExecutionConfig(new ObjectMapper().writeValueAsString(Map.of("type","custom","permissions",List.of("orders.export"),
+            "handlerParams",Map.of("targetRecordAuthorization","business","targetRecordAction","update","dslPersistence",false,
+                "tenantSecretRead",true,"tenantSecretServiceTypes",List.of("integration"),"tenantSecretFields",List.of("definition")))));
+        guard.authorize(file);
+        when(owner.businessTenantSecrets()).thenReturn(Set.of(new BusinessResourceAuthorization.TenantSecretReference("integration","different","definition")));
+        assertThatThrownBy(()->guard.authorize(file)).isInstanceOf(AccessDeniedException.class);
+    }
+    @Test void currentOnlySlotsRejectReplacedOrClearedFilePointersWithoutRelyingOnCreator() {
+        when(owner.businessCurrentArtifactFields()).thenReturn(Set.of("export_file"));
+        var current=new java.util.HashMap<String,Object>(root);current.put("export_file",file.getPid());
+        when(data.getByIdForAuthorization("orders",PID)).thenReturn(current);
+        when(authorization.resolve(eq(30L),anyList(),eq("orders"),eq(current))).thenReturn(allowed);
+        when(authorization.resolveModelRead(30L,"orders",current)).thenReturn(denied);
+        guard.authorize(file);
+        current.put("export_file","01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        assertThatThrownBy(()->guard.authorize(file)).isInstanceOf(AccessDeniedException.class);
+        current.remove("export_file");assertThatThrownBy(()->guard.authorize(file)).isInstanceOf(AccessDeniedException.class);
+    }
+    @Test void anUndeclaredCurrentSlotCannotChangeArtifactAccessSemantics() {
+        when(owner.businessCurrentArtifactFields()).thenReturn(Set.of("other_file"));
+        assertThatThrownBy(()->guard.authorize(file)).isInstanceOf(AccessDeniedException.class);
+    }
     @Test void an_owner_requiring_root_relationships_rejects_an_older_unbound_stamp() {
         when(owner.businessArtifactRootBindingFields()).thenReturn(Set.of("project"));
         assertThatThrownBy(() -> guard.authorize(file)).isInstanceOf(AccessDeniedException.class);
@@ -76,6 +103,19 @@ class BusinessArtifactAccessGuardTest {
         guard.authorize(file);
         when(authorization.resolve(eq(30L), anyList(), eq("orders"), eq(root))).thenReturn(denied);
         assertThatThrownBy(() -> guard.authorize(file)).isInstanceOf(AccessDeniedException.class);
+    }
+    @Test void currentIntrinsicActorGateAlsoAppliesToPreviouslyGeneratedBytesAndModelReaders() {
+        var enabled=new java.util.concurrent.atomic.AtomicBoolean(true);
+        when(owner.businessActorAuthorization()).thenReturn(new com.auraboot.framework.plugin.extension.BusinessActorAuthorization() {
+            public Map<String,Set<String>> sources(){return Map.of();}
+            public boolean authorize(Context context){return enabled.get() && "actor".equals(context.target().currentUserPid());}
+        });
+        guard.authorize(file);
+        enabled.set(false);
+        assertThatThrownBy(()->guard.authorize(file)).isInstanceOf(AccessDeniedException.class);
+        when(authorization.resolve(eq(30L),anyList(),eq("orders"),eq(root))).thenReturn(denied);
+        when(authorization.resolveModelRead(30L,"orders",root)).thenReturn(allowed);
+        assertThatThrownBy(()->guard.authorize(file)).isInstanceOf(AccessDeniedException.class);
     }
     @Test void a_valid_model_reader_does_not_need_the_generation_permission_or_creator_identity() {
         file.setCreatedBy(999L);

@@ -91,6 +91,8 @@ public class HandlerPhase implements CommandPhase {
     private final DynamicDataService dynamicDataService;
     private final DynamicDataMapper dynamicDataMapper;
     private final MetaModelService metaModelService;
+    @Autowired(required=false) private com.auraboot.framework.meta.service.CommandService nativeCodeCommands;
+    @Autowired(required=false) private com.auraboot.framework.meta.service.impl.CommandAutoSetExecutor nativeCodeGenerator;
     private final RecordSnapshotReader snapshotReader;
     private final DataPermissionEngine dataPermissionEngine;
     private final DataDomainService dataDomainService;
@@ -635,9 +637,9 @@ public class HandlerPhase implements CommandPhase {
                 && (isAsyncHandler(asyncHandlerParams) || !secondaryHandlers.isEmpty())) {
             throw new AccessDeniedException("Command-created models require one synchronous handler");
         }
-        if (Boolean.TRUE.equals(asyncHandlerParams.get(
-                com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.OPT_IN))
-                && isAsyncHandler(asyncHandlerParams)) {
+        if ((Boolean.TRUE.equals(asyncHandlerParams.get(com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.OPT_IN))
+                || Boolean.TRUE.equals(asyncHandlerParams.get(com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.CREATE_OPT_IN)))
+                && (isAsyncHandler(asyncHandlerParams) || !secondaryHandlers.isEmpty())) {
             throw new AccessDeniedException("Related updates cannot execute asynchronously");
         }
 
@@ -728,6 +730,8 @@ public class HandlerPhase implements CommandPhase {
                         commandCode, tenantId, pluginSettings);
                 com.auraboot.framework.plugin.pf4j.DocumentCurrencyAccessorImpl.install(
                         pluginSettings, tenantId, currencyConversionService);
+                com.auraboot.framework.plugin.pf4j.NativeBusinessCodeAccessorImpl.install(pluginSettings,
+                        tenantId,MetaContext.exists()?MetaContext.getCurrentUserPid():null,commandCode,nativeCodeCommands,metaModelService,nativeCodeGenerator,objectMapper);
                 com.auraboot.framework.plugin.pf4j.TenantSecretAccessorImpl.install(
                         pluginSettings, tenantId, cloudConfigService, objectMapper);
                 com.auraboot.framework.plugin.pf4j.VerifiedPhoneGrantAccessorImpl.install(
@@ -755,18 +759,19 @@ public class HandlerPhase implements CommandPhase {
                                 instanceof TenantProjectionAccessor projection)) {
                         throw new AccessDeniedException("Related delete authorization requires a target handler and projection");
                     }
-                    pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,
+                    if (!Boolean.TRUE.equals(pluginSettings.get(
+                            com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.OPT_IN))) {
+                        pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,
                             new com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor(dynamicDataService,
                                     tenantId,commandCode,modelCode,effectiveRecordId,
                                     MetaContext.getCurrentUserPid(),handler,projection));
+                    }
                 }
                 if (Boolean.TRUE.equals(pluginSettings.get(
                         com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.OPT_IN))) {
                     if (handler == null || !relatedUpdateBoundaryAuthorized
                             || !StringUtils.hasText(effectiveRecordId)
                             || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
-                            || Boolean.TRUE.equals(pluginSettings.get(
-                                com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor.OPT_IN))
                             || !(pluginSettings.get(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY)
                                 instanceof TenantProjectionAccessor projection)) {
                         throw new AccessDeniedException("Related update requires an authorized readable target and projection");
@@ -774,8 +779,20 @@ public class HandlerPhase implements CommandPhase {
                     pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,
                             new com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor(dynamicDataService,
                                     tenantId,commandCode,modelCode,effectiveRecordId,
-                                    MetaContext.getCurrentUserPid(),handler,projection));
+                                    MetaContext.getCurrentUserPid(),handler,projection,
+                                    Boolean.TRUE.equals(pluginSettings.get(
+                                        com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor.OPT_IN)),
+                                    Boolean.TRUE.equals(pluginSettings.get(
+                                        com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.CREATE_OPT_IN)),
+                                    Boolean.TRUE.equals(pluginSettings.get(
+                                        com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.ROOT_UPDATE_OPT_IN))));
                 }
+                if(Boolean.TRUE.equals(pluginSettings.get(com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.CREATE_OPT_IN))
+                        && !Boolean.TRUE.equals(pluginSettings.get(com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.OPT_IN)))
+                    throw new AccessDeniedException("Related create requires the exact related command boundary");
+                if(Boolean.TRUE.equals(pluginSettings.get(com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.ROOT_UPDATE_OPT_IN))
+                        && !Boolean.TRUE.equals(pluginSettings.get(com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.OPT_IN)))
+                    throw new AccessDeniedException("Root update requires the exact related command boundary");
                 com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.installRelatedWriter(
                         pluginSettings,dynamicDataService,handler,modelCode,effectiveRecordId);
                 pluginSettings.put(TenantRoleAssignmentAccessor.SETTINGS_KEY,
@@ -837,6 +854,11 @@ public class HandlerPhase implements CommandPhase {
                     if(com.auraboot.framework.meta.security.DocumentArtifactContract.from(execConfig,modelCode)!=null) {
                         controls.add(com.auraboot.framework.plugin.extension.FileAccessor.SETTINGS_KEY);
                         controls.add(com.auraboot.framework.plugin.extension.DocumentOutputAccessor.SETTINGS_KEY);
+                    }
+                    var tenantSecrets=businessScope.tenantSecretAccessor(pluginSettings);
+                    if(tenantSecrets!=null) {
+                        controls.add(com.auraboot.framework.plugin.extension.TenantSecretAccessor.SETTINGS_KEY);
+                        pluginSettings.put(com.auraboot.framework.plugin.extension.TenantSecretAccessor.SETTINGS_KEY,tenantSecrets);
                     }
                     pluginSettings.keySet().removeIf(key->key.startsWith("__") && !controls.contains(key));
                     pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,businessScope.accessor());
@@ -983,7 +1005,8 @@ public class HandlerPhase implements CommandPhase {
         if(businessResources==null || !(handler instanceof com.auraboot.framework.plugin.extension.BusinessResourceAuthorization)
                 || !secondaryHandlers.isEmpty() || !Boolean.FALSE.equals(params.get("dslPersistence"))
                 || params.containsKey("async") || params.containsKey("commandCreatedModels")
-                || params.containsKey("relatedUpdateAuthorization") || params.containsKey("relatedDeleteAuthorization"))
+                || params.containsKey("relatedUpdateAuthorization") || params.containsKey("relatedDeleteAuthorization")
+                || params.containsKey("relatedCreateAuthorization") || params.containsKey("rootUpdateAuthorization"))
             throw new AccessDeniedException("A synchronous business command requires one complete resource owner");
         return true;
     }

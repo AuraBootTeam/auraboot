@@ -9,6 +9,7 @@ import { useListMemberInvite } from './list/useListMemberInvite';
 import { useListMetadata } from './list/useListMetadata';
 import { useListPageRuntime } from './list/useListPageRuntime';
 import { useListSelectionBinding } from './list/useListSelectionBinding';
+import { useListStatusPolling } from './list/useListStatusPolling';
 import { useListPageState } from './list/useListPageState';
 import { useListQueryActions } from './list/useListQueryActions';
 import { useListQuickFilters } from './list/useListQuickFilters';
@@ -105,6 +106,7 @@ function ListPageContentInner(props: PageContentProps) {
     { ...pageRuntime, ...state, ...metadata, ...savedViews },
     { get filterBlock() { return columns.filterBlock; } },
   );
+  useListStatusPolling({ ...state, loadDataRef: pageRuntime.loadDataRef });
   const queryActions = useListQueryActions(
     { ...pageRuntime, ...state, ...dataLoader, ...metadata, ...savedViews },
     {

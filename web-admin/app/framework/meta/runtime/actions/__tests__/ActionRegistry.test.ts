@@ -1322,6 +1322,42 @@ describe('ActionRegistry form.reset / state.set handlers', () => {
     expect(stateManager.updateState).toHaveBeenCalledWith('s1', 'page', 2);
   });
 
+  it('state.set evaluates typed values once before applying any scoped updates', async () => {
+    const stateManager = { updateState: vi.fn() };
+    await actionRegistry.execute('state.set', {
+      stateManager, scopeId: 'typed-state', expressionEvaluator: new ExpressionEvaluator(),
+      expressionContext: createExpressionContext({ form: { version: 7, enabled: false, label: '${record.secret}' } }),
+      args: { version: '${form.version}', enabled: '${form.enabled}',
+        selection: { label: '${form.label}', values: ['${form.version}', null] } },
+    });
+    expect(stateManager.updateState.mock.calls).toEqual([
+      ['typed-state', 'version', 7], ['typed-state', 'enabled', false],
+      ['typed-state', 'selection', { label: '${record.secret}', values: [7, null] }],
+    ]);
+  });
+
+  it('state.set keeps numeric pagination and observed versions through the real flow into a command', async () => {
+    const manager = new ScopedStateManager({ locale: 'en-US', theme: 'light' } as any);
+    manager.createScope('paged-book', { form: {} });
+    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: { saved: true } });
+    const flow = new FlowRunner({ evaluator: new ExpressionEvaluator(), actionRegistry,
+      stateManager: manager, scopeId: 'paged-book', dataSourceManager: {} as any,
+      schema: {} as any, getAllFormFields: () => [] });
+    await flow.run([
+      { action: 'state.set', args: { page: '${dataSources.profiles.current + 1}',
+        observedVersion: '${record.version}', supplier: '${record.pid}' } },
+      { action: 'command.execute', args: { command: 'example:save', operationType: 'update',
+        targetRecordPid: '${state.supplier}', expectedVersion: '${state.observedVersion}',
+        payload: { page: '${state.page}' } } },
+    ], { ...manager.getContext('paged-book'), record: { pid: 'supplier', version: 9 },
+      dataSources: { profiles: { current: 1 } }, fetchResult } as any);
+    expect(manager.getContext('paged-book').state.page).toBe(2);
+    expect(manager.getContext('paged-book').state.observedVersion).toBe(9);
+    expect(fetchResult).toHaveBeenCalledWith('/api/meta/commands/execute/example:save', expect.objectContaining({
+      method: 'post', params: expect.objectContaining({ targetRecordPid: 'supplier', expectedVersion: 9, payload: { page: 2 } }),
+    }));
+  });
+
   it('state.set logs and no-ops without stateManager, scopeId, or args', async () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     await actionRegistry.execute('state.set', {});

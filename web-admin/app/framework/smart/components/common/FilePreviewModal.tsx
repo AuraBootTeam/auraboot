@@ -25,6 +25,12 @@ export interface FilePreviewModalProps {
   fileName: string;
   /** MIME type or file extension */
   fileType?: string;
+  /** Opt in only for a Blob whose PDF MIME and magic bytes were verified by its owner. */
+  verifiedPdfBlob?: boolean;
+  description?: string;
+  closeLabel?: string;
+  onCloseAutoFocus?: (event: Event) => void;
+  downloadAction?: { label: string; busy: boolean; error?: string; onClick: () => void };
 }
 
 type PreviewKind = 'image' | 'pdf' | 'text' | 'other';
@@ -81,6 +87,11 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   fileUrl,
   fileName,
   fileType,
+  verifiedPdfBlob,
+  description,
+  closeLabel,
+  onCloseAutoFocus,
+  downloadAction,
 }) => {
   const [textContent, setTextContent] = useState<string | null>(null);
   const [textLoading, setTextLoading] = useState(false);
@@ -123,12 +134,18 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className={`${contentMaxWidth} w-[90vw]`} data-testid="file-preview-modal">
+      <DialogContent
+        className={`${contentMaxWidth} w-[90vw]`}
+        style={kind === 'pdf' ? { maxWidth: 'min(90vw, 80rem)' } : undefined}
+        data-testid="file-preview-modal"
+        closeLabel={closeLabel}
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
         <DialogHeader>
           <DialogTitle className="truncate pr-8" title={fileName}>
             {fileName}
           </DialogTitle>
-          <DialogDescription className="sr-only">File preview</DialogDescription>
+          <DialogDescription className="sr-only">{description || 'File preview'}</DialogDescription>
         </DialogHeader>
 
         <div className="mt-2">
@@ -148,7 +165,13 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
             <iframe
               src={fileUrl}
               title={fileName}
-              sandbox="allow-scripts allow-same-origin"
+              sandbox={
+                verifiedPdfBlob === true &&
+                fileType === 'application/pdf' &&
+                fileUrl.startsWith('blob:')
+                  ? undefined
+                  : 'allow-scripts allow-same-origin'
+              }
               className="h-[70vh] w-full rounded-lg border border-gray-200"
             />
           )}
@@ -207,6 +230,23 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
             </div>
           )}
         </div>
+        {downloadAction?.error && (
+          <p role="alert" className="text-status-red text-sm">
+            {downloadAction.error}
+          </p>
+        )}
+        {downloadAction && (
+          <div className="border-border flex justify-end border-t pt-4">
+            <button
+              type="button"
+              disabled={downloadAction.busy}
+              onClick={downloadAction.onClick}
+              className="rounded-control bg-accent px-4 py-2 text-sm text-white disabled:opacity-50"
+            >
+              {downloadAction.label}
+            </button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

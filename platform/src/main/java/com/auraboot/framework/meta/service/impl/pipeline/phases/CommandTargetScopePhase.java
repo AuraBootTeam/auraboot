@@ -344,6 +344,10 @@ public class CommandTargetScopePhase implements CommandPhase {
             ctx.setBusinessGrantDecision(result);
             ctx.setBusinessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization(
                     ctx.getCommandCode(), modelCode, recordId, action, ctx.getTenantId(), ctx.getUserId(), member));
+            if(owner!=null) {
+                ctx.setBusinessTenantSecrets(com.auraboot.framework.plugin.pf4j.BusinessTenantSecretContract.references(owner));
+                com.auraboot.framework.meta.service.impl.CommandBusinessActorAuthorization.require(ctx,owner,dynamicDataService,record);
+            }
             if (resultProjection != null) ctx.setBusinessResultProjection(nativeContract != null
                     ? resultProjection.prepareNative(ctx, nativeContract) : resultProjection.prepare(ctx,owner));
             if (ctx.getBusinessResultProjection()!=null && ctx.getBusinessResultProjection().requiresRootDocuments())

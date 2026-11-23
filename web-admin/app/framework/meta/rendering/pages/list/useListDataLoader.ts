@@ -147,7 +147,7 @@ export function useListDataLoader({
 
       clearApiReadFailure();
       try {
-        setLoading(true);
+        if (!params?.background) setLoading(true);
         setError(null);
 
         // Resolve endpoint: use API datasource endpoint if configured, else default dynamic table

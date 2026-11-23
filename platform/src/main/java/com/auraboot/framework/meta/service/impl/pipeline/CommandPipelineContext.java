@@ -149,6 +149,10 @@ public class CommandPipelineContext {
     @lombok.Builder.Default
     private Map<String, String> artifactRootBinding = Map.of();
 
+    /** Compiled private input selectors captured before idempotency; never secret values. */
+    @lombok.Builder.Default
+    private Set<com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.TenantSecretReference> businessTenantSecrets = Set.of();
+
     public record BusinessTargetAuthorization(String commandCode, String modelCode, String targetRecordId,
                                                String action, Long tenantId, Long userId, Long memberId) {}
 

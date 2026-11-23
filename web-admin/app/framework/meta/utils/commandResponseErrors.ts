@@ -41,7 +41,9 @@ export function resolveCommandErrorMessage(
       return localized;
     }
   }
-  const conflictCode = String(body.context?.errorCode || '').toUpperCase();
+  const conflictCode = String(
+    body.context?.errorCode || (String(body.code) === '40900' ? 'CAS_VERSION_CONFLICT' : ''),
+  ).toUpperCase();
   const conflictMessages: Record<string, { key: string; zh: string; en: string }> = {
     CAS_VERSION_CONFLICT: {
       key: 'common.error.recordVersionConflict',
