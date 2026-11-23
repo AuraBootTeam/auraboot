@@ -40,6 +40,8 @@ test.describe('PCBA quote customer view golden', () => {
       await expect(page.locator('main')).toContainText(seeded.quoteCode, { timeout: 20_000 });
       await expect(page.locator('main')).not.toContainText(/加载失败|Business error/);
       expect(await page.getByRole('button', { name: /保存|Save/ }).count()).toBe(0);
+      await expect(page.getByRole('button', { name: /^(编辑|Edit)$/ })).toHaveCount(0);
+      await expect(page.locator('main input:not([readonly]):not([disabled]), main textarea:not([readonly]):not([disabled])')).toHaveCount(0);
 
       // 只读面:只读角色(viewer)对报价直写被拒绝;admin 特权写是设计内行为,不作断言
       // viewer 会话在测试内自建(空角色用户 + UI 登录):不依赖 checkout 本地的

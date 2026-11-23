@@ -379,6 +379,9 @@ test.describe('BOM workbench deep golden as bom_engineering @smoke', () => {
       await expect(nextArtifact).toContainText(`Rev ${nextRevision!.bom_er_revision_no}`);
       await expect(previousArtifact).toBeVisible();
       await expect(nextArtifact).toBeVisible();
+      await expect(nextArtifact).toContainText('已生成');
+      await expect(nextArtifact).not.toContainText(/\d{4}-\d{2}-\d{2}T|generated/);
+      await expect(nextArtifact.getByRole('link', { name: '下载', exact: true })).toBeVisible();
       await testInfo.attach('engineering-export-revisions', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
       await testInfo.attach('engineering-retained-export-proof', { body: JSON.stringify({ previousRevision, nextRevision, oldDownloadStatus: oldDownload.status() }), contentType: 'application/json' });
 
