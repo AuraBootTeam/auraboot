@@ -260,7 +260,7 @@ export const SmartParetoChart: React.FC<SmartParetoChartProps> = ({
           name: '%',
           min: 0,
           max: 100,
-          axisLabel: { formatter: '{value}%' },
+          axisLabel: { formatter: '{value}%', hideOverlap: true },
         },
       ],
       series: [
@@ -299,7 +299,8 @@ export const SmartParetoChart: React.FC<SmartParetoChartProps> = ({
                 },
                 label: {
                   formatter: `${thresholdValue}%`,
-                  position: 'end',
+                  position: 'insideEndTop',
+                  color: '#475569',
                 },
                 data: [
                   {

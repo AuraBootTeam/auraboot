@@ -12,6 +12,7 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import { X } from 'lucide-react';
 import { DashboardViewer } from './DashboardViewer';
 import { useDashboardStore } from '../store/useDashboardStore';
+import { useI18n } from '~/contexts/I18nContext';
 
 interface BigScreenModeProps {
   dashboardId: string;
@@ -25,6 +26,8 @@ export const BigScreenMode: React.FC<BigScreenModeProps> = ({
   onExit,
   refreshInterval = 60000,
 }) => {
+  const { locale } = useI18n();
+  const exitLabel = locale.startsWith('zh') ? '退出大屏' : 'Exit presentation';
   const { dashboard, widgets, layoutConfig, loadDashboard } = useDashboardStore();
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -56,15 +59,18 @@ export const BigScreenMode: React.FC<BigScreenModeProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-white" data-testid="big-screen-mode">
-      {/* Exit button — top-right corner */}
-      <button
-        onClick={onExit}
-        title="Press ESC to exit"
-        className="fixed top-4 right-4 z-[60] rounded-full bg-black/20 p-2 text-white backdrop-blur-sm transition hover:bg-black/40"
-        data-testid="big-screen-exit"
-      >
-        <X className="h-5 w-5" />
-      </button>
+      <div className="flex shrink-0 justify-end border-b border-slate-200 px-4 py-2">
+        <button
+          type="button"
+          onClick={onExit}
+          title={exitLabel}
+          aria-label={exitLabel}
+          className="rounded-md p-1.5 text-slate-600 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-blue-600"
+          data-testid="big-screen-exit"
+        >
+          <X className="h-5 w-5" aria-hidden="true" />
+        </button>
+      </div>
 
       {/* Dashboard content */}
       <div className="flex-1 overflow-auto">
@@ -73,6 +79,7 @@ export const BigScreenMode: React.FC<BigScreenModeProps> = ({
           layoutConfig={layoutConfig}
           title={dashboard?.title || 'Dashboard'}
           showExport={false}
+          hideWidgetActions
           className="h-full"
         />
       </div>

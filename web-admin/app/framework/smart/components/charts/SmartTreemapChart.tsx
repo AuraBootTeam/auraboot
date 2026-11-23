@@ -159,7 +159,7 @@ export const SmartTreemapChart: React.FC<SmartTreemapChartProps> = ({
         {
           type: 'treemap',
           data: treemapData,
-          top: title ? '12%' : '5%',
+          top: title ? 34 : '5%',
           bottom: '2%',
           left: '2%',
           right: '2%',
@@ -173,6 +173,12 @@ export const SmartTreemapChart: React.FC<SmartTreemapChartProps> = ({
             show: true,
             formatter: '{b}\n{c}',
             fontSize: 12,
+            lineHeight: 16,
+            color: '#fff',
+            backgroundColor: 'rgba(15, 23, 42, 0.82)',
+            borderRadius: 4,
+            padding: [3, 5],
+            overflow: 'truncate',
           },
           itemStyle: {
             borderColor: '#fff',
