@@ -459,6 +459,7 @@ export interface ColumnConfig {
   required?: boolean;
 
   // 自定义渲染
+  /** Link columns may use render.to (local page target with row placeholders) and render.visibleWhen. */
   render?: string | Record<string, unknown>;
   /** Custom cell renderer registry key. Keep valueType reserved for built-in semantic types. */
   cellRenderer?: string;

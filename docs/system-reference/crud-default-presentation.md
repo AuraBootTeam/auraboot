@@ -2,7 +2,7 @@
 type: system-reference
 status: active
 created: 2026-10-27
-updated: 2026-11-21
+updated: 2026-11-23
 ---
 
 # Generated CRUD default presentation
@@ -38,6 +38,10 @@ A detail can pair `extension.headerStatusField` with `extension.headerStatusDict
 Direct detail bodies without tabs or an aside can declare `extension.detailBodyGroups`. Each group contains a unique `id`, existing `blockIds`, optional localized `title`/`description`, and optional `layout` (`stack` or `rows`). Unknown or repeated block references are rejected. Ungrouped blocks retain their position; grouped children keep their original runtime, form scope, identity, permissions and visibility expressions. Sections re-evaluate visibility on context changes and omit an empty shell. The `rows` layout joins existing material groups and insets their existing toolbar; it does not create business actions or modify inputs.
 
 Collapsible card grids can declare a nonnegative integer `groupsDefaultOpenCount` to initially open only that many groups. `groupsDefaultOpen: false` still closes every group; omitting the count preserves the existing all/none behavior. Collapsing a group keeps its inputs mounted and does not discard or reassign drafts.
+
+## Local record links in table cells
+
+A `valueType: "link"` column may retain its business label while using `render.to` as a local absolute page target, for example `/p/order/view/{pid}`. Placeholders resolve from the row through the shared page-target resolver and are URL encoded. Missing identities or external/executable targets render plain text. `render.visibleWhen` evaluates with the same row/record context as row actions; a false condition preserves the text without a link. Navigation does not grant access to the destination record. Existing URL and authenticated file-download columns retain their behavior when `render.to` is absent.
 
 ## User journey
 

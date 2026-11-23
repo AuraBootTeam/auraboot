@@ -1,3 +1,4 @@
+import { resolvePageTargetPath } from '~/framework/meta/runtime/actions/resolvePageTarget';
 import { resolveRowActionModel } from './rowActionModel';
 import { hasButtonPermissions } from '~/framework/meta/utils/buttonPermissions';
 import { WorkspaceCell } from '~/framework/meta/runtime/renderers/WorkspaceCells';
@@ -117,6 +118,13 @@ function domSafeValue(value: string): string {
 
 function resolveLinkHref(column: ColumnConfig, row: any, value: unknown): string | undefined {
   const config = renderConfig(column);
+  if (config.to !== undefined) {
+    if (typeof config.to !== 'string' || !config.to.startsWith('/') || config.to.startsWith('//')) return undefined;
+    const fields = [...config.to.matchAll(/\{(\w+)\}/g)].map((match: RegExpMatchArray) => match[1]);
+    if (fields.some((field: string) => !Object.hasOwn(row || {}, field)
+      || !['string', 'number'].includes(typeof row[field]) || String(row[field]).trim() === '')) return undefined;
+    return resolvePageTargetPath(config.to, row);
+  }
   const url = value === undefined || value === null ? '' : String(value).trim();
   const derivedFileIdField = column.field.endsWith('_url')
     ? `${column.field.slice(0, -4)}_file_id`
@@ -145,7 +153,7 @@ function renderLinkCell(
   t: (key: string) => string,
 ): React.ReactNode {
   const href = resolveLinkHref(column, row, value);
-  if (!href) return <span className="text-text-3">-</span>;
+  if (!href) return <span className="text-text-3">{renderConfig(column).to !== undefined ? String(value ?? '-') : '-'}</span>;
   const config = renderConfig(column);
   const label = config.text
     ? getLocalizedText(config.text, locale, t)
@@ -798,6 +806,10 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     const enrichedDisplayValue = row?.[`${column.field}_display`];
 
     if (column.valueType === 'link' || column.valueType === 'url') {
+      const condition = renderConfig(column).visibleWhen;
+      if (condition && !evaluator.evaluateCondition(condition, { ...context, row, record: row })) {
+        return <span>{String(value ?? '-')}</span>;
+      }
       return renderLinkCell(column, row, value, locale, t);
     }
 

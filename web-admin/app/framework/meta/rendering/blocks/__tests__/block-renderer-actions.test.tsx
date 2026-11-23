@@ -1,3 +1,4 @@
+import { ExpressionEvaluator } from '~/framework/meta/runtime/expression/evaluator';
 /**
  * block-renderer-actions.test.tsx
  *
@@ -13,7 +14,7 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, render, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, fireEvent, waitFor, screen } from '@testing-library/react';
 
 // ---------------------------------------------------------------------------
 // Mocks — must be declared BEFORE importing the SUT so the hook mock is in place
@@ -676,6 +677,40 @@ describe('TableBlockRenderer', () => {
       '/api/file/download/01KV2GTQTNJJ8QSYZS8R5A0YDC',
     );
   });
+
+  it('links a business label to an encoded local row target only for the declared state', () => {
+    const records = [
+      { pid: 'order/one', bill: 'PO-001', state: 'succeeded' },
+      { pid: 'order-two', bill: 'PO-002', state: 'failed' },
+      { pid: 'order-three', bill: 'PO-003', state: 'unknown' },
+      { bill: 'PO-004', state: 'succeeded' },
+    ];
+    const runtime = makeRuntime({ getEvaluator: () => new ExpressionEvaluator(), getDataSourceManager: () => ({
+      getData: () => records, has: () => true, register: vi.fn(),
+    }) });
+    render(<TableBlockRenderer block={{ type: 'table', dataSource: 'list', columns: [{
+      field: 'bill', label: 'Order', valueType: 'link',
+      render: { to: '/p/order/view/{pid}', visibleWhen: "record.state === 'succeeded'" },
+    }] } as any} runtime={runtime} />);
+    expect(screen.getByRole('link', { name: 'PO-001' })).toHaveAttribute('href', '/p/order/view/order%2Fone');
+    for (const label of ['PO-002', 'PO-003', 'PO-004']) {
+      expect(screen.getByText(label)).toBeVisible();
+      expect(screen.queryByRole('link', { name: label })).toBeNull();
+    }
+  });
+
+  it.each(['https://unexpected.example/{pid}', '//unexpected.example/{pid}', 'javascript:alert(1)'])(
+    'does not turn a configured local target into an external or executable link: %s', (to) => {
+      const runtime = makeRuntime({ getDataSourceManager: () => ({
+        getData: () => [{ pid: 'one', bill: 'PO-001' }], has: () => true, register: vi.fn(),
+      }) });
+      render(<TableBlockRenderer block={{ type: 'table', dataSource: 'list', columns: [{
+        field: 'bill', label: 'Order', valueType: 'link', render: { to },
+      }] } as any} runtime={runtime} />);
+      expect(screen.getByText('PO-001')).toBeVisible();
+      expect(screen.queryByRole('link', { name: 'PO-001' })).toBeNull();
+    },
+  );
 
   it('dispatches new-format row action with the row as record', () => {
     const runtime = makeRuntimeWithData();
