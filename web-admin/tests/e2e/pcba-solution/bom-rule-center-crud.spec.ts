@@ -1453,6 +1453,7 @@ for (const kind of ['aml', 'avl'] as const) {
     await expect(page.getByRole('heading', { name: '物料关系治理证据', exact: true })).toBeVisible();
     await expect(page.getByText(`Reviewed ${marker}`, { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: '审核处理', exact: true })).toHaveCount(0);
+    await info.attach(`${kind}-issue-approved-browser`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     await info.attach(`${kind}-issue-resolution`, { body: JSON.stringify({ before, missing, ineffective, after }), contentType: 'application/json' });
   });
 }

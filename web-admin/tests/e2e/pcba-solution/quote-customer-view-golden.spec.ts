@@ -108,12 +108,6 @@ test.describe('PCBA quote customer view golden', () => {
       ]);
       expect(records, 'attachment record keeps the original filename').toHaveLength(1);
       expect(String(records[0].qo_qca_file_id)).toBe(fileId);
-      const relation = await page.request.post('/api/file/relation', { data: {
-        entityType: 'qo_quote_customer_attachment_common', entityId: String(records[0].pid),
-        fieldName: 'qo_qca_file_id', fileIds: [fileId],
-      }});
-      expect(relation.ok()).toBe(true);
-
       const listed = page.waitForResponse(response =>
         new URL(response.url()).pathname === '/api/dynamic/qo_quote_customer_attachment_common/list'
         && response.request().method() === 'GET');

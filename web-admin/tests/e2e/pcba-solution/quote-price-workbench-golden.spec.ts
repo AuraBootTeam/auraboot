@@ -167,6 +167,7 @@ test.describe('PCBA quote BOM price workbench golden', () => {
       await expect(failedCandidate).toContainText(/金蝶历史采购|Kingdee/);
       await failedCandidate.click();
       await expect(reviewDrawer).toContainText(/未命中可用价格|未命中/);
+      await test.info().attach('q04-02-pending-price-evidence', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     } finally {
       await cleanupRows(page, created);
     }
