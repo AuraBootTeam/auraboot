@@ -1549,6 +1549,8 @@ CREATE TABLE public.ab_agent_action (
     delegation_grant_id character varying(26),
     agent_release_pid character varying(26),
     deployment_pid character varying(26),
+    created_by bigint,
+    updated_by bigint,
     CONSTRAINT ab_agent_action_actual_effects_check CHECK (((actual_effects IS NULL) OR public.valid_effect_class_array(actual_effects)))
 );
 
