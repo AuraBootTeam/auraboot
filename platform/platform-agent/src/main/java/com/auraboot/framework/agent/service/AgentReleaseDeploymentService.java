@@ -3,6 +3,7 @@ package com.auraboot.framework.agent.service;
 import com.auraboot.framework.agent.identity.ExecutionPrincipal;
 import com.auraboot.framework.agent.identity.ExecutionPrincipalContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.exception.BusinessException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -146,8 +147,7 @@ public class AgentReleaseDeploymentService {
                 tenantId,
                 agentDefinitionPid);
         if (definitions.size() != 1) {
-            throw new IllegalArgumentException(
-                    "Active Agent definition not found: " + agentDefinitionPid);
+            throw new BusinessException("Activate the template before publishing; an active Agent is required in the current tenant");
         }
         Map<String, Object> definition = definitions.get(0);
         String agentCode = text(definition.get("agent_code"));
@@ -315,8 +315,14 @@ public class AgentReleaseDeploymentService {
                            FROM ab_agent_deployment d
                            WHERE d.tenant_id = r.tenant_id
                              AND d.agent_release_pid = r.pid
-                             AND d.status = 'active'
-                       ) AS deployed
+                             AND d.status IN ('active', 'suspended')
+                       ) AS deployed,
+                       (SELECT d.status FROM ab_agent_deployment d
+                        WHERE d.tenant_id=r.tenant_id AND d.agent_release_pid=r.pid
+                          AND d.status IN ('active','suspended') LIMIT 1) AS deployment_status,
+                       r.release_hash = (SELECT encode(digest(ab_agent_release_spec(a)::text, 'sha256'), 'hex')
+                         FROM ab_agent_definition a WHERE a.tenant_id=r.tenant_id AND a.pid=r.agent_definition_pid
+                           AND (a.deleted_flag IS NULL OR a.deleted_flag=FALSE)) AS matches_draft
                 FROM ab_agent_release r
                 WHERE r.tenant_id = ? AND r.agent_definition_pid = ?
                 ORDER BY r.release_no DESC
@@ -337,7 +343,7 @@ public class AgentReleaseDeploymentService {
                 JOIN ab_agent_deployment dp
                   ON dp.tenant_id = ad.tenant_id
                  AND dp.agent_code = ad.agent_code
-                 AND dp.status = 'active'
+                 AND dp.status IN ('active','suspended')
                 WHERE ad.tenant_id = ?
                   AND ad.pid = ?
                   AND (ad.deleted_flag IS NULL OR ad.deleted_flag = FALSE)
@@ -350,9 +356,29 @@ public class AgentReleaseDeploymentService {
                     "Active deployment not found for Agent: " + agentDefinitionPid);
         }
         Map<String, Object> row = rows.get(0);
-        return new DeploymentPolicy(
-                text(row.get("deployment_pid")),
-                jsonMap(row.get("channel_policy")),
+        Map<String, Object> policy = new LinkedHashMap<>(jsonMap(row.get("channel_policy")));
+        // Keep identifiers lossless in the view; numeric strings are accepted by normalization.
+        for (String field : List.of("allowedUserIds", "allowedMemberIds", "allowedRoleIds")) {
+            policy.put(field, positiveLongList(policy.get(field)).stream().map(String::valueOf).toList());
+        }
+        policy.put("subjectChoices", Map.of(
+                "allowedUserIds", jdbc.queryForList("""
+                    SELECT DISTINCT u.id::text AS id, COALESCE(NULLIF(u.nick_name,''),NULLIF(u.user_name,'')) AS name
+                    FROM ab_tenant_member m JOIN ab_user u ON u.id=m.user_id
+                    WHERE m.tenant_id=? AND m.deleted_flag=FALSE AND u.deleted_flag=FALSE
+                    ORDER BY name, id
+                    """, tenantId),
+                "allowedMemberIds", jdbc.queryForList("""
+                    SELECT m.id::text AS id, COALESCE(NULLIF(u.nick_name,''),NULLIF(u.user_name,'')) AS name
+                    FROM ab_tenant_member m JOIN ab_user u ON u.id=m.user_id
+                    WHERE m.tenant_id=? AND m.deleted_flag=FALSE AND u.deleted_flag=FALSE
+                    ORDER BY name, id
+                    """, tenantId),
+                "allowedRoleIds", jdbc.queryForList("""
+                    SELECT id::text AS id, name FROM ab_role
+                    WHERE tenant_id=? AND deleted_flag=FALSE ORDER BY name, id
+                    """, tenantId)));
+        return new DeploymentPolicy(text(row.get("deployment_pid")), policy,
                 jsonMap(row.get("policy_snapshot")));
     }
 
@@ -500,8 +526,7 @@ public class AgentReleaseDeploymentService {
                 agentCode,
                 fromStatus);
         if (updated != 1) {
-            throw new IllegalStateException(
-                    "Deployment lifecycle transition matched no row: agentCode=" + agentCode);
+            throw new BusinessException("No deployment exists in the expected state; activate or publish the Agent first");
         }
     }
 

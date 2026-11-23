@@ -1549,6 +1549,8 @@ CREATE TABLE public.ab_agent_action (
     delegation_grant_id character varying(26),
     agent_release_pid character varying(26),
     deployment_pid character varying(26),
+    created_by bigint,
+    updated_by bigint,
     CONSTRAINT ab_agent_action_actual_effects_check CHECK (((actual_effects IS NULL) OR public.valid_effect_class_array(actual_effects)))
 );
 
@@ -15104,6 +15106,92 @@ CREATE TABLE public.ab_plugin_field_rename_row (
 
 
 --
+-- Name: ab_plugin_handover_batch; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_plugin_handover_batch (
+    id bigint NOT NULL,
+    pid character varying(64) NOT NULL,
+    tenant_id bigint NOT NULL,
+    contract_id character varying(128) NOT NULL,
+    contract_digest character varying(64) NOT NULL,
+    source_plugin_pid character varying(64) NOT NULL,
+    source_plugin_id character varying(255) NOT NULL,
+    idempotency_key character varying(128) NOT NULL,
+    request_digest character varying(64) NOT NULL,
+    preview_digest character varying(64) NOT NULL,
+    status character varying(32) NOT NULL,
+    created_by bigint NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    snapshot jsonb NOT NULL,
+    CONSTRAINT ab_plugin_handover_batch_check CHECK ((expires_at > created_at)),
+    CONSTRAINT ab_plugin_handover_batch_snapshot_check CHECK ((jsonb_typeof(snapshot) = 'object'::text)),
+    CONSTRAINT ab_plugin_handover_batch_status_check CHECK (((status)::text = 'PREVIEWED'::text))
+);
+
+
+--
+-- Name: ab_plugin_handover_batch_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_plugin_handover_batch_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_plugin_handover_batch_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_plugin_handover_batch_id_seq OWNED BY public.ab_plugin_handover_batch.id;
+
+
+--
+-- Name: ab_plugin_handover_item; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_plugin_handover_item (
+    id bigint NOT NULL,
+    tenant_id bigint NOT NULL,
+    batch_pid character varying(64) NOT NULL,
+    ordinal integer NOT NULL,
+    resource_type character varying(32) NOT NULL,
+    resource_code character varying(255) NOT NULL,
+    resource_pid character varying(64) NOT NULL,
+    target_plugin_pid character varying(64) NOT NULL,
+    action character varying(32) NOT NULL,
+    snapshot jsonb NOT NULL,
+    CONSTRAINT ab_plugin_handover_item_action_check CHECK (((action)::text = ANY ((ARRAY['MOVE_OWNER'::character varying, 'VERIFY_REFERENCE'::character varying])::text[]))),
+    CONSTRAINT ab_plugin_handover_item_ordinal_check CHECK ((ordinal >= 0)),
+    CONSTRAINT ab_plugin_handover_item_resource_type_check CHECK (((resource_type)::text = ANY ((ARRAY['field'::character varying, 'dict'::character varying, 'model_field_binding'::character varying])::text[]))),
+    CONSTRAINT ab_plugin_handover_item_snapshot_check CHECK ((jsonb_typeof(snapshot) = 'object'::text))
+);
+
+
+--
+-- Name: ab_plugin_handover_item_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_plugin_handover_item_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_plugin_handover_item_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_plugin_handover_item_id_seq OWNED BY public.ab_plugin_handover_item.id;
+
+
+--
 -- Name: ab_plugin_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
@@ -19831,6 +19919,20 @@ ALTER TABLE ONLY public.ab_platform_release ALTER COLUMN id SET DEFAULT nextval(
 
 
 --
+-- Name: ab_plugin_handover_batch id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_plugin_handover_batch ALTER COLUMN id SET DEFAULT nextval('public.ab_plugin_handover_batch_id_seq'::regclass);
+
+
+--
+-- Name: ab_plugin_handover_item id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_plugin_handover_item ALTER COLUMN id SET DEFAULT nextval('public.ab_plugin_handover_item_id_seq'::regclass);
+
+
+--
 -- Name: ab_promotion_drift_event id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -24045,6 +24147,62 @@ ALTER TABLE ONLY public.ab_plugin_field_rename
 
 ALTER TABLE ONLY public.ab_plugin_field_rename
     ADD CONSTRAINT ab_plugin_field_rename_tenant_id_model_pid_to_field_key UNIQUE (tenant_id, model_pid, to_field);
+
+
+--
+-- Name: ab_plugin_handover_batch ab_plugin_handover_batch_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_plugin_handover_batch
+    ADD CONSTRAINT ab_plugin_handover_batch_pid_key UNIQUE (pid);
+
+
+--
+-- Name: ab_plugin_handover_batch ab_plugin_handover_batch_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_plugin_handover_batch
+    ADD CONSTRAINT ab_plugin_handover_batch_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_plugin_handover_batch ab_plugin_handover_batch_tenant_id_idempotency_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_plugin_handover_batch
+    ADD CONSTRAINT ab_plugin_handover_batch_tenant_id_idempotency_key_key UNIQUE (tenant_id, idempotency_key);
+
+
+--
+-- Name: ab_plugin_handover_batch ab_plugin_handover_batch_tenant_id_pid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_plugin_handover_batch
+    ADD CONSTRAINT ab_plugin_handover_batch_tenant_id_pid_key UNIQUE (tenant_id, pid);
+
+
+--
+-- Name: ab_plugin_handover_item ab_plugin_handover_item_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_plugin_handover_item
+    ADD CONSTRAINT ab_plugin_handover_item_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_plugin_handover_item ab_plugin_handover_item_tenant_id_batch_pid_ordinal_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_plugin_handover_item
+    ADD CONSTRAINT ab_plugin_handover_item_tenant_id_batch_pid_ordinal_key UNIQUE (tenant_id, batch_pid, ordinal);
+
+
+--
+-- Name: ab_plugin_handover_item ab_plugin_handover_item_tenant_id_batch_pid_resource_type_r_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_plugin_handover_item
+    ADD CONSTRAINT ab_plugin_handover_item_tenant_id_batch_pid_resource_type_r_key UNIQUE (tenant_id, batch_pid, resource_type, resource_code);
 
 
 --
@@ -33205,6 +33363,14 @@ ALTER TABLE ONLY public.ab_ot_data_log
 
 ALTER TABLE ONLY public.ab_plugin_field_rename_row
     ADD CONSTRAINT ab_plugin_field_rename_row_migration_id_fkey FOREIGN KEY (migration_id) REFERENCES public.ab_plugin_field_rename(id);
+
+
+--
+-- Name: ab_plugin_handover_item ab_plugin_handover_item_tenant_id_batch_pid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_plugin_handover_item
+    ADD CONSTRAINT ab_plugin_handover_item_tenant_id_batch_pid_fkey FOREIGN KEY (tenant_id, batch_pid) REFERENCES public.ab_plugin_handover_batch(tenant_id, pid);
 
 
 --

@@ -172,6 +172,8 @@ public class PluginImportServiceImpl implements PluginImportService {
 
     private final ObjectMapper objectMapper = createObjectMapper();
     private final PluginPublicPublicationLifecycle publicPublicationLifecycle;
+    @org.springframework.beans.factory.annotation.Autowired
+    private PluginPackageReplacements packageReplacements;
 
     // Cache for in-progress imports (importId -> manifest)
     private final Map<String, ImportContext> importContextCache = new ConcurrentHashMap<>();
@@ -400,6 +402,8 @@ public class PluginImportServiceImpl implements PluginImportService {
         // Sanitize comment-only declarations before deciding which optional capabilities are required.
         manifest.sanitize();
         PluginAgentResourceGuard.requireManifest(manifest, agentDefinitionResources);
+        packageReplacements.requireImportable(manifest.getPluginId());
+        manifest = packageReplacements.contribute(manifest);
 
         String importId = UlidGenerator.generate();
         Long tenantId = requireTenantContextForImport();
@@ -621,6 +625,9 @@ public class PluginImportServiceImpl implements PluginImportService {
      */
     private ImportExecuteResult executeWithLock(ImportContext context, ImportRequest request) {
         PluginAgentResourceGuard.requireManifest(context.getManifest(), agentDefinitionResources);
+        packageReplacements.requireImportable(context.getManifest().getPluginId());
+        packageReplacements.selectAgentTemplates(context.getManifest(), request.getAgentTemplateCodes());
+        PluginAgentResourceGuard.requireManifest(context.getManifest(), agentDefinitionResources);
         // Merge manifest importOptions as defaults before applying hard defaults.
         // Manifest options only take effect when the request field is null (i.e., not explicitly set by caller).
         mergeManifestImportOptions(context.getManifest(), request);
@@ -776,8 +783,10 @@ public class PluginImportServiceImpl implements PluginImportService {
 
             boolean publicImport = (manifest.getPublicResources() != null && !manifest.getPublicResources().isEmpty())
                     || (manifest.getPublicQueries() != null && !manifest.getPublicQueries().isEmpty());
+            boolean trackedMetadataImport = publicImport
+                    || (manifest.getAgentDefinitions() != null && !manifest.getAgentDefinitions().isEmpty());
             PluginMetadataRollbackSnapshot.Metadata previousMetadata = null;
-            if (publicImport) {
+            if (trackedMetadataImport) {
                 var previous = pluginRecordMapper.findByTenantAndPluginId(manifest.getPluginId());
                 if (previous != null) {
                     var locked = pluginRecordMapper.lockIdentityIncludingDeleted(tenantId, previous.getPid());
@@ -791,7 +800,7 @@ public class PluginImportServiceImpl implements PluginImportService {
 
             // Create or update plugin record
             String pluginPid = createOrUpdatePlugin(manifest, tenantId);
-            if (publicImport) {
+            if (trackedMetadataImport) {
                 var installed = pluginRecordMapper.lockIdentityIncludingDeleted(tenantId, pluginPid);
                 if (installed == null || !Objects.equals(tenantId, installed.getTenantId())
                         || !Objects.equals(manifest.getPluginId(), installed.getPluginId())) {
@@ -803,15 +812,18 @@ public class PluginImportServiceImpl implements PluginImportService {
                         new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}));
             }
             result.setPluginPid(pluginPid);
+            packageReplacements.requireSafeAdoption(manifest.getPluginId(), tenantId, request.getConflictStrategy());
 
             // V2 plans own only physical DDL deferral; logical required remains unchanged.
             try (var migration = modelFieldRenameMigrator.prepare(request.getIdentifierMappingPath(),
                     identifierMappingRoot(context, request), manifest, tenantId, pluginPid, importId)) {
                 var seeds = seedUpgradeContext(tenantId, manifest.getPluginId());
                 importResources(context, request, result, pluginPid, seeds);
+                int adopted = packageReplacements.adopt(manifest.getPluginId(), pluginPid, tenantId);
                 Map<String, Object> receipt = new LinkedHashMap<>();
                 receipt.put("moduleSeedBaselines", seeds.baselines());
                 receipt.put("warnings", new ArrayList<>(result.getWarnings()));
+                receipt.put("packageResourcesAdopted", adopted);
                 context.getHistory().setResult(receipt);
                 if (migration.isV2()) result.setFieldMigrations(migration.complete());
                 else applyIdentifierDataMigration(request, result, tenantId);
@@ -1510,6 +1522,10 @@ public class PluginImportServiceImpl implements PluginImportService {
         if (!ImportStatus.SUCCESS.code().equals(history.getStatus())) {
             throw new PluginException("Can only rollback successful imports");
         }
+        if (history.getResult() != null && history.getResult().get("packageResourcesAdopted") instanceof Number adopted
+                && adopted.intValue() > 0) {
+            throw new PluginException("Package adoption cannot use generic import rollback; preserve the receiver and review ownership explicitly");
+        }
 
         if (agentDefinitionResources == null) {
             if (!Objects.equals(history.getTenantId(), MetaContext.getCurrentTenantId())) {
@@ -1525,15 +1541,43 @@ public class PluginImportServiceImpl implements PluginImportService {
         if (!Objects.equals(history.getTenantId(), MetaContext.getCurrentTenantId())) {
             throw new PluginException("Rollback tenant does not match import owner");
         }
+        packageReplacements.requireImportable(history.getPluginId());
         var rollbackOwner = pluginRecordMapper.lockIdentityIncludingDeleted(history.getTenantId(), history.getPluginPid());
         if (rollbackOwner == null) throw new PluginException("Plugin rollback owner is missing");
         auraPluginManager.requireTenantLifecycleChange(rollbackOwner);
         modelFieldRenameMigrator.assertHistoricalRollbackSafe(history.getTenantId(), history.getPluginPid());
 
+        Object agentSummary = history.getResourceSummary() == null ? null
+                : history.getResourceSummary().get(ResourceType.AGENT_DEFINITION.name());
+        var importResources = pluginResourceMapper.findByImportId(importId);
+        boolean agentImport = agentSummary instanceof Map<?, ?> || importResources.stream()
+                .anyMatch(row -> row.getResourceTypeEnum() == ResourceType.AGENT_DEFINITION);
+        if (agentImport) {
+            if (!(agentSummary instanceof Map<?, ?>))
+                throw new PluginException("Agent rollback resource summary is missing");
+            var latest = importHistoryMapper.findLastSuccessful(history.getTenantId(), history.getPluginId());
+            if (latest == null || !importId.equals(latest.getImportId()))
+                throw new PluginException("Only the latest successful Agent import can be rolled back");
+            var counts = (Map<?, ?>) agentSummary;
+            int expectedWrites = 0;
+            for (String action : List.of("CREATE", "UPDATE")) {
+                if (counts.get(action) instanceof Number count) expectedWrites += count.intValue();
+            }
+            var currentAgents = importResources.stream()
+                    .filter(row -> row.getResourceTypeEnum() == ResourceType.AGENT_DEFINITION
+                            && Objects.equals(row.getTenantId(), history.getTenantId())
+                            && Objects.equals(row.getPluginPid(), history.getPluginPid())).toList();
+            if (currentAgents.size() != expectedWrites)
+                throw new PluginException("Agent rollback owner changed or resource tracking is missing");
+            if (currentAgents.stream().anyMatch(row -> row.getActionEnum() == ResourceAction.UPDATE
+                    && row.getPreviousState() == null))
+                throw new PluginException("Agent recovery snapshot is missing");
+        }
+
         PluginMetadataRollbackSnapshot metadataRollback = null;
         boolean hasPublicPublications = pluginResourceMapper.findByPluginPid(history.getPluginPid()).stream()
                 .anyMatch(resource -> resource.getResourceTypeEnum().isPublicPublication());
-        if (hasPublicPublications) {
+        if (hasPublicPublications || agentImport) {
             var currentPlugin = pluginRecordMapper.lockIdentityIncludingDeleted(history.getTenantId(), history.getPluginPid());
             if (currentPlugin == null) {
                 throw new PluginException("Public publication plugin owner is missing");

@@ -932,5 +932,327 @@
     "zh-CN": "无法读取业务参数，请取消后重试或联系管理员。",
     "en-US": "Business parameters are unavailable. Cancel and try again or contact an administrator.",
     "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.title",
+    "source": "import",
+    "zh-CN": "首次启用并发布",
+    "en-US": "First enable and publish",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.help",
+    "source": "import",
+    "zh-CN": "选择已配置的 AI 服务。此操作将启用该同事并发布首个不可变版本，入职需要另行操作。",
+    "en-US": "Choose a configured AI service. This enables the colleague and publishes its first immutable release. Enrollment is a separate step.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.provider",
+    "source": "import",
+    "zh-CN": "AI 服务",
+    "en-US": "AI service",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.choose",
+    "source": "import",
+    "zh-CN": "请选择 AI 服务",
+    "en-US": "Choose an AI service",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.required",
+    "source": "import",
+    "zh-CN": "请先选择 AI 服务。",
+    "en-US": "Choose an AI service first.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.loadFailed",
+    "source": "import",
+    "zh-CN": "无法加载 AI 服务，请重试后再启用。",
+    "en-US": "AI services could not be loaded. Retry before enabling.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.empty",
+    "source": "import",
+    "zh-CN": "尚未配置 AI 服务，请先前往 AI 设置添加，再返回此处。",
+    "en-US": "No AI service is configured. Add one in AI Settings, then return here.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.settings",
+    "source": "import",
+    "zh-CN": "AI 设置",
+    "en-US": "AI Settings",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.failed",
+    "source": "import",
+    "zh-CN": "启用失败，已保留所选服务。请检查 AI 服务后重试。",
+    "en-US": "Activation failed. Your selection is preserved; retry after checking the AI service.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.busy",
+    "source": "import",
+    "zh-CN": "正在启用并发布…",
+    "en-US": "Enabling and publishing…",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.success",
+    "source": "import",
+    "zh-CN": "AI 同事已启用并发布首个版本，现在可以办理入职。",
+    "en-US": "Colleague enabled and first release published. You can now enroll it.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.disabledHelp",
+    "source": "import",
+    "zh-CN": "此模板尚未启用。请先选择 AI 服务并发布首个版本，再办理入职。",
+    "en-US": "This template is disabled. Choose an AI service and publish its first release before enrollment.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.denied",
+    "source": "import",
+    "zh-CN": "此模板尚未启用，请联系具有运行管理权限的管理员启用。",
+    "en-US": "This template is disabled. Ask an administrator with runtime management permission to enable it.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.activation.beforePublish",
+    "source": "import",
+    "zh-CN": "请先使用页面上方的入口，首次启用并发布此模板。",
+    "en-US": "Enable and publish this template first using the action above.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.title",
+    "source": "import",
+    "zh-CN": "办理入职",
+    "en-US": "Enroll as Employee",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.subtitle",
+    "source": "import",
+    "zh-CN": "将 {name} 纳入组织架构",
+    "en-US": "Add {name} to the org chart",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.field.department",
+    "source": "import",
+    "zh-CN": "部门",
+    "en-US": "Department",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.field.position",
+    "source": "import",
+    "zh-CN": "岗位",
+    "en-US": "Position",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.placeholder.department",
+    "source": "import",
+    "zh-CN": "请选择部门",
+    "en-US": "— Select Department —",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.placeholder.position",
+    "source": "import",
+    "zh-CN": "请选择岗位",
+    "en-US": "— Select Position —",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.empty.department",
+    "source": "import",
+    "zh-CN": "尚无可选部门，请先在组织管理中创建部门，再为该同事办理入职。",
+    "en-US": "No departments yet — create one under Organization first, then enrol this colleague.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.empty.position",
+    "source": "import",
+    "zh-CN": "该部门尚无岗位，请先在组织管理中添加岗位，再办理入职。",
+    "en-US": "This department has no positions yet — add one under Organization before enrolling.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.hint.selectDeptFirst",
+    "source": "import",
+    "zh-CN": "请先选择部门，以加载该部门的岗位",
+    "en-US": "Select a department first to load positions",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.loading",
+    "source": "import",
+    "zh-CN": "正在加载…",
+    "en-US": "Loading...",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.confirm",
+    "source": "import",
+    "zh-CN": "确认入职",
+    "en-US": "Enroll",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.enrolling",
+    "source": "import",
+    "zh-CN": "正在办理入职…",
+    "en-US": "Enrolling...",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.success",
+    "source": "import",
+    "zh-CN": "{name} 已作为 AI 员工纳入组织",
+    "en-US": "{name} has been enrolled as a digital employee",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.error.deptRequired",
+    "source": "import",
+    "zh-CN": "请选择部门",
+    "en-US": "Please select a department",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.error.positionRequired",
+    "source": "import",
+    "zh-CN": "请选择岗位",
+    "en-US": "Please select a position",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.enroll.error.failed",
+    "source": "import",
+    "zh-CN": "入职失败，请检查部门和岗位后重试。",
+    "en-US": "Enrollment failed. Check the department and position, then retry.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.list.denied",
+    "source": "import",
+    "zh-CN": "您没有查看 AI 同事的权限",
+    "en-US": "You do not have permission to view AI colleagues",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.list.deniedHelp",
+    "source": "import",
+    "zh-CN": "请联系管理员申请访问权限，当前未显示任何同事数据。",
+    "en-US": "Ask an administrator for access. No colleague data is shown.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.list.retryHelp",
+    "source": "import",
+    "zh-CN": "请检查网络连接后重试。",
+    "en-US": "Check your connection and try again.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.releases.paused",
+    "source": "import",
+    "zh-CN": "当前版本 · 已暂停",
+    "en-US": "Current version · suspended",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.policy.subject.allowedUserIds",
+    "source": "import",
+    "zh-CN": "允许的用户",
+    "en-US": "Allowed users",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.policy.subject.allowedMemberIds",
+    "source": "import",
+    "zh-CN": "允许的组织成员",
+    "en-US": "Allowed organization members",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.policy.subject.allowedRoleIds",
+    "source": "import",
+    "zh-CN": "允许的角色",
+    "en-US": "Allowed roles",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.policy.unnamed",
+    "source": "import",
+    "zh-CN": "未命名的人员或角色",
+    "en-US": "Unnamed person or role",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.policy.unavailable",
+    "source": "import",
+    "zh-CN": "不可用的原选择 {number}",
+    "en-US": "Unavailable selection {number}",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.policy.selectionHelp",
+    "source": "import",
+    "zh-CN": "选择名称可限制访问范围；清空选择则沿用租户兼容访问。",
+    "en-US": "Select names to restrict access. Clear the selection to keep tenant-compatible access.",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.type.reactive",
+    "source": "import",
+    "zh-CN": "响应型同事",
+    "en-US": "Reactive colleague",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.type.copilot",
+    "source": "import",
+    "zh-CN": "协作助手",
+    "en-US": "Copilot",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.type.autonomous",
+    "source": "import",
+    "zh-CN": "自主执行型",
+    "en-US": "Autonomous colleague",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.type.proactive",
+    "source": "import",
+    "zh-CN": "主动协作型",
+    "en-US": "Proactive colleague",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.type.workflow",
+    "source": "import",
+    "zh-CN": "流程执行型",
+    "en-US": "Workflow colleague",
+    "refType": "ui"
+  },
+  {
+    "key": "ai.colleagues.releases.unknown",
+    "source": "import",
+    "zh-CN": "暂时无法核对草稿内容，请刷新后重试。",
+    "en-US": "Draft content could not be compared. Refresh to retry.",
+    "refType": "ui"
   }
 ]

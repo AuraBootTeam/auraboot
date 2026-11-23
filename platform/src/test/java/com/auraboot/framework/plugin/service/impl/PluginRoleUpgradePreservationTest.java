@@ -40,7 +40,7 @@ class PluginRoleUpgradePreservationTest {
         when(roles.findIdByCode(7L, "quote_reader")).thenReturn(3L);
         when(roles.findPidByCode(7L, "quote_reader")).thenReturn("existing-role");
         PermissionDTO permission = new PermissionDTO(); permission.setId(9L); permission.setCode("quote.read");
-        when(permissions.findByCode("quote.read")).thenReturn(permission);
+        when(permissions.findByTenantIdAndCode(7L, "quote.read")).thenReturn(permission);
     }
 
     @Test void overwriteCannotRestoreARevokedGrantOrReplaceExistingRoleScope() {

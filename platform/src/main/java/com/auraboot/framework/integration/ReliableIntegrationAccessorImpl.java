@@ -1,6 +1,8 @@
 package com.auraboot.framework.integration;
 
 import com.auraboot.framework.meta.constant.OutboxStatus;
+import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
 import com.auraboot.framework.meta.entity.OutboxEvent;
 import com.auraboot.framework.meta.mapper.OutboxEventMapper;
 import com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope;
@@ -27,16 +29,50 @@ public class ReliableIntegrationAccessorImpl implements ReliableIntegrationAcces
     private final ReliableIntegrationMetrics metrics;
     private final InventoryReceiptEnqueueProvenance provenance;
     private final ApplicationEventPublisher events;
+    private final PluginRecordMapper plugins;
 
     @Autowired
+    public ReliableIntegrationAccessorImpl(OutboxEventMapper outboxEventMapper, ObjectMapper objectMapper,
+                                           ReliableIntegrationMetrics metrics, InventoryReceiptEnqueueProvenance provenance,
+                                           ApplicationEventPublisher events,
+                                           PluginRecordMapper plugins) {
+        this.outboxEventMapper = outboxEventMapper; this.objectMapper = objectMapper;
+        this.metrics = metrics; this.provenance = provenance;
+        this.events = java.util.Objects.requireNonNull(events);
+        this.plugins = java.util.Objects.requireNonNull(plugins);
+    }
+
+    /** Retained for existing isolated enqueue fixtures that never query installations. */
     public ReliableIntegrationAccessorImpl(OutboxEventMapper outboxEventMapper, ObjectMapper objectMapper,
                                            ReliableIntegrationMetrics metrics, InventoryReceiptEnqueueProvenance provenance,
                                            ApplicationEventPublisher events) {
         this.outboxEventMapper = outboxEventMapper; this.objectMapper = objectMapper;
         this.metrics = metrics; this.provenance = provenance;
-        this.events = java.util.Objects.requireNonNull(events);
+        this.events = java.util.Objects.requireNonNull(events); this.plugins = null;
     }
 
+    @Override
+    public boolean isPluginInstalled(long tenantId, String pluginId) {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()
+                || tenantId <= 0 || !Long.valueOf(tenantId).equals(
+                    MetaContext.getCurrentTenantId())) {
+            throw new SecurityException("Installation lookup requires the event transaction and tenant");
+        }
+        if (plugins == null || pluginId == null || pluginId.isBlank()) {
+            throw new IllegalStateException("Tenant installation lookup is unavailable or invalid");
+        }
+        var plugin = plugins.findIntegrationIdentity(tenantId, pluginId);
+        if (plugin == null) return false;
+        if (!Long.valueOf(tenantId).equals(plugin.getTenantId())
+                || !pluginId.equals(plugin.getPluginId())) {
+            throw new SecurityException("Installation lookup returned another tenant or plugin");
+        }
+        if (Boolean.TRUE.equals(plugin.getDeletedFlag())
+                || !java.util.Set.of("installed", "enabled").contains(plugin.getStatus() == null ? "" : plugin.getStatus())) {
+            throw new IllegalStateException("Selected integration is not available: " + pluginId);
+        }
+        return true;
+    }
 
     @Override
     public void enqueue(IntegrationEventEnvelope envelope) {

@@ -166,8 +166,8 @@ final class PluginPageNavigationImporter {
                     null, null, dto.getCode(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
         }
 
-        if (support.shouldSkipForOverwriteSafe(tenantId, conflictStrategy, ResourceType.MENU, dto.getCode())) {
-            log.info("Skipping user-modified resource: {} {}", ResourceType.MENU, PluginImportSupport.logSafe(dto.getCode()));
+        if (exists && support.preserveExistingMenuForSafeImport(tenantId, conflictStrategy, dto.getCode(), pluginPid)) {
+            log.info("Preserving existing menu ownership or customization: {}", PluginImportSupport.logSafe(dto.getCode()));
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.MENU,
                     null, null, dto.getCode(), dto.getEffectiveName(), ResourceAction.SKIP, null, null);
         }

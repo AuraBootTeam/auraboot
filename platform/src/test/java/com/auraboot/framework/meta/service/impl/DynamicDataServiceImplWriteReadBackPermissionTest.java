@@ -230,6 +230,25 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
     }
 
     @Test
+    void createInitializesRequiredHostVersionBeforeValidationWithoutTreatingItAsSubmitted() {
+        stubReadVerdict(false);
+        var fields = new java.util.ArrayList<>(model.getFields());
+        fields.add(FieldDefinition.builder().code("row_version").columnName("row_version").required(true).build());
+        model.setFields(fields);
+        when(dynamicDataMapper.insert(anyString(), anyMap())).thenReturn(1);
+        doAnswer(call -> {
+            Map<String, Object> validated = call.getArgument(1);
+            assertThat(validated).containsEntry("row_version", 1);
+            return null;
+        }).when(validationService).validateAndThrow(eq(model), anyMap(),
+                eq(com.auraboot.framework.meta.dto.ValidationContext.CREATE));
+        service.create(MODEL_CODE, new HashMap<>(Map.of("pid", RECORD_ID, "name", "written-value")));
+        var nativeFields = applicationContext.getBean(NativeRecordFieldAuthorization.class);
+        verify(nativeFields).requireCreated(eq(MODEL_CODE), eq(RECORD_ID),
+                argThat(submitted -> !submitted.containsKey("row_version")));
+    }
+
+    @Test
     @DisplayName("create succeeds when the caller may write but not read the model")
     void create_callerCannotReadModel_stillSucceeds() {
         stubReadVerdict(false); // caller may create, but may NOT read this model

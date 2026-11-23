@@ -34,7 +34,7 @@ import {
   type RowHeight,
 } from '~/framework/smart/types/savedView';
 import { DraggableColumnHeader } from './DraggableColumnHeader';
-import { fitDefaultColumnWidths } from './responsiveColumnWidths';
+import { COMPACT_COLUMN_WIDTH, fitDefaultColumnWidths } from './responsiveColumnWidths';
 import { RowActionButtons } from './RowActionButtons';
 import { estimateActionColumnWidth, partitionRowActions } from './actionColumnWidth';
 import { SummaryRow, hasAnyAggregate } from './SummaryRow';
@@ -849,7 +849,7 @@ export const ListTable = React.memo(function ListTable({
                                 key={column.field}
                                 style={getCellStyle(column)}
                                 data-testid={`table-cell-${index}-${column.field}`}
-                                className={`${compactSpacing ? 'px-3' : 'px-6'} ${rowHeightCfg.pyClass} text-text-2 overflow-hidden text-sm whitespace-nowrap ${
+                                className={`${compactSpacing || getRenderedColumnWidth(column) < COMPACT_COLUMN_WIDTH ? 'px-3' : 'px-6'} ${rowHeightCfg.pyClass} text-text-2 overflow-hidden text-sm whitespace-nowrap ${
                                   column.align === 'right'
                                     ? 'text-right'
                                     : column.align === 'center'
@@ -959,7 +959,7 @@ export const ListTable = React.memo(function ListTable({
                               key={column.field}
                               style={getCellStyle(column)}
                               data-testid={`table-cell-${index}-${column.field}`}
-                              className={`${compactSpacing ? 'px-3' : 'px-6'} ${rowHeightCfg.pyClass} text-text-2 overflow-hidden text-sm whitespace-nowrap ${
+                              className={`${compactSpacing || getRenderedColumnWidth(column) < COMPACT_COLUMN_WIDTH ? 'px-3' : 'px-6'} ${rowHeightCfg.pyClass} text-text-2 overflow-hidden text-sm whitespace-nowrap ${
                                 column.align === 'right'
                                   ? 'text-right'
                                   : column.align === 'center'
@@ -1076,7 +1076,7 @@ export const ListTable = React.memo(function ListTable({
                               key={column.field}
                               style={getCellStyle(column)}
                               data-testid={`table-cell-${index}-${column.field}`}
-                              className={`${compactSpacing ? 'px-3' : 'px-6'} ${rowHeightCfg.pyClass} text-text-2 text-sm whitespace-nowrap ${
+                              className={`${compactSpacing || getRenderedColumnWidth(column) < COMPACT_COLUMN_WIDTH ? 'px-3' : 'px-6'} ${rowHeightCfg.pyClass} text-text-2 text-sm whitespace-nowrap ${
                                 column.align === 'right'
                                   ? 'text-right'
                                   : column.align === 'center'

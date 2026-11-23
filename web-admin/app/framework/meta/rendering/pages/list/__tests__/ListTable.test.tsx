@@ -546,3 +546,21 @@ describe('list header label overflow contract', () => {
     expect(screen.getByText('Submitted quantity')).toHaveClass('truncate');
   });
 });
+
+it('keeps narrow authored headers, business values and summaries on compact padding', () => {
+  renderListTable({
+    columns: [
+      { field: 'status', label: 'Status', width: 110 },
+      { field: 'quantity', label: 'Quantity', width: 80, aggregate: 'sum' },
+      { field: 'released', label: 'Released at', width: 180 },
+    ],
+    data: [
+      { pid: 'released-hold', status: 'Released', quantity: 2, released: '2026-11-23 00:00:00' },
+    ],
+  });
+  for (const field of ['status', 'quantity', 'released']) {
+    expect(screen.getByTestId(`table-header-${field}`)).toHaveClass('px-3');
+    expect(screen.getByTestId(`table-cell-0-${field}`)).toHaveClass('px-3');
+    expect(screen.getByTestId(`summary-cell-${field}`)).toHaveClass('px-3');
+  }
+});

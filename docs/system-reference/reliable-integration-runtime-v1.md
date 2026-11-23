@@ -344,3 +344,17 @@ human fallback deny-all predicate. Other unadapted SQL entry points and
 `baseRowFilter` retain machine deny-all behavior. Missing decisions, nonmatching
 root rows and legacy scopes remain denied; this adapter is not a general machine
 query permission grant.
+
+## Optional tenant-installed integrations
+
+`ReliableIntegrationAccessor.isPluginInstalled(tenantId, pluginId)` is a read-only selection
+check inside the event transaction. The tenant must match the host context. It reads the
+explicit tenant installation identity, including retired records; globally loaded JARs are
+not a selection signal. Only a missing identity returns false. Installed/enabled identities
+return true; disabled, failed, retired, unknown states and lookup failures throw. The default
+SPI implementation throws on older hosts rather than implicitly opting out.
+
+A producer adapter may omit an optional derived effect only when the owner has never been
+installed in that tenant. Once selected, missing consumers and processing failures retain
+normal reliable delivery/receipt rollback and retry behavior. This check does not authorize
+writes, broaden model scopes or retroactively enqueue facts produced before selection.
