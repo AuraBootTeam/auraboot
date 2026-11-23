@@ -49,6 +49,7 @@ export interface PageExtensionConfig {
   workspaceShell?: WorkspaceShellConfig;
   detailHeaderLayout?: LayoutConfig;
   detailBodyOrder?: 'schema';
+  compactHeaderActions?: boolean;
 }
 
 // Layout 配置
@@ -799,6 +800,8 @@ export interface SubTableConfig {
   childModel: string;
   parentField: string;
   readOnly?: boolean;
+  /** Keep the first column in view when a read-only table scrolls horizontally. */
+  pinFirstColumn?: boolean;
   editableWhen?: string;
   columns: ColumnConfig[];
   /** Parent-record actions rendered above the child collection, including when it is empty. */

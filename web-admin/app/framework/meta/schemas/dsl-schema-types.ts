@@ -55,6 +55,7 @@ export interface PageExtensionConfig {
   workspaceShell?: RuntimePageExtensionConfig['workspaceShell'];
   detailHeaderLayout?: RuntimePageExtensionConfig['detailHeaderLayout'];
   detailBodyOrder?: RuntimePageExtensionConfig['detailBodyOrder'];
+  compactHeaderActions?: RuntimePageExtensionConfig['compactHeaderActions'];
 }
 
 // ---------------------------------------------------------------------------

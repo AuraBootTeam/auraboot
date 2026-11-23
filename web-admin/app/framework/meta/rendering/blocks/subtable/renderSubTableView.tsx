@@ -310,6 +310,7 @@ export function renderSubTableView({
     );
   }
 
+  const pinnedColumn = !isEditable && config.pinFirstColumn ? effectiveColumns[0]?.field : undefined;
   const tableHeader = (
     <thead className="bg-subtle">
       <tr>
@@ -323,7 +324,7 @@ export function renderSubTableView({
                 : col.align === 'center'
                   ? 'text-center'
                   : 'text-left'
-            }`}
+            } ${col.field === pinnedColumn ? 'bg-subtle sticky left-0 z-10' : ''}`}
             style={
               col.width
                 ? {
@@ -490,7 +491,7 @@ export function renderSubTableView({
                           key={col.field}
                           className={`text-text-2 px-4 py-2 text-sm ${cellAlign}${
                             canInlineEdit ? 'hover:bg-hover cursor-pointer' : ''
-                          }`}
+                          } ${col.field === pinnedColumn ? 'bg-panel sticky left-0 z-10' : ''}`}
                           onDoubleClick={canInlineEdit ? () => handleStartEdit(row) : undefined}
                         >
                           {formatCellValue(

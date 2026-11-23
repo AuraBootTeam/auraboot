@@ -283,6 +283,40 @@ export function renderDetailPageView({
     />
   ) : null;
 
+  const showShare = schema.extension?.showShare !== false && canManageRecordShares;
+  const reportRecordPid = schema.extension?.showReport !== false ? recordData?.pid : undefined;
+  const showPrint = schema.extension?.showPrint !== false;
+  const showPdfExport = schema.extension?.showPdfExport !== false;
+  const utilityActions = (
+    <>
+      {showShare && (
+        <button
+          onClick={() => setShareDialogOpen(true)}
+          className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover border px-3 py-1.5 text-sm font-medium"
+          data-testid={deriveTestId('detail', schema?.modelCode || tableName, 'share-btn')}
+        >
+          {t('action.share')}
+        </button>
+      )}
+      {reportRecordPid && (
+        <ReportGenerateButton
+          modelCode={schema?.modelCode || tableName}
+          recordPid={reportRecordPid}
+        />
+      )}
+      {showPrint && (
+        <PrintButton title={getLocalizedText(schema.title, locale, t)} />
+      )}
+      {showPdfExport && (
+        <ExportPdfButton
+          targetRef={pdfExportTargetRef}
+          fileName={resolveDetailPdfFileName(schema, recordData, tableName, locale, t)}
+          orientation="portrait"
+        />
+      )}
+    </>
+  );
+
   return (
     <div
       className={
@@ -382,31 +416,16 @@ export function renderDetailPageView({
 
             {/* Header toolbar buttons */}
             <div className={headerLayout.actions} data-print="hide">
-              {schema.extension?.showShare !== false && canManageRecordShares && (
-                <button
-                  onClick={() => setShareDialogOpen(true)}
-                  className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover border px-3 py-1.5 text-sm font-medium"
-                  data-testid={deriveTestId('detail', schema?.modelCode || tableName, 'share-btn')}
-                >
-                  {t('action.share')}
-                </button>
-              )}
-              {schema.extension?.showReport !== false && recordData?.pid && (
-                <ReportGenerateButton
-                  modelCode={schema?.modelCode || tableName}
-                  recordPid={recordData.pid}
-                />
-              )}
-              {schema.extension?.showPrint !== false && (
-                <PrintButton title={getLocalizedText(schema.title, locale, t)} />
-              )}
-              {schema.extension?.showPdfExport !== false && (
-                <ExportPdfButton
-                  targetRef={pdfExportTargetRef}
-                  fileName={resolveDetailPdfFileName(schema, recordData, tableName, locale, t)}
-                  orientation="portrait"
-                />
-              )}
+              {schema.extension?.compactHeaderActions && (showShare || reportRecordPid || showPrint || showPdfExport) ? (
+                <details className="relative">
+                  <summary className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover cursor-pointer list-none border px-3 py-1.5 text-sm font-medium">
+                    {getLocalizedText({ 'zh-CN': '更多操作', en: 'More actions' }, locale, t)}
+                  </summary>
+                  <div className="rounded-card border-border bg-panel absolute left-0 z-30 mt-2 flex w-max max-w-[min(20rem,75vw)] flex-wrap gap-2 border p-2 shadow-lg sm:right-0 sm:left-auto">
+                    {utilityActions}
+                  </div>
+                </details>
+              ) : utilityActions}
               {!presentation && nativeActions}
             </div>
           </div>
