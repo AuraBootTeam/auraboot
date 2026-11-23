@@ -178,12 +178,15 @@ if [ "${#PLUGINS[@]}" -eq 0 ]; then
     exit 2
 fi
 
-# These empty wrappers were replaced by composition/showcase entrypoints.
+# Retired optional packages and replaced wrappers must not resolve from stale roots.
 # Reject before login and path discovery so stale checkout roots cannot revive them.
 for selected_plugin in "${PLUGINS[@]}"; do
     selected_name="${selected_plugin%/}"
     selected_name="${selected_name##*/}"
     case "$selected_name" in
+        airflow-observability|com.auraboot.airflow-observability)
+            echo "ERROR: retired plugin airflow-observability; no replacement; Core webhook support is unchanged" >&2
+            exit 2 ;;
         pcba-warehouse|com.auraboot.pcba-warehouse)
             echo "ERROR: retired plugin pcba-warehouse; import inventory; manufacturing roles come from pcba-solution" >&2
             exit 2 ;;

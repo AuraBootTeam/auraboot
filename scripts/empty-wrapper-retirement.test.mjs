@@ -18,7 +18,7 @@ test('the legacy full demo no longer selects either empty wrapper and retains al
   for(const name of profiles['quarry-delivery']) assert.ok(profiles['enterprise-demo'].includes(name),name);
 });
 
-for(const name of ['quarry-solution','marketing-crm-demo','pcba-warehouse']) {
+for(const name of ['quarry-solution','marketing-crm-demo','pcba-warehouse','airflow-observability']) {
   test(`explicit ${name} names, identities and legacy paths reject before any network call`,()=>{
     const fixture=mkdtempSync(join(tmpdir(),'retired-wrapper-'));
     const curl=join(fixture,'curl');const marker=join(fixture,'network-called');
@@ -29,7 +29,7 @@ for(const name of ['quarry-solution','marketing-crm-demo','pcba-warehouse']) {
       });
       assert.equal(result.status,2,result.stderr);
       assert.match(result.stderr,/retired plugin/);
-      assert.match(result.stderr,name==='quarry-solution'?/quarry-delivery/:name==='pcba-warehouse'?/inventory/:/showcase\/media\/marketing-crm/);
+      assert.match(result.stderr,name==='airflow-observability'?/no replacement/:name==='quarry-solution'?/quarry-delivery/:name==='pcba-warehouse'?/inventory/:/showcase\/media\/marketing-crm/);
       assert.equal(existsSync(marker),false,'No login or import request may precede retirement rejection');
     }
   });
