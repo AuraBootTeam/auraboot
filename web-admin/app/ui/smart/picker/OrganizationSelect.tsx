@@ -261,7 +261,7 @@ export const OrganizationSelect: React.FC<OrganizationSelectProps> = ({
       <div className="relative" data-testid={`organization-select-${name}`}>
         <div
           data-testid={`organization-select-trigger-${name}`}
-          className={`rounded-control border-border-strong flex min-h-[var(--ds-control-field)] w-full items-center border px-3 py-1 text-sm shadow-card ${disabledValue ? 'bg-subtle cursor-not-allowed' : 'bg-panel hover:border-border-strong cursor-pointer'} ${selectedOrganizations.length > 0 ? 'text-text' : 'text-text-2'} focus-visible:shadow-focus focus:outline-none`}
+          className={`rounded-control border-border-strong flex min-h-[var(--ds-control-field)] w-full items-center border px-3 py-0.5 text-sm shadow-card ${disabledValue ? 'bg-subtle cursor-not-allowed' : 'bg-panel hover:border-border-strong cursor-pointer'} ${selectedOrganizations.length > 0 ? 'text-text' : 'text-text-2'} focus-visible:shadow-focus focus:outline-none`}
           onClick={() => !disabledValue && setIsOpen(!isOpen)}
         >
           <div className="flex w-full items-center justify-between">
