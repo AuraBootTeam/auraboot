@@ -808,7 +808,7 @@ test.describe
     await expect(page.getByTestId("sidebar")).toBeVisible();
     const currentActor = await data(page.request, 'get', `${BASE_URL}/api/auth/me`);
     expect(String(currentActor.user.tenantId)).toBe(String(platform.tenantId));
-    await expect(page.getByRole('heading', { name: '插件管理', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Kernel Plugin Manager', exact: true })).toBeVisible();
     await expect(page.getByText('Page Unavailable', { exact: true })).toBeHidden();
     await capture(page, "NAV02");
     await login(page, "admin@auraboot.com", "Test2026x", "en-US");
