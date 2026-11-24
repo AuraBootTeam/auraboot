@@ -747,8 +747,7 @@ test.describe
       .fill(createRequestId);
     await choose(page, createRequestId);
     await page.setViewportSize({ width: 390, height: 844 });
-    const closeMenu = page.getByTestId('sidebar').getByRole('button', { name: '关闭', exact: true });
-    if (await closeMenu.isVisible()) await closeMenu.click();
+    await expect(page.getByTestId('sidebar')).not.toBeInViewport();
     await page.getByTestId('http-audit-inspector').evaluate(element => element.scrollIntoView({ block: 'start' }));
     await expect(page.getByTestId("http-audit-inspector")).toBeVisible();
     await capture(page, "LOG12");
