@@ -40,8 +40,6 @@ public class CommandAuthorizationPhase implements CommandPhase {
     private final UserPermissionService userPermissionService;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.auraboot.framework.permission.service.DomainCommandAuthorization domains;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private com.auraboot.framework.plugin.pf4j.ExtensionRegistry extensionRegistry;
     private final RecordShareService recordShareService;
     private final ObjectProvider<DynamicDataService> dynamicDataServiceProvider;
 
@@ -86,10 +84,9 @@ public class CommandAuthorizationPhase implements CommandPhase {
         }
 
         if (domains != null && requiredPermissions.stream().anyMatch(domains::isDomain)
-                && (ctx.getUserId() == null
+                && (requiredPermissions.size() != 1 || ctx.getUserId() == null
                     || !java.util.Objects.equals(ctx.getUserId(), MetaContext.getCurrentUserId())
-                    || !java.util.Objects.equals(ctx.getTenantId(), MetaContext.getCurrentTenantId())
-                    || requiredPermissions.size() != 1 && !hasBoundBusinessOwner(ctx))) {
+                    || !java.util.Objects.equals(ctx.getTenantId(), MetaContext.getCurrentTenantId()))) {
             applyVerdict(ctx, CommandAuthorizationVerdict.denied(requiredPermissions));
             throw new BusinessException(ResponseCode.FORBIDDEN, "Domain commands require one current application boundary");
         }
@@ -140,25 +137,6 @@ public class CommandAuthorizationPhase implements CommandPhase {
         applyVerdict(ctx, CommandAuthorizationVerdict.denied(requiredPermissions));
         throw new BusinessException(ResponseCode.FORBIDDEN,
                 "Command permission denied: required one of " + String.join(", ", requiredPermissions));
-    }
-
-    /** A code-owned shared action may declare alternative duties, with its intrinsic actor gate retained. */
-    private boolean hasBoundBusinessOwner(CommandPipelineContext ctx) {
-        if(extensionRegistry==null || ctx.getCommand()==null)return false;
-        var canonical=extensionRegistry.getBusinessResourceOwner(ctx.getCommandCode()).orElse(null);
-        Object raw=ctx.getExecConfig().get("handler");
-        if(raw!=null && (!(raw instanceof String code) || !StringUtils.hasText(code)))return false;
-        String handlerCode=raw==null?ctx.getCommandCode():((String)raw).trim();
-        var resolved=extensionRegistry.getBusinessResourceOwner(handlerCode).orElse(null);
-        if(canonical==null || canonical!=resolved
-                || !(canonical instanceof com.auraboot.framework.plugin.extension.BusinessResourceAuthorization owner)
-                || owner.businessActorAuthorization()==null)return false;
-        try {
-            com.auraboot.framework.plugin.pf4j.BusinessResourcePermissionContract.requireDeclaration(ctx,owner);
-            return true;
-        } catch(org.springframework.security.access.AccessDeniedException denied) {
-            return false;
-        }
     }
 
     /**

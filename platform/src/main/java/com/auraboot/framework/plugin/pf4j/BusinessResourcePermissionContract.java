@@ -9,15 +9,6 @@ import java.util.*;
 public final class BusinessResourcePermissionContract {
     private BusinessResourcePermissionContract() {}
     public static List<String> require(CommandPipelineContext context,BusinessResourceAuthorization owner) {
-        var declared=requireDeclaration(context,owner);
-        if(context.getAuthorizationVerdict()==null || !context.getAuthorizationVerdict().isAuthorized()
-                || !declared.contains(context.getAuthorizationVerdict().permissionCode()))
-            throw new AccessDeniedException("Command duties differ from the business owner contract");
-        return declared;
-    }
-
-    /** Immutable declaration only; this does not grant a duty or authorize an actor/resource. */
-    public static List<String> requireDeclaration(CommandPipelineContext context,BusinessResourceAuthorization owner) {
         var boundary=owner.businessBoundary();
         Object params=context.getExecConfig()==null?null:context.getExecConfig().get("handlerParams");
         if(boundary==null || context.getCommand()==null || !boundary.commandCode().equals(context.getCommandCode())
@@ -37,7 +28,9 @@ public final class BusinessResourcePermissionContract {
         if(expected.isEmpty() || expected.size()>128 || expected.stream().anyMatch(code->code.isBlank()
                 || !code.equals(code.strip()) || code.length()>255 || Set.of("*","meta.command.execute").contains(code))
                 || !(raw instanceof List<?> declared) || declared.size()!=expected.size()
-                || declared.stream().anyMatch(code->!(code instanceof String)) || !new HashSet<>(declared).equals(expected))
+                || declared.stream().anyMatch(code->!(code instanceof String)) || !new HashSet<>(declared).equals(expected)
+                || context.getAuthorizationVerdict()==null || !context.getAuthorizationVerdict().isAuthorized()
+                || !expected.contains(context.getAuthorizationVerdict().permissionCode()))
             throw new AccessDeniedException("Command duties differ from the business owner contract");
         return declared.stream().map(String.class::cast).toList();
     }
