@@ -294,7 +294,10 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
       return Array.isArray(value) ? value : [];
     }
     if (expectsJsonObjectValue) {
-      return parseJsonObject(value);
+      // Keep a controlled range controlled when reset removes the parent value.
+      // Passing undefined would restore the smart field's previous local dates.
+      const parsed = parseJsonObject(value);
+      return componentLower === 'daterange' ? parsed ?? {} : parsed;
     }
     return value;
   }, [componentLower, expectsJsonObjectValue, isMemberPickerMultiple, isUploadComponent, field.props?.multiple, value]);
@@ -592,7 +595,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
         data-testid={`field-${field.field}`}
       >
         {resolvedLabel && (
-          <label htmlFor={field.field} className={`text-text-2 block text-sm font-medium ${field.props?.inline ? 'shrink-0 whitespace-nowrap sm:pt-2' : 'mb-1'}`}>
+          <label htmlFor={field.field} className={`text-text-2 block text-sm font-medium ${field.props?.inline ? 'shrink-0 whitespace-nowrap pt-2' : 'mb-1'}`}>
             {resolvedLabel}
             {isRequired && <span className="text-status-red ml-0.5">*</span>}
           </label>
