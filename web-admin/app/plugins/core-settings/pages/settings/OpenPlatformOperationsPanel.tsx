@@ -59,8 +59,10 @@ interface WebhookHealth {
 
 export default function OpenPlatformOperationsPanel({
   installationPid,
+  deliveriesOnly = false,
 }: {
   installationPid: string;
+  deliveriesOnly?: boolean;
 }) {
   const { t, locale } = useI18n();
   const { showToast } = useToastContext();
@@ -198,8 +200,9 @@ export default function OpenPlatformOperationsPanel({
               </div>
             ))}
           </div>
-          <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+          <div className={`grid min-w-0 gap-4 ${deliveriesOnly ? 'grid-cols-1' : 'lg:grid-cols-2'}`}>
             <div
+              hidden={deliveriesOnly}
               data-testid="open-platform-call-audit"
               className="min-w-0 overflow-hidden rounded-lg border border-gray-200 p-3 dark:border-gray-700"
             >

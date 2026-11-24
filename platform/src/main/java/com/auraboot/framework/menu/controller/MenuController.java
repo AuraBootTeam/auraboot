@@ -34,6 +34,9 @@ public class MenuController {
     @Autowired
     private MenuService menuService;
 
+    @Autowired
+    private com.auraboot.framework.menu.service.PlatformManagementNavigation platformNavigation;
+
     /**
      * 获取当前用户的菜单树
      * 用于前端动态渲染菜单
@@ -45,7 +48,7 @@ public class MenuController {
             @CurrentUserId Long userId ) {
 
         List<Menu> menuTree = menuService.getUserMenuTree(userId, MetaContext.getCurrentTenantId());
-        return ApiResponse.success(menuTree);
+        return ApiResponse.success(platformNavigation.append(menuTree, userId, MetaContext.getCurrentTenantId()));
     }
 
     /**

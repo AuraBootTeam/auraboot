@@ -113,10 +113,19 @@ public class OpenPlatformManagementController {
 
     @GetMapping("/installations/{installationPid}/audits")
     public ApiResponse<List<CallAuditView>> listAudits(@PathVariable String installationPid,
-                                                       @RequestParam(required = false) String requestId,
-                                                       @RequestParam(required = false) Integer status,
-                                                       @RequestParam(defaultValue = "50") int limit) {
-        return ApiResponse.success(managementService.listCallAudits(installationPid, requestId, status, limit));
+            @RequestParam(required = false) String requestId, @RequestParam(required = false) Integer status,
+            @RequestParam(defaultValue = "50") int limit, @RequestParam(defaultValue = "0") int offset,
+            @RequestParam(required = false) String keyword, @RequestParam(required = false) String method,
+            @RequestParam(defaultValue = "all") String statusClass,
+            @RequestParam(defaultValue = "24") int windowHours) {
+        return ApiResponse.success(managementService.searchCallAudits(installationPid, requestId, status,
+                limit, offset, keyword, method, statusClass, windowHours));
+    }
+
+    @GetMapping("/installations/{installationPid}/audits/{auditPid}")
+    public ApiResponse<com.auraboot.framework.openplatform.dto.OpenPlatformDtos.CallAuditDetail> auditDetail(
+            @PathVariable String installationPid, @PathVariable String auditPid) {
+        return ApiResponse.success(managementService.getCallAuditDetail(installationPid, auditPid));
     }
 
     @GetMapping("/installations/{installationPid}/webhook-deliveries")

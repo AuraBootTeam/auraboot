@@ -19,7 +19,7 @@ class ExternalEventIngressControllerTest {
     private final ExternalEventIngressService service = mock(ExternalEventIngressService.class);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new ExternalEventIngressController(service, mock(InstalledIntegrationService.class)))
             .setCustomArgumentResolvers(new org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver())
-            .addFilters(new OpenApiRequestIdFilter())
+            .addFilters(new OpenApiRequestIdFilter(new ObjectMapper(), org.mockito.Mockito.mock(com.auraboot.framework.openplatform.mapper.OpenApiCallAuditMapper.class)))
             .setMessageConverters(new org.springframework.http.converter.StringHttpMessageConverter(),
                     new org.springframework.http.converter.json.MappingJackson2HttpMessageConverter(new ObjectMapper())).build();
     private static final String PATH = "/api/open/v1/event-sources/kingdee-procurement-orders/events";

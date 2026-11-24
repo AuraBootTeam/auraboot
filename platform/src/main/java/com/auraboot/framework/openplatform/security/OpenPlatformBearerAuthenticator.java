@@ -102,6 +102,7 @@ public class OpenPlatformBearerAuthenticator implements ExternalMachineAuthentic
         audit.setOccurredAt(Instant.now());
         audit.setBusinessDetails(OpenApiBusinessAudit.details(request));
         auditMapper.insert(audit);
+        request.setAttribute(OpenApiHttpCapture.TARGET, new OpenApiHttpCapture.Target(audit.getPid(), audit.getTenantId(), audit.getInstallationPid()));
     }
 
     @Override
@@ -134,6 +135,7 @@ public class OpenPlatformBearerAuthenticator implements ExternalMachineAuthentic
         audit.setOccurredAt(Instant.now());
         audit.setBusinessDetails(com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode()
                 .put("actorKind", "unauthenticated").put("phase", "authentication").put("code", code));
+        request.setAttribute(OpenApiHttpCapture.TARGET, new OpenApiHttpCapture.Target(audit.getPid(), audit.getTenantId(), audit.getInstallationPid()));
         if (auditMapper.insertAuthenticationFailure(audit) != 1) {
             throw new IllegalStateException("Authentication failure audit was not persisted");
         }

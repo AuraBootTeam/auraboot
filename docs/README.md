@@ -46,3 +46,5 @@ This directory holds engineering-facing material that ships with the repository.
 - [WeChat code exchange and trusted client addresses](system-reference/wechat-code-exchange-and-client-address.md) — server-only contracts and caller-owned state, business authorization and ingress obligations.
 - CRUD runtime reference: [Generated CRUD default presentation](./system-reference/crud-default-presentation.md).
 - Focused browser regression: [Default CRUD regression](./system-reference/crud-regression.md), including responsive lists and the real Page Designer save/publish/runtime roundtrip.
+
+- Open Platform HTTP audit: [capture, redaction, navigation and authorization](system-reference/open-platform-http-audit.md).

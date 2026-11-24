@@ -6853,5 +6853,555 @@
     "key": "auth.capability.security.desc",
     "zh-CN": "多租户与细粒度权限管理访问范围，审计与 Trace 记录执行过程。",
     "en-US": "Scope access by tenant and permission. Review execution with audit records and traces."
+  },
+  {
+    "key": "openPlatform.logs.copied",
+    "zh-CN": "已复制脱敏内容",
+    "en-US": "Redacted content copied"
+  },
+  {
+    "key": "openPlatform.logs.copyFailed",
+    "zh-CN": "剪贴板不可用，请下载脱敏记录。",
+    "en-US": "Clipboard unavailable. Download the redacted record instead."
+  },
+  {
+    "key": "openPlatform.logs.downloaded",
+    "zh-CN": "已下载脱敏报文",
+    "en-US": "Redacted record downloaded"
+  },
+  {
+    "key": "openPlatform.logs.emptyBody",
+    "zh-CN": "本次调用未携带正文。",
+    "en-US": "This call has no body."
+  },
+  {
+    "key": "openPlatform.logs.truncatedBody",
+    "zh-CN": "报文超过 64 KB 采集上限。为保证可靠脱敏，不保存截断的正文。",
+    "en-US": "Body exceeds the 64 KB capture limit. No partial body is stored because it cannot be safely redacted."
+  },
+  {
+    "key": "openPlatform.logs.invalidJson",
+    "zh-CN": "正文不是有效 JSON，未保存原文。",
+    "en-US": "Invalid JSON was not stored."
+  },
+  {
+    "key": "openPlatform.logs.unreadBody",
+    "zh-CN": "请求在读取正文前被拒绝，未采集请求体。",
+    "en-US": "The request was rejected before its body was read. No body was captured."
+  },
+  {
+    "key": "openPlatform.logs.incompleteResponse",
+    "zh-CN": "响应未完整结束，未采集响应体。",
+    "en-US": "The response did not complete. No response body was captured."
+  },
+  {
+    "key": "openPlatform.logs.unsupportedBody",
+    "zh-CN": "此报文格式无法安全采集，当前仅采集 JSON。",
+    "en-US": "Body format is not supported for safe capture. Only JSON is captured."
+  },
+  {
+    "key": "openPlatform.logs.request",
+    "zh-CN": "请求 Request",
+    "en-US": "Request"
+  },
+  {
+    "key": "openPlatform.logs.response",
+    "zh-CN": "响应 Response",
+    "en-US": "Response"
+  },
+  {
+    "key": "openPlatform.logs.copyCurl",
+    "zh-CN": "复制 cURL 模板",
+    "en-US": "Copy cURL template"
+  },
+  {
+    "key": "openPlatform.logs.requestHeaders",
+    "zh-CN": "请求头 Headers",
+    "en-US": "Request headers"
+  },
+  {
+    "key": "openPlatform.logs.responseHeaders",
+    "zh-CN": "响应头 Headers",
+    "en-US": "Response headers"
+  },
+  {
+    "key": "openPlatform.logs.query",
+    "zh-CN": "查询参数 Query",
+    "en-US": "Query parameters"
+  },
+  {
+    "key": "openPlatform.logs.queryTruncated",
+    "zh-CN": "查询参数超过采集上限，未保存原文。",
+    "en-US": "Query parameters exceeded the capture limit and were not stored."
+  },
+  {
+    "key": "openPlatform.logs.requestBody",
+    "zh-CN": "请求体 Body",
+    "en-US": "Request body"
+  },
+  {
+    "key": "openPlatform.logs.responseBody",
+    "zh-CN": "响应体 Body",
+    "en-US": "Response body"
+  },
+  {
+    "key": "openPlatform.logs.copyRequest",
+    "zh-CN": "复制请求体",
+    "en-US": "Copy request body"
+  },
+  {
+    "key": "openPlatform.logs.copyResponse",
+    "zh-CN": "复制响应体",
+    "en-US": "Copy response body"
+  },
+  {
+    "key": "openPlatform.logs.callDetail",
+    "zh-CN": "调用详情",
+    "en-US": "Call details"
+  },
+  {
+    "key": "openPlatform.logs.callResult",
+    "zh-CN": "接口调用结果",
+    "en-US": "API call result"
+  },
+  {
+    "key": "openPlatform.logs.restore",
+    "zh-CN": "还原详情宽度",
+    "en-US": "Restore detail width"
+  },
+  {
+    "key": "openPlatform.logs.expand",
+    "zh-CN": "展开详情",
+    "en-US": "Expand details"
+  },
+  {
+    "key": "openPlatform.logs.close",
+    "zh-CN": "关闭详情",
+    "en-US": "Close details"
+  },
+  {
+    "key": "openPlatform.logs.requestId",
+    "zh-CN": "请求 ID",
+    "en-US": "Request ID"
+  },
+  {
+    "key": "openPlatform.logs.copyId",
+    "zh-CN": "复制请求 ID",
+    "en-US": "Copy request ID"
+  },
+  {
+    "key": "openPlatform.logs.acceptedHelp",
+    "zh-CN": "请求已接收，尚不代表最终业务处理成功。请使用原 eventId 查询事件处理结果。",
+    "en-US": "Accepted for processing. Query the original event ID for the final business result."
+  },
+  {
+    "key": "openPlatform.logs.failureHelp",
+    "zh-CN": "本次调用失败。请结合响应体与响应头排查，再由调用方按接口约定处理。",
+    "en-US": "The call failed. Review the response body and headers before the caller submits another request."
+  },
+  {
+    "key": "openPlatform.logs.detailSections",
+    "zh-CN": "调用详情内容",
+    "en-US": "Call detail sections"
+  },
+  {
+    "key": "openPlatform.logs.messages",
+    "zh-CN": "请求与响应",
+    "en-US": "Request and response"
+  },
+  {
+    "key": "openPlatform.logs.execution",
+    "zh-CN": "执行信息",
+    "en-US": "Execution info"
+  },
+  {
+    "key": "openPlatform.logs.redaction",
+    "zh-CN": "敏感字段已脱敏，复制与下载使用相同内容。",
+    "en-US": "Sensitive fields are redacted. Copies and downloads use the same redacted content."
+  },
+  {
+    "key": "openPlatform.logs.historical",
+    "zh-CN": "此条历史日志未采集报文",
+    "en-US": "This historical record has no captured HTTP content"
+  },
+  {
+    "key": "openPlatform.logs.historicalHelp",
+    "zh-CN": "当时仅记录调用摘要。启用采集不会补齐历史请求与响应。",
+    "en-US": "Only the call summary was recorded. Enabling capture cannot recover old request or response bodies."
+  },
+  {
+    "key": "openPlatform.logs.app",
+    "zh-CN": "应用",
+    "en-US": "Application"
+  },
+  {
+    "key": "openPlatform.logs.environment",
+    "zh-CN": "环境",
+    "en-US": "Environment"
+  },
+  {
+    "key": "openPlatform.logs.occurredAt",
+    "zh-CN": "调用时间",
+    "en-US": "Call time"
+  },
+  {
+    "key": "openPlatform.logs.duration",
+    "zh-CN": "耗时",
+    "en-US": "Duration"
+  },
+  {
+    "key": "openPlatform.logs.remote",
+    "zh-CN": "请求来源",
+    "en-US": "Source address"
+  },
+  {
+    "key": "openPlatform.logs.tenantOnly",
+    "zh-CN": "仅展示当前租户日志",
+    "en-US": "Current tenant only"
+  },
+  {
+    "key": "openPlatform.logs.download",
+    "zh-CN": "下载脱敏报文",
+    "en-US": "Download redacted record"
+  },
+  {
+    "key": "openPlatform.logs.accepted",
+    "zh-CN": "已接收",
+    "en-US": "Accepted"
+  },
+  {
+    "key": "openPlatform.logs.success",
+    "zh-CN": "成功",
+    "en-US": "Success"
+  },
+  {
+    "key": "openPlatform.logs.limited",
+    "zh-CN": "限流",
+    "en-US": "Rate limited"
+  },
+  {
+    "key": "openPlatform.logs.failed",
+    "zh-CN": "失败",
+    "en-US": "Failed"
+  },
+  {
+    "key": "openPlatform.logs.redirected",
+    "zh-CN": "重定向",
+    "en-US": "Redirected"
+  },
+  {
+    "key": "openPlatform.logs.total",
+    "zh-CN": "调用总数",
+    "en-US": "Total calls"
+  },
+  {
+    "key": "openPlatform.logs.errorRate",
+    "zh-CN": "错误率",
+    "en-US": "Error rate"
+  },
+  {
+    "key": "openPlatform.logs.failureCount",
+    "zh-CN": "失败调用",
+    "en-US": "Failed calls"
+  },
+  {
+    "key": "openPlatform.logs.p95",
+    "zh-CN": "P95 响应耗时",
+    "en-US": "P95 response time"
+  },
+  {
+    "key": "openPlatform.logs.overview",
+    "zh-CN": "调用概览",
+    "en-US": "Call overview"
+  },
+  {
+    "key": "openPlatform.logs.currentWindow",
+    "zh-CN": "当前应用、环境及时间范围",
+    "en-US": "Current application, environment and time window"
+  },
+  {
+    "key": "openPlatform.logs.search",
+    "zh-CN": "搜索请求 ID 或接口路径",
+    "en-US": "Search request ID or API path"
+  },
+  {
+    "key": "openPlatform.logs.timeRange",
+    "zh-CN": "时间范围",
+    "en-US": "Time range"
+  },
+  {
+    "key": "openPlatform.logs.lastHour",
+    "zh-CN": "最近 1 小时",
+    "en-US": "Last hour"
+  },
+  {
+    "key": "openPlatform.logs.lastDay",
+    "zh-CN": "最近 24 小时",
+    "en-US": "Last 24 hours"
+  },
+  {
+    "key": "openPlatform.logs.lastWeek",
+    "zh-CN": "最近 7 天",
+    "en-US": "Last 7 days"
+  },
+  {
+    "key": "openPlatform.logs.statusFilter",
+    "zh-CN": "调用状态",
+    "en-US": "Call status"
+  },
+  {
+    "key": "openPlatform.logs.allStatuses",
+    "zh-CN": "全部状态",
+    "en-US": "All statuses"
+  },
+  {
+    "key": "openPlatform.logs.onlyFailures",
+    "zh-CN": "仅失败",
+    "en-US": "Failed calls"
+  },
+  {
+    "key": "openPlatform.logs.onlySuccess",
+    "zh-CN": "仅成功（HTTP 2xx）",
+    "en-US": "HTTP 2xx"
+  },
+  {
+    "key": "openPlatform.logs.method",
+    "zh-CN": "请求方法",
+    "en-US": "HTTP method"
+  },
+  {
+    "key": "openPlatform.logs.allMethods",
+    "zh-CN": "全部方法",
+    "en-US": "All methods"
+  },
+  {
+    "key": "openPlatform.logs.reset",
+    "zh-CN": "重置",
+    "en-US": "Reset"
+  },
+  {
+    "key": "openPlatform.logs.refresh",
+    "zh-CN": "刷新日志",
+    "en-US": "Refresh logs"
+  },
+  {
+    "key": "openPlatform.logs.records",
+    "zh-CN": "调用记录",
+    "en-US": "Call records"
+  },
+  {
+    "key": "openPlatform.logs.newest",
+    "zh-CN": "按时间倒序",
+    "en-US": "Newest first"
+  },
+  {
+    "key": "openPlatform.logs.loading",
+    "zh-CN": "正在加载日志",
+    "en-US": "Loading logs"
+  },
+  {
+    "key": "openPlatform.logs.loadFailed",
+    "zh-CN": "日志加载失败",
+    "en-US": "Unable to load logs"
+  },
+  {
+    "key": "openPlatform.logs.loadFailedHelp",
+    "zh-CN": "筛选条件已保留，请检查网络后重试。",
+    "en-US": "Filters are preserved. Check the connection and retry."
+  },
+  {
+    "key": "openPlatform.logs.retry",
+    "zh-CN": "重试",
+    "en-US": "Retry"
+  },
+  {
+    "key": "openPlatform.logs.noCalls",
+    "zh-CN": "没有符合条件的调用",
+    "en-US": "No matching calls"
+  },
+  {
+    "key": "openPlatform.logs.noCallsHelp",
+    "zh-CN": "试试调整请求 ID、接口路径、时间范围或状态筛选。",
+    "en-US": "Adjust the request ID, API path, time range or status filters."
+  },
+  {
+    "key": "openPlatform.logs.clearFilters",
+    "zh-CN": "清空筛选",
+    "en-US": "Clear filters"
+  },
+  {
+    "key": "openPlatform.logs.timeAndId",
+    "zh-CN": "调用时间 / 请求 ID",
+    "en-US": "Call time / Request ID"
+  },
+  {
+    "key": "openPlatform.logs.api",
+    "zh-CN": "接口",
+    "en-US": "API"
+  },
+  {
+    "key": "openPlatform.logs.result",
+    "zh-CN": "结果",
+    "en-US": "Result"
+  },
+  {
+    "key": "openPlatform.logs.viewCall",
+    "zh-CN": "查看调用",
+    "en-US": "View call"
+  },
+  {
+    "key": "openPlatform.logs.timeZone",
+    "zh-CN": "时间遵循账号时区",
+    "en-US": "Times use your account time zone"
+  },
+  {
+    "key": "openPlatform.logs.previous",
+    "zh-CN": "上一页",
+    "en-US": "Previous page"
+  },
+  {
+    "key": "openPlatform.logs.next",
+    "zh-CN": "下一页",
+    "en-US": "Next page"
+  },
+  {
+    "key": "openPlatform.logs.loadingDetail",
+    "zh-CN": "正在加载调用详情",
+    "en-US": "Loading call details"
+  },
+  {
+    "key": "openPlatform.logs.payloadDenied",
+    "zh-CN": "暂无报文查看权限",
+    "en-US": "No permission to view HTTP content"
+  },
+  {
+    "key": "openPlatform.logs.detailFailed",
+    "zh-CN": "调用详情加载失败",
+    "en-US": "Unable to load call details"
+  },
+  {
+    "key": "openPlatform.logs.payloadDeniedHelp",
+    "zh-CN": "仍可查看调用摘要。请联系应用 owner 申请维护权限。",
+    "en-US": "Call summaries remain available. Ask an application owner for maintenance access."
+  },
+  {
+    "key": "openPlatform.logs.detailFailedHelp",
+    "zh-CN": "日志可能已不可用，请重试或刷新调用列表。",
+    "en-US": "The record may be unavailable. Retry or refresh the call list."
+  },
+  {
+    "key": "openPlatform.logs.wait",
+    "zh-CN": "请稍候…",
+    "en-US": "Please wait…"
+  },
+  {
+    "key": "openPlatform.logs.retentionHelp",
+    "zh-CN": "202 仅表示请求已接收，不代表业务处理成功。历史报文无法补采，采集记录遵循现有日志保留策略。",
+    "en-US": "202 means accepted, not final business success. Historical HTTP content cannot be recovered. Captures follow the existing audit retention policy."
+  },
+  {
+    "key": "openPlatform.logs.navigation",
+    "zh-CN": "开放平台导航",
+    "en-US": "Open Platform navigation"
+  },
+  {
+    "key": "openPlatform.logs.applications",
+    "zh-CN": "应用管理",
+    "en-US": "Applications"
+  },
+  {
+    "key": "openPlatform.logs.callLogs",
+    "zh-CN": "接口调用日志",
+    "en-US": "API call logs"
+  },
+  {
+    "key": "openPlatform.logs.webhooks",
+    "zh-CN": "Webhook 投递",
+    "en-US": "Webhook deliveries"
+  },
+  {
+    "key": "openPlatform.logs.production",
+    "zh-CN": "生产环境",
+    "en-US": "Production"
+  },
+  {
+    "key": "openPlatform.logs.staging",
+    "zh-CN": "预发布环境",
+    "en-US": "Staging"
+  },
+  {
+    "key": "openPlatform.logs.development",
+    "zh-CN": "开发环境",
+    "en-US": "Development"
+  },
+  {
+    "key": "openPlatform.logs.openPlatform",
+    "zh-CN": "开放平台",
+    "en-US": "Open Platform"
+  },
+  {
+    "key": "openPlatform.logs.subtitle",
+    "zh-CN": "追踪每一次接口调用，查看请求、响应与执行结果。",
+    "en-US": "Trace API calls and inspect their requests, responses and results."
+  },
+  {
+    "key": "openPlatform.logs.webhookSubtitle",
+    "zh-CN": "独立查看出站投递、重试记录与集成健康状态。",
+    "en-US": "Inspect outbound deliveries, retries and integration health separately."
+  },
+  {
+    "key": "openPlatform.logs.noApplications",
+    "zh-CN": "暂无可查看的应用",
+    "en-US": "No applications available"
+  },
+  {
+    "key": "openPlatform.logs.noApplicationsHelp",
+    "zh-CN": "请创建应用，或联系应用 owner 将你加入应用。",
+    "en-US": "Create an application or ask an owner to share it with you."
+  },
+  {
+    "key": "openPlatform.logs.disabled",
+    "zh-CN": "已停用",
+    "en-US": "Disabled"
+  },
+  {
+    "key": "openPlatform.logs.isolation",
+    "zh-CN": "按应用与环境查询 · 租户数据已隔离",
+    "en-US": "Application and environment scoped · Tenant isolated"
+  },
+  {
+    "key": "openPlatform.logs.noInstallation",
+    "zh-CN": "此应用尚未安装，请先安装后再查看调用记录。",
+    "en-US": "This application has no installations. Install it before inspecting calls."
+  },
+  {
+    "key": "header.platform_console",
+    "zh-CN": "平台控制台",
+    "en-US": "Platform Console"
+  },
+  {
+    "key": "sidebar.platformManagement",
+    "zh-CN": "平台管理",
+    "en-US": "Platform management"
+  },
+  {
+    "key": "openPlatform.title",
+    "zh-CN": "开放平台",
+    "en-US": "Open Platform"
+  },
+  {
+    "key": "openPlatform.applications",
+    "zh-CN": "应用管理",
+    "en-US": "Applications"
+  },
+  {
+    "key": "openPlatform.callLogs",
+    "zh-CN": "接口调用日志",
+    "en-US": "API call logs"
+  },
+  {
+    "key": "openPlatform.webhookDeliveries",
+    "zh-CN": "Webhook 投递",
+    "en-US": "Webhook deliveries"
   }
 ]

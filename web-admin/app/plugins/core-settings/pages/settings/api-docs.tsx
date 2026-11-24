@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
+import OpenPlatformOperationsWorkspace, { OpenPlatformOperationsTabs } from './OpenPlatformOperationsWorkspace';
 import {
   ArrowPathIcon,
   ArrowTopRightOnSquareIcon,
@@ -92,6 +93,7 @@ interface CredentialSecret {
 
 export default function OpenPlatformPage() {
   const { t, locale } = useI18n();
+  const [viewParams, setViewParams] = useSearchParams();
   const { showToast } = useToastContext();
   const [applications, setApplications] = useState<ExternalApplication[]>([]);
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
@@ -417,11 +419,16 @@ export default function OpenPlatformPage() {
     }
   };
 
+  if (['calls', 'webhooks'].includes(viewParams.get('view') ?? '')) {
+    return <OpenPlatformOperationsWorkspace applications={applications} loading={loading} error={error} onRetry={() => void load()} />;
+  }
+
   return (
     <main
       className="mx-auto w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] min-w-0 space-y-6 p-4 sm:w-auto sm:max-w-6xl sm:p-6"
       data-testid="open-platform-page"
     >
+      <OpenPlatformOperationsTabs view="applications" />
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
@@ -676,9 +683,7 @@ export default function OpenPlatformPage() {
                             <button
                               type="button"
                               onClick={() =>
-                                setOperationsInstallation((current) =>
-                                  current === installation.pid ? null : installation.pid,
-                                )
+                                setViewParams({ view: 'calls', application: application.pid, installation: installation.pid })
                               }
                               className="inline-flex min-w-0 items-center justify-center gap-1 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200"
                               data-testid={`open-platform-operations-${installation.pid}`}

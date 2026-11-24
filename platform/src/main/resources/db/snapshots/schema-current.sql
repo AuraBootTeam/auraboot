@@ -13573,6 +13573,7 @@ CREATE TABLE public.ab_open_api_call_audit (
     remote_address character varying(96),
     occurred_at timestamp with time zone DEFAULT now() NOT NULL,
     business_details jsonb,
+    http_details jsonb,
     CONSTRAINT chk_open_api_audit_identity CHECK ((((tenant_id IS NOT NULL) AND (application_pid IS NOT NULL) AND (installation_pid IS NOT NULL)) OR ((tenant_id IS NULL) AND (application_pid IS NULL) AND (installation_pid IS NULL) AND (token_pid IS NULL) AND COALESCE(((business_details ->> 'actorKind'::text) = 'unauthenticated'::text), false) AND COALESCE(((business_details ->> 'phase'::text) = 'authentication'::text), false))))
 );
 
@@ -13589,6 +13590,13 @@ COMMENT ON TABLE public.ab_open_api_call_audit IS 'Secret-free request audit for
 --
 
 COMMENT ON COLUMN public.ab_open_api_call_audit.business_details IS 'Server-owned public machine actor/capability/resource/operation/PID/replay descriptors; no payload or credentials';
+
+
+--
+-- Name: COLUMN ab_open_api_call_audit.http_details; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_open_api_call_audit.http_details IS 'Bounded redacted HTTP metadata and JSON bodies; NULL means historical capture unavailable. Never stores credentials or raw partial payloads.';
 
 
 --
@@ -30334,6 +30342,13 @@ CREATE INDEX idx_notification_send_log_tenant ON public.ab_notification_send_log
 --
 
 CREATE INDEX idx_notification_user ON public.ab_notification USING btree (tenant_id, user_id, is_read, created_at DESC);
+
+
+--
+-- Name: idx_open_api_audit_installation_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_open_api_audit_installation_time ON public.ab_open_api_call_audit USING btree (tenant_id, installation_pid, occurred_at DESC, id DESC);
 
 
 --
