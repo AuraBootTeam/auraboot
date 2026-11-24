@@ -1,5 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { registerActiveFormDialog } from '../../../runtime/actions/formDialogLifecycle';
 import { describe, expect, it, vi } from 'vitest';
 import { CardGridBlockRenderer } from '../CardGridBlockRenderer';
 import { ScopedStateManager } from '../../../runtime/state/scoped-state';
@@ -35,9 +36,16 @@ describe('Authored collection presentations', () => {
  });
  it('renders a collection review in a modal and routes dismissal through the configured action', async () => {
   handleAction.mockClear();
-  setup({collectionDialog:{title:'Review entire plan',buttons:[],dismissAction:{code:'discard-preview',action:{type:'flow',steps:[]}}}});
+  setup({collectionDialog:{title:'Review entire plan',headerFields:[{field:'plannedCount',label:'Planned orders',component:'SmartDisplay',valueWhen:'${fn.COUNT(form.groups)}',props:{appearance:'plain'}}],buttons:[],dismissAction:{code:'discard-preview',action:{type:'flow',steps:[]}}}});
   expect(screen.getByRole('dialog')).toHaveTextContent('Batch one');
   expect(screen.getByRole('dialog')).toHaveTextContent('Batch two');
+  await waitFor(() => expect(screen.getByText('2',{exact:true})).toBeVisible());
+  expect(screen.getByRole('dialog')).not.toHaveClass('max-w-lg','p-6');
+  let release: () => void;
+  act(() => {release = registerActiveFormDialog();});
+  fireEvent.click(screen.getByRole('button',{name:'Close'}));
+  expect(handleAction).not.toHaveBeenCalled();
+  act(() => release());
   fireEvent.click(screen.getByRole('button',{name:'Close'}));
   await waitFor(() => expect(handleAction).toHaveBeenCalledTimes(1));
   expect(handleAction.mock.calls[0][0].code).toBe('discard-preview');

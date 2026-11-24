@@ -28,7 +28,8 @@ import { reconcileDraftRows } from '../../runtime/state/reconcile-draft-rows';
 
 import { initializeSelectedRows, indexSelectionRows, positiveRowValue, type RowSelectionRule } from '../../runtime/expression/row-selection';
 import { readOwnPath } from '../../runtime/expression/row-projection';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { hasActiveFormDialog, subscribeFormDialogVisibility } from '../../runtime/actions/formDialogLifecycle';
 import { useNavigate } from 'react-router';
 import type { BlockConfig, ButtonConfig, CardImageViewport, FieldConfig, LayoutConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
@@ -121,6 +122,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   if (parentConfig && (!cfg.groupByField || !parentConfig.field || !parentConfig.identityField || !parentConfig.titleField))
     throw new Error('Joined card groups require an explicit parent form array and group identity');
   const [activeDetails, setActiveDetails] = useState<string | null>(null);
+  const formDialogOpen = useSyncExternalStore(subscribeFormDialogVisibility, hasActiveFormDialog, () => false);
   const [groupSearch, setGroupSearch] = useState<Record<string, string>>({});
   const rowSelection = cfg.rowSelection;
   if (rowSelection && !formField) throw new Error('Card row selection requires a form array');
@@ -593,7 +595,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
     if (!cfg.collectionDialog) return collection;
     const dialog = cfg.collectionDialog;
     const dialogFields = (fields: FieldConfig[]) => <div className="grid gap-3 sm:grid-cols-3">{fields.map(field => <FieldRenderer key={field.field} runtime={runtime} field={{...field, readOnly: true}} value={field.valueWhen ? runtime.getEvaluator().evaluate(field.valueWhen, runtime.getContext()) : stateManager.getFieldValue(scopeId, field.field)} />)}</div>;
-    return <Dialog open onOpenChange={open => { if (!open) void runCardAction(dialog.dismissAction, runtime.getContext().form || {}, -1); }}><DialogContent className="flex max-h-[90dvh] w-[calc(100%-2rem)] max-w-[900px] flex-col gap-0 overflow-hidden p-0" closeLabel={locale.startsWith('zh') ? '关闭' : 'Close'} aria-describedby={undefined}>
+    return <Dialog open modal={!formDialogOpen} onOpenChange={open => { if (!open && !hasActiveFormDialog()) void runCardAction(dialog.dismissAction, runtime.getContext().form || {}, -1); }}><DialogContent onInteractOutside={event => { if (hasActiveFormDialog()) event.preventDefault(); }} onEscapeKeyDown={event => { if (hasActiveFormDialog()) event.preventDefault(); }} className="flex max-h-[90dvh] w-[calc(100%-2rem)] max-w-[900px] flex-col gap-0 overflow-hidden p-0" closeLabel={locale.startsWith('zh') ? '关闭' : 'Close'} aria-describedby={undefined}>
       <div className="border-border border-b px-6 py-5"><DialogTitle>{getLocalizedText(dialog.title, locale, t)}</DialogTitle></div>
       <div className="min-h-0 overflow-y-auto px-6 py-5"><div className="bg-subtle mb-4 rounded-lg p-4">{dialogFields(dialog.headerFields || [])}</div>{collection}
         {dialog.footerFields?.length ? <div className="bg-subtle mt-4 rounded-lg p-4">{dialogFields(dialog.footerFields)}</div> : null}</div>

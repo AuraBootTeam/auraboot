@@ -27,6 +27,7 @@ import {
   resolveDetailRelatedLinks,
 } from './detailLayoutValues';
 import { resolveTextFallback } from './detailFieldDisplay';
+import { resolveSettingsCardDisplayValue } from './detailFieldDisplay';
 import { prepareDetailRuntimeBlock } from './detailBlockValues';
 import { DetailBlockRenderer } from './DetailBlockRenderer';
 import { FallbackDetailView } from './FallbackDetailView';
@@ -415,7 +416,7 @@ export function renderDetailPageView({
                   </p>
                 ) : null}
                 {Array.isArray(schema.extension?.headerFacts) && <dl data-testid="detail-header-facts" className="text-text-3 mt-3 flex flex-wrap gap-x-6 gap-y-2 text-xs">
-                  {schema.extension.headerFacts.map((fact: {field: string; label: any}) => headerRecord[fact.field] != null && headerRecord[fact.field] !== '' ? <div key={fact.field} className="flex items-baseline gap-2"><dt>{getLocalizedText(fact.label, locale, t)}</dt><dd className="text-text font-medium whitespace-pre-wrap">{String(headerRecord[fact.field])}</dd></div> : null)}
+                  {schema.extension.headerFacts.map((fact: {field: string; label: any; format?: string}) => headerRecord[fact.field] != null && headerRecord[fact.field] !== '' ? <div key={fact.field} className="flex items-baseline gap-2"><dt>{getLocalizedText(fact.label, locale, t)}</dt><dd className="text-text font-medium whitespace-pre-wrap">{resolveSettingsCardDisplayValue(headerRecord[fact.field], undefined, {field:fact.field, format:fact.format} as FieldConfig, undefined, timezone)}</dd></div> : null)}
                 </dl>}
                 {relatedLinks.length > 0 && (
                   <div className="text-text-3 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" data-testid="detail-related-links">

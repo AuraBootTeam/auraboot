@@ -30,7 +30,7 @@ import { useLocation } from 'react-router';
 import { useAuth } from '~/contexts/AuthContext';
 import { ProtectedFilePreviewProvider } from '~/framework/meta/rendering/components/ProtectedFilePreviewProvider';
 import { useModalFocusTrap } from '~/hooks/useModalFocusTrap';
-import { cancelCurrentFormDialog, registerFormDialogScope } from './formDialogLifecycle';
+import { cancelCurrentFormDialog, registerFormDialogScope, registerActiveFormDialog } from './formDialogLifecycle';
 import type { ResolvedPromptPresentation } from './promptPresentation';
 import { useI18n } from '~/contexts/I18nContext';
 import { useTimezone } from '~/contexts/TimezoneContext';
@@ -240,6 +240,7 @@ function FormDialogHost() {
     defaults: {},
   });
   const stateRef = useRef(state);
+  useLayoutEffect(() => state.open ? registerActiveFormDialog() : undefined, [state.open]);
   stateRef.current = state;
   const containerRef = useRef<HTMLDivElement>(null);
   const feedbackRef = useRef<HTMLDivElement>(null);

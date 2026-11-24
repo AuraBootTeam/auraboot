@@ -29,6 +29,24 @@ describe('RuntimeFieldRenderer bindState', () => {
     } as any;
   };
 
+  it('renders explicit read-only summary values without requiring a change callback', async () => {
+    let captured: any;
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: (props: any) => { captured = props; return <div />; },
+    }));
+    const runtime = buildRuntime({updateField:vi.fn(),updateState:vi.fn(),notifyStateChanged:vi.fn()});
+    runtime.getStateManager().getFieldValue = () => 'Stale stored summary';
+    const { RuntimeFieldRenderer } = await import('../RuntimeFieldRenderer');
+    const view = render(<RuntimeFieldRenderer field={{field:'total',component:'SmartDisplay',readOnly:true}} runtime={runtime} value="CNY 518" />);
+    expect(captured.props.value).toBe('CNY 518');
+    view.rerender(<RuntimeFieldRenderer field={{field:'total',component:'SmartDisplay',readOnly:true}} runtime={runtime} value="CNY 348" />);
+    expect(captured.props.value).toBe('CNY 348');
+    view.rerender(<RuntimeFieldRenderer field={{field:'total',component:'SmartDisplay',readOnly:true}} runtime={runtime} value={undefined} />);
+    expect(captured.props.value).toBeNull();
+    expect(runtime.getStateManager().updateField).not.toHaveBeenCalled();
+  });
+
   it('updates nested field controls from scoped state changes and resets', async () => {
     let captured: any;
     let fieldValue: unknown = null;
