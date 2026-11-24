@@ -320,7 +320,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
     const rowContext = { ...runtime.getContext(), row } as any;
     if (field.visibleWhen && !runtime.getEvaluator().evaluateCondition(field.visibleWhen, rowContext)) return null;
     const conditionalReadOnly = Boolean(field.readOnlyWhen && runtime.getEvaluator().evaluateCondition(field.readOnlyWhen, rowContext));
-    return (
+    const content = (
     <FieldRenderer
       key={field.field}
       runtime={runtime}
@@ -338,6 +338,8 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
       }}
     />
     );
+    return cfg.separatedFields?.includes(field.field)
+      ? <div className="border-border mt-2 border-t pt-3">{content}</div> : content;
   };
 
   const renderTable = (entries: {row: any; index: number}[]) => <div className="overflow-x-auto" data-testid="card-group-table"><table className="w-full text-xs">

@@ -26,7 +26,7 @@ import {
   resolveDetailPdfFileName,
   resolveDetailRelatedLinks,
 } from './detailLayoutValues';
-import { resolveTextFallback } from './detailFieldDisplay';
+import { resolveTextFallback, getDetailHeaderStatusTone } from './detailFieldDisplay';
 import { resolveSettingsCardDisplayValue } from './detailFieldDisplay';
 import { prepareDetailRuntimeBlock } from './detailBlockValues';
 import { DetailBlockRenderer } from './DetailBlockRenderer';
@@ -415,7 +415,7 @@ export function renderDetailPageView({
                     </h2>
                   )}
                   {schema.extension?.headerStatusField && (
-                    <span className="text-accent bg-accent-weak rounded px-2 py-1 text-xs">
+                    <span className={`${getDetailHeaderStatusTone(schema.extension?.headerStatusTones?.[String(headerRecord[schema.extension.headerStatusField])])} rounded px-2 py-1 text-xs`}>
                       {(() => {
                         const field = enrichField({
                           field: schema.extension.headerStatusField,

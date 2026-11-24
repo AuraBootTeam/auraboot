@@ -585,3 +585,31 @@ describe('Exact decimal line extension totals', () => {
   expect(() => fn.DECIMAL_SUM_PRODUCTS([],[])).toThrow();
  });
 });
+
+
+describe('Exact independent quantity balances', () => {
+  const count = (parents: unknown, children: unknown) => fn.DECIMAL_BALANCE_SUMMARY(parents,'id','demand',children,'parent','quantity').balanced;
+  it('counts exact balances per identity without cancelling differences across units', () => {
+    const parents=[{id:'pcs',demand:'350'},{id:'box',demand:'100'}];
+    expect(count(parents,[{parent:'pcs',quantity:'100'},{parent:'box',quantity:'350'}])).toBe(0);
+    expect(count(parents,[{parent:'pcs',quantity:'100'},{parent:'pcs',quantity:'250'},{parent:'box',quantity:'100'}])).toBe(2);
+    expect(count(parents,[{parent:'pcs',quantity:'100'},{parent:'box',quantity:'100'}])).toBe(1);
+    expect(count(parents,[{parent:'foreign',quantity:'450'}])).toBe(0);
+  });
+  it('retains decimal differences beyond safe floating precision and rejects ambiguous parents', () => {
+    const parents=[{id:'a',demand:'9007199254740993.000001'}];
+    expect(count(parents,[{parent:'a',quantity:'9007199254740993.000000'}])).toBe(0);
+    expect(count(parents,[{parent:'a',quantity:'9007199254740993'},{parent:'a',quantity:'0.000001'}])).toBe(1);
+    expect(() => count([...parents,...parents],[])).toThrow('Duplicate');
+    expect(() => count(parents,[{parent:'a',quantity:'-1'}])).toThrow('nonnegative');
+    expect(fn.DECIMAL_BALANCE_SUMMARY([{id:'a',demand:'0'}],'id','demand',[],'parent','quantity')).toEqual({balanced:0,total:0});
+  });
+});
+
+describe('Quantity summary DSL access', () => {
+ it('exposes balanced and applicable counts through the real expression parser', () => {
+  const parser = new ExpressionParser(createExpressionContext({form:{parents:[{id:'a',demand:'2.0'},{id:'b',demand:'0'}],children:[{parent:'a',quantity:'2'}]}} as any));
+  expect(parser.evaluate("fn.DECIMAL_BALANCE_SUMMARY(form.parents, 'id', 'demand', form.children, 'parent', 'quantity').balanced")).toBe(1);
+  expect(parser.evaluate("fn.DECIMAL_BALANCE_SUMMARY(form.parents, 'id', 'demand', form.children, 'parent', 'quantity').total")).toBe(1);
+ });
+});

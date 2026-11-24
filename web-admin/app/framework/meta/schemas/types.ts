@@ -181,6 +181,8 @@ export interface BlockConfig {
   collectionDialog?: { title: string | LocalizedText; headerFields?: FieldConfig[]; footerFields?: FieldConfig[]; buttons: ButtonConfig[]; dismissAction: ButtonConfig };
   primaryField?: string;
   primarySupportingField?: string;
+  /** Separate an editing area from the preceding card facts. */
+  separatedFields?: string[];
   fieldDensity?: 'default' | 'compact';
   groupBadgeField?: string;
   groupLayout?: 'cards' | 'divided';
