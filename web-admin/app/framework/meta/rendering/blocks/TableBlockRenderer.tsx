@@ -807,6 +807,16 @@ const TableBlockBodyRenderer: React.FC<TableBlockRendererProps> = ({ block, runt
       return renderLinkCell(column, row, value, locale, t);
     }
 
+    if (typeof value === 'string' && !enrichedDisplayValue && Number.isInteger(column.textPreviewLength)
+        && column.textPreviewLength! >= 40 && value.length > column.textPreviewLength!) {
+      return <details data-testid="table-text-details" onClick={event => event.stopPropagation()}>
+        <summary className="cursor-pointer whitespace-pre-line">{value.slice(0,column.textPreviewLength)}…
+          <span className="text-primary ml-2 text-xs">{getLocalizedText({'zh-CN':'完整内容',en:'Full text'},locale,t)}</span>
+        </summary>
+        <div className="mt-2 whitespace-pre-wrap break-words">{value}</div>
+      </details>;
+    }
+
     // Dynamic list APIs enrich reference fields as `<field>_display`. A table
     // block must prefer that business label; rendering the raw pid leaks an
     // implementation identifier even though the backend already supplied the
@@ -1701,6 +1711,7 @@ const TableBlockBodyRenderer: React.FC<TableBlockRendererProps> = ({ block, runt
                       title={getCellTitle(column, row)}
                       style={{
                         maxWidth: column.ellipsis ? column.width : undefined,
+                        verticalAlign: column.verticalAlign,
                         // Tree indent: apply padding to first column
                         paddingLeft:
                           treeConfig && colIdx === 0

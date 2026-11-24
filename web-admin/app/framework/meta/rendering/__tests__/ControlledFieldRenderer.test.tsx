@@ -9,6 +9,72 @@ describe('ControlledFieldRenderer', () => {
     capturedPropsSpy.mockClear();
   });
 
+  it('places inline filter labels beside the control while keeping feedback with the control', async () => {
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: () => <input aria-label="Created date" />,
+    }));
+    const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+    render(
+      <ControlledFieldRenderer
+        field={
+          {
+            field: 'created_at',
+            component: 'DateRange',
+            label: 'Created date',
+            props: { inline: true },
+            helpText: 'Choose a range',
+          } as any
+        }
+        value={null}
+        onChange={vi.fn()}
+        error="Invalid range"
+        context={{ locale: 'en', t: (key: string) => key } as any}
+      />,
+    );
+    const wrapper = screen.getByTestId('field-created_at');
+    expect(wrapper).toHaveClass('flex', 'flex-col', 'sm:flex-row');
+    const label = wrapper.querySelector('label')!;
+    expect(label).toHaveClass('whitespace-nowrap');
+    expect(label).not.toHaveClass('mb-1');
+    const body = screen.getByRole('textbox', { name: 'Created date' }).parentElement!;
+    expect(body).toHaveTextContent('Invalid range');
+    expect(body).toHaveTextContent('Choose a range');
+    expect(label.parentElement).toBe(wrapper);
+  });
+
+  it.each([undefined, 'today'] as const)('clears the actual date range after reset with preset %s', async (defaultRange) => {
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', async () => {
+      const { DateRange } = await import('~/ui/smart/datetime/DateRange');
+      return { ComponentLoader: ({ props }: { props: React.ComponentProps<typeof DateRange> }) => <DateRange {...props} /> };
+    });
+    const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+    function Filter() {
+      const [values, setValues] = React.useState<Record<string, unknown>>({});
+      return <>
+        <ControlledFieldRenderer field={{ field: 'created_at', component: 'daterange', label: 'Created date',
+          props: { defaultRange },
+        } as any} value={values.created_at} onChange={value => setValues({ created_at: value })}
+          context={{ locale: 'en', t: (key: string) => key } as any} />
+        <button onClick={() => setValues({})}>Reset dates</button>
+      </>;
+    }
+    render(<Filter />);
+    const start = screen.getByTestId('daterange-created_at-start');
+    const end = screen.getByTestId('daterange-created_at-end');
+    if (defaultRange) await waitFor(() => expect(start).not.toHaveValue(''));
+    fireEvent.change(start, { target: { value: '2026-11-23' } });
+    fireEvent.change(end, { target: { value: '2026-11-24' } });
+    expect(start).toHaveValue('2026-11-23');expect(end).toHaveValue('2026-11-24');
+    fireEvent.click(screen.getByRole('button', { name: 'Reset dates' }));
+    expect(start).toHaveValue('');expect(end).toHaveValue('');
+    expect(start).not.toHaveAttribute('max');expect(end).not.toHaveAttribute('min');
+    fireEvent.change(start, { target: { value: '2026-11-25' } });
+    fireEvent.change(end, { target: { value: '2026-11-26' } });
+    expect(start).toHaveValue('2026-11-25');expect(end).toHaveValue('2026-11-26');
+  });
+
   it('clears the actual select when a parent removes its filter value', async () => {
     vi.resetModules();
     vi.doMock('~/framework/meta/rendering/components/ComponentLoader', async () => {

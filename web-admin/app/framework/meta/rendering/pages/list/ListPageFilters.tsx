@@ -256,7 +256,7 @@ export function renderInlineListFilters(model: Pick<ListPageModel,
   return <div className="flex min-w-0 flex-wrap items-end gap-3" data-testid="inline-list-filters">
     {model.filterBlock.fields.map((field: FieldConfig) => <div key={field.field} className="w-full min-w-0 sm:w-auto" onKeyDown={e => {
       if (e.key === 'Enter') { e.preventDefault(); model.handleSearch(); }
-    }}>{model.renderSmartField(field)}</div>)}
+    }}>{model.renderSmartField({ ...field, props: { ...field.props, inline: true } })}</div>)}
     <button type="button" data-testid="filter-search" onClick={model.handleSearch}
       className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover h-9 border px-4">{model.t('action.search')}</button>
     <button type="button" data-testid="filter-reset" onClick={model.handleReset}

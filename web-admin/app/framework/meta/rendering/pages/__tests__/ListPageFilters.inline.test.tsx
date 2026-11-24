@@ -8,7 +8,7 @@ describe('inline list filter controls', () => {
     const search = vi.fn(), reset = vi.fn(), renderer = vi.fn(() => <input aria-label="Created date" />);
     render(<>{renderInlineListFilters({ schemaExtension: { filterLayout: 'inline' }, filterBlock: { fields: [field] },
       renderSmartField: renderer, handleSearch: search, handleReset: reset, t: (key: string) => key } as any)}</>);
-    expect(renderer).toHaveBeenCalledWith(field);
+    expect(renderer).toHaveBeenCalledWith({ ...field, props: { inline: true } });
     fireEvent.click(screen.getByTestId('filter-search'));expect(search).toHaveBeenCalledTimes(1);
     fireEvent.keyDown(screen.getByLabelText('Created date'), { key: 'Enter' });expect(search).toHaveBeenCalledTimes(2);
     fireEvent.click(screen.getByTestId('filter-reset'));expect(reset).toHaveBeenCalledTimes(1);

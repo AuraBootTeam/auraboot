@@ -109,6 +109,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
     : undefined;
   // A declared form field stores draft card rows; data-source refreshes never replace edits.
   const formField = typeof cfg.field === 'string' && cfg.field.trim() ? cfg.field : undefined;
+  if (cfg.childrenField && formField) throw new Error("Nested child cards require a read-only data source");
   const parentConfig = cfg.groupRows;
   if (parentConfig && (!cfg.groupByField || !parentConfig.field || !parentConfig.identityField || !parentConfig.titleField))
     throw new Error('Joined card groups require an explicit parent form array and group identity');
@@ -198,14 +199,18 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
       })()
     : undefined;
   const formRows = formField ? stateManager?.getFieldValue(scopeId, formField) : undefined;
-  const freshRows = normalizeRows(rawData);
+  const freshRows = cfg.childrenField ? normalizeRows(rawData).flatMap(parent => {
+    const children = readOwnPath(parent, cfg.childrenField);
+    if (!Array.isArray(children)) throw new Error('Card child rows must be an array');
+    return children;
+  }) : normalizeRows(rawData);
   const initialRows = rowSelection ? initializeSelectedRows(freshRows,rowSelection) : freshRows;
   const rows = Array.isArray(formRows) ? formRows : initialRows;
   const storedParents = parentConfig ? stateManager?.getFieldValue(scopeId, parentConfig.field) : undefined;
   if (parentConfig && !parentConfig.dataSource && !Array.isArray(storedParents))
     throw new Error('Joined card parent form rows must be an array');
   const rawParents = parentConfig?.dataSource ? dataSourceManager.getData(parentConfig.dataSource) : storedParents;
-  const parentsReadOnly = Boolean(parentConfig && (parentConfig.fields || []).every((field: FieldConfig) => field.readOnly || field.valueWhen));
+  const parentsReadOnly = Boolean(parentConfig && [...(parentConfig.fields || []), ...(parentConfig.detailsFields || [])].every((field: FieldConfig) => field.readOnly || field.valueWhen));
   const parentRows = parentsReadOnly ? normalizeRows(rawParents) : Array.isArray(storedParents) ? storedParents : normalizeRows(rawParents);
   const previousParents = useRef<unknown>(undefined);
   const previousRows = useRef<unknown>(undefined);
@@ -514,6 +519,10 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
       const searchLabel = getLocalizedText(cfg.searchPlaceholder || { 'zh-CN': '搜索', en: 'Search' }, locale, t);
       return <>
         {parentFields(group, parentConfig?.fields || [], false)}
+        {parentConfig?.detailsFields?.length ? <details data-testid="card-group-details" className="my-3">
+          <summary className="text-primary cursor-pointer text-sm">{getLocalizedText(parentConfig.detailsLabel || { 'zh-CN': '查看补充信息', en: 'View additional information' }, locale, t)}</summary>
+          <div className="mt-3">{parentFields(group, parentConfig.detailsFields, false)}</div>
+        </details> : null}
         {cfg.searchFields?.length && group.entries.length > 0 ? <div className="my-3 flex justify-end">
           <input type="search" aria-label={searchLabel} placeholder={searchLabel} value={search}
             className="rounded-control border-border bg-panel text-text max-w-full border px-3 py-2 text-sm"

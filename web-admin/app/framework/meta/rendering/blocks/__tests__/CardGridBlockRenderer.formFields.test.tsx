@@ -203,7 +203,7 @@ describe('Card-grid draft form fields', () => {
   });
 });
 
-function setupJoinedGroups(duplicate = false, pendingParents = false, compact = false, formOnly = false) {
+function setupJoinedGroups(duplicate = false, pendingParents = false, compact = false, formOnly = false, details = false, nested = false) {
   let parentsReady = !pendingParents;
   const state = new ScopedStateManager({} as any);state.createScope('joined', { form: pendingParents ? { demands: [] } : {} });
   const parents = [
@@ -216,6 +216,7 @@ function setupJoinedGroups(duplicate = false, pendingParents = false, compact = 
     { pid: 'offer-b', sourcePid: 's-a', supplierName: 'Beta', proposedQty: '40' },
     { pid: 'offer-c', sourcePid: 's-b', supplierName: 'Alpha', proposedQty: '80' },
   ];
+  if(nested) for(const parent of parents)(parent as any).children=offers.filter(row=>row.sourcePid===parent.sourcePid);
   const listeners = new Set<() => void>();
   const reads: string[] = [];
   if (formOnly) state.updateField('joined', 'demands', parents);
@@ -230,11 +231,12 @@ function setupJoinedGroups(duplicate = false, pendingParents = false, compact = 
     getSchema: () => ({ id: 'joined' }),getDataSourceManager: () => manager,triggerFieldLinkage: vi.fn(),
   } as any;
   render(<CardGridBlockRenderer runtime={runtime} block={{
-    id: 'joined',blockType: 'card-grid',dataSource: 'offers',field: 'allocations',titleField: 'supplierName',
+    id: 'joined',blockType: 'card-grid',dataSource: nested ? 'parents' : 'offers',...(nested ? {childrenField:'children'} : {field:'allocations'}),titleField: 'supplierName',
     groupByField: 'sourcePid',groupTitleField: 'sourceLabel',collapsibleGroups: true,groupsDefaultOpen: true,compact,groupDescriptionField: 'remainingQty',
     searchFields: ['supplierName'],searchPlaceholder: 'Search suppliers',
     groupRows: { ...(formOnly ? {} : {dataSource: 'parents'}),field: 'demands',identityField: 'sourcePid',titleField: 'sourceLabel',
       summaryFields: [{ field: 'remainingQty',label: 'Remaining',component: 'SmartInput',readOnly: true }],
+      ...(details ? {detailsLabel: 'Quantity basis', detailsFields: [{field:'remainingQty',label:'Frozen basis',component:'SmartInput',readOnly:true}]} : {}),
       fields: [{ field: 'quantity',label: 'Purchase target',component: 'SmartInput', readOnly: pendingParents || formOnly }],emptyText: 'Not dispatched',
     },fields: [{field:'proposedQty',label:'Proposed quantity',component:'SmartInput'}],
   } as any} />);
@@ -242,6 +244,27 @@ function setupJoinedGroups(duplicate = false, pendingParents = false, compact = 
 }
 
 describe('Joined card groups keep source and offer drafts independent', () => {
+  it('reads nested child cards and immutable parents from one response without joining unrelated groups', () => {
+    setupJoinedGroups(false,false,true,false,true,true);
+    const groups=screen.getAllByTestId('card-grid-group');
+    expect(groups[0].querySelectorAll('[data-testid="card-grid-card"]')).toHaveLength(2);
+    expect(groups[1].querySelectorAll('[data-testid="card-grid-card"]')).toHaveLength(1);
+    expect(groups[2].querySelectorAll('[data-testid="card-grid-card"]')).toHaveLength(0);
+    expect(within(groups[0].querySelector('[data-testid="card-grid-card"]') as HTMLElement).getByRole('textbox',{name:'Proposed quantity'})).toHaveAttribute('readonly');
+  });
+  it('keeps supplementary group facts collapsed and read-only without changing allocation drafts', () => {
+    const {state}=setupJoinedGroups(false,false,true,true,true);
+    const group=screen.getAllByTestId('card-grid-group')[0];
+    const details=group.querySelector('[data-testid="card-group-details"]') as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    fireEvent.click(details.querySelector('summary')!);
+    expect(details.open).toBe(true);
+    const basis=within(details).getByRole('textbox',{name:'Frozen basis'});
+    expect(basis).toHaveValue('100');expect(basis).toHaveAttribute('readonly');
+    fireEvent.change(basis,{target:{value:'999'}});
+    expect(state.getFieldValue('joined','demands')[0].remainingQty).toBe('100');
+    expect(state.getFieldValue('joined','allocations')[0].proposedQty).toBe('60');
+  });
   it('groups an explicit form-only preview without fetching or overwriting its parent snapshot', () => {
     const {state,reads,refresh} = setupJoinedGroups(false,false,true,true);
     expect(reads).not.toContain('parents');
