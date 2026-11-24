@@ -9,6 +9,7 @@ import com.auraboot.framework.meta.dto.RuleOverride;
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.service.InvariantEngine;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.service.impl.CommandExecutorUtils;
 import com.auraboot.framework.meta.service.impl.CommandSpelEvaluator;
 import com.auraboot.framework.meta.service.impl.CommandStateCheckExecutor;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
@@ -55,7 +56,7 @@ public class PreInvariantPhase implements CommandPhase {
         // Resolve the plugin's persistence ownership before loading any target state. A handler
         // that owns persistence is also skipped by StateCheckPhase, so probing the model's first
         // *_status field here is both semantically unrelated and an avoidable database read.
-        String pluginHandlerCode = resolvePluginHandlerCode(ctx.getCommand().getCode(), ctx.getExecConfig());
+        String pluginHandlerCode = CommandExecutorUtils.resolvePluginHandlerCode(ctx.getCommand().getCode(), ctx.getExecConfig());
         Optional<CommandHandlerExtension> pluginHandler = findPluginHandler(pluginHandlerCode);
         ctx.setHasPluginHandler(pluginHandler.isPresent());
         ctx.setPluginRequiresDslPersistence(pluginHandler
@@ -136,13 +137,4 @@ public class PreInvariantPhase implements CommandPhase {
                 : Optional.empty();
     }
 
-    private String resolvePluginHandlerCode(String commandCode, Map<String, Object> execConfig) {
-        if (execConfig != null) {
-            Object handler = execConfig.get("handler");
-            if (handler instanceof String handlerCode && StringUtils.hasText(handlerCode)) {
-                return handlerCode.trim();
-            }
-        }
-        return commandCode;
-    }
 }
