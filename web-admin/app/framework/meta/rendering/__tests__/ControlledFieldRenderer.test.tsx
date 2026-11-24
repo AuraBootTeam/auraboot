@@ -9,6 +9,40 @@ describe('ControlledFieldRenderer', () => {
     capturedPropsSpy.mockClear();
   });
 
+  it('places inline filter labels beside the control while keeping feedback with the control', async () => {
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: () => <input aria-label="Created date" />,
+    }));
+    const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+    render(
+      <ControlledFieldRenderer
+        field={
+          {
+            field: 'created_at',
+            component: 'DateRange',
+            label: 'Created date',
+            props: { inline: true },
+            helpText: 'Choose a range',
+          } as any
+        }
+        value={null}
+        onChange={vi.fn()}
+        error="Invalid range"
+        context={{ locale: 'en', t: (key: string) => key } as any}
+      />,
+    );
+    const wrapper = screen.getByTestId('field-created_at');
+    expect(wrapper).toHaveClass('flex', 'flex-col', 'sm:flex-row');
+    const label = wrapper.querySelector('label')!;
+    expect(label).toHaveClass('whitespace-nowrap');
+    expect(label).not.toHaveClass('mb-1');
+    const body = screen.getByRole('textbox', { name: 'Created date' }).parentElement!;
+    expect(body).toHaveTextContent('Invalid range');
+    expect(body).toHaveTextContent('Choose a range');
+    expect(label.parentElement).toBe(wrapper);
+  });
+
   it('clears the actual select when a parent removes its filter value', async () => {
     vi.resetModules();
     vi.doMock('~/framework/meta/rendering/components/ComponentLoader', async () => {
