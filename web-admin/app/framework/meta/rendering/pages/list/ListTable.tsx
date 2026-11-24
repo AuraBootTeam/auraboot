@@ -175,9 +175,10 @@ export const ListTable = React.memo(function ListTable({
   const [containerWidth, setContainerWidth] = useState(0);
   const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set());
   const expansionDefinition = JSON.stringify(rowExpansion);
+  const expansionRows = rowExpansion ? JSON.stringify(data.map(getPublicRecordKey)) : '';
   useEffect(() => {
     setExpandedDetails(new Set());
-  }, [data, modelCode, expansionDefinition]);
+  }, [expansionRows, modelCode, expansionDefinition]);
 
   const getColumnWidth = useCallback(
     (column: ColumnConfig) => {

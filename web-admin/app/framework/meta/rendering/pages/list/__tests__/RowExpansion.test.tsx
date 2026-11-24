@@ -206,4 +206,20 @@ describe('lazy read-only row expansion', () => {
     await waitFor(() => expect(detail).toHaveTextContent('material-a'));
     expect(state.fetch).toHaveBeenCalledWith('/api/tasks/task-59/sources', expect.anything());
   });
+
+  it('keeps an expanded row after a list refresh with the same record identities', async () => {
+    state.fetch.mockResolvedValue(response());
+    const options = tableProps();
+    const view = render(<ListTable {...options} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Expand details: RFQ-001' }));
+    await screen.findByText('material-a');
+
+    view.rerender(<ListTable {...options} data={[{ ...record, code: 'RFQ-001 updated' }]} />);
+    expect(screen.getByTestId('row-expansion-detail')).toHaveTextContent('material-a');
+    expect(state.fetch).toHaveBeenCalledTimes(1);
+
+    view.rerender(<ListTable {...options} data={[{ pid: 'task-b', code: 'RFQ-002' }]} />);
+    expect(screen.queryByTestId('row-expansion-detail')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Expand details: RFQ-002' })).toBeVisible();
+  });
 });
