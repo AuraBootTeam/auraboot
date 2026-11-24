@@ -48,3 +48,5 @@ This directory holds engineering-facing material that ships with the repository.
 - Focused browser regression: [Default CRUD regression](./system-reference/crud-regression.md), including responsive lists and the real Page Designer save/publish/runtime roundtrip.
 
 - Open Platform HTTP audit: [capture, redaction, navigation and authorization](system-reference/open-platform-http-audit.md).
+
+- [Platform console navigation ownership](system-reference/platform-console-navigation.md)
