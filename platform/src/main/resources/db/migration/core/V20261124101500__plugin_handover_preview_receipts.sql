@@ -1,5 +1,8 @@
 -- Preview receipts only. No ownership mutation, execution or retirement state is introduced.
-CREATE TABLE ab_plugin_handover_batch (
+-- Re-versioned from 20261119003000, which landed below versions preserved databases had
+-- already recorded. IF NOT EXISTS lets a database that applied that backdated version
+-- proceed after `flyway repair` removes it from the schema history.
+CREATE TABLE IF NOT EXISTS ab_plugin_handover_batch (
     id BIGSERIAL PRIMARY KEY,
     pid VARCHAR(64) NOT NULL UNIQUE,
     tenant_id BIGINT NOT NULL,
@@ -19,7 +22,7 @@ CREATE TABLE ab_plugin_handover_batch (
     UNIQUE (tenant_id, pid),
     CHECK (expires_at > created_at)
 );
-CREATE TABLE ab_plugin_handover_item (
+CREATE TABLE IF NOT EXISTS ab_plugin_handover_item (
     id BIGSERIAL PRIMARY KEY,
     tenant_id BIGINT NOT NULL,
     batch_pid VARCHAR(64) NOT NULL,

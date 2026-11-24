@@ -46,6 +46,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # The fresh-database steps below apply a lower version in order and cannot
+      # see it; preserved databases reject the upgrade instead (#2550).
+      - name: Migrations added by this change are newer than the base branch
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$BASE_REF"
+          scripts/db/check-migration-order-vs-base.sh FETCH_HEAD
+
       - name: Install Flyway CLI
         run: |
           set -euo pipefail
