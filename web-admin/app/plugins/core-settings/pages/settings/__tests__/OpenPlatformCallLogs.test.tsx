@@ -23,4 +23,16 @@ describe('Call-log pagination stability',()=>{
    expect(screen.queryByRole('button',{name:'View call request-1',exact:true})).toBeNull();
    expect(api.mock.calls.filter(([url])=>String(url).includes('/audits?')&&String(url).includes('offset=0'))).toHaveLength(1);
  });
+ it('prevents opening an old row while a new search is still debouncing',async()=>{
+   vi.useFakeTimers();
+   api.mockImplementation(async(url:string)=>url.includes('/overview?')?{windowHours:24,totalCalls:1,errorCalls:0,errorRate:0,p95DurationMs:10}:[{auditPid:'a',requestId:'r',method:'GET',path:'/api/open/v1/whoami',status:200,durationMs:10,occurredAt:'2026-11-24T12:00:00Z'}]);
+   await act(async()=>{render(<OpenPlatformCallLogs installationPid="installation-a" applicationName="Owned application" environment="Development" canReadPayload/>);});
+   const row=screen.getByRole('button',{name:'View call r',exact:true});
+   expect(row).toBeEnabled();
+   fireEvent.change(screen.getByRole('textbox',{name:'Search request ID or API path'}),{target:{value:'r'}});
+   expect(row).toBeDisabled();
+   await act(async()=>{await vi.advanceTimersByTimeAsync(300);});
+   expect(screen.getByRole('button',{name:'View call r',exact:true})).toBeEnabled();
+ });
+
 });

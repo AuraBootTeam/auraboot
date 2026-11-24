@@ -389,6 +389,7 @@ export default function OpenPlatformCallLogs({
                               type="button"
                               className="text-text text-start focus-visible:outline-accent"
                               aria-label={`${text("viewCall", "View call")} ${audit.requestId}`}
+                              disabled={loading || keyword !== search}
                               onClick={(event) => {
                                 trigger.current = event.currentTarget;
                                 setSelected(audit);
