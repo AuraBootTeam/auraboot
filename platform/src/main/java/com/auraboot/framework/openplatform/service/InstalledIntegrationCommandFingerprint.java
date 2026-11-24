@@ -59,6 +59,43 @@ final class InstalledIntegrationCommandFingerprint {
         }
         return List.copyOf(candidates);
     }
+    /** Reconstruct only the provider's exact new create/secret declarations and read-contract setting.
+     * Callers must use these candidates only when the durable receipt is already completed.
+     */
+    static List<Map<String,String>> beforeProcessCapabilityAddition(ObjectMapper json,Map<String,String> configs,
+            String processCommand,com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension.CompletedProcessCapabilityAddition addition) {
+        if(addition==null || !configs.containsKey(processCommand))return List.of();
+        var process=object(json,configs.get(processCommand));
+        if(!(process.path("handlerParams") instanceof ObjectNode parameters))return List.of();
+        boolean settingsRemoved=false;
+        for(String key:addition.readContractSettings())if(parameters.has(key)) {
+            var value=parameters.get(key);
+            if(!value.isArray() || value.isEmpty() || value.size()>64 || value.toString().length()>65536)return List.of();
+            for(var contract:value)if(!contract.isObject() || contract.isEmpty())return List.of();
+            parameters.remove(key);settingsRemoved=true;
+        }
+        var result=new ArrayList<Map<String,String>>();
+        if(settingsRemoved) {var previous=new LinkedHashMap<>(configs);previous.put(processCommand,process.toString());result.add(Map.copyOf(previous));}
+        if(!parameters.path("tenantSecretRead").isBoolean() || !parameters.path("tenantSecretRead").asBoolean()
+                || !exactNames(parameters.path("tenantSecretServiceTypes"),addition.secretServiceTypes())
+                || !exactNames(parameters.path("tenantSecretFields"),addition.secretFields())
+                || !(parameters.path("installedMachineData") instanceof ObjectNode grants))return List.copyOf(result);
+        for(var entry:addition.createFields().entrySet()) {
+            if(!(grants.get(entry.getKey()) instanceof ObjectNode grant) || !validReadFields(grant.path("read"))
+                    || !exactNames(grant.path("create"),entry.getValue()))return List.copyOf(result);
+        }
+        for(String model:addition.createFields().keySet())((ObjectNode)grants.get(model)).remove("create");
+        parameters.remove(java.util.List.of("tenantSecretRead","tenantSecretServiceTypes","tenantSecretFields"));
+        var previous=new LinkedHashMap<>(configs);previous.put(processCommand,process.toString());result.add(Map.copyOf(previous));
+        return List.copyOf(result);
+    }
+    private static boolean exactNames(JsonNode values,java.util.Set<String> expected) {
+        if(!values.isArray() || values.size()!=expected.size())return false;
+        var actual=new java.util.HashSet<String>();
+        for(var value:values)if(!value.isTextual() || !actual.add(value.asText()))return false;
+        return actual.equals(expected);
+    }
+
     private static boolean boundedSecretNames(JsonNode values) {
         if(!values.isArray() || values.isEmpty() || values.size()>32)return false;
         var seen=new java.util.HashSet<String>();

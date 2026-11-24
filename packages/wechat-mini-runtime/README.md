@@ -66,3 +66,9 @@ Package unit tests use independent wx callbacks and filesystem fixtures; the sta
 `probeDeviceConnectivity({wxApi, config, path, verify, logger})` performs one anonymous GET from a physical phone, requires the matching response `X-Trace-Id`, and calls a product verifier for runtime identity and health. It returns a receipt without mutating config or reading tokens. DevTools and desktop platforms cannot create this receipt. The product may admit business requests only after accepting the receipt for its unchanged target. Failed probes remain blocked; retry must be an explicit user action. Never prefill a verified flag from a Mac request or an old phone/browser check.
 
 Phone platform values follow the [official WeChat API typings](https://github.com/wechat-miniprogram/api-typings/blob/master/types/wx/lib.wx.api.d.ts) (`ios`, `android`, `ohos`; exclude desktop and `devtools`).
+
+### Explicit binary reads
+
+`responseType: 'arraybuffer'` opts a GET into binary delivery. The client sets WeChat's binary response type and manual redirect policy, requires HTTP200 and an actual ArrayBuffer, and returns `{data, header}` rather than decoding the product JSON envelope. Session-generation checks, current401 expiry,403 rejection, trace correlation and no-retry behavior remain mandatory. Other response types and binary writes are rejected before transport. Products validate their own MIME, signature, name, size, authorized relative route and file lifecycle; this option does not authorize a file or open a document.
+
+The native option shapes follow the [official WeChat API typings](https://github.com/wechat-miniprogram/api-typings/blob/master/types/wx/lib.wx.api.d.ts). Unit callback fixtures do not qualify a physical device or native PDF renderer.

@@ -89,6 +89,22 @@ describe('warehouse shortage feedback', () => {
 
 
 describe('resolveCommandErrorMessage concurrency guidance', () => {
+  it('localizes the actual 40900 response without requiring a context error code', () => {
+    const body = { code: '40900', message: 'Record changed concurrently. Reload the current record before retrying.', data: null, context: null };
+    const original = structuredClone(body);
+    expect(resolveCommandErrorMessage(body, 'task:confirm_purchase', key => key, 'zh-CN'))
+      .toBe('这条记录已被其他操作更新，请刷新查看最新内容后再提交。');
+    expect(resolveCommandErrorMessage(body, 'task:confirm_purchase', key => key, 'en-US'))
+      .toBe('This record was updated by someone else. Refresh to review the latest data before saving.');
+    expect(body).toEqual(original);
+  });
+
+  it('keeps specific conflict classification and unrelated failure reasons intact', () => {
+    expect(resolveCommandErrorMessage({code:'40900', context:{errorCode:'REQUEST_INTENT_CONFLICT'}},
+      'task:confirm_purchase', key => key, 'zh-CN')).toContain('原请求内容不一致');
+    expect(resolveCommandErrorMessage({code:'403', message:'Access forbidden'},
+      'task:confirm_purchase', key => key, 'zh-CN')).toBe('Access forbidden');
+  });
   it.each(['CAS_VERSION_CONFLICT', 'REQUEST_INTENT_CONFLICT', 'CAS_VERSION_REQUIRED'])(
     'uses Chinese guidance without leaking technical details for %s', (errorCode) => {
       const message = resolveCommandErrorMessage({ context: { errorCode, detail: 'SECRET-PID in internal_model' } },

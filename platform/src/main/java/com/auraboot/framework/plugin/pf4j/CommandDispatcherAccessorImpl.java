@@ -26,6 +26,15 @@ public class CommandDispatcherAccessorImpl implements CommandDispatcherAccessor 
     @Override
     public Object execute(String commandCode, String modelCode, String recordPid,
                           Map<String, Object> payload) {
+        return dispatch(commandCode,modelCode,recordPid,payload,null);
+    }
+
+    @Override public Object execute(String commandCode,String modelCode,String recordPid,Map<String,Object> payload,String clientRequestId) {
+        if(clientRequestId==null || clientRequestId.isBlank() || clientRequestId.length()>128) throw new IllegalArgumentException("Nested command correlation is required");
+        return dispatch(commandCode,modelCode,recordPid,payload,clientRequestId);
+    }
+
+    private Object dispatch(String commandCode,String modelCode,String recordPid,Map<String,Object> payload,String clientRequestId) {
         if (commandExecutor == null || commandCode == null || commandCode.isBlank()) {
             return null;
         }
@@ -33,6 +42,7 @@ public class CommandDispatcherAccessorImpl implements CommandDispatcherAccessor 
         request.setPayload(payload != null ? payload : Map.of());
         request.setTargetRecordId(recordPid);
         request.setTargetRecordPid(recordPid);
+        if(clientRequestId!=null) request.setClientRequestId(clientRequestId);
         MetaContext.Snapshot callerContext = MetaContext.snapshot();
         try {
             CommandExecuteResult result = commandExecutor.execute(commandCode, request);

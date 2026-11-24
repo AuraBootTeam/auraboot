@@ -44,7 +44,7 @@ public class CloudConfigServiceImpl implements CloudConfigService {
             "apiKey",
             "secretId", "secretKey", "appSecret", "clientSecret",
             "privateKey", "password", "accessKey", "accessToken", "refreshToken",
-            "encryptKey", "verificationToken"
+            "encryptKey", "verificationToken", "callbackSalt", "purchaseContractDefinition"
     );
 
     private final CloudConfigMapper cloudConfigMapper;

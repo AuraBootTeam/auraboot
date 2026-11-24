@@ -26,7 +26,6 @@ export type LocalizedText = ContractLocalizedText;
 /** Record-form view for consumers that require a locale map (not a bare string). */
 export type ResolvedLocalizedText = Exclude<LocalizedText, string>;
 
-
 /** Optional shared workspace shell. Omission preserves the existing shell. */
 export interface WorkspaceShellConfig {
   useThemeTokens?: boolean;
@@ -553,6 +552,8 @@ export type ActionDef =
       type: 'command';
       command: string;
       download?: { fileIdField: string };
+      /** Protected PDF preview; cannot be combined with an automatic download. */
+      preview?: { fileIdField: string; contentType: 'application/pdf' };
     } & CommandActionConfig)
   | ({ type: 'state_transition'; command: string } & CommandActionConfig)
   | ({ type: 'bulk_command'; command: string } & CommandInputFormConfig)
@@ -578,7 +579,11 @@ export type ActionDef =
       presentation?: { mode: 'modal'; width?: number };
     }
   | { type: 'builtin'; name: string }
-  | { type: 'flow'; steps: FlowStep[]; /** False when steps own refresh and must retain parent drafts. */ refresh?: boolean }
+  | {
+      type: 'flow';
+      steps: FlowStep[];
+      /** False when steps own refresh and must retain parent drafts. */ refresh?: boolean;
+    }
   | { type: 'flow'; handler: string }
   | {
       type: 'workflow';

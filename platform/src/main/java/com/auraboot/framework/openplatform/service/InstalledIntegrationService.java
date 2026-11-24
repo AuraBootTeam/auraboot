@@ -56,6 +56,23 @@ public class InstalledIntegrationService {
         return Set.copyOf(events);
     }
 
+    /** Resolve only current registered code and active grants; callers never supply a machine principal. */
+    Resolved recoveryTarget(InstalledIntegrationReceiptMapper.Receipt receipt) {
+        return inTenant(receipt.tenantId(),receipt.installationPid(),() -> {
+            var registration=registry.registration(receipt.sourceCode()).orElseThrow(InstalledIntegrationService::denied).getKey();
+            var identity=installations.findActiveIdentity(receipt.tenantId(),receipt.installationPid());
+            if(identity==null)throw denied();
+            var principal=new MachinePrincipal(receipt.tenantId(),receipt.installationPid(),receipt.installationPid(),
+                    Set.of(registration.requiredScope()),identity.applicationPid(),receipt.installationPid(),null,null);
+            return resolve(principal,receipt.sourceCode(),receipt.externalEventId(),receipt.durableEventId());
+        });
+    }
+    void verifyRecoveryEnvelope(Resolved resolved,IntegrationEventEnvelope persisted,InstalledIntegrationReceiptMapper.Receipt receipt) {
+        var original=restoreOriginalTime(persisted);
+        verifyEnvelope(resolved,original);
+        if(!receipt.envelopeSha256().equals(envelopeHash(original)) || !receipt.durableEventId().equals(original.eventId()))throw denied();
+    }
+
     private Resolved resolve(MachinePrincipal principal, String source, String eventId, String durableId) {
         var entry = registry.registration(source).orElseThrow(InstalledIntegrationService::denied);
         Registration registration = entry.getKey();
@@ -150,6 +167,19 @@ public class InstalledIntegrationService {
                 json,configs,registration.processCommand(),readAdditions,readFieldAdditions,
                 registry.completedReceiptProcessSecretReadAddition(registration,entry.getValue()))) {
             for(var declaration:declarations) {
+                previousReadHashes.add(commandHash(declaration,previous));
+                previousReadHashes.add(scopedCommandHash(declaration,previous,principal.installationPid()));
+            }
+        }
+
+        // Exact new write declarations may explain old terminal result authority, never pending delivery.
+        var capability=registry.completedReceiptProcessCapabilityAddition(registration,entry.getValue());
+        if(capability.isPresent()) {
+            var bases=new ArrayList<Map<String,String>>();bases.add(configs);
+            bases.addAll(InstalledIntegrationCommandFingerprint.beforeProcessReadAdditions(json,configs,registration.processCommand(),
+                    readAdditions,readFieldAdditions,registry.completedReceiptProcessSecretReadAddition(registration,entry.getValue())));
+            for(var base:bases)for(var previous:InstalledIntegrationCommandFingerprint.beforeProcessCapabilityAddition(
+                    json,base,registration.processCommand(),capability.get()))for(var declaration:declarations) {
                 previousReadHashes.add(commandHash(declaration,previous));
                 previousReadHashes.add(scopedCommandHash(declaration,previous,principal.installationPid()));
             }

@@ -14,6 +14,24 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.*;
 
 class BusinessArtifactAuthorizationTest {
+    @Test void scalarProvenanceRetainsItsHistoricalFingerprintAndMissingStructuredProperty() {
+        var fields=new ModelFields(Set.of("brand","export_file","name"),Set.of("export_file","name"),List.of(),List.of());
+        var old=new CommandPublicOutputProjectionPlan(TARGET,null,Map.of("orders",fields));
+        assertThat(old.fingerprint()).isEqualTo("de97cd3098d13aae4480f073470412645c7c65001e80949d2ecc7dddf8101b5f");
+        String encoded=BusinessArtifactAuthorization.capture(old,"export_file").encode();
+        assertThat(encoded).doesNotContain("structured");assertThat(BusinessArtifactAuthorization.parse(encoded).permits(old)).isTrue();
+    }
+    @Test void structuredContractIsStampedAndCannotBeDowngradedOrStrippedFromProvenance() {
+        var structured=new ModelFields(Set.of("export_file","name"),Set.of("export_file","name"),List.of(),List.of(),Set.of("name"));
+        var source=new CommandPublicOutputProjectionPlan(TARGET,null,Map.of("orders",structured));
+        var scalar=new CommandPublicOutputProjectionPlan(TARGET,null,Map.of("orders",new ModelFields(structured.declared(),structured.readable(),List.of(),List.of())));
+        var stamp=BusinessArtifactAuthorization.capture(source,"export_file");String encoded=stamp.encode();
+        assertThat(BusinessArtifactAuthorization.parse(encoded).permits(source)).isTrue();assertThat(stamp.permits(scalar)).isFalse();
+        assertThat(BusinessArtifactAuthorization.capture(scalar,"export_file").permits(source)).isFalse();
+        assertThatThrownBy(()->BusinessArtifactAuthorization.parse(encoded.replace(",\"structured\":[\"name\"]",""))).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->new ModelFields(structured.declared(),structured.readable(),List.of(new BusinessResultProjectionPlan.PolicyMask("name","partial",null)),List.of(),Set.of("name")))
+                .isInstanceOf(AccessDeniedException.class);
+    }
     @Test void a_document_relation_has_a_versioned_source_view_without_a_fake_model_file_field() {
         var source = plan(fields(Set.of("name", "brand"), List.of()));
         String document = "\"document\":{\"code\":\"orders.standard\",\"version\":\"1.0.0\","
@@ -48,6 +66,23 @@ class BusinessArtifactAuthorizationTest {
         return new CommandPublicOutputProjectionPlan(TARGET, null, Map.of("orders", new ModelFields(Set.of("export_file"), Set.of("export_file"), List.of(), List.of()), "lines", lines));
     }
 
+    @Test void exactTenantSecretSelectorsRoundTripWithoutChangingLegacyPublicFingerprints() {
+        var plan=plan(fields(Set.of("name","brand"),List.of()));
+        var reference=new com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.TenantSecretReference("integration","contract","definition");
+        var stamp=BusinessArtifactAuthorization.capture(plan,"export_file",Map.of(),Set.of(reference));
+        assertThat(BusinessArtifactAuthorization.parse(stamp.encode())).isEqualTo(stamp);
+        assertThat(stamp.tenantSecrets()).containsExactly(reference);assertThat(stamp.fingerprint()).isEqualTo(plan.fingerprint());
+        assertThat(BusinessArtifactAuthorization.capture(plan,"export_file").encode()).doesNotContain("tenantSecrets");
+        assertThatThrownBy(()->stamp.tenantSecrets().clear()).isInstanceOf(UnsupportedOperationException.class);
+    }
+    @Test void tenantSecretProvenanceRejectsWildcardsAndOversizedSelectorSets() {
+        assertThatThrownBy(()->new com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.TenantSecretReference("integration","*","definition"))
+            .isInstanceOf(IllegalArgumentException.class);
+        var refs=java.util.stream.IntStream.range(0,9).mapToObj(i->new com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.TenantSecretReference("integration","provider"+i,"definition"))
+            .collect(java.util.stream.Collectors.toSet());
+        assertThatThrownBy(()->BusinessArtifactAuthorization.capture(plan(fields(Set.of("name"),List.of())),"export_file",Map.of(),refs))
+            .isInstanceOf(AccessDeniedException.class);
+    }
     @Test void immutable_source_view_round_trips_without_storing_raw_values() {
         var plan = plan(fields(Set.of("name", "brand"), List.of()));
         var stamp = BusinessArtifactAuthorization.capture(plan, "export_file");

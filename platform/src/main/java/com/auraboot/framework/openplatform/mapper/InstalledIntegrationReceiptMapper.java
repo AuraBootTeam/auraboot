@@ -54,4 +54,16 @@ public interface InstalledIntegrationReceiptMapper {
         """)
     int completed(@Param("tenant") long tenant, @Param("installation") String installation,
                  @Param("source") String source, @Param("event") String event, @Param("pid") String pid);
+    @Update("""
+        UPDATE ab_installed_integration_receipt
+        SET command_sha256=#{d.commandSha256},provider_sha256=#{d.providerSha256},updated_at=NOW()
+        WHERE tenant_id=#{tenant} AND installation_pid=#{installation} AND source_code=#{source}
+          AND external_event_id=#{event} AND state='accepted' AND request_pid=#{d.requestPid}
+          AND envelope_sha256=#{d.envelopeSha256} AND binding_sha256=#{d.bindingSha256}
+          AND command_sha256=#{d.previousCommandSha256} AND provider_sha256=#{d.previousProviderSha256}
+        """)
+    int recover(@Param("tenant") long tenant,@Param("installation") String installation,
+                @Param("source") String source,@Param("event") String event,
+                @Param("d") com.auraboot.framework.openplatform.service.InstalledIntegrationRecoveryContracts.Decision decision);
+
 }

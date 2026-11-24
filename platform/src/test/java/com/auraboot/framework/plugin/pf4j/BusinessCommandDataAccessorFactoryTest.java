@@ -417,13 +417,14 @@ class BusinessCommandDataAccessorFactoryTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(strings={"empty", "sort", "keyword", "any", "oversize"})
+    @org.junit.jupiter.params.provider.ValueSource(strings={"empty", "sort", "keyword", "any", "oversize", "time"})
     void pagedReadsRejectUnreviewedQueryDimensionsBeforeNativeExecution(String variant) throws Exception {
         pagedOwner();
         var query = new DataPageQuery(variant.equals("empty") ? Map.of() : Map.of("parent", "root-1"),
                 variant.equals("any") ? Map.of("qty", List.<Object>of(1,2)) : Map.of(),
                 variant.equals("sort") ? List.of(new DataPageQuery.Sort("pid",false)) : List.of(),
-                1,variant.equals("oversize") ? 3 : 2,variant.equals("keyword") ? "secret" : "");
+                1,variant.equals("oversize") ? 3 : 2,variant.equals("keyword") ? "secret" : "",
+                variant.equals("time") ? Map.of("created_at",new DataPageQuery.TimeRange(java.time.Instant.EPOCH,java.time.Instant.EPOCH.plusSeconds(1))) : Map.of());
         command(scope -> { denied(() -> scope.accessor().queryPage("line", query)); return null; });
         verify(data,never()).list(anyString(),any());
     }
@@ -510,6 +511,28 @@ class BusinessCommandDataAccessorFactoryTest {
         assertThat(holder.isRollbackOnly()).isTrue();
     }
 
+    @Test void structuredInventoryCannotDisagreeWithTheCapturedPublicPlan() throws Exception {
+        publicOwner();owner.structuredFields=Map.of("line",Set.of("qty"));
+        assertThatThrownBy(()->command(scope->null)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(holder.isRollbackOnly()).isTrue();
+    }
+    @Test void currentArtifactSlotsMustBelongToTheFiniteArtifactInventory() {
+        owner.currentFields=Set.of("file");
+        assertThatThrownBy(()->command(scope->null)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(holder.isRollbackOnly()).isTrue();
+    }
+    @Test void structuredInventoryCannotChangeDuringTheInvocation() throws Exception {
+        publicOwner();command(scope->{
+            owner.structuredFields=Map.of("line",Set.of("qty"));
+            denied(()->scope.accessor().getById("line","line-1"));return null;
+        });assertThat(holder.isRollbackOnly()).isTrue();
+    }
+    @Test void freshInvocationCannotChangeStructuredSourceSemantics() throws Exception {
+        publicOwner();owner.structuredFields=Map.of("line",Set.of("qty"));
+        var replacement=new Owner();replacement.readIsolation=owner.readIsolation;replacement.publicFields=owner.publicFields;owner.invocation=replacement;
+        assertThatThrownBy(()->command(scope->null)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(mapper);
+    }
     @Test void publicOutputRequiresThePreparedDeclarationAndHostService() throws Exception {
         publicOwner(); context.setPublicOutputProjection(null);
         assertThatThrownBy(() -> command(scope -> null)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
@@ -726,6 +749,113 @@ class BusinessCommandDataAccessorFactoryTest {
         });
     }
 
+    static final BusinessResourceAuthorization.TenantSecretReference SECRET=
+        new BusinessResourceAuthorization.TenantSecretReference("integration","contract","definition");
+    void tenantSecrets(Set<BusinessResourceAuthorization.TenantSecretReference> references) {
+        owner.secrets=references;context.setBusinessTenantSecrets(Set.copyOf(references));
+        var params=new LinkedHashMap<String,Object>((Map<String,Object>)context.getExecConfig().get("handlerParams"));
+        params.put("tenantSecretRead",true);
+        params.put("tenantSecretServiceTypes",references.stream().map(BusinessResourceAuthorization.TenantSecretReference::serviceType).distinct().sorted().toList());
+        params.put("tenantSecretFields",references.stream().map(BusinessResourceAuthorization.TenantSecretReference::field).distinct().sorted().toList());
+        var config=new LinkedHashMap<>(context.getExecConfig());config.put("handlerParams",params);context.setExecConfig(config);
+    }
+    @Test void compiledTenantSecretSelectorsPermitOnlyTheirExactTuple() {
+        tenantSecrets(Set.of(SECRET));var raw=mock(TenantSecretAccessor.class);
+        when(raw.readCloudSecret("integration","contract","definition")).thenReturn("private-definition");
+        command(scope->{
+            var cap=scope.tenantSecretAccessor(Map.of(TenantSecretAccessor.SETTINGS_KEY,raw,"tenantSecretRead",true,
+                "tenantSecretServiceTypes",List.of("integration"),"tenantSecretFields",List.of("definition")));
+            assertThat(cap.readCloudSecret("integration","contract","definition")).isEqualTo("private-definition");return null;
+        });
+        verify(raw).readCloudSecret("integration","contract","definition");assertThat(holder.isRollbackOnly()).isFalse();
+    }
+    Map<String,Object> secretSettings(TenantSecretAccessor raw) {
+        var result=new LinkedHashMap<String,Object>((Map<String,Object>)context.getExecConfig().get("handlerParams"));
+        result.put(TenantSecretAccessor.SETTINGS_KEY,raw);return result;
+    }
+    @Test void metadataAloneCannotResurrectAnUndeclaredSecretCapability() {
+        var raw=mock(TenantSecretAccessor.class);
+        command(scope->{assertThat(scope.tenantSecretAccessor(Map.of(TenantSecretAccessor.SETTINGS_KEY,raw,
+            "tenantSecretRead",true,"tenantSecretServiceTypes",List.of("integration"),"tenantSecretFields",List.of("definition")))).isNull();return null;});
+        verifyNoInteractions(raw);
+    }
+    @Test void aDifferentSecretTupleIsDeniedAndPoisonsFurtherCapabilityUse() {
+        tenantSecrets(Set.of(SECRET));var raw=mock(TenantSecretAccessor.class);
+        command(scope->{var cap=scope.tenantSecretAccessor(secretSettings(raw));
+            assertThatThrownBy(()->cap.readCloudSecret("integration","another-provider","definition")).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+            assertThatThrownBy(()->cap.readCloudSecret("integration","contract","definition")).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);return null;});
+        verifyNoInteractions(raw);assertThat(holder.isRollbackOnly()).isTrue();
+    }
+    @Test void secretSelectorsDoNotGrantTheCartesianProductOfTheirServicesProvidersAndFields() {
+        var other=new BusinessResourceAuthorization.TenantSecretReference("storage","archive","credential");
+        tenantSecrets(Set.of(SECRET,other));var raw=mock(TenantSecretAccessor.class);
+        command(scope->{var cap=scope.tenantSecretAccessor(secretSettings(raw));
+            assertThatThrownBy(()->cap.readCloudSecret("integration","archive","credential")).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);return null;});
+        verifyNoInteractions(raw);
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"fields","services","disabled","duplicate","missing"})
+    void widenedOrMissingSecretMetadataCannotOpenTheResourceScope(String attack) {
+        tenantSecrets(Set.of(SECRET));var config=new LinkedHashMap<>(context.getExecConfig());
+        var params=new LinkedHashMap<String,Object>((Map<String,Object>)config.get("handlerParams"));
+        switch(attack) {
+            case "fields" -> params.put("tenantSecretFields",List.of("definition","password"));
+            case "services" -> params.put("tenantSecretServiceTypes",List.of("integration","storage"));
+            case "disabled" -> params.put("tenantSecretRead",false);
+            case "duplicate" -> params.put("tenantSecretFields",List.of("definition","definition"));
+            case "missing" -> params.remove("tenantSecretFields");
+            default -> throw new AssertionError(attack);
+        }
+        config.put("handlerParams",params);context.setExecConfig(config);
+        assertThatThrownBy(()->command(scope->null)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(data,never()).getByIdForAuthorization(anyString(),anyString());
+    }
+    @Test void changedSecretDeclarationsCannotBeUsedByACapturedReader() {
+        tenantSecrets(Set.of(SECRET));var raw=mock(TenantSecretAccessor.class);
+        command(scope->{var cap=scope.tenantSecretAccessor(secretSettings(raw));owner.secrets=Set.of();
+            assertThatThrownBy(()->cap.readCloudSecret("integration","contract","definition")).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);return null;});
+        verifyNoInteractions(raw);
+    }
+    @Test void closedSecretReadersCannotOutliveTheirPhysicalInvocation() {
+        tenantSecrets(Set.of(SECRET));var raw=mock(TenantSecretAccessor.class);
+        var cap=command(scope->scope.tenantSecretAccessor(secretSettings(raw)));
+        assertThatThrownBy(()->cap.readCloudSecret("integration","contract","definition")).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(raw);
+    }
+    @Test void changedActorDuringSecretReadCannotReturnThePrivateValue() {
+        tenantSecrets(Set.of(SECRET));var raw=mock(TenantSecretAccessor.class);
+        when(raw.readCloudSecret("integration","contract","definition")).thenAnswer(call->{MetaContext.setMemberId(99L);return "private-definition";});
+        command(scope->{var cap=scope.tenantSecretAccessor(secretSettings(raw));
+            assertThatThrownBy(()->cap.readCloudSecret("integration","contract","definition")).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);return null;});
+        assertThat(holder.isRollbackOnly()).isTrue();
+    }
+    @Test void excessiveCompiledSecretSelectorsCannotReachNativeData() {
+        var refs=java.util.stream.IntStream.range(0,9).mapToObj(i->new BusinessResourceAuthorization.TenantSecretReference("integration","provider"+i,"definition"))
+            .collect(java.util.stream.Collectors.toSet());tenantSecrets(refs);
+        assertThatThrownBy(()->command(scope->null)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(data,never()).getByIdForAuthorization(anyString(),anyString());
+    }
+    @Test void changedPreReplaySecretPlanCannotBeUsedByACapturedReader() {
+        tenantSecrets(Set.of(SECRET));var raw=mock(TenantSecretAccessor.class);
+        command(scope->{var cap=scope.tenantSecretAccessor(secretSettings(raw));context.setBusinessTenantSecrets(Set.of());
+            assertThatThrownBy(()->cap.readCloudSecret("integration","contract","definition")).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);return null;});
+        verifyNoInteractions(raw);
+    }
+    @Test void tenantSecretReadsShareTheInvocationOperationBudget() {
+        tenantSecrets(Set.of(SECRET));var raw=mock(TenantSecretAccessor.class);
+        when(raw.readCloudSecret("integration","contract","definition")).thenReturn("private-definition");
+        command(scope->{var cap=scope.tenantSecretAccessor(secretSettings(raw));
+            org.springframework.test.util.ReflectionTestUtils.setField(scope,"operations",9999);
+            assertThat(cap.readCloudSecret("integration","contract","definition")).isEqualTo("private-definition");
+            assertThatThrownBy(()->cap.readCloudSecret("integration","contract","definition")).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);return null;});
+        verify(raw,times(1)).readCloudSecret("integration","contract","definition");assertThat(holder.isRollbackOnly()).isTrue();
+    }
+    @Test void replacementInvocationCannotChangeTheCompiledSecretSet() {
+        tenantSecrets(Set.of(SECRET));owner.invocation=new Owner();
+        assertThatThrownBy(()->command(scope->null)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(data,never()).getByIdForAuthorization(anyString(),anyString());
+    }
+
     static final class Owner implements CommandHandlerExtension, BusinessResourceAuthorization {
         RecordReadAccessor captured;
         String extraWrite;
@@ -736,7 +866,11 @@ class BusinessCommandDataAccessorFactoryTest {
         ReadIsolation readIsolation;
         Map<String,Integer> pagedLimits = Map.of();
         Map<String,Set<String>> publicFields = Map.of();
+        Map<String,Set<String>> structuredFields = Map.of();
         Map<String,Integer> artifactFields = Map.of();
+        Set<TenantSecretReference> secrets=Set.of();
+        public Set<TenantSecretReference> businessTenantSecrets(){return secrets;}
+        Set<String> currentFields=Set.of();
         Map<String,Integer> sourceFileFields = Map.of();
         Map<String,BusinessResultField> resultProjection = Map.of();
         boolean denyLineRead;
@@ -744,7 +878,9 @@ class BusinessCommandDataAccessorFactoryTest {
         public BusinessResourceAuthorization newInvocationAuthorization() { return invocation == null ? this : invocation; }
         public Map<String,Integer> pagedBusinessResourceRowLimits() { return pagedLimits; }
         public Map<String,Set<String>> publicBusinessResourceFields() { return publicFields; }
+        public Map<String,Set<String>> publicBusinessResourceStructuredFields() { return structuredFields; }
         public Map<String,Integer> businessArtifactFields() { return artifactFields; }
+        public Set<String> businessCurrentArtifactFields() { return currentFields; }
         public Map<String,Integer> businessSourceFileFields() { return sourceFileFields; }
         public ReadIsolation resourceReadIsolation() { return readIsolation; }
         public Set<String> optionalBusinessResourceModels() { return optionalReference ? Set.of("reference") : Set.of(); }

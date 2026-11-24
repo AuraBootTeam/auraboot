@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.plugin.extension.*;
 import java.util.Map;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
@@ -25,7 +26,68 @@ class RelatedUpdateCommandDataAccessorTest {
                 MetaContext.runWithAuthorizedCommandCode("receipt:submit",body));
     }
     Map<String,Object> changes(){return Map.of("status","enqueued","_expectedVersion",3L);}
-    @AfterEach void clear(){MetaContext.clear();}
+    @AfterEach void clear(){MetaContext.clear();org.springframework.transaction.support.TransactionSynchronizationManager.clear();}
+    @Test void explicitRootUpdatesRequireAnExactOwnerDecisionAndCannotReplaceTheOriginalVersion() {
+        when(reads.getById("receipt","root")).thenReturn(Map.of("pid","root","tenant_id",1L,"row_version",7L));
+        var bridge=new RelatedUpdateCommandDataAccessor(data,1L,"receipt:submit","receipt","root","actor",handler,reads,false,false,true);
+        var input=Map.<String,Object>of("identity","verified","_expectedVersion",7L);
+        command(()->assertThatThrownBy(()->bridge.update("receipt","root",input)).isInstanceOf(AccessDeniedException.class));
+        verifyNoInteractions(data);
+        when(handler.authorizeRelatedUpdate(any())).thenAnswer(call->{
+            var context=(CommandHandlerExtension.RelatedUpdateAuthorizationContext)call.getArgument(0);
+            return context.root().recordId().equals("root") && context.recordId().equals("root") && context.changes().equals(input);
+        });
+        command(()->bridge.update("receipt","root",input));
+        verify(data).update("receipt","root",input);
+        command(()->assertThatThrownBy(()->bridge.update("receipt","root",Map.of("identity","verified","_expectedVersion",6L)))
+                .isInstanceOf(com.auraboot.framework.meta.exception.RecordVersionConflictException.class));
+        command(()->assertThat(MetaContext.getCommandExpectedVersion("receipt","root")).isEqualTo(7L));
+    }
+    @Test void relatedCasRequiresTransactionAndHandlerAndRetainsNativeVersionAndCompareValue() {
+        var bridge=accessor();var claim=new CompareAndSetUpdate("request",8L,Map.of("revision",8L));
+        command(()->assertThatThrownBy(()->bridge.compareAndSetBatch("journal","revision",List.of(claim))).isInstanceOf(IllegalStateException.class));
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        command(()->assertThatThrownBy(()->bridge.compareAndSetBatch("journal","revision",List.of(claim))).isInstanceOf(AccessDeniedException.class));
+        verifyNoInteractions(data);
+        when(handler.authorizeRelatedUpdate(any())).thenAnswer(i->{
+            CommandHandlerExtension.RelatedUpdateAuthorizationContext c=i.getArgument(0);
+            assertThat(c.changes()).isEqualTo(Map.of("revision",8L,"_expectedVersion",3L));return true;
+        });
+        doAnswer(i->{
+            assertThat(MetaContext.getCommandPermitTargetFor("journal")).isEqualTo("request");
+            assertThat(MetaContext.getCommandExpectedVersion("journal","request")).isEqualTo(3L);return null;
+        }).when(data).compareAndSetBatch("journal","revision",List.of(claim));
+        command(()->{bridge.compareAndSetBatch("journal","revision",List.of(claim));
+            assertThat(MetaContext.getCommandPermitTargetFor("receipt")).isEqualTo("root");});
+        verify(data).compareAndSetBatch("journal","revision",List.of(claim));
+    }
+    @Test void relatedCasValidatesEntireBatchBeforeNativeLocksAndRejectsForeignDuplicateOrInjectedVersion() {
+        var bridge=accessor();org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        when(handler.authorizeRelatedUpdate(any())).thenReturn(true);
+        when(reads.getById("journal","foreign")).thenReturn(Map.of("pid","foreign","tenant_id",2L,"row_version",1L));
+        var claim=new CompareAndSetUpdate("request",8L,Map.of("revision",8L));
+        command(()->{
+            assertThatThrownBy(()->bridge.compareAndSetBatch("journal","revision",List.of(claim,new CompareAndSetUpdate("foreign",1,Map.of("revision",1))))).isInstanceOf(AccessDeniedException.class);
+            assertThatThrownBy(()->bridge.compareAndSetBatch("journal","revision",List.of(claim,claim))).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(()->bridge.compareAndSetBatch("journal","revision",List.of(new CompareAndSetUpdate("request",8,Map.of("revision",8,"_expectedVersion",3))))).isInstanceOf(IllegalArgumentException.class);
+        });verifyNoInteractions(data);
+    }
+    @Test void relatedCasUsesStableLockOrderAndRestoresAuthorityAfterNativeConflict() {
+        var bridge=accessor();org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        when(reads.getById("journal","a")).thenReturn(Map.of("pid","a","tenant_id",1L,"row_version",4L));
+        when(handler.authorizeRelatedUpdate(any())).thenReturn(true);
+        var a=new CompareAndSetUpdate("a",1,Map.of("revision",1));
+        var z=new CompareAndSetUpdate("request",8,Map.of("revision",8));
+        var failure=new com.auraboot.framework.exception.ConflictException("Changed");
+        doThrow(failure).when(data).compareAndSetBatch("journal","revision",List.of(z));
+        command(()->{
+            assertThatThrownBy(()->bridge.compareAndSetBatch("journal","revision",List.of(z,a))).isSameAs(failure);
+            assertThat(MetaContext.getCommandPermitTargetFor("receipt")).isEqualTo("root");
+            assertThat(MetaContext.getCommandExpectedVersion("receipt","root")).isEqualTo(7L);
+        });
+        var order=inOrder(data);order.verify(data).compareAndSetBatch("journal","revision",List.of(a));
+        order.verify(data).compareAndSetBatch("journal","revision",List.of(z));
+    }
     @Test void explicitDecisionPinsNativeUpdateToExactVersionAndRestoresRoot() {
         var bridge=accessor();when(handler.authorizeRelatedUpdate(any())).thenAnswer(i->{
             var c=(CommandHandlerExtension.RelatedUpdateAuthorizationContext)i.getArgument(0);
@@ -82,5 +144,72 @@ class RelatedUpdateCommandDataAccessorTest {
     @Test void olderHandlerDeniesByDefault() {
         var old=new CommandHandlerExtension(){public String getCommandType(){return "old";}public Object execute(CommandContext c){return null;}};
         assertThat(old.authorizeRelatedUpdate(null)).isFalse();
+        assertThat(old.authorizeRelatedCreate(null)).isFalse();
+    }
+    @Test void relatedCreateRequiresExplicitOptInOriginalAuthorityAndExactHandlerInput() {
+        accessor();var bridge=new RelatedUpdateCommandDataAccessor(data,1L,"receipt:submit","receipt","root","actor",handler,reads,false,true);
+        var input=Map.<String,Object>of("receipt_pid","root","status","draft");
+        command(()->assertThatThrownBy(()->bridge.create("journal",input)).isInstanceOf(IllegalStateException.class));
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        command(()->assertThatThrownBy(()->bridge.create("journal",input)).isInstanceOf(AccessDeniedException.class));verifyNoInteractions(data);
+        when(handler.authorizeRelatedCreate(any())).thenAnswer(i->{
+            CommandHandlerExtension.RelatedCreateAuthorizationContext c=i.getArgument(0);
+            assertThat(c.root().recordId()).isEqualTo("root");assertThat(c.input()).isEqualTo(input);
+            assertThatThrownBy(()->c.input().put("tenant_id",2L)).isInstanceOf(UnsupportedOperationException.class);return true;
+        });
+        when(data.create("journal",input)).thenAnswer(i->{
+            assertThat(MetaContext.getCommandPermitScopeFor("journal")).isEqualTo("ALL");
+            assertThat(MetaContext.getAuthorizedCommandCode()).isEqualTo("receipt:submit");return Map.of("pid","new");
+        });
+        command(()->{assertThat(bridge.create("journal",input)).containsEntry("pid","new");
+            assertThat(MetaContext.getCommandPermitTargetFor("receipt")).isEqualTo("root");});
+        verify(data).create("journal",input);
+    }
+    @Test void relatedCreateCannotBeRetainedOutsideCommandOrLeakScopeAfterNativeFailure() {
+        accessor();var bridge=new RelatedUpdateCommandDataAccessor(data,1L,"receipt:submit","receipt","root","actor",handler,reads,false,true);
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        var input=Map.<String,Object>of("receipt_pid","root");MetaContext.setContext(1L,2L,"actor","Buyer");
+        assertThatThrownBy(()->bridge.create("journal",input)).isInstanceOf(AccessDeniedException.class);verifyNoInteractions(handler,data);
+        when(handler.authorizeRelatedCreate(any())).thenReturn(true);var failure=new IllegalStateException("Native failure");when(data.create("journal",input)).thenThrow(failure);
+        command(()->{assertThatThrownBy(()->bridge.create("journal",input)).isSameAs(failure);
+            assertThat(MetaContext.getCommandPermitTargetFor("receipt")).isEqualTo("root");});
+    }
+    @Test void sameModelChildUpdateRetainsItsOwnHandlerDecisionAndRestoresTheRootTarget() {
+        var bridge=accessor();when(reads.getById("receipt","child")).thenReturn(Map.of("pid","child","tenant_id",1L,"row_version",3L));
+        command(()->assertThatThrownBy(()->bridge.update("receipt","child",changes())).isInstanceOf(AccessDeniedException.class));
+        when(handler.authorizeRelatedUpdate(any())).thenReturn(true);
+        when(data.update(eq("receipt"),eq("child"),anyMap())).thenAnswer(i->{
+            assertThat(MetaContext.getCommandPermitTargetFor("receipt")).isEqualTo("child");
+            assertThat(MetaContext.getCommandExpectedVersion("receipt","child")).isEqualTo(3L);return Map.of("pid","child");
+        });
+        command(()->{bridge.update("receipt","child",changes());assertThat(MetaContext.getCommandPermitTargetFor("receipt")).isEqualTo("root");});
+        verify(data).update("receipt","child",changes());
+    }
+    @Test void explicitCombinedDeleteRequiresTheHandlerAndPinsTheSameModelChild() {
+        accessor();var bridge=new RelatedUpdateCommandDataAccessor(data,1L,"receipt:submit","receipt","root","actor",handler,reads,true);
+        when(reads.getById("receipt","child")).thenReturn(Map.of("pid","child","tenant_id",1L,"row_version",3L));
+        command(()->assertThatThrownBy(()->bridge.delete("receipt","child")).isInstanceOf(AccessDeniedException.class));
+        verify(data,never()).delete(anyString(),anyString());
+        when(handler.authorizeRelatedDelete(any())).thenAnswer(i->{
+            CommandHandlerExtension.RelatedDeleteAuthorizationContext c=i.getArgument(0);
+            assertThat(c.root().recordId()).isEqualTo("root");assertThat(c.recordId()).isEqualTo("child");return true;
+        });
+        doAnswer(i->{assertThat(MetaContext.getCommandPermitTargetFor("receipt")).isEqualTo("child");
+            assertThat(MetaContext.getCommandExpectedVersion("receipt","child")).isEqualTo(3L);return null;}).when(data).delete("receipt","child");
+        command(()->{bridge.delete("receipt","child");assertThat(MetaContext.getCommandPermitTargetFor("receipt")).isEqualTo("root");});
+        verify(data).delete("receipt","child");
+    }
+    @Test void combinedDeleteRejectsMissingAuthorityForeignRowsAndRestoresAfterNativeFailure() {
+        accessor();var bridge=new RelatedUpdateCommandDataAccessor(data,1L,"receipt:submit","receipt","root","actor",handler,reads,true);
+        MetaContext.setContext(1L,2L,"actor","Buyer");
+        assertThatThrownBy(()->bridge.delete("journal","request")).isInstanceOf(AccessDeniedException.class);
+        when(reads.getById("journal","request")).thenReturn(Map.of("pid","request","tenant_id",2L,"row_version",3L));
+        command(()->assertThatThrownBy(()->bridge.delete("journal","request")).isInstanceOf(AccessDeniedException.class));
+        verifyNoInteractions(handler,data);
+        when(reads.getById("journal","request")).thenReturn(Map.of("pid","request","tenant_id",1L,"row_version",3L));
+        when(handler.authorizeRelatedDelete(any())).thenReturn(true);var failure=new com.auraboot.framework.exception.ConflictException("Changed");
+        doThrow(failure).when(data).delete("journal","request");
+        command(()->{assertThatThrownBy(()->bridge.delete("journal","request")).isSameAs(failure);
+            assertThat(MetaContext.getCommandPermitTargetFor("receipt")).isEqualTo("root");});
     }
 }

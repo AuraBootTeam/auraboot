@@ -48,12 +48,51 @@ public interface ExternalEventIngressExtension extends ExtensionPoint {
      */
     default boolean completedReceiptProcessSecretReadAddition() { return false; }
 
+    /** A precise release-local process capability predecessor, only for terminal result reads/replays.
+     * The host preserves accept/result, existing grants, all bindings and every undeclared field.
+     * This declaration never authorizes delivery or migration of accepted work.
+     */
+    default java.util.Optional<CompletedProcessCapabilityAddition> completedReceiptProcessCapabilityAddition() {
+        return java.util.Optional.empty();
+    }
+
+    record CompletedProcessCapabilityAddition(Map<String,Set<String>> createFields,
+            Set<String> secretServiceTypes,Set<String> secretFields,Set<String> readContractSettings) {
+        public CompletedProcessCapabilityAddition {
+            if(createFields==null || createFields.isEmpty() || createFields.size()>16
+                    || secretServiceTypes==null || secretServiceTypes.isEmpty() || secretServiceTypes.size()>16
+                    || secretFields==null || secretFields.isEmpty() || secretFields.size()>32
+                    || readContractSettings==null || readContractSettings.size()>4)throw new IllegalArgumentException("Invalid completed process capability declaration");
+            var copy=new java.util.LinkedHashMap<String,Set<String>>();
+            var systemFields=Set.of("pid","tenant_id","deleted_flag","created_at","created_by","updated_at","updated_by","row_version");
+            for(var entry:createFields.entrySet()) {
+                if(entry.getKey()==null || !entry.getKey().matches("[a-z][a-z0-9_]{1,99}")
+                        || entry.getValue()==null || entry.getValue().isEmpty() || entry.getValue().size()>64
+                        || entry.getValue().stream().anyMatch(field->field==null || !field.matches("[a-z][a-z0-9_]{1,127}") || systemFields.contains(field)))
+                    throw new IllegalArgumentException("Invalid completed create declaration");
+                copy.put(entry.getKey(),Set.copyOf(entry.getValue()));
+            }
+            if(java.util.stream.Stream.concat(secretServiceTypes.stream(),secretFields.stream())
+                    .anyMatch(name->name==null || !name.matches("[A-Za-z][A-Za-z0-9_]{0,63}"))
+                    || readContractSettings.stream().anyMatch(name->name==null || !name.matches("[a-z][a-zA-Z0-9]{0,49}ReadContracts")))
+                throw new IllegalArgumentException("Invalid completed process setting declaration");
+            createFields=Map.copyOf(copy);secretServiceTypes=Set.copyOf(secretServiceTypes);
+            secretFields=Set.copyOf(secretFields);readContractSettings=Set.copyOf(readContractSettings);
+        }
+    }
+
     /** Opt-in request defaults owned by the provider, before durable acceptance. */
     default java.util.Optional<RequestNormalizer> requestNormalizer() { return java.util.Optional.empty(); }
 
     @FunctionalInterface
     interface RequestNormalizer {
         PreparedRequest normalize(java.util.Map<String, Object> request, RequestDefaults defaults);
+
+        /** Pure retry identity projection. Default retains every caller field. Providers may
+         * omit only explicitly ignored wire fields, never defaults or business facts. */
+        default java.util.Map<String,Object> fingerprintInput(java.util.Map<String,Object> request) {
+            return request;
+        }
     }
 
     /** Safe provider field errors discovered while resolving the installed business binding. */
