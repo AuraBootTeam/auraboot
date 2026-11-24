@@ -7418,5 +7418,340 @@
     "key": "openPlatform.logs.unstructuredJson",
     "en-US": "Unstructured JSON values are not stored. Only JSON objects and arrays support safe field redaction.",
     "zh-CN": "未保存非结构化 JSON 值；仅 JSON 对象和数组支持按字段可靠脱敏。"
+  },
+  {
+    "key": "kernelPlugins.title",
+    "zh-CN": "内核插件管理",
+    "en-US": "Kernel Plugin Manager"
+  },
+  {
+    "key": "kernelPlugins.description",
+    "zh-CN": "查看运行时已注册插件及其激活状态。此清单仅供查看。",
+    "en-US": "View registered runtime plugins and their activation status. This inventory is read-only."
+  },
+  {
+    "key": "kernelPlugins.backendManager",
+    "zh-CN": "后台插件管理",
+    "en-US": "Backend plugin management"
+  },
+  {
+    "key": "kernelPlugins.empty",
+    "zh-CN": "暂未注册插件，系统可能仍在启动中。",
+    "en-US": "No plugins registered yet. Startup may still be in progress."
+  },
+  {
+    "key": "kernelPlugins.registryHelp",
+    "zh-CN": "刷新可重新读取当前运行时插件清单，不改变插件状态。",
+    "en-US": "Refresh reads the current runtime registry without changing plugin state."
+  },
+  {
+    "key": "kernelPlugins.refresh",
+    "zh-CN": "刷新",
+    "en-US": "Refresh"
+  },
+  {
+    "key": "kernelPlugins.summary.total",
+    "zh-CN": "插件总数",
+    "en-US": "Total"
+  },
+  {
+    "key": "kernelPlugins.summary.active",
+    "zh-CN": "已激活",
+    "en-US": "Active"
+  },
+  {
+    "key": "kernelPlugins.state.active",
+    "zh-CN": "已激活",
+    "en-US": "Active"
+  },
+  {
+    "key": "kernelPlugins.summary.licensed",
+    "zh-CN": "已授权",
+    "en-US": "Licensed"
+  },
+  {
+    "key": "kernelPlugins.state.licensed",
+    "zh-CN": "已授权",
+    "en-US": "Licensed"
+  },
+  {
+    "key": "kernelPlugins.summary.enabled",
+    "zh-CN": "已启用",
+    "en-US": "Enabled"
+  },
+  {
+    "key": "kernelPlugins.state.enabled",
+    "zh-CN": "已启用",
+    "en-US": "Enabled"
+  },
+  {
+    "key": "kernelPlugins.summary.installed",
+    "zh-CN": "已安装",
+    "en-US": "Installed"
+  },
+  {
+    "key": "kernelPlugins.state.installed",
+    "zh-CN": "已安装",
+    "en-US": "Installed"
+  },
+  {
+    "key": "kernelPlugins.state.discovered",
+    "zh-CN": "已发现",
+    "en-US": "Discovered"
+  },
+  {
+    "key": "kernelPlugins.column.plugin",
+    "zh-CN": "插件",
+    "en-US": "Plugin"
+  },
+  {
+    "key": "kernelPlugins.column.kind",
+    "zh-CN": "类型",
+    "en-US": "Kind"
+  },
+  {
+    "key": "kernelPlugins.column.version",
+    "zh-CN": "版本",
+    "en-US": "Version"
+  },
+  {
+    "key": "kernelPlugins.column.state",
+    "zh-CN": "状态",
+    "en-US": "State"
+  },
+  {
+    "key": "kernelPlugins.column.features",
+    "zh-CN": "功能授权",
+    "en-US": "Features"
+  },
+  {
+    "key": "kernelPlugins.column.dependencies",
+    "zh-CN": "依赖插件",
+    "en-US": "Dependencies"
+  },
+  {
+    "key": "kernelPlugins.column.inactiveReason",
+    "zh-CN": "未激活原因",
+    "en-US": "Inactive Reason"
+  },
+  {
+    "key": "kernelPlugins.kind.core",
+    "zh-CN": "核心",
+    "en-US": "Core"
+  },
+  {
+    "key": "kernelPlugins.kind.oss",
+    "zh-CN": "开源",
+    "en-US": "Open source"
+  },
+  {
+    "key": "kernelPlugins.kind.enterprise",
+    "zh-CN": "企业版",
+    "en-US": "Enterprise"
+  },
+  {
+    "key": "kernelPlugins.kind.solution",
+    "zh-CN": "解决方案",
+    "en-US": "Solution"
+  },
+  {
+    "key": "kernelPlugins.reason.moduleUnavailable",
+    "zh-CN": "应用模块不可用",
+    "en-US": "Application module unavailable"
+  },
+  {
+    "key": "kernelPlugins.reason.circularDependency",
+    "zh-CN": "插件之间存在循环依赖",
+    "en-US": "Circular dependency"
+  },
+  {
+    "key": "kernelPlugins.reason.dependencyInactive",
+    "zh-CN": "依赖插件未激活：{detail}",
+    "en-US": "Dependency inactive: {detail}"
+  },
+  {
+    "key": "kernelPlugins.reason.moduleUnavailableDetail",
+    "zh-CN": "应用模块不可用：{detail}",
+    "en-US": "Application module unavailable: {detail}"
+  },
+  {
+    "key": "kernelPlugins.reason.missingFeature",
+    "zh-CN": "缺少功能授权：{detail}",
+    "en-US": "Missing feature: {detail}"
+  },
+  {
+    "key": "kernelPlugins.reason.setupFailed",
+    "zh-CN": "初始化失败：{detail}",
+    "en-US": "Setup failed: {detail}"
+  },
+  {
+    "key": "kernelPlugins.reason.missingDependency",
+    "zh-CN": "缺少依赖插件：{detail}",
+    "en-US": "Missing dependency: {detail}"
+  },
+  {
+    "key": "kernelPlugins.reason.dependencyNotEnabled",
+    "zh-CN": "依赖插件未启用：{detail}",
+    "en-US": "Dependency not enabled: {detail}"
+  },
+  {
+    "key": "kernelPlugins.reason.dependencyFailed",
+    "zh-CN": "依赖插件激活失败：{detail}",
+    "en-US": "Dependency failed: {detail}"
+  },
+  {
+    "key": "kernelPlugins.reason.laterPhase",
+    "zh-CN": "依赖插件 {dependency} 的激活阶段较晚：{phase}",
+    "en-US": "Dependency {dependency} is in a later activation phase: {phase}"
+  },
+  {
+    "key": "plugin.core.admin.name",
+    "zh-CN": "系统管理",
+    "en-US": "Admin"
+  },
+  {
+    "key": "plugin.core.admin.description",
+    "zh-CN": "云配置、登录渠道、功能授权、基础设施、模板、环境及文档上传管理。",
+    "en-US": "System admin: cloud config, login channels, entitlements, infrastructure, templates, environments, document upload."
+  },
+  {
+    "key": "plugin.core.ai-colleagues.name",
+    "zh-CN": "AI 同事",
+    "en-US": "AI Colleagues"
+  },
+  {
+    "key": "plugin.core.ai-colleagues.description",
+    "zh-CN": "AI 智能体设置、列表、创建引导、详情与对话。",
+    "en-US": "AI agent management — center settings, agent grid, creation wizard, detail, chat."
+  },
+  {
+    "key": "plugin.core.aurabot.name",
+    "zh-CN": "AuraBot",
+    "en-US": "AuraBot"
+  },
+  {
+    "key": "plugin.core.aurabot.description",
+    "zh-CN": "AuraBot 工作台、调用追踪、运行日志、模型服务、提示词及检索知识库。",
+    "en-US": "AuraBot dashboard, traces, run logs, providers, prompts, RAG knowledge."
+  },
+  {
+    "key": "plugin.core.automation.name",
+    "zh-CN": "自动化",
+    "en-US": "Automation"
+  },
+  {
+    "key": "plugin.core.automation.description",
+    "zh-CN": "自动化流程设计与基础运行能力。",
+    "en-US": "Automation builder and runtime (basic)."
+  },
+  {
+    "key": "plugin.core.dashboard.name",
+    "zh-CN": "仪表盘",
+    "en-US": "Dashboard"
+  },
+  {
+    "key": "plugin.core.dashboard.description",
+    "zh-CN": "仪表盘查看与设计、图表组件、工作台布局及编辑工具。",
+    "en-US": "Dashboard viewer and designer with chart widgets, workbench layouts, and authoring tools."
+  },
+  {
+    "key": "plugin.core.decisionops.name",
+    "zh-CN": "规则中心",
+    "en-US": "Rule Center"
+  },
+  {
+    "key": "plugin.core.decisionops.description",
+    "zh-CN": "条件片段、策略设计、决策定义、执行日志及治理。",
+    "en-US": "Rule Center console — condition fragments, strategy studio, decision definitions, execution logs, governance."
+  },
+  {
+    "key": "plugin.core.demo.name",
+    "zh-CN": "示例",
+    "en-US": "Demo"
+  },
+  {
+    "key": "plugin.core.demo.description",
+    "zh-CN": "验证内核与插件之间的集成契约。",
+    "en-US": "Hello-world plugin proving the kernel ↔ plugin contract is wired."
+  },
+  {
+    "key": "plugin.core.designer.name",
+    "zh-CN": "设计器",
+    "en-US": "Designers"
+  },
+  {
+    "key": "plugin.core.designer.description",
+    "zh-CN": "页面设计器、流程设计器及查询构建器。",
+    "en-US": "Page Designer, Flow Designer, Query Builder."
+  },
+  {
+    "key": "plugin.core.email.name",
+    "zh-CN": "电子邮件",
+    "en-US": "Email"
+  },
+  {
+    "key": "plugin.core.email.description",
+    "zh-CN": "Gmail 账号管理、邮件撰写及会话查看。",
+    "en-US": "Gmail account management, compose, and message thread views."
+  },
+  {
+    "key": "plugin.core.meta.name",
+    "zh-CN": "元数据",
+    "en-US": "Meta"
+  },
+  {
+    "key": "plugin.core.meta.description",
+    "zh-CN": "模型、字段、字典、命名查询、一致性规则及 AI 建模。",
+    "en-US": "Models, fields, dictionaries, named queries, consistency rules, AI-driven modeling."
+  },
+  {
+    "key": "plugin.core.ops.name",
+    "zh-CN": "运维工具",
+    "en-US": "Operations"
+  },
+  {
+    "key": "plugin.core.ops.description",
+    "zh-CN": "通知、通知规则、定时任务、审计日志及文档管理。",
+    "en-US": "Operational tools — notifications, notification rules, scheduler, audit logs, documents."
+  },
+  {
+    "key": "plugin.core.organization.name",
+    "zh-CN": "组织管理",
+    "en-US": "Organization"
+  },
+  {
+    "key": "plugin.core.organization.description",
+    "zh-CN": "组织成员与团队基础管理。",
+    "en-US": "Organization members and teams (basic)."
+  },
+  {
+    "key": "plugin.core.personal.name",
+    "zh-CN": "个人中心",
+    "en-US": "Personal"
+  },
+  {
+    "key": "plugin.core.personal.description",
+    "zh-CN": "个人资料、安全设置、社交账号关联及账号停用。",
+    "en-US": "Personal profile, security, social links, account deactivation."
+  },
+  {
+    "key": "plugin.core.platform.name",
+    "zh-CN": "平台管理",
+    "en-US": "Platform"
+  },
+  {
+    "key": "plugin.core.platform.description",
+    "zh-CN": "系统级插件清单及跨租户管理入口。",
+    "en-US": "System-wide plugin manager (cross-tenant view)."
+  },
+  {
+    "key": "plugin.core.settings.name",
+    "zh-CN": "系统设置",
+    "en-US": "Settings"
+  },
+  {
+    "key": "plugin.core.settings.description",
+    "zh-CN": "租户插件、偏好、账单、Webhook、API 文档、连接器、币种、时区及国际化设置。",
+    "en-US": "Tenant settings: plugins, preferences, billing, webhooks, API docs, connectors, currency, timezone, i18n."
   }
 ]
