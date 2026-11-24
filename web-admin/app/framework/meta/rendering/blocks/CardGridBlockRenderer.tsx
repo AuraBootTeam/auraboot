@@ -454,7 +454,10 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
             )}
 
             {/* Title */}
-            <h3 className={`text-text mb-1 break-words font-semibold ${compact || dense ? 'text-sm' : 'text-base'}`}>{title}</h3>
+            <div className={cfg.headerLayout === 'inline' ? 'mb-2 flex flex-wrap items-center justify-between gap-2' : undefined}>
+              <h3 className={`text-text mb-1 break-words font-semibold ${compact || dense ? 'text-sm' : 'text-base'}`}>{title}</h3>
+              {cfg.headerLayout === 'inline' && badge ? <span className="rounded-pill border-border self-start border px-2 py-0.5 text-xs">{badge}</span> : null}
+            </div>
 
             {/* Description */}
             {description && (
@@ -462,13 +465,13 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
             )}
 
             {/* Badge */}
-            {badge && (
+            {badge && cfg.headerLayout !== 'inline' && (
               <span className="rounded-pill border-border mb-3 self-start border px-2 py-0.5 text-xs">
                 {badge}
               </span>
             )}
 
-            {cfg.primaryField && cardFields.find(field => field.field === cfg.primaryField) ? <div className="my-3">{renderField(cardFields.find(field => field.field === cfg.primaryField)!)}</div> : null}
+            {cfg.primaryField && cardFields.find(field => field.field === cfg.primaryField) ? <div className={dense ? "my-1" : "my-3"}>{renderField(cardFields.find(field => field.field === cfg.primaryField)!)}</div> : null}
 
             {/* Declared fields; without a form array they are display-only. */}
             {visibleFields.length > 0 && (
@@ -585,11 +588,13 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
       </>;
 
     };
+    const orderedGroups = Array.from(groups.entries());
+    if (cfg.groupOrder === 'reverse') orderedGroups.reverse();
     const collection = (
       <div data-testid="card-grid-block" className={cfg.groupLayout === 'divided' ? 'border-border bg-panel overflow-hidden rounded-lg border' : 'space-y-4'}>
         {block.title ? <div className="border-border border-b px-4 py-4"><h2 className="text-text text-base font-semibold">{getLocalizedText(block.title,locale,t)}</h2></div> : null}
         {selectionHint}
-        {Array.from(groups.entries()).map(([key, group], index) => cfg.collapsibleGroups === true ? (
+        {orderedGroups.map(([key, group], index) => cfg.collapsibleGroups === true ? (
           <details key={key} data-testid="card-grid-group" open={cfg.groupsDefaultOpen !== false}
             style={{ scrollMarginBlockStart: 'calc(var(--workspace-header-height, 3.5rem) + 1rem)' }}
             className={`${cfg.groupLayout === 'divided' ? 'border-border border-b last:border-b-0' : 'rounded-lg border border-border'} ${compact ? 'group overflow-hidden' : 'p-3'} ${cfg.groupWarningField && (group.parent?.[cfg.groupWarningField] === true || group.entries.some(({ row }) => row[cfg.groupWarningField] === true)) ? 'bg-amber-50' : 'bg-surface'}`}>

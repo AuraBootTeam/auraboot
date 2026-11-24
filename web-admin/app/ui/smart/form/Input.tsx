@@ -29,6 +29,9 @@ const Input: React.FC<InputProps> = ({
   size = 'medium',
   variant = 'default',
   className = '',
+  inline = false,
+  density = 'default',
+  controlClassName,
   maxLength,
   minLength,
   pattern,
@@ -156,7 +159,9 @@ const Input: React.FC<InputProps> = ({
       required={requiredValue}
       helpText={helpTextText}
       error={meta.showError ? errorText : undefined}
-      className="mb-4"
+      inline={inline}
+      controlClassName={controlClassName}
+      className={density === 'compact' ? 'mb-0' : 'mb-4'}
       labelClassName="cursor-pointer"
       onLabelClick={handleLabelClick}
     >

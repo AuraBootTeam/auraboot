@@ -34,6 +34,16 @@ describe('Authored collection presentations', () => {
   fireEvent.click(screen.getAllByRole('button',{name:'Full tracking'})[1]);expect(screen.getByRole('dialog')).toHaveTextContent('Only second trace');
   expect(rows[0].address).toBe('Old address');expect(handleAction).not.toHaveBeenCalled();
  });
+ it('reverses displayed batch groups while keeping child quantities and modal details bound to their source', () => {
+  setup({groupOrder:'reverse'});
+  const groups=screen.getAllByTestId('card-grid-group');
+  expect(groups[0]).toHaveTextContent('Batch two');
+  expect(groups[0]).toHaveTextContent('20');
+  expect(groups[1]).toHaveTextContent('Batch one');
+  fireEvent.click(screen.getAllByRole('button',{name:'Full tracking'})[0]);
+  expect(screen.getByRole('dialog')).toHaveTextContent('Only second trace');
+  expect(screen.getByRole('dialog')).not.toHaveTextContent('Only first trace');
+ });
  it('renders a collection review in a modal and routes dismissal through the configured action', async () => {
   handleAction.mockClear();
   setup({collectionDialog:{title:'Review entire plan',headerFields:[{field:'plannedCount',label:'Planned orders',component:'SmartDisplay',valueWhen:'${fn.COUNT(form.groups)}',props:{appearance:'plain'}}],buttons:[],dismissAction:{code:'discard-preview',action:{type:'flow',steps:[]}}}});
