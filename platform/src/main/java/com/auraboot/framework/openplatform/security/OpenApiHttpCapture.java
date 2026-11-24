@@ -67,6 +67,13 @@ public final class OpenApiHttpCapture {
         root.set("response", completed ? body(response.bytes.toByteArray(), response.count > LIMIT,
                 response.getContentType(), parse(response.bytes.toByteArray()))
                 : mapper.createObjectNode().put("state", "not_captured").put("reason", "incomplete_response"));
+        String requestState = root.path("request").path("state").asText();
+        if ((requestState.equals("truncated") || requestState.equals("not_captured"))
+                && !root.path("request").path("reason").asText().equals("request_body_not_read")
+                && root.path("response").path("state").asText().equals("captured")) {
+            root.set("response", mapper.createObjectNode().put("state", "not_captured")
+                    .put("reason", "unsafe_request_echo"));
+        }
         return root;
     }
 
@@ -93,6 +100,8 @@ public final class OpenApiHttpCapture {
                 || type.toLowerCase(Locale.ROOT).contains("+json")))
             return node.put("state", "not_captured").put("reason", "unsupported_content_type");
         if (parsed == null) return node.put("state", "not_captured").put("reason", "invalid_json");
+        if (!parsed.isObject() && !parsed.isArray())
+            return node.put("state", "not_captured").put("reason", "unstructured_json");
         node.put("state", "captured");
         node.set("body", redact(parsed, 0));
         return node;

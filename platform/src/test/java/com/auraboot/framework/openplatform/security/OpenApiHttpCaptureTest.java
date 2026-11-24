@@ -71,4 +71,21 @@ class OpenApiHttpCaptureTest {
         var response=new OpenApiHttpCapture.Response(new MockHttpServletResponse());
         assertThat(new OpenApiHttpCapture(mapper).snapshot(request,response,false).path("response").path("reason").asText()).isEqualTo("incomplete_response");
     }
+    @Test void unsafeRequestShapesCannotLeakThroughAnErrorEcho() throws Exception {
+        for (String raw : new String[]{"{\"password\":\"unsafe-secret", "\"opaque-secret\""}) {
+            var original = new MockHttpServletRequest("POST", "/api/open/v1/test");
+            original.setContentType("application/json"); original.setContent(raw.getBytes(StandardCharsets.UTF_8));
+            var request = new OpenApiHttpCapture.Request(original); request.getInputStream().readAllBytes();
+            var transport = new MockHttpServletResponse(); var response = new OpenApiHttpCapture.Response(transport);
+            response.setContentType("application/json");
+            String echo = mapper.writeValueAsString(java.util.Map.of("message", raw));
+            response.getOutputStream().write(echo.getBytes(StandardCharsets.UTF_8));
+            var captured = new OpenApiHttpCapture(mapper).snapshot(request, response, true);
+            assertThat(captured.path("request").path("state").asText()).isEqualTo("not_captured");
+            assertThat(captured.path("response").path("reason").asText()).isEqualTo("unsafe_request_echo");
+            assertThat(captured.toString()).doesNotContain("unsafe-secret", "opaque-secret");
+            assertThat(transport.getContentAsString()).isEqualTo(echo);
+        }
+    }
+
 }

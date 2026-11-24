@@ -858,7 +858,7 @@ test.describe
     await capture(page, 'LOG20');
     const malformed = await page.request.post(`${BACKEND_URL}/api/open/v1/resources/${resourceCode}`, {
       headers: { Authorization: `Bearer ${machineToken}`, 'Content-Type': 'application/json', 'Idempotency-Key': `malformed-${tag}` },
-      data: '{"password":"audit-malformed-secret',
+      data: Buffer.from('{"password":"audit-malformed-secret'),
     });
     expect(malformed.status()).toBe(400);
     const malformedId = malformed.headers()['x-request-id'];
@@ -867,6 +867,7 @@ test.describe
     await page.getByRole('textbox', { name: '搜索请求 ID 或接口路径' }).fill(malformedId);
     await choose(page, malformedId);
     await expect(inspector.getByTestId('request-body-state')).toContainText('不是有效 JSON');
+    await expect(inspector.getByTestId('response-body-state')).toContainText('回显');
     await expect(inspector).not.toContainText('audit-malformed-secret');
     await capture(page, 'LOG21');
     expect(sql(`SELECT http_details::text FROM ab_open_api_call_audit WHERE tenant_id='${tenantId}'::bigint AND request_id='${malformedId}'`)).not.toContain('audit-malformed-secret');

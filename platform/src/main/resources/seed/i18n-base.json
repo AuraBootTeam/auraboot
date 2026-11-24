@@ -7408,5 +7408,15 @@
     "key": "openPlatform.logs.fullDetails",
     "zh-CN": "查看请求与响应详情",
     "en-US": "View requests and responses"
+  },
+  {
+    "key": "openPlatform.logs.unsafeEcho",
+    "en-US": "Response body was not stored because it may echo request content that could not be safely redacted.",
+    "zh-CN": "请求内容无法可靠脱敏，响应可能回显输入，因此未保存响应正文。"
+  },
+  {
+    "key": "openPlatform.logs.unstructuredJson",
+    "en-US": "Unstructured JSON values are not stored. Only JSON objects and arrays support safe field redaction.",
+    "zh-CN": "未保存非结构化 JSON 值；仅 JSON 对象和数组支持按字段可靠脱敏。"
   }
 ]

@@ -139,6 +139,10 @@ export function HttpAuditInspector({
             "truncatedBody",
             "Body exceeds the 64 KB capture limit. No partial body is stored because it cannot be safely redacted.",
           )
+        : body.reason === "unsafe_request_echo"
+          ? text("unsafeEcho", "Response body was not stored because it may echo request content that could not be safely redacted.")
+        : body.reason === "unstructured_json"
+          ? text("unstructuredJson", "Unstructured JSON values are not stored. Only JSON objects and arrays support safe field redaction.")
         : body.reason === "invalid_json"
           ? text("invalidJson", "Invalid JSON was not stored.")
           : body.reason === "request_body_not_read"
