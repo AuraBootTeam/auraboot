@@ -246,20 +246,47 @@ public class OpenPlatformManagementService {
 
     public List<CallAuditView> listCallAudits(String installationPid, String requestId,
                                               Integer status, int limit) {
+        return searchCallAudits(installationPid, requestId, status, limit, 0, null, null, "all", 24 * 30);
+    }
+
+    public List<CallAuditView> searchCallAudits(String installationPid, String requestId,
+            Integer status, int limit, int offset, String keyword, String method, String statusClass, int windowHours) {
         Long tenantId = requireTenant();
         ApplicationInstallation installation = requireInstallation(tenantId, installationPid);
         requireInstallationCapability(tenantId, installation, OpenPlatformApplicationRole::canReadOperations);
+        if (!Set.of("all", "error", "success").contains(statusClass)
+                || (method != null && !Set.of("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS").contains(method))
+                || windowHours < 1 || windowHours > 720 || limit < 1 || limit > 200 || offset < 0 || offset > 10000
+                || (keyword != null && keyword.length() > 200))
+            throw new BusinessException(ResponseCode.BadParam, "Invalid audit filters");
         String normalizedRequestId = requestId == null || requestId.isBlank() ? null : requestId.trim();
-        return auditMapper.findForOperations(tenantId, installationPid, normalizedRequestId, status,
-                        Math.max(1, Math.min(limit, 200))).stream()
+        String pattern = keyword == null || keyword.isBlank() ? null : "%" + keyword.trim()
+                .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+        return auditMapper.searchForOperations(tenantId, installationPid, normalizedRequestId, status,
+                pattern, method, statusClass, Instant.now().minus(windowHours, ChronoUnit.HOURS), limit, offset).stream()
                 .map(item -> new CallAuditView(item.getRequestId(), item.getHttpMethod(), item.getRequestPath(),
                         item.getResponseStatus(), item.getDurationMs(), item.getOccurredAt(),
                         auditText(item, "actorKind"), item.getApplicationPid(), item.getInstallationPid(),
                         auditText(item, "capability"), auditText(item, "resource"), auditText(item, "operation"),
                         auditText(item, "recordPid"), item.getBusinessDetails() != null
                             && item.getBusinessDetails().path("idempotentReplay").isBoolean()
-                            ? item.getBusinessDetails().path("idempotentReplay").booleanValue() : null))
+                            ? item.getBusinessDetails().path("idempotentReplay").booleanValue() : null, item.getPid()))
                 .toList();
+    }
+
+    public com.auraboot.framework.openplatform.dto.OpenPlatformDtos.CallAuditDetail getCallAuditDetail(
+            String installationPid, String auditPid) {
+        Long tenantId = requireTenant();
+        ApplicationInstallation installation = installationMapper.findByTenantAndPid(tenantId, installationPid);
+        if (installation == null) throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.NOT_FOUND, "Installation not found");
+        requireInstallationCapability(tenantId, installation, OpenPlatformApplicationRole::canManageRuntime);
+        var item = auditMapper.findDetail(tenantId, installationPid, auditPid);
+        if (item == null) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "Call audit not found");
+        return new com.auraboot.framework.openplatform.dto.OpenPlatformDtos.CallAuditDetail(
+                item.getPid(), item.getRequestId(), item.getHttpMethod(), item.getRequestPath(),
+                item.getResponseStatus(), item.getDurationMs(), item.getOccurredAt(), item.getRemoteAddress(),
+                item.getHttpDetails() == null ? "not_captured" : "captured", item.getHttpDetails());
     }
 
     private String auditText(com.auraboot.framework.openplatform.entity.OpenApiCallAudit item, String key) {

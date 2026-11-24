@@ -287,45 +287,19 @@ export class HeaderPage {
    */
   async logout(): Promise<void> {
     await this.openUserMenu();
-
-    const logoutVisible = await this.logoutLink.isVisible({ timeout: 3000 }).catch(() => false);
-    if (logoutVisible) {
-      await this.logoutLink.click();
-    } else {
-      // Fallback: try button with logout text
-      const logoutBtn = this.page.locator('button:has-text("退出")');
-      await logoutBtn.click();
-    }
-
-    if (!/\/login([?#].*)?$/.test(this.page.url())) {
-      const logoutButton = this.page
-        .locator('button:has-text("确认退出"), button:has-text("Log Out"), button[type="submit"]')
-        .first();
-      await expect(logoutButton).toBeVisible({ timeout: 10000 });
-      await logoutButton.scrollIntoViewIfNeeded();
+    await this.logoutLink.click();
+    // Wait for the selected destination before locating its confirmation form.
+    // A generic submit button on the departing page is not a logout control.
+    await this.page.waitForURL(url => /^\/(logout|login)(?:\/)?$/.test(url.pathname), { timeout: 10000 });
+    if (/\/logout(?:\/)?$/.test(new URL(this.page.url()).pathname)) {
+      await expect(this.page.getByRole('heading', { name: /^(退出登录|Log Out)$/ })).toBeVisible();
+      const confirmation = this.page.getByRole('button', { name: /^(确认退出|Log Out)$/ });
+      await expect(confirmation).toBeVisible();
       await Promise.all([
-        this.page.waitForURL(/\/login/, { timeout: 10000 }),
-        logoutButton.click().catch(async () => {
-          await this.page
-            .locator('form')
-            .first()
-            .evaluate((form) => {
-              if (form instanceof HTMLFormElement) {
-                form.requestSubmit();
-              }
-            });
-        }),
-      ]).catch(async () => {
-        await this.page
-          .locator('form')
-          .first()
-          .evaluate((form) => {
-            if (form instanceof HTMLFormElement) {
-              form.requestSubmit();
-            }
-          });
-        await this.page.waitForURL(/\/login/, { timeout: 10000 });
-      });
+        this.page.waitForURL(/\/login(?:[?#].*)?$/, { timeout: 10000 }),
+        confirmation.click(),
+      ]);
     }
+    await expect(this.page).toHaveURL(/\/login(?:[?#].*)?$/);
   }
 }

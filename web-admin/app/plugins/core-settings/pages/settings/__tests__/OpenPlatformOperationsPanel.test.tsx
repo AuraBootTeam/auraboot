@@ -76,3 +76,17 @@ describe('installation call audit receipts', () => {
     expect(screen.getByTestId('call-audit-accepted-help')).toHaveTextContent('HTTP 202 仅表示已接收');
   });
 });
+
+
+it('does not offer message access to an operations-only viewer', async () => {
+  state.rows = [{ ...accepted, auditPid: 'audit' }];
+  render(<OpenPlatformOperationsPanel installationPid="installation" canReadBodies={false} />);
+  await screen.findByTestId('open-platform-call-audit-entry');
+  expect(screen.queryByTestId('call-audit-messages-toggle')).not.toBeInTheDocument();
+});
+
+it('offers inline message disclosure to a runtime manager in the existing audit row', async () => {
+  state.rows = [{ ...accepted, auditPid: 'audit' }];
+  render(<OpenPlatformOperationsPanel installationPid="installation" canReadBodies />);
+  expect(await screen.findByTestId('call-audit-messages-toggle')).toHaveAttribute('aria-expanded', 'false');
+});

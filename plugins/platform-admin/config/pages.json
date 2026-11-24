@@ -513,52 +513,9 @@
       },
       {
         "id": "delivery_logs",
-        "blockType": "sub-table",
-        "title": {
-          "zh-CN": "投递日志",
-          "en-US": "Delivery Logs"
-        },
-        "childModel": "webhook_delivery_log",
-        "parentField": "subscription_pid",
-        "readOnly": true,
-        "columns": [
-          {
-            "field": "delivery_status",
-            "width": 100,
-            "renderType": "tag",
-            "dictCode": "webhook_delivery_status"
-          },
-          {
-            "field": "response_status",
-            "width": 100
-          },
-          {
-            "field": "event_id",
-            "width": 180
-          },
-          {
-            "field": "retry_count",
-            "width": 80
-          },
-          {
-            "field": "error_message",
-            "width": 250
-          },
-          {
-            "field": "delivered_at",
-            "width": 180,
-            "format": "YYYY-MM-DD HH:mm:ss"
-          },
-          {
-            "field": "created_at",
-            "width": 180,
-            "format": "YYYY-MM-DD HH:mm:ss"
-          }
-        ],
-        "defaultSort": {
-          "field": "created_at",
-          "order": "desc"
-        }
+        "blockType": "custom",
+        "component": "WebhookDeliveryHistory",
+        "layout": { "colSpan": 12 }
       }
     ]
   },

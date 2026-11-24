@@ -3616,6 +3616,32 @@
         },
         "type": "object"
       },
+      "ApiResponseCallAuditDetail": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CallAuditDetail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseCapabilityCatalog": {
         "properties": {
           "code": {
@@ -19339,12 +19365,53 @@
         },
         "type": "object"
       },
+      "CallAuditDetail": {
+        "properties": {
+          "auditPid": {
+            "type": "string"
+          },
+          "captureState": {
+            "type": "string"
+          },
+          "durationMs": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "httpDetails": {
+            "$ref": "#/components/schemas/JsonNode"
+          },
+          "method": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "remoteAddress": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "status": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "CallAuditView": {
         "properties": {
           "actorKind": {
             "type": "string"
           },
           "applicationPid": {
+            "type": "string"
+          },
+          "auditPid": {
             "type": "string"
           },
           "capability": {
@@ -56781,6 +56848,26 @@
         },
         "tags": [
           "automation-run-stream-controller"
+        ]
+      }
+    },
+    "/api/admin/bootstrap/platform-navigation/reconcile": {
+      "post": {
+        "operationId": "reconcile",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringBoolean"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "platform-navigation-maintenance-controller"
         ]
       }
     },
@@ -98113,6 +98200,51 @@
               "format": "int32",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "keyword",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "method",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "statusClass",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "windowHours",
+            "required": false,
+            "schema": {
+              "default": 24,
+              "format": "int32",
+              "type": "integer"
+            }
           }
         ],
         "responses": {
@@ -98121,6 +98253,44 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseListCallAuditView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "open-platform-management-controller"
+        ]
+      }
+    },
+    "/api/open-platform/installations/{installationPid}/audits/{auditPid}": {
+      "get": {
+        "operationId": "auditDetail",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "installationPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "auditPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCallAuditDetail"
                 }
               }
             },

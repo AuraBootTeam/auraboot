@@ -106,3 +106,14 @@ describe('SidebarSubmenu navigation', () => {
     );
   });
 });
+
+
+it('selects only the matching query-addressed platform section', () => {
+  render(<MemoryRouter initialEntries={['/settings/api-docs?view=applications']}><SidebarSubmenu name="Open Platform" submenu={[
+    {path:'/settings/api-docs?view=applications',name:'Applications'},
+    {path:'/settings/api-docs?view=webhooks',name:'Webhook deliveries'},
+  ]}/></MemoryRouter>);
+  expect(screen.getByRole('link',{name:'Applications'})).toHaveAttribute('aria-current','page');
+  expect(screen.getByRole('link',{name:'Webhook deliveries'})).not.toHaveClass('active');
+  expect(screen.getByRole('link',{name:'Webhook deliveries'})).not.toHaveAttribute('aria-current','page');
+});

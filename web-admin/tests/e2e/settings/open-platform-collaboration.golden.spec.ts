@@ -66,13 +66,11 @@ async function capture(page: Page, id: string) {
   await page.screenshot({ path: path.join(EVIDENCE_DIR, `${id}.png`), fullPage: true });
 }
 
-async function openAccountMenu(page: Page) {
+async function openPlatformMenu(page: Page) {
   await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true', {
     timeout: 15_000,
   });
-  const userMenu = page.getByTestId('user-menu');
-  await userMenu.getByRole('button', { name: /User avatar/ }).click();
-  await expect(userMenu.getByTestId('user-dropdown')).toBeVisible();
+  await expect(page.getByTestId('sidebar').locator('a[href="/settings/api-docs?view=applications"]')).toBeVisible();
 }
 
 async function dismissToasts(page: Page) {
@@ -167,10 +165,10 @@ test.describe('Open Platform collaboration golden states', () => {
     await page.goto('/');
     await expect(page).not.toHaveURL(/\/login|\/setup/);
     await expect(page.locator('.animate-spin')).toHaveCount(0, { timeout: 15_000 });
-    await openAccountMenu(page);
-    await expect(page.getByTestId('open-platform-link')).toBeVisible();
+    await openPlatformMenu(page);
+    await expect(page.getByTestId('sidebar').locator('a[href="/settings/api-docs?view=applications"]')).toBeVisible();
     await capture(page, 'OPC-UI-01');
-    await page.getByTestId('open-platform-link').click();
+    await page.getByTestId('sidebar').locator('a[href="/settings/api-docs?view=applications"]').click();
     await expect(page.getByTestId('open-platform-page')).toBeVisible();
     await expect(
       page
