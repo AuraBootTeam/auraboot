@@ -23,7 +23,7 @@ import static com.auraboot.framework.saas.executor.SystemTenantContextExecutor.S
 @RequirePlatformAdmin
 @DisallowImpersonation
 @RequiredArgsConstructor
-@RequestMapping("/api/admin/platform/navigation")
+@RequestMapping("/api/admin/bootstrap/platform-navigation")
 public class PlatformNavigationMaintenanceController {
     private final PlatformConsoleMenuBootstrap menus;
     private final AdminRoleChecker roles;
