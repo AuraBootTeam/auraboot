@@ -682,6 +682,8 @@ export interface RowExpansionConfig {
 export interface TableConfig {
   /** Render the block title and existing block buttons together above the rows. */
   showTitle?: boolean;
+  /** Optional panel minimum height, including heading, for balanced master-detail layouts. */
+  minHeight?: number;
   rowKey?: string;
   dataSource?: string;
   maxHeight?: number | string;

@@ -1563,7 +1563,7 @@ const TableBlockBodyRenderer: React.FC<TableBlockRendererProps> = ({ block, runt
               >
                 <span className="min-w-0 break-words">{String(row?.[labelField] ?? '')}</span>
                 {countField && (
-                  <span className="text-text-3 shrink-0 text-xs tabular-nums">
+                  <span className="bg-subtle text-text-2 shrink-0 rounded-full px-2 py-0.5 text-xs tabular-nums">
                     {String(row?.[countField] ?? 0)}
                   </span>
                 )}
@@ -1846,10 +1846,10 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     !sourceState?.error &&
     !sourceState?.loading;
   return (
-    <>
+    <div style={block.table?.minHeight ? { minHeight: block.table.minHeight } : undefined}>
       {block.table?.showTitle && (
         <div
-          className="border-border flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3"
+          className="border-border flex flex-wrap items-center justify-between gap-3 border-b px-4 py-4"
           data-testid="table-panel-heading"
         >
           <h2 className="text-text min-w-0 text-sm font-semibold break-words">
@@ -1877,7 +1877,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
         </div>
       )}
       <TableBlockBodyRenderer block={block} runtime={runtime} />
-    </>
+    </div>
   );
 };
 

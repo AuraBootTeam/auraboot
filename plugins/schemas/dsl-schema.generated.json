@@ -2253,6 +2253,10 @@
           "type": "boolean",
           "description": "Render the block title and existing block buttons together above the rows."
         },
+        "minHeight": {
+          "type": "number",
+          "description": "Optional panel minimum height, including heading, for balanced master-detail layouts."
+        },
         "rowKey": {
           "type": "string",
           "minLength": 1
