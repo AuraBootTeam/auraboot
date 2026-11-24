@@ -58,6 +58,8 @@ export interface PageExtensionConfig {
   [key: string]: any;
   workspaceShell?: WorkspaceShellConfig;
   uxProfile?: PageUxProfile | string;
+  /** Custom composed lists may supply their own individual panel surfaces. */
+  resultsSurface?: 'panel' | 'canvas';
   detailBodyGroups?: DetailBodyGroupConfig[];
   detailHeaderLayout?: LayoutConfig;
   detailBodyOrder?: 'schema';
@@ -700,6 +702,8 @@ export interface RowExpansionConfig {
 }
 
 export interface TableConfig {
+  /** Render the block title and existing block buttons together above the rows. */
+  showTitle?: boolean;
   rowKey?: string;
   dataSource?: string;
   maxHeight?: number | string;
@@ -732,6 +736,8 @@ export interface TableConfig {
 export interface PaginationConfig {
   /** Explicit opt-in for paged API data sources on a table block. */
   mode?: 'server';
+  /** Hide pagination only on the first page when the entire result fits. */
+  hideOnSinglePage?: boolean;
   /** Use the declared response field; request parameters remain pageNum/pageSize. */
   pageField?: 'pageNum' | 'current' | 'page';
   pageSize?: number;
@@ -757,7 +763,10 @@ export interface SelectionConfig {
    * Renders exclusive multiple-selection rows as one decision card per group.
    * The bound value remains an array containing at most one row per group.
    */
-  presentation?: 'table' | 'grouped-radio';
+  presentation?: 'table' | 'grouped-radio' | 'navigation';
+  labelField?: string;
+  countField?: string;
+  searchPlaceholder?: string | LocalizedText;
   /**
    * Field whose value defines an exclusive selection group. In multiple mode,
    * selecting another row with the same value replaces the previous row.

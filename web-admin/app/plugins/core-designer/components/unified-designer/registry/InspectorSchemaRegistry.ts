@@ -400,6 +400,9 @@ const columnFields: PropertySchema<string>[] = [
 ];
 
 const tableFields: PropertySchema<string>[] = [
+  { key: 'table.showTitle', label: 'Show panel heading', type: 'boolean' },
+  { key: 'table.selection', label: 'Selection and navigation JSON', type: 'json' },
+  { key: 'table.pagination', label: 'Pagination JSON', type: 'json' },
   { key: 'title', label: 'Title', type: 'localizedText' },
   { key: 'dataSource.model', label: 'Model', type: 'model' },
   { key: 'props.rows', label: 'Preview rows JSON', type: 'json' },
