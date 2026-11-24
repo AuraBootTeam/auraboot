@@ -836,7 +836,7 @@ export default function OpenPlatformPage() {
                       )}
                       {application.permissions.readOperations &&
                         operationsInstallation === installation.pid && (
-                          <OpenPlatformOperationsPanel installationPid={installation.pid} />
+                          <OpenPlatformOperationsPanel installationPid={installation.pid} canReadBodies={application.permissions.manageRuntime} />
                         )}
                       {access.platformAdmin &&
                         application.permissions.manageRuntime &&

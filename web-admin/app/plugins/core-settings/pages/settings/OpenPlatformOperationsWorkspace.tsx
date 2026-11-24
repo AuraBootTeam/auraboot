@@ -1,5 +1,5 @@
 import { Link, useNavigation, useSearchParams } from "react-router";
-import { useAuditText } from "~/ui/smart/diagnostics/HttpAuditInspector";
+import { useAuditText } from "./open-platform-text";
 import OpenPlatformOperationsPanel from "./OpenPlatformOperationsPanel";
 
 export interface OperationsApplication {

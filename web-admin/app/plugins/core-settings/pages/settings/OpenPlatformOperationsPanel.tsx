@@ -4,6 +4,7 @@ import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { openPlatformApiFetch as apiFetch } from './open-platform-api';
+import { CallAuditMessageDetails } from './CallAuditMessageDetails';
 
 interface Overview {
   windowHours: number;
@@ -15,6 +16,7 @@ interface Overview {
   deadLetterCount: number;
 }
 interface Audit {
+  auditPid?: string;
   requestId: string;
   method: string;
   path: string;
@@ -60,9 +62,11 @@ interface WebhookHealth {
 export default function OpenPlatformOperationsPanel({
   installationPid,
   deliveriesOnly = false,
+  canReadBodies = false,
 }: {
   installationPid: string;
   deliveriesOnly?: boolean;
+  canReadBodies?: boolean;
 }) {
   const { t, locale } = useI18n();
   const { showToast } = useToastContext();
@@ -276,6 +280,9 @@ export default function OpenPlatformOperationsPanel({
                           {formatTime(audit.occurredAt, locale)} · {audit.durationMs} ms
                         </span>
                       </div>
+                      {canReadBodies && audit.auditPid && (
+                        <CallAuditMessageDetails key={`${installationPid}/${audit.auditPid}`} installationPid={installationPid} auditPid={audit.auditPid} />
+                      )}
                     </div>
                   ))}
                 </div>

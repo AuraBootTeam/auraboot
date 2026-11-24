@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { HttpMessageDetails, storedHttpBody } from '~/ui/smart/diagnostics/HttpMessageDetails';
 import {
   PlusIcon,
   PencilIcon,
@@ -387,35 +388,14 @@ function DeliveryLogRow({ log }: { log: DeliveryLog }) {
               <span className="text-red-600 dark:text-red-400">{log.errorMessage}</span>
             </div>
           )}
-          {log.requestBody && (
-            <div>
-              <span className="mb-1 block font-medium text-gray-500">Request Body:</span>
-              <pre className="overflow-x-auto rounded bg-gray-100 p-2 text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                {tryPrettyJson(log.requestBody)}
-              </pre>
-            </div>
-          )}
-          {log.responseBody && (
-            <div>
-              <span className="mb-1 block font-medium text-gray-500">Response Body:</span>
-              <pre className="overflow-x-auto rounded bg-gray-100 p-2 text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                {tryPrettyJson(log.responseBody)}
-              </pre>
-            </div>
-          )}
+          <HttpMessageDetails request={storedHttpBody(log.requestBody)} response={storedHttpBody(log.responseBody)} />
         </div>
       )}
     </div>
   );
 }
 
-function tryPrettyJson(s: string) {
-  try {
-    return JSON.stringify(JSON.parse(s), null, 2);
-  } catch {
-    return s;
-  }
-}
+
 
 // ─── Event Type Badge ─────────────────────────────────────────────────────────
 
