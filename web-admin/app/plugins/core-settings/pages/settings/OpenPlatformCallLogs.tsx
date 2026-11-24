@@ -40,11 +40,13 @@ export default function OpenPlatformCallLogs({
   applicationName,
   environment,
   canReadPayload,
+  contextPending = false,
 }: {
   installationPid: string;
   applicationName: string;
   environment: string;
   canReadPayload: boolean;
+  contextPending?: boolean;
 }) {
   const text = useAuditText();
   const { locale } = useI18n();
@@ -184,7 +186,7 @@ export default function OpenPlatformCallLogs({
   return (
     <section
       className="min-w-0 space-y-4"
-      data-testid="open-platform-call-logs"
+      data-testid="open-platform-call-logs" inert={contextPending || undefined} aria-busy={contextPending || loading}
     >
       <div
         className="rounded-card border-border bg-panel grid grid-cols-2 gap-y-4 border py-4 lg:grid-cols-4"
@@ -227,7 +229,7 @@ export default function OpenPlatformCallLogs({
             <MagnifyingGlassIcon className="text-text-3 absolute top-2 start-2 h-4 w-4" />
             <input
               className={`${control} w-full ps-8`}
-              aria-label={text("search", "Search request ID or API path")}
+              disabled={contextPending} aria-label={text("search", "Search request ID or API path")}
               placeholder={text("search", "Search request ID or API path")}
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
@@ -357,7 +359,7 @@ export default function OpenPlatformCallLogs({
                 </div>
               ) : (
                 <div className="max-h-[min(640px,calc(100dvh-24rem))] min-w-0 overflow-auto">
-                  <table className="w-full text-start text-xs">
+                  <table className="w-full min-w-[520px] table-fixed text-start text-xs xl:min-w-0"><colgroup><col className="w-[34%]"/><col className="w-[34%]"/><col className="w-[20%]"/><col className="w-[12%]"/></colgroup>
                     <thead className="bg-subtle text-text-3">
                       <tr>
                         {[
@@ -406,7 +408,7 @@ export default function OpenPlatformCallLogs({
                               </code>
                             </button>
                           </td>
-                          <td className="max-w-64 min-w-36 px-4 py-3">
+                          <td className="min-w-0 px-3 py-3">
                             <span className="text-accent bg-accent-weak rounded-control inline-block px-1.5 py-0.5 font-mono text-[11px]">
                               {audit.method}
                             </span>
@@ -420,7 +422,7 @@ export default function OpenPlatformCallLogs({
                           <td className="px-4 py-3">
                             <HttpStatus status={audit.status} />
                           </td>
-                          <td className="text-text-2 px-4 py-3 text-end whitespace-nowrap tabular-nums">
+                          <td className="text-text-2 px-2 py-3 text-end text-[11px] whitespace-nowrap tabular-nums">
                             {audit.durationMs} ms
                           </td>
                         </tr>

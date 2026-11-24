@@ -1,4 +1,4 @@
-import { Link, useSearchParams } from "react-router";
+import { Link, useNavigation, useSearchParams } from "react-router";
 import { useAuditText } from "~/ui/smart/diagnostics/HttpAuditInspector";
 import OpenPlatformCallLogs from "./OpenPlatformCallLogs";
 import OpenPlatformOperationsPanel from "./OpenPlatformOperationsPanel";
@@ -51,6 +51,8 @@ export default function OpenPlatformOperationsWorkspace({
 }) {
   const text = useAuditText();
   const [params, setParams] = useSearchParams();
+  const navigation = useNavigation();
+  const contextPending = navigation.state !== "idle";
   const view = params.get("view") === "webhooks" ? "webhooks" : "calls";
   const readable = applications.filter(
     (application) => application.permissions.readOperations,
@@ -155,7 +157,7 @@ export default function OpenPlatformOperationsWorkspace({
               <select
                 className="rounded-control border-border-strong bg-panel h-8 max-w-64 border px-3 text-xs"
                 aria-label={text("app", "Application")}
-                value={selectedApplication.pid}
+                disabled={contextPending} value={selectedApplication.pid}
                 onChange={(event) => selectApplication(event.target.value)}
               >
                 {readable.map((application) => (
@@ -171,7 +173,7 @@ export default function OpenPlatformOperationsWorkspace({
                 className="rounded-control border-border-strong bg-panel h-8 max-w-64 border px-3 text-xs"
                 aria-label={text("environment", "Environment")}
                 value={installation?.pid ?? ""}
-                disabled={!installations.length}
+                disabled={!installations.length || contextPending}
                 onChange={(event) => selectInstallation(event.target.value)}
               >
                 {installations.map((item) => (
@@ -209,7 +211,7 @@ export default function OpenPlatformOperationsWorkspace({
               installationPid={installation.pid}
               applicationName={selectedApplication.name}
               environment={environmentLabel(installation.environment)}
-              canReadPayload={selectedApplication.permissions.manageRuntime}
+              contextPending={contextPending} canReadPayload={selectedApplication.permissions.manageRuntime}
             />
           ) : (
             <OpenPlatformOperationsPanel

@@ -73,6 +73,13 @@ export function HttpAuditInspector({
     heading.current?.focus();
   }, [detail.auditPid]);
   const { formatDate } = useDateFormat();
+  const [feedback, setFeedback] = useState('');
+  const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (feedbackTimer.current) clearTimeout(feedbackTimer.current); }, []);
+  const notify = (message: string) => {
+    if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
+    setFeedback(message); feedbackTimer.current = setTimeout(() => setFeedback(''), 2000);
+  };
   const data = detail.httpDetails;
   const occurred = formatDate(detail.occurredAt, {
     dateStyle: "short",
@@ -81,7 +88,7 @@ export function HttpAuditInspector({
   const copy = async (value: string) => {
     try {
       await navigator.clipboard.writeText(value);
-      showToast(text("copied", "Redacted content copied"), "success");
+      notify(text("copied", "Redacted content copied"));
     } catch {
       showToast(
         text(
@@ -98,8 +105,13 @@ export function HttpAuditInspector({
         ? JSON.stringify(data.request.body)
         : null;
     const shellQuote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(data?.query ?? {})) {
+      for (const item of Array.isArray(value) ? value : [value]) query.append(key, String(item));
+    }
+    const querySuffix = query.size ? '?' + query.toString() : '';
     // A template only: it deliberately contains neither a live origin nor credentials.
-    return `curl -X ${detail.method} ${shellQuote("https://api.example.com" + detail.path)} \\\n  -H 'Authorization: Bearer <YOUR_ACCESS_TOKEN>'${body ? " \\\n  -H 'Content-Type: application/json' \\\n  --data-raw " + shellQuote(body) : ""}`;
+    return `curl -X ${detail.method} ${shellQuote("https://api.example.com" + detail.path + querySuffix)} \\\n  -H 'Authorization: Bearer <YOUR_ACCESS_TOKEN>'${body ? " \\\n  -H 'Content-Type: application/json' \\\n  --data-raw " + shellQuote(body) : ""}`;
   };
   const download = () => {
     const content = {
@@ -117,7 +129,7 @@ export function HttpAuditInspector({
     anchor.download = `api-call-${detail.auditPid}-redacted.json`;
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    showToast(text("downloaded", "Redacted record downloaded"), "success");
+    notify(text("downloaded", "Redacted record downloaded"));
   };
   const stateText = (body: HttpBodyCapture) =>
     body.state === "empty"
@@ -187,7 +199,7 @@ export function HttpAuditInspector({
               type="button"
               className="text-accent text-xs disabled:opacity-50"
               onClick={() => void copy(curl())}
-              disabled={body.state !== "captured" && body.state !== "empty"}
+              disabled={(body.state !== "captured" && body.state !== "empty") || data.queryState !== "captured"}
               data-testid="copy-curl"
             >
               {text("copyCurl", "Copy cURL template")}
@@ -431,9 +443,7 @@ export function HttpAuditInspector({
         )}
       </div>
       <footer className="border-border mt-auto flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3">
-        <span className="text-text-3 text-xs">
-          {text("tenantOnly", "Current tenant only")}
-        </span>
+        <span className="text-text-3 text-xs" role="status">{feedback || text("tenantOnly", "Current tenant only")}</span>
         <button
           type="button"
           className={button}

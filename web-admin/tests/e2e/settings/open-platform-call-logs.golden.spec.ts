@@ -217,7 +217,11 @@ async function navigate(
   await nav.getByRole("link", { name: "接口调用日志", exact: true }).click();
   await expect(page.getByTestId("open-platform-call-logs")).toBeVisible();
   await page.getByLabel("应用", { exact: true }).selectOption({ label: name });
+  await expect(page).toHaveURL(/[?&]application=/);
+  await expect(page.getByLabel('环境', { exact: true })).toBeEnabled();
   await page.getByLabel("环境", { exact: true }).selectOption(installation);
+  await expect(page).toHaveURL(new RegExp(`[?&]installation=${installation}`));
+  await expect(page.getByRole('textbox', { name: '搜索请求 ID 或接口路径', exact: true })).toBeEnabled();
   await expect(page.getByLabel("应用", { exact: true }).locator("option:checked")).toHaveText(name);
 }
 async function choose(page: Page, id: string) {
@@ -578,6 +582,10 @@ test.describe
     await expect(inspector.getByTestId("request-body-state")).toContainText(
       "未携带正文",
     );
+    await inspector.getByTestId('copy-curl').click();
+    const getTemplate = await page.evaluate(() => navigator.clipboard.readText());
+    expect(getTemplate).toContain('reference=READABLE');
+    expect(getTemplate).not.toContain('private-query-token');
     await capture(page, "LOG03");
     await inspector
       .getByRole("button", { name: "关闭详情", exact: true })
