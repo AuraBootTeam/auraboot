@@ -401,6 +401,7 @@ const columnFields: PropertySchema<string>[] = [
 
 const tableFields: PropertySchema<string>[] = [
   { key: 'table.showTitle', label: 'Show panel heading', type: 'boolean' },
+  { key: 'table.minHeight', label: 'Panel minimum height (px)', type: 'number' },
   { key: 'table.selection', label: 'Selection and navigation JSON', type: 'json' },
   { key: 'table.pagination', label: 'Pagination JSON', type: 'json' },
   { key: 'title', label: 'Title', type: 'localizedText' },
