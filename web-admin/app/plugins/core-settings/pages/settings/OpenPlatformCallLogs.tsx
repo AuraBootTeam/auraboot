@@ -70,12 +70,13 @@ export default function OpenPlatformCallLogs({
   const { formatDate } = useDateFormat();
   const trigger = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
+    if (keyword === search) return;
     const timer = setTimeout(() => {
       setSearch(keyword);
       setPage(0);
     }, 250);
     return () => clearTimeout(timer);
-  }, [keyword]);
+  }, [keyword, search]);
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
@@ -355,7 +356,7 @@ export default function OpenPlatformCallLogs({
                   </button>
                 </div>
               ) : (
-                <div className="min-w-0 overflow-x-auto">
+                <div className="max-h-[min(640px,calc(100dvh-24rem))] min-w-0 overflow-auto">
                   <table className="w-full text-start text-xs">
                     <thead className="bg-subtle text-text-3">
                       <tr>
@@ -441,7 +442,7 @@ export default function OpenPlatformCallLogs({
                   <button
                     type="button"
                     className={control}
-                    disabled={!page || loading}
+                    disabled={!page || loading || keyword !== search}
                     onClick={() => setPage((value) => value - 1)}
                     aria-label={text("previous", "Previous page")}
                   >
@@ -451,7 +452,7 @@ export default function OpenPlatformCallLogs({
                   <button
                     type="button"
                     className={control}
-                    disabled={!hasMore || loading || error}
+                    disabled={!hasMore || loading || error || keyword !== search}
                     onClick={() => setPage((value) => value + 1)}
                     aria-label={text("next", "Next page")}
                   >
@@ -464,6 +465,7 @@ export default function OpenPlatformCallLogs({
           {selected &&
             (detailState === "ready" && detail ? (
               <HttpAuditInspector
+                className="max-h-[max(480px,calc(100dvh-24rem))]"
                 detail={detail}
                 onClose={close}
                 expanded={expanded}

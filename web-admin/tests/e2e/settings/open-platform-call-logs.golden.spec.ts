@@ -143,10 +143,10 @@ async function login(
     },
     { name: "locale", value: locale, url: BASE_URL, sameSite: "Lax" },
   ]);
-  await page.addInitScript(
-    (locale) => localStorage.setItem("locale", locale),
-    locale,
-  );
+  await page.addInitScript(() => {
+    const locale = document.cookie.match(/(?:^|; )locale=([^;]+)/)?.[1];
+    if (locale) localStorage.setItem('locale', decodeURIComponent(locale));
+  });
   return {
     jwt: selected.jwt as string,
     tenantId: String(business.tenantId),
@@ -502,6 +502,9 @@ test.describe
       }),
     ).toBeVisible();
     await capture(page, "LOG14");
+    await page.getByRole('button', { name: '上一页', exact: true }).click();
+    await expect(page.getByTestId('open-platform-call-logs').locator('tbody tr')).toHaveCount(25);
+    await page.getByRole('button', { name: '下一页', exact: true }).click();
     await choose(page, createRequestId);
     const inspector = page.getByTestId("http-audit-inspector");
     await expect(inspector.getByTestId("http-request")).toContainText(
@@ -522,6 +525,21 @@ test.describe
     expect(curl).toContain("api.example.com");
     expect(curl).toContain("<YOUR_ACCESS_TOKEN>");
     expect(curl.includes(machineToken), "cURL must not contain the live token").toBe(false);
+    await inspector.getByRole('button', { name: '复制请求体', exact: true }).click();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(`UI-${tag}`);
+    await inspector.getByRole('button', { name: '复制响应体', exact: true }).click();
+    const copiedResponse = JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
+    expect(copiedResponse.assetCode).toBe(`UI-${tag}`);
+    await inspector.getByRole('button', { name: '复制请求 ID', exact: true }).click();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(createRequestId);
+    await inspector.getByTestId('response-headers').locator('summary').click();
+    await expect(inspector.getByTestId('response-headers')).toContainText('application/json');
+    const requestBody = inspector.getByTestId('http-request').locator('details').last();
+    await requestBody.locator('summary').click();
+    await expect(inspector.getByRole('button', { name: '复制请求体', exact: true })).toBeHidden();
+    await requestBody.locator('summary').click();
+    await inspector.getByRole('button', { name: '还原详情宽度', exact: true }).click();
+    await inspector.getByRole('button', { name: '展开详情', exact: true }).click();
     const downloadPromise = page.waitForEvent("download");
     await inspector.getByTestId("download-http-audit").click();
     const download = await downloadPromise;
@@ -536,6 +554,10 @@ test.describe
     expect(JSON.stringify(artifact).includes(machineToken), "Download must not contain the live token").toBe(false);
     await inspector.getByRole("tab", { name: "执行信息", exact: true }).click();
     await expect(inspector).toContainText(appName);
+    await inspector.getByRole('tab', { name: '执行信息', exact: true }).press('ArrowLeft');
+    await expect(inspector.getByRole('tab', { name: '请求与响应', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await inspector.getByRole('tab', { name: '请求与响应', exact: true }).press('ArrowRight');
+    await expect(inspector.getByRole('tab', { name: '执行信息', exact: true })).toHaveAttribute('aria-selected', 'true');
     await capture(page, "LOG13");
     await inspector
       .getByRole("button", { name: "关闭详情", exact: true })
@@ -595,6 +617,9 @@ test.describe
     await expect(
       page.getByTestId("open-platform-call-logs").locator("tbody tr"),
     ).toHaveCount(25);
+    await page.getByRole('button', { name: '2', exact: true }).click();
+    await expect(page.getByLabel('调用状态', { exact: true })).toHaveValue('error');
+    await page.getByRole('button', { name: '重置', exact: true }).click();
     await page.getByLabel("请求方法", { exact: true }).selectOption("POST");
     await expect(
       page.getByTestId("open-platform-call-logs").locator("tbody tr"),

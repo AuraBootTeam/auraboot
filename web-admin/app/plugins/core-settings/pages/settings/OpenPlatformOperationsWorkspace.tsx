@@ -85,7 +85,7 @@ export default function OpenPlatformOperationsWorkspace({
         : text("development", "Development");
   return (
     <main
-      className="mx-auto min-w-0 max-w-[1800px] space-y-5 p-4 sm:p-6"
+      className="mx-auto w-full min-w-0 max-w-[1800px] space-y-5 p-4 sm:p-6"
       data-testid="open-platform-page"
     >
       <header>

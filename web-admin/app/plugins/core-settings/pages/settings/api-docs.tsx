@@ -420,7 +420,7 @@ export default function OpenPlatformPage() {
   };
 
   if (['calls', 'webhooks'].includes(viewParams.get('view') ?? '')) {
-    return <OpenPlatformOperationsWorkspace applications={applications} loading={loading} error={error} onRetry={() => void load()} />;
+    return <OpenPlatformOperationsWorkspace applications={applications} loading={loading && applications.length === 0} error={error} onRetry={() => void load()} />;
   }
 
   return (

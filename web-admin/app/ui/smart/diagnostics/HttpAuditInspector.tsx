@@ -49,6 +49,7 @@ const button =
 /** Shared diagnostic viewer. All data must already be redacted and authorized by the server. */
 export function HttpAuditInspector({
   detail,
+  className = "",
   onClose,
   expanded,
   onExpand,
@@ -56,6 +57,7 @@ export function HttpAuditInspector({
   environment,
 }: {
   detail: HttpAuditDetail;
+  className?: string;
   onClose: () => void;
   expanded: boolean;
   onExpand: () => void;
@@ -258,7 +260,7 @@ export function HttpAuditInspector({
   }
   return (
     <aside
-      className="border-border-strong bg-panel flex min-w-0 flex-col border-s"
+      className={`border-border-strong bg-panel flex min-w-0 flex-col border-s ${className}`}
       aria-label={text("callDetail", "Call details")}
       data-testid="http-audit-inspector"
       onKeyDown={(event) => {
@@ -304,7 +306,7 @@ export function HttpAuditInspector({
           </button>
         </div>
       </header>
-      <div className="min-w-0 px-5 pb-4">
+      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-5 pb-4">
         <div className="text-text-2 mb-3 flex min-w-0 items-start gap-2">
           <span className="bg-accent-weak text-accent rounded-control px-1.5 py-0.5 font-mono text-xs">
             {detail.method}
