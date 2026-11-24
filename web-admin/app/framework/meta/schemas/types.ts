@@ -634,7 +634,7 @@ export interface ButtonConfig {
   label?: string | LocalizedText;
   primary?: boolean;
   danger?: boolean;
-  variant?: 'default' | 'primary' | 'danger';
+  variant?: 'default' | 'primary' | 'danger' | 'link';
   icon?: string;
   /**
    * Row actions only — render this button inline in the action column instead of
