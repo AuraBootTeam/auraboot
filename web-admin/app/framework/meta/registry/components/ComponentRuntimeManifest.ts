@@ -24,6 +24,7 @@ function runtime(
 }
 
 export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> = {
+  webhookdeliveryhistory: runtime('admin', 'WebhookDeliveryHistory', { aliases: ['webhook-delivery-history'] }),
   skilldefinitioneditor: runtime('agent', 'SkillDefinitionEditor', { aliases: ['SkillDefinitionEditor'] }),
   openapiactionpublicationeditor: runtime('admin', 'OpenApiActionPublicationEditor', { aliases: ['open-api-action-publication-editor'] }),
   openapipublicationeditor: runtime('admin', 'OpenApiPublicationEditor', { aliases: ['open-api-publication-editor'] }),
