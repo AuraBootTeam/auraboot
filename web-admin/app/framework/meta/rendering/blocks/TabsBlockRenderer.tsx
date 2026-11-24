@@ -25,13 +25,14 @@ export const TabsBlockRenderer: React.FC<TabsBlockRendererProps> = ({ block, run
   );
   const [selectedKey, setSelectedKey] = useState<string | undefined>();
   const activeTab = Math.max(0, tabs.findIndex((tab) => tab.key === selectedKey));
+  const card = block.surface === 'card';
 
   return (
-    <div className="tabs-block">
+    <div className={card ? 'tabs-block rounded-lg border border-border bg-panel' : 'tabs-block'}>
       {/* Tab headers */}
       <div className="border-border min-w-0 border-b">
         <nav
-          className="-mb-px flex min-h-11 max-w-full gap-6 overflow-x-auto overscroll-x-contain px-1 [scrollbar-width:thin]"
+          className={`-mb-px flex min-h-11 max-w-full gap-6 overflow-x-auto overscroll-x-contain [scrollbar-width:thin] ${card ? 'px-4' : 'px-1'}`}
           role="tablist"
           aria-label={getLocalizedText({ 'zh-CN': '页签', en: 'Tabs' }, locale, t)}
         >
@@ -58,7 +59,7 @@ export const TabsBlockRenderer: React.FC<TabsBlockRendererProps> = ({ block, run
       </div>
 
       {/* Tab content */}
-      <div className={runtime.getSchema?.().kind === 'form' ? 'mt-4 space-y-4' : 'mt-4'}>
+      <div className={card ? 'min-w-0 p-4' : runtime.getSchema?.().kind === 'form' ? 'mt-4 space-y-4' : 'mt-4'}>
         {tabs[activeTab]?.blocks?.map((nestedBlock: BlockConfig, index: number) => (
           <BlockRenderer
             key={nestedBlock.id || index}

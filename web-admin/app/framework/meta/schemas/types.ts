@@ -203,6 +203,8 @@ export interface BlockConfig {
   previewLimit?: number;
 
   // List tabs
+  /** Optional unified panel around tab navigation and its content. */
+  surface?: 'bare' | 'card';
   tabs?: ListTabConfig[] | DetailTabConfig[];
 
   // Sub-table (master-detail)

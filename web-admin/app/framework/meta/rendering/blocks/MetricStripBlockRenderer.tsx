@@ -330,7 +330,7 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
       <div
         className={
           overview
-            ? `rounded-lg border border-border bg-panel grid ${configuredCardGridClass(cardColumns || 3)}`
+            ? `overflow-hidden rounded-lg border border-border bg-panel grid ${configuredCardGridClass(cardColumns || 3)}`
             : variant === 'chips'
             ? 'flex flex-wrap gap-2'
             : cardColumns
