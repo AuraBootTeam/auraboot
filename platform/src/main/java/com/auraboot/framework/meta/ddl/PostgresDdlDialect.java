@@ -70,6 +70,38 @@ public class PostgresDdlDialect implements DdlDialect {
         }
     }
 
+    private static final java.util.regex.Pattern BARE_IDENTIFIER = java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+
+    @Override
+    public String getAlterColumnTypeUsing(String columnName, String currentType, String targetType) {
+        // The column name comes from field metadata and is written into SQL as it is.
+        if (columnName == null || !BARE_IDENTIFIER.matcher(columnName).matches()) {
+            throw new IllegalArgumentException("Column name is not a bare identifier: " + columnName);
+        }
+        String from = normalizeType(currentType);
+        String to = normalizeType(targetType);
+        if ("JSONB".equals(to) && isCharacterType(from)) {
+            // PostgreSQL has no assignment cast from a character type to jsonb. An empty string
+            // becomes NULL; any other value has to be valid JSON, or the statement fails as a
+            // whole and the column is left as it was.
+            return " USING NULLIF(" + columnName + ", '')::jsonb";
+        }
+        if (isCharacterType(to) && "JSONB".equals(from)) {
+            return " USING " + columnName + "::" + targetType.trim();
+        }
+        return "";
+    }
+
+    /** Same shape as the schema service's comparison: upper case, VARCHAR for CHARACTER VARYING, no blanks. */
+    private static String normalizeType(String type) {
+        return type == null ? "" : type.trim().toUpperCase(Locale.ROOT).replace("CHARACTER VARYING", "VARCHAR").replaceAll("\\s+", "");
+    }
+
+    private static boolean isCharacterType(String type) {
+        return type.startsWith("VARCHAR") || type.startsWith("CHARACTER") || type.startsWith("CHAR(")
+                || "CHAR".equals(type) || "TEXT".equals(type);
+    }
+
     @Override
     public String formatDefaultValue(Object defaultValue, String dataType) {
         if (defaultValue == null) {

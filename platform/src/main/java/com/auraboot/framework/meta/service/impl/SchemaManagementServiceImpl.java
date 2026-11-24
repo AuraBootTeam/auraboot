@@ -713,10 +713,12 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                 // PostgreSQL需要分多个语句修改列
                 List<String> ddls = new ArrayList<>();
                 
-                // 修改数据类型
+                // 修改数据类型。PostgreSQL 对字符类型→jsonb 没有赋值转换,需要 USING 子句(由方言给出)
                 String dataType = dialect.mapDataType(field);
-                ddls.add(String.format("ALTER TABLE %s ALTER COLUMN %s TYPE %s", 
-                        tableName, columnName, dataType));
+                String currentType = tableMetadataService.getColumnTypeDefinition(tableName, columnName);
+                ddls.add(String.format("ALTER TABLE %s ALTER COLUMN %s TYPE %s%s",
+                        tableName, columnName, dataType,
+                        alterColumnTypeUsing(dialect, columnName, currentType, dataType)));
                 
                 // 修改NOT NULL约束
                 // Transient fields are never INSERTed, so they must stay nullable — this also
@@ -1239,10 +1241,14 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
             }
 
             String expectedType = canonicalizeColumnType(ddlDialectProvider.getDialect().mapDataType(field));
-            String actualType = canonicalizeColumnType(tableMetadataService.getColumnTypeDefinition(tableName, columnName));
+            String currentType = tableMetadataService.getColumnTypeDefinition(tableName, columnName);
+            String actualType = canonicalizeColumnType(currentType);
             if (expectedType != null && actualType != null && !expectedType.equals(actualType)) {
-                ddlStatements.add(String.format("ALTER TABLE %s ALTER COLUMN %s TYPE %s",
-                        tableName, columnName, ddlDialectProvider.getDialect().mapDataType(field)));
+                // PostgreSQL 对字符类型→jsonb 没有赋值转换,需要 USING 子句(由方言给出)
+                DdlDialect dialect = ddlDialectProvider.getDialect();
+                String dataType = dialect.mapDataType(field);
+                ddlStatements.add(String.format("ALTER TABLE %s ALTER COLUMN %s TYPE %s%s",
+                        tableName, columnName, dataType, alterColumnTypeUsing(dialect, columnName, currentType, dataType)));
             }
 
             boolean expectedNullable = !physicalRequired(tableName, field);
@@ -1279,6 +1285,15 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
         }
 
         return ddlStatements;
+    }
+
+    /**
+     * The USING clause for a column type change, or an empty string. Null-safe because a dialect
+     * that does not implement the method (or a test double) answers null; the interface default is "".
+     */
+    private String alterColumnTypeUsing(DdlDialect dialect, String columnName, String currentType, String targetType) {
+        String using = dialect.getAlterColumnTypeUsing(columnName, currentType, targetType);
+        return using == null ? "" : using;
     }
 
     private String canonicalizeColumnType(String sqlType) {

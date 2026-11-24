@@ -191,4 +191,53 @@ class PostgresDdlDialectTest {
         assertTrue(unknownError.getMessage().contains("Unsupported default value"));
     }
 
+    // A multiple-file field became jsonb in Core 8a9b5b765 (#2456). Columns created before that
+    // are character types, and PostgreSQL refuses "ALTER COLUMN … TYPE jsonb" on them: there is
+    // no assignment cast from a character type to jsonb (seen on a product database on
+    // 2026-11-23: three columns had to be cast by hand with USING NULLIF(col, '')::jsonb).
+
+    @Test
+    void aCharacterColumnBecomingJsonbGetsAUsingClause() {
+        assertEquals(" USING NULLIF(anc_alert_evidence, '')::jsonb",
+                dialect.getAlterColumnTypeUsing("anc_alert_evidence", "character varying(255)", "jsonb"));
+        assertEquals(" USING NULLIF(notes, '')::jsonb",
+                dialect.getAlterColumnTypeUsing("notes", "text", "jsonb"));
+        assertEquals(" USING NULLIF(code, '')::jsonb",
+                dialect.getAlterColumnTypeUsing("code", "CHARACTER VARYING(32)", "JSONB"));
+    }
+
+    @Test
+    void aJsonbColumnBecomingACharacterTypeGetsAUsingClause() {
+        assertEquals(" USING payload::VARCHAR(255)", dialect.getAlterColumnTypeUsing("payload", "jsonb", "VARCHAR(255)"));
+        assertEquals(" USING payload::text", dialect.getAlterColumnTypeUsing("payload", "JSONB", "text"));
+    }
+
+    @Test
+    void aChangePostgresCastsByItselfGetsNoUsingClause() {
+        assertEquals("", dialect.getAlterColumnTypeUsing("c", "character varying(255)", "VARCHAR(2048)"));
+        assertEquals("", dialect.getAlterColumnTypeUsing("c", "character varying(255)", "text"));
+        assertEquals("", dialect.getAlterColumnTypeUsing("c", "text", "VARCHAR(255)"));
+        assertEquals("", dialect.getAlterColumnTypeUsing("c", "integer", "bigint"));
+        assertEquals("", dialect.getAlterColumnTypeUsing("c", "jsonb", "jsonb"));
+        assertEquals("", dialect.getAlterColumnTypeUsing("c", "character varying(255)", "integer"));
+    }
+
+    @Test
+    void anUnknownCurrentTypeGetsNoUsingClause() {
+        // Nothing is guessed: the statement then fails in PostgreSQL as it did before, instead of
+        // converting values on an assumption.
+        assertEquals("", dialect.getAlterColumnTypeUsing("c", null, "jsonb"));
+        assertEquals("", dialect.getAlterColumnTypeUsing("c", "", "jsonb"));
+    }
+
+    @Test
+    void aColumnNameThatIsNotABareIdentifierIsRefused() {
+        IllegalArgumentException spaced = assertThrows(IllegalArgumentException.class,
+                () -> dialect.getAlterColumnTypeUsing("a b", "text", "jsonb"));
+        assertTrue(spaced.getMessage().contains("bare identifier"));
+        assertThrows(IllegalArgumentException.class,
+                () -> dialect.getAlterColumnTypeUsing("c'); DROP TABLE t; --", "text", "jsonb"));
+        assertThrows(IllegalArgumentException.class, () -> dialect.getAlterColumnTypeUsing(null, "text", "jsonb"));
+    }
+
 }
