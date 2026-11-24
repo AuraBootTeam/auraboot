@@ -136,8 +136,7 @@
     "pcba-finance",
     "sales-templates",
     "dev-pipeline",
-    "growth",
-    "customer-pcba-solution"
+    "growth"
   ],
   "bom-quote": [
     "core-meta",
