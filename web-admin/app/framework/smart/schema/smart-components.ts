@@ -82,6 +82,7 @@ export interface FormFieldProps extends BaseSmartComponentProps {
 
 // SmartInput 属性
 export interface InputProps extends FormFieldProps {
+  controlWidth?: number;
   density?: 'default' | 'compact';
   controlClassName?: string;
   type?: 'text' | 'password' | 'email' | 'number' | 'tel' | 'url';

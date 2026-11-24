@@ -8,12 +8,12 @@ it('honors compact inline fields without losing exact decimal drafts or accessib
   function Harness() {
     const [value,setValue] = React.useState('350');
     return <Input name="allocation" label="Purchase quantity" inline density="compact"
-      controlClassName="ml-auto max-w-[90px]" value={value} onChange={setValue} />;
+      controlClassName="ml-auto" controlWidth={90} value={value} onChange={setValue} />;
   }
   render(<RouterProvider router={createMemoryRouter([{path:'/',element:<Harness />}])} />);
   const input = screen.getByRole('textbox',{name:'Purchase quantity'});
   expect(input.closest('.mb-0')).not.toBeNull();
-  expect(input.parentElement).toHaveClass('max-w-[90px]');
+  expect(input.parentElement).toHaveStyle({width:'90px',flex:'0 0 90px'});
   expect(input.parentElement?.parentElement).toHaveClass('flex');
   expect(input).not.toHaveAttribute('inline');
   expect(input).not.toHaveAttribute('density');
