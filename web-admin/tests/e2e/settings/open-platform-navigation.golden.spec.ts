@@ -1,12 +1,13 @@
 import { expect, test } from '@playwright/test';
 import { loginViaUI, ensureBusinessSpace } from '../../helpers/auth-fixtures';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { BASE_URL } from '../../helpers/environments';
 
 test.use({ storageState: { cookies: [], origins: [] }, locale: 'zh-CN', viewport: { width: 1440, height: 1000 }, trace: 'off', video: 'off', screenshot: 'off' });
 process.env.PLAYWRIGHT_NO_COPY_PROMPT = '1';
 
 test('keeps supported platform entries and retires the duplicate call-log workspace', async ({ page }) => {
-  await page.context().addCookies([{ name: 'locale', value: 'zh-CN', url: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173' }]);
+  await page.context().addCookies([{ name: 'locale', value: 'zh-CN', url: BASE_URL }]);
   await page.addInitScript(() => localStorage.setItem('locale', 'zh-CN'));
   await loginViaUI(page, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
   await ensureBusinessSpace(page);
