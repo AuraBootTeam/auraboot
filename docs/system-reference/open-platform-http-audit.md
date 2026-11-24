@@ -6,7 +6,7 @@ created: 2026-11-24
 
 # Open Platform HTTP audit and navigation
 
-The authenticated backend menu tree includes a system navigation group for Platform Management. Open Platform links select applications, API calls or Webhook deliveries on the existing settings route. Platform Console is visible only to users with the platform operator role in a platform space; its navigation action posts to the existing space-switch action before redirecting to `/platform/plugins`. Navigation visibility does not grant application access. Account menus contain identity actions, About and Sign out.
+The authenticated backend menu tree includes a system navigation group for Platform Management. Open Platform links select applications, API calls or Webhook deliveries on the existing settings route. Platform Console is visible only to users with the platform operator role in a platform space; its navigation action posts to the existing space-switch action before redirecting to `/platform/plugins`. The platform route reuses the existing permission-gated plugin manager instead of falling through to an unconfigured dynamic page. Navigation visibility does not grant application access. Account menus contain identity actions, About and Sign out.
 
 ## Capture contract
 

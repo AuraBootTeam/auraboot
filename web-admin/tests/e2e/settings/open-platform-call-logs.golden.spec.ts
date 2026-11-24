@@ -663,12 +663,19 @@ test.describe
       page.getByTestId("open-platform-operations-panel"),
     ).toBeVisible();
     await expect(page.getByTestId("open-platform-call-audit")).toBeHidden();
+    const menuLinks = page.getByTestId('sidebar');
+    await expect(menuLinks.getByRole('link', { name: '接口调用日志', exact: true })).not.toHaveClass(/(?:^|\s)active(?:\s|$)/);
+    await expect(menuLinks.getByRole('link', { name: 'Webhook 投递', exact: true })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByLabel('环境', { exact: true })).toHaveValue(productionPid);
+    await expect(page.getByTestId('open-platform-operations-panel')).not.toContainText('—');
     await capture(page, "LOG11");
     await navigate(page);
     await page
       .getByLabel("应用", { exact: true })
       .selectOption({ label: otherAppName });
     await expect(page.getByTestId("call-logs-empty")).toBeVisible();
+    await expect(page.getByLabel('环境', { exact: true })).toBeEnabled();
+    await expect(page.getByTestId('open-platform-call-logs')).toHaveAttribute('aria-busy', 'false');
     await capture(page, "LOG17");
     expect(
       sql(
@@ -740,6 +747,9 @@ test.describe
       .fill(createRequestId);
     await choose(page, createRequestId);
     await page.setViewportSize({ width: 390, height: 844 });
+    const closeMenu = page.getByTestId('sidebar').getByRole('button', { name: '关闭', exact: true });
+    if (await closeMenu.isVisible()) await closeMenu.click();
+    await page.getByTestId('http-audit-inspector').evaluate(element => element.scrollIntoView({ block: 'start' }));
     await expect(page.getByTestId("http-audit-inspector")).toBeVisible();
     await capture(page, "LOG12");
     await page.getByRole("button", { name: "关闭详情", exact: true }).click();
@@ -799,6 +809,8 @@ test.describe
     await expect(page.getByTestId("sidebar")).toBeVisible();
     const currentActor = await data(page.request, 'get', `${BASE_URL}/api/auth/me`);
     expect(String(currentActor.user.tenantId)).toBe(String(platform.tenantId));
+    await expect(page.getByRole('heading', { name: '插件管理', exact: true })).toBeVisible();
+    await expect(page.getByText('Page Unavailable', { exact: true })).toBeHidden();
     await capture(page, "NAV02");
     await login(page, "admin@auraboot.com", "Test2026x", "en-US");
     await page.goto("/home");
@@ -846,6 +858,8 @@ test.describe
     await expect(inspector.getByTestId('http-response')).toContainText(eventId);
     await page.setViewportSize({ width: 1280, height: 960 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+    await inspector.getByRole('button', { name: '展开详情', exact: true }).click();
+    await inspector.evaluate(element => element.scrollIntoView({ block: 'start' }));
     await capture(page, 'LOG19');
     const revoked = await page.request.delete(`${BASE_URL}/api/open-platform/installations/${stagingPid}/integration-tokens/${credential.metadata.pid}`);
     expect(revoked.status()).toBe(200); expect(String((await revoked.json()).code)).toBe('0');
@@ -855,6 +869,8 @@ test.describe
     await page.getByRole('textbox', { name: '搜索请求 ID 或接口路径' }).fill(unauthorized.headers()['x-request-id']);
     await choose(page, unauthorized.headers()['x-request-id']);
     await expect(inspector.getByTestId('http-response')).toContainText('invalid_token');
+    await inspector.getByRole('button', { name: '展开详情', exact: true }).click();
+    await inspector.evaluate(element => element.scrollIntoView({ block: 'start' }));
     await capture(page, 'LOG20');
     const malformed = await page.request.post(`${BACKEND_URL}/api/open/v1/resources/${resourceCode}`, {
       headers: { Authorization: `Bearer ${machineToken}`, 'Content-Type': 'application/json', 'Idempotency-Key': `malformed-${tag}` },

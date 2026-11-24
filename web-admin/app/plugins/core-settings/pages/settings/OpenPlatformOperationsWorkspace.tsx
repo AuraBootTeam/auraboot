@@ -16,6 +16,7 @@ export interface OperationsApplication {
 }
 export function OpenPlatformOperationsTabs({ view }: { view: string }) {
   const text = useAuditText();
+  const [params] = useSearchParams();
   return (
     <nav
       className="border-border flex min-w-0 flex-wrap gap-6 border-b"
@@ -28,7 +29,7 @@ export function OpenPlatformOperationsTabs({ view }: { view: string }) {
       ].map(([value, label]) => (
         <Link
           key={value}
-          to={`/settings/api-docs?view=${value}`}
+          to={`/settings/api-docs?${new URLSearchParams({ ...Object.fromEntries(params), view: value })}`}
           className={`pb-3 text-sm ${view === value ? "border-accent text-accent border-b-2 font-medium" : "text-text-2"}`}
           aria-current={view === value ? "page" : undefined}
         >

@@ -2,6 +2,13 @@ import type { PluginResource } from '../_shared/types.js'
 
 export const RESOURCES: PluginResource[] = [
   {
+    key: 'platform.console-plugins',
+    path: '/platform/plugins',
+    title: { en: 'Platform Plugins', zh: '平台插件管理' },
+    icon: 'package',
+    file: './plugins/core-platform/pages/PlatformPluginsPage.tsx',
+  },
+  {
     key: 'platform.plugins',
     path: '/plugins',
     title: { en: 'Plugins', zh: '插件管理' },

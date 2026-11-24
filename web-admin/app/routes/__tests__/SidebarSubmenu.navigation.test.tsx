@@ -116,5 +116,7 @@ it('selects only the matching query-addressed platform section', () => {
   ]}/></MemoryRouter>);
   expect(screen.getByRole('link',{name:'Call logs'})).toHaveAttribute('aria-current','page');
   expect(screen.getByRole('link',{name:'Applications'})).not.toHaveAttribute('aria-current','page');
+  expect(screen.getByRole('link',{name:'Applications'})).not.toHaveClass('active');
+  expect(screen.getByRole('link',{name:'Webhook deliveries'})).not.toHaveClass('active');
   expect(screen.getByRole('link',{name:'Webhook deliveries'})).not.toHaveAttribute('aria-current','page');
 });

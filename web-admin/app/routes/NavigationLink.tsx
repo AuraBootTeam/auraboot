@@ -69,7 +69,7 @@ export default function NavigationLink({ opening, ...props }: NavigationProps) {
                 ...state,
                 isActive: state.isActive && !queryMismatch,
               })
-          : props.className
+          : () => props.className as string
       }
       reloadDocument={external || opening === "new"}
       target={opening === "new" ? "_blank" : undefined}
