@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 917310ac22e4b30cf607987c27374ba335aa9cd936087d1ab1066e6f873ce86a
+ * Contract SHA-256: 87e9d87de5802c0af44b5fbce7786636126aa49606e179b242a6a9a081a3d130
  */
 export interface paths {
     "/api/activities": {
@@ -429,6 +429,22 @@ export interface paths {
         get: operations["streamLlmChunks"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/bootstrap/platform-navigation/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reconcile"];
         delete?: never;
         options?: never;
         head?: never;
@@ -17256,6 +17272,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/open-platform/installations/{installationPid}/audits/{auditPid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["auditDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/open-platform/installations/{installationPid}/credentials": {
         parameters: {
             query?: never;
@@ -25242,6 +25274,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseCallAuditDetail: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["CallAuditDetail"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseCapabilityCatalog: {
             code?: string;
             context?: unknown;
@@ -30312,9 +30352,25 @@ export interface components {
             /** Format: time-local */
             startTime?: string;
         };
+        CallAuditDetail: {
+            auditPid?: string;
+            captureState?: string;
+            /** Format: int64 */
+            durationMs?: number;
+            httpDetails?: components["schemas"]["JsonNode"];
+            method?: string;
+            /** Format: date-time */
+            occurredAt?: string;
+            path?: string;
+            remoteAddress?: string;
+            requestId?: string;
+            /** Format: int32 */
+            status?: number;
+        };
         CallAuditView: {
             actorKind?: string;
             applicationPid?: string;
+            auditPid?: string;
             capability?: string;
             /** Format: int64 */
             durationMs?: number;
@@ -43415,6 +43471,26 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": components["schemas"]["SseEmitter"];
+                };
+            };
+        };
+    };
+    reconcile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseMapStringBoolean"];
                 };
             };
         };
@@ -72036,9 +72112,14 @@ export interface operations {
     listAudits: {
         parameters: {
             query?: {
+                keyword?: string;
                 limit?: number;
+                method?: string;
+                offset?: number;
                 requestId?: string;
                 status?: number;
+                statusClass?: string;
+                windowHours?: number;
             };
             header?: never;
             path: {
@@ -72055,6 +72136,29 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseListCallAuditView"];
+                };
+            };
+        };
+    };
+    auditDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                auditPid: string;
+                installationPid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseCallAuditDetail"];
                 };
             };
         };

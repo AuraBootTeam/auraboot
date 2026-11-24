@@ -2,7 +2,6 @@ package com.auraboot.framework.saas.bootstrap;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.billing.account.service.BillingAccountIdentityService;
-import com.auraboot.framework.menu.mapper.MenuMapper;
 import com.auraboot.framework.plugin.service.BuiltinPluginImportService;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
@@ -55,13 +54,14 @@ class BootstrapRepairServiceTenantBootstrapTest {
     @Mock
     private UserRoleMapper userRoleMapper;
     @Mock
-    private MenuMapper menuMapper;
-    @Mock
     private TenantBootstrapService tenantBootstrapService;
     @Mock
     private BillingAccountIdentityService billingAccountIdentityService;
     @Mock
     private JdbcTemplate jdbcTemplate;
+
+    @Mock
+    private PlatformConsoleMenuBootstrap platformConsoleMenus;
 
     @InjectMocks
     private BootstrapRepairService service;
@@ -91,6 +91,15 @@ class BootstrapRepairServiceTenantBootstrapTest {
 
         assertThat(result.status()).isEqualTo(RepairStepResult.Status.REPAIRED);
         verify(tenantBootstrapService).bootstrapTenant(7L, 42L);
+    }
+
+    @Test
+    void existingPlatformRoleStillReconcilesRetiredMenuRows() {
+        Tenant system = new Tenant(); system.setId(1L); system.setName("System");
+        when(tenantService.findByName("System")).thenReturn(system);
+        when(roleMapper.existsByCode(1L, "platform_admin")).thenReturn(true);
+        assertThat(service.repairPlatformAdminRole(options()).status()).isEqualTo(RepairStepResult.Status.PRESENT);
+        verify(platformConsoleMenus).reconcile(1L, 0L);
     }
 
     @Test

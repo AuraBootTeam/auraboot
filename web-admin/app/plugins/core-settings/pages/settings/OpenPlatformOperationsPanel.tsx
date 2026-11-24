@@ -4,6 +4,7 @@ import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { openPlatformApiFetch as apiFetch } from './open-platform-api';
+import { CallAuditMessageDetails } from './CallAuditMessageDetails';
 
 interface Overview {
   windowHours: number;
@@ -15,6 +16,7 @@ interface Overview {
   deadLetterCount: number;
 }
 interface Audit {
+  auditPid?: string;
   requestId: string;
   method: string;
   path: string;
@@ -59,8 +61,12 @@ interface WebhookHealth {
 
 export default function OpenPlatformOperationsPanel({
   installationPid,
+  deliveriesOnly = false,
+  canReadBodies = false,
 }: {
   installationPid: string;
+  deliveriesOnly?: boolean;
+  canReadBodies?: boolean;
 }) {
   const { t, locale } = useI18n();
   const { showToast } = useToastContext();
@@ -198,8 +204,9 @@ export default function OpenPlatformOperationsPanel({
               </div>
             ))}
           </div>
-          <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+          <div className={`grid min-w-0 gap-4 ${deliveriesOnly ? 'grid-cols-1' : 'lg:grid-cols-2'}`}>
             <div
+              hidden={deliveriesOnly}
               data-testid="open-platform-call-audit"
               className="min-w-0 overflow-hidden rounded-lg border border-gray-200 p-3 dark:border-gray-700"
             >
@@ -216,6 +223,7 @@ export default function OpenPlatformOperationsPanel({
               </div>
               <h4 className="mb-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
                 {t('openPlatform.callAudit', undefined, 'Call audit')}
+
               </h4>
               {audits.some((audit) => audit.status === 202 && audit.path.startsWith('/api/open/v1/event-sources/')) && (
                 <p className="mb-2 text-xs text-gray-500" data-testid="call-audit-accepted-help">
@@ -228,7 +236,7 @@ export default function OpenPlatformOperationsPanel({
               {audits.length === 0 ? (
                 <Empty label={t('openPlatform.noCalls', undefined, 'No calls match this filter')} />
               ) : (
-                <div className="max-h-72 min-w-0 space-y-2 overflow-auto">
+                <div className="max-h-72 min-w-0 space-y-2 overflow-auto [&:has([aria-expanded=true])]:max-h-[44rem]">
                   {audits.map((audit) => (
                     <div
                       key={`${audit.requestId}-${audit.occurredAt}`}
@@ -272,6 +280,9 @@ export default function OpenPlatformOperationsPanel({
                           {formatTime(audit.occurredAt, locale)} · {audit.durationMs} ms
                         </span>
                       </div>
+                      {canReadBodies && audit.auditPid && (
+                        <CallAuditMessageDetails key={`${installationPid}/${audit.auditPid}`} installationPid={installationPid} auditPid={audit.auditPid} />
+                      )}
                     </div>
                   ))}
                 </div>

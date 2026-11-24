@@ -4,7 +4,7 @@ status: active
 ---
 
 # Controller Permission-Annotation Exemption Registry
-Regenerated 2026-11-23 (CI-anchored by scripts/check-controller-authz.mjs — the counts below now fail the controller-authz gate when they drift). 267 `@RestController` classes; 145 carry `@RequirePermission`; the controllers listed below do not and rely on `SecurityConfig` (`anyRequest().authenticated()` / explicit `PermitAll`) plus service-layer scoping.
+Regenerated 2026-11-23 (CI-anchored by scripts/check-controller-authz.mjs — the counts below now fail the controller-authz gate when they drift). 268 `@RestController` classes; 145 carry `@RequirePermission`; the controllers listed below do not and rely on `SecurityConfig` (`anyRequest().authenticated()` / explicit `PermitAll`) plus service-layer scoping.
 Policy: this registry is the year-reviewable record of WHY each controller has no `@RequirePermission`. New controllers default to annotated; removals from annotation need an entry here.
 
 ## agent (6)
@@ -245,10 +245,11 @@ Rationale: domain-specific scoping enforced at service layer; A4 census classifi
 Rationale: domain-specific scoping enforced at service layer; A4 census classification pending (TBD)
 - `ReviewController.java`
 
-## saas (1)
+## saas (2)
 
 Rationale: bootstrap/platform-admin surfaces — guarded by explicit role checks in service layer (AdminRoleChecker family)
 - `controller/BootstrapController.java`
+- `controller/PlatformNavigationMaintenanceController.java` — `@RequirePlatformAdmin`, `@DisallowImpersonation` and an explicit System-space/platform-scope role check protect the audited maintenance operation.
 
 ## tenant (1)
 

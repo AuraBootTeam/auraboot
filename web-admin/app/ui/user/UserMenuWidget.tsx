@@ -2,8 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router';
 import {
   BuildingOffice2Icon,
-  CommandLineIcon,
-  Cog6ToothIcon,
   InformationCircleIcon,
   IdentificationIcon,
   PowerIcon,
@@ -65,13 +63,11 @@ export function UserMenuWidget({
   const userDropdownRef = useRef<HTMLDivElement>(null);
 
   const workspaceLabel = st('$i18n:header.workspaces', 'Workspaces');
-  const platformConsoleLabel = st('$i18n:header.platform_console', 'Platform Console');
   const aboutLabel = t(
     'about.menuLabel',
     { productName: branding.productName },
     locale === 'zh-CN' ? `关于 ${branding.productName}` : `About ${branding.productName}`,
   );
-  const openPlatformLabel = locale === 'zh-CN' ? '开放平台' : 'Open Platform';
 
   // Lazy-load spaces for tenant switching in the account menu
   useEffect(() => {
@@ -282,39 +278,6 @@ export function UserMenuWidget({
               </div>
             )}
 
-          {/* Platform Console — only for platform_admin users */}
-          {spaces.some((s) => s.spaceType === 'platform') && (
-            <div className="border-b border-gray-200 py-1 dark:border-gray-700">
-              <button
-                data-testid="platform-console-link"
-                onClick={() => {
-                  setShowUserDropdown(false);
-                  const platformSpace = spaces.find((s) => s.spaceType === 'platform');
-                  if (!platformSpace) return;
-                  const form = document.createElement('form');
-                  form.method = 'POST';
-                  form.action = '/_action/switch-space';
-                  const tid = document.createElement('input');
-                  tid.type = 'hidden';
-                  tid.name = 'tenantId';
-                  tid.value = platformSpace.tenantId;
-                  form.appendChild(tid);
-                  const redir = document.createElement('input');
-                  redir.type = 'hidden';
-                  redir.name = 'redirectTo';
-                  redir.value = '/platform/plugins';
-                  form.appendChild(redir);
-                  document.body.appendChild(form);
-                  form.submit();
-                }}
-                className="flex w-full items-center gap-3 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
-              >
-                <Cog6ToothIcon className="h-4 w-4 flex-shrink-0 text-gray-400" />
-                <span>{platformConsoleLabel}</span>
-              </button>
-            </div>
-          )}
-
           {user && (
             <div className="border-b border-gray-200 py-1 dark:border-gray-700">
               <Link
@@ -328,15 +291,7 @@ export function UserMenuWidget({
                   {t('user.profile', undefined, locale.startsWith('zh') ? '个人资料' : 'Profile')}
                 </span>
               </Link>
-              <Link
-                to="/settings/api-docs"
-                data-testid="open-platform-link"
-                className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
-                onClick={() => setShowUserDropdown(false)}
-              >
-                <CommandLineIcon className="h-4 w-4 flex-shrink-0 text-gray-400" />
-                <span>{openPlatformLabel}</span>
-              </Link>
+
             </div>
           )}
 

@@ -104,22 +104,20 @@ function appCard(page: Page) {
     .filter({ hasText: APP_NAME });
 }
 
-async function openAccountMenu(page: Page) {
+async function openPlatformMenu(page: Page) {
   await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true', {
     timeout: 20_000,
   });
-  const userMenu = page.getByTestId('user-menu');
-  await userMenu.getByRole('button', { name: /User avatar/ }).click();
-  await expect(userMenu.getByTestId('user-dropdown')).toBeVisible();
+  await expect(page.getByTestId('sidebar').locator('a[href="/settings/api-docs?view=applications"]')).toBeVisible();
 }
 
 async function gotoOpenPlatform(page: Page) {
   await page.goto('/');
   await expect(page).not.toHaveURL(/\/login|\/setup/);
   await expect(page.locator('.animate-spin')).toHaveCount(0, { timeout: 20_000 });
-  await openAccountMenu(page);
-  await expect(page.getByTestId('open-platform-link')).toBeVisible();
-  await page.getByTestId('open-platform-link').click();
+  await openPlatformMenu(page);
+  await expect(page.getByTestId('sidebar').locator('a[href="/settings/api-docs?view=applications"]')).toBeVisible();
+  await page.getByTestId('sidebar').locator('a[href="/settings/api-docs?view=applications"]').click();
   await expect(page.getByTestId('open-platform-page')).toBeVisible({ timeout: 20_000 });
   await expect(page.locator('.animate-spin')).toHaveCount(0, { timeout: 20_000 });
 }

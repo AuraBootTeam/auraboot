@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import NavigationLink from './NavigationLink';
+import NavigationLink, { matchesNavigationTarget } from './NavigationLink';
 import { useLocation, Link } from 'react-router';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { useI18n } from '~/contexts/I18nContext';
@@ -35,7 +35,7 @@ export function resolveMenuLabel(
 
 function isPathInSubmenu(items: SubmenuItem[], pathname: string): boolean {
   for (const item of items) {
-    if (item.path === pathname) return true;
+    if (item.path.split('?')[0] === pathname) return true;
     if (item.submenu && isPathInSubmenu(item.submenu, pathname)) return true;
   }
   return false;
@@ -121,7 +121,7 @@ export default function SidebarSubmenu({
             }
 
             const itemName = resolveMenuLabel(t, item);
-            const isActive = location.pathname === item.path;
+            const isActive = matchesNavigationTarget(location.pathname, location.search, item.path);
             return (
               <NavigationLink
                 key={item.id || index}

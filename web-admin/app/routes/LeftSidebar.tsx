@@ -4,7 +4,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { NavLink, useLocation, useRevalidator } from 'react-router';
 import { useRootLoaderData } from '~/root-data';
 import { useI18n } from '~/contexts/I18nContext';
-import NavigationLink from './NavigationLink';
+import NavigationLink, { matchesNavigationTarget } from './NavigationLink';
 import SidebarSubmenu, { resolveMenuLabel } from '~/routes/SidebarSubmenu';
 import { XMarkIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
@@ -444,7 +444,7 @@ function PopoverSubmenu({
           );
         }
 
-        const isActive = location.pathname === item.path;
+        const isActive = matchesNavigationTarget(location.pathname, location.search, item.path);
         return (
           <NavigationLink
             key={item.id || index}
@@ -524,7 +524,7 @@ function PopoverGroup({
 
 function isPathInSubmenu(items: any[], pathname: string): boolean {
   for (const item of items) {
-    if (item.path === pathname) return true;
+    if (item.path.split('?')[0] === pathname) return true;
     if (item.submenu && isPathInSubmenu(item.submenu, pathname)) return true;
   }
   return false;

@@ -21,8 +21,8 @@ import type { LinkageRule } from '~/framework/meta/schemas/linkage-types';
 // Single source: the published DSL contract (packages/dsl-types, >=0.0.2).
 // The renderer consumes the record form through ResolvedLocalizedText /
 // getLocalizedText — derived views, not a second definition.
-import type { LocalizedText as ContractLocalizedText } from '@auraboot/dsl-types';
-export type LocalizedText = ContractLocalizedText;
+import type { LocalizedText } from '@auraboot/dsl-types';
+export type { LocalizedText } from '@auraboot/dsl-types';
 /** Record-form view for consumers that require a locale map (not a bare string). */
 export type ResolvedLocalizedText = Exclude<LocalizedText, string>;
 
@@ -46,6 +46,8 @@ export interface WorkspaceShellConfig {
 export interface PageExtensionConfig {
   [key: string]: any;
   workspaceShell?: WorkspaceShellConfig;
+  /** Custom composed lists may supply their own individual panel surfaces. */
+  resultsSurface?: 'panel' | 'canvas';
   detailHeaderLayout?: LayoutConfig;
   detailBodyOrder?: 'schema';
   /** Overrides the utility action menu default for standalone detail pages. */
@@ -685,6 +687,10 @@ export interface RowExpansionConfig {
 }
 
 export interface TableConfig {
+  /** Render the block title and existing block buttons together above the rows. */
+  showTitle?: boolean;
+  /** Optional panel minimum height, including heading, for balanced master-detail layouts. */
+  minHeight?: number;
   rowKey?: string;
   dataSource?: string;
   maxHeight?: number | string;
@@ -717,6 +723,8 @@ export interface TableConfig {
 export interface PaginationConfig {
   /** Explicit opt-in for paged API data sources on a table block. */
   mode?: 'server';
+  /** Hide pagination only on the first page when the entire result fits. */
+  hideOnSinglePage?: boolean;
   /** Use the declared response field; request parameters remain pageNum/pageSize. */
   pageField?: 'pageNum' | 'current' | 'page';
   pageSize?: number;
@@ -742,7 +750,10 @@ export interface SelectionConfig {
    * Renders exclusive multiple-selection rows as one decision card per group.
    * The bound value remains an array containing at most one row per group.
    */
-  presentation?: 'table' | 'grouped-radio';
+  presentation?: 'table' | 'grouped-radio' | 'navigation';
+  labelField?: string;
+  countField?: string;
+  searchPlaceholder?: string | LocalizedText;
   /**
    * Field whose value defines an exclusive selection group. In multiple mode,
    * selecting another row with the same value replaces the previous row.

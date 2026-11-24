@@ -59,6 +59,7 @@ import static com.auraboot.framework.common.constant.ResponseCode.UnreachableCod
 @AuthenticatedAccess("post-login space selection: the caller holds a platform session JWT but no tenant space yet; every action operates on the caller's own memberships and issues the tenant-scoped session")
 public class TenantSelectionController {
 
+    private final com.auraboot.framework.tenant.service.UserSpaceService userSpaceService;
     private final UserService userService;
     private final TenantApplicationService tenantApplicationService;
     private final TenantMemberService tenantMemberService;
@@ -78,59 +79,7 @@ public class TenantSelectionController {
      */
     @GetMapping("/my-spaces")
     public ApiResponse<List<UserSpaceDTO>> getMySpaces(@CurrentUserId Long userId) {
-        List<Long> tenantIds = tenantMemberService.getTenantIdsByUserId(userId);
-        if (tenantIds.isEmpty()) {
-            return ApiResponse.success(Collections.emptyList());
-        }
-
-        List<UserSpaceDTO> spaces = new ArrayList<>();
-        for (Long tenantId : tenantIds) {
-            Tenant tenant = tenantService.getById(tenantId);
-            if (tenant == null) continue;
-
-            boolean isSystem = "System".equals(tenant.getName());
-
-            // Get member's roles in this tenant (resolve memberId → roleId → role code)
-            TenantMember tenantMember = tenantMemberService.findByTenantIdAndUserId(tenantId, userId);
-            Long memberId = tenantMember != null ? tenantMember.getId() : null;
-            List<UserRole> userRoles = memberId != null
-                    ? userRoleService.list(new LambdaQueryWrapper<UserRole>()
-                        .eq(UserRole::getMemberId, memberId)
-                        .eq(UserRole::getTenantId, tenantId)
-                        .eq(UserRole::getDeletedFlag, false))
-                    : Collections.emptyList();
-            List<Long> roleIds = userRoles.stream().map(UserRole::getRoleId).toList();
-            List<String> roleCodes;
-            if (roleIds.isEmpty()) {
-                roleCodes = Collections.emptyList();
-            } else {
-                List<Role> roles = roleService.listByIds(roleIds);
-                roleCodes = roles.stream()
-                        .map(Role::getCode)
-                        .filter(c -> c != null)
-                        .toList();
-            }
-
-            if (systemModeService.isSingleTenant()) {
-                Long defaultTenantId = systemModeService.getDefaultTenantId();
-                boolean defaultBusinessSpace = !isSystem && tenantId.equals(defaultTenantId);
-                boolean platformOperatorSpace = isSystem && roleCodes.contains("platform_admin");
-                if (!defaultBusinessSpace && !platformOperatorSpace) {
-                    continue;
-                }
-            }
-
-            spaces.add(UserSpaceDTO.builder()
-                    .tenantId(tenantId)
-                    .tenantName(tenant.getName())
-                    .tenantDisplayName(tenant.getDisplayName())
-                    .spaceType(isSystem ? "platform" : "business")
-                    .roleCodes(roleCodes)
-                    .isDefault(!isSystem && spaces.stream().noneMatch(s -> "business".equals(s.getSpaceType())))
-                    .build());
-        }
-
-        return ApiResponse.success(spaces);
+        return ApiResponse.success(userSpaceService.listForUser(userId));
     }
 
     @PostMapping("/process")
