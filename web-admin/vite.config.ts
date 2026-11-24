@@ -261,6 +261,7 @@ export default defineConfig({
       '@auraboot/runtime-kernel',
       '@auraboot/track',
       '@auraboot/plugin-sdk',
+      '@auraboot/dsl-runtime/shared/services/http-client',
       // Lazy expression and telemetry imports must not trigger a navigation reload.
       '@jsep-plugin/object',
       '@opentelemetry/api',
