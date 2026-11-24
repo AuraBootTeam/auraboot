@@ -20,7 +20,8 @@ interface Delivery {
 
 /** Read-only history in the existing Webhook DSL detail, using the existing authorized API. */
 export function WebhookDeliveryHistory() {
-  const { recordPid } = useParams();
+  const params = useParams();
+  const recordPid = params.recordPid ?? params.recordId;
   const { locale, t } = useI18n();
   const label = (zh: string, en: string) => getLocalizedText({ 'zh-CN': zh, en }, locale, t);
   const [state, setState] = useState<{ pid?: string; rows?: Delivery[]; failed?: boolean }>({});

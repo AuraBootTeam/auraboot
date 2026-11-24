@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-vi.mock('react-router', () => ({ useParams: () => ({ recordPid: 'owned-subscription' }) }));
+const routeState = vi.hoisted(() => ({ parameter: 'recordPid' }));
+vi.mock('react-router', () => ({ useParams: () => ({ [routeState.parameter]: 'owned-subscription' }) }));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WebhookDeliveryHistory } from '../WebhookDeliveryHistory';
 
@@ -7,10 +8,11 @@ const get = vi.hoisted(() => vi.fn());
 vi.mock('~/shared/services/ApiService', () => ({ getApiService: () => ({ get }) }));
 vi.mock('~/contexts/I18nContext', () => ({ useI18n: () => ({ locale: 'en', t: (_key: string, _params: unknown, fallback: string) => fallback }) }));
 const show = () => render(<WebhookDeliveryHistory />);
-beforeEach(() => get.mockReset());
+beforeEach(() => { get.mockReset(); routeState.parameter = 'recordPid'; });
 
 describe('existing Webhook DSL delivery history', () => {
-  it('reads the exact subscription API and uses shared messages inside its original detail context', async () => {
+  it.each(['recordPid', 'recordId'])('reads the exact subscription API for the supported %s detail route', async parameter => {
+    routeState.parameter = parameter;
     get.mockResolvedValue({ success: true, data: [{ pid: 'delivery', deliveryStatus: 'success', responseStatus: 200,
       retryCount: 0, createdAt: '2026-11-24T12:00:00Z', requestBody: '{"order":"P001"}', responseBody: '{"accepted":true}' }] });
     show();
