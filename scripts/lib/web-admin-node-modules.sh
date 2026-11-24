@@ -9,6 +9,25 @@ web_admin_node_modules_matches_checkout() {
   node "$helper_dir/web-admin-lock-contract.mjs" "$candidate" "$target" >/dev/null 2>&1
 }
 
+# A view may be linked from another checkout only while its tool shims still run the files its
+# package links expose, seen through the borrowing checkout's path. Some pnpm installs write shims of
+# "$basedir/../../../node_modules/.pnpm/<package>/...": they resolve from the path the shim was
+# invoked by. Reached through a symlink from another checkout, such a shim starts the copy in that
+# checkout's own root store while the package links still lead into the owner's store, and two
+# copies of one version meet in a single process (measured with playwright@1.60.0: "Playwright Test
+# did not expect test.describe.configure() to be called here"). Shims that are links into their
+# package (published capsules) or that reach it through the view ("$basedir/../<package>/...") follow
+# the view and stay consistent.
+web_admin_node_modules_seedable() {
+  local candidate="$1" shim
+  [ -d "$candidate/.bin" ] || return 0
+  for shim in "$candidate"/.bin/*; do
+    [ -f "$shim" ] || continue
+    grep -q '"\$basedir/\.\./\.\./\.\./node_modules/\.pnpm/' "$shim" && return 1
+  done
+  return 0
+}
+
 web_admin_node_modules_usable() {
   local candidate="$1"
   local candidate_real checkout_root checkout_node_modules_real entry entry_real
