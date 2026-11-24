@@ -17,6 +17,19 @@ vi.mock('~/utils/icon-resolver', () => ({
 }));
 
 describe('SidebarSubmenu navigation', () => {
+  it('traverses pathless groups without crashing the application shell', () => {
+    render(
+      <MemoryRouter initialEntries={['/p/c/qo_pr_rfq_list']}>
+        <SidebarSubmenu name="Procurement" submenu={[
+          { path: null as unknown as string, name: 'Buyer collaboration', submenu: [
+            { path: '/p/c/qo_pr_rfq_list', name: 'RFQs' },
+          ] },
+        ]} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('button', { name: 'Buyer collaboration' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('link', { name: 'RFQs' })).toHaveAttribute('aria-current', 'page');
+  });
   it('exposes the current expansion state without collapsing initially visible leaves', () => {
     render(
       <MemoryRouter>
