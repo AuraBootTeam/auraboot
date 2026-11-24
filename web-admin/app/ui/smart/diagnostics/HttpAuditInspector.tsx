@@ -347,7 +347,7 @@ export function HttpAuditInspector({
           <p className="rounded-control bg-accent-weak text-accent mb-3 px-3 py-2 text-xs leading-6">
             {text(
               "acceptedHelp",
-              "Accepted for processing. Query the original event ID for the final business result.",
+              "Accepted for processing, not final business success. Confirm the final result using the contract of this API.",
             )}
           </p>
         )}

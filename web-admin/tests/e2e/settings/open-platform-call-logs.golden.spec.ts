@@ -61,6 +61,9 @@ const scenarios = [
   ["LOG16", "英文界面", "en-US"],
   ["LOG17", "应用切换隔离", "other application"],
   ["LOG18", "维护者报文访问", "maintainer"],
+  ["LOG19", "真实事件接收与窄桌面", "202 / 1280px"],
+  ["LOG20", "已撤销凭据的真实失败报文", "401"],
+  ["LOG21", "非法 JSON 不保存原文", "malformed JSON"],
 ];
 let manifest = scenarios.map(([id, feature, state]) => ({
   id,
@@ -189,6 +192,7 @@ let installationPid = "",
   stagingPid = "",
   otherAppName = "";
 let tenantId = "";
+let devicePid = "";
 const accounts: Record<
   string,
   { email: string; password: string; pid: string }
@@ -273,6 +277,7 @@ test.describe
       scope: "openapi.profile.read",
       deviceName: `Audit office device ${tag}`,
     });
+    devicePid = caller.device.pid;
     installationPid = caller.installation.pid;
     appName = caller.name;
     machineToken = caller.machine.Authorization.slice(7);
@@ -792,6 +797,8 @@ test.describe
       .click();
     await expect(page).toHaveURL(/\/platform\/plugins/);
     await expect(page.getByTestId("sidebar")).toBeVisible();
+    const currentActor = await data(page.request, 'get', `${BASE_URL}/api/auth/me`);
+    expect(String(currentActor.user.tenantId)).toBe(String(platform.tenantId));
     await capture(page, "NAV02");
     await login(page, "admin@auraboot.com", "Test2026x", "en-US");
     await page.goto("/home");
@@ -808,4 +815,61 @@ test.describe
     ).toBeVisible();
     await capture(page, "LOG16");
   });
+  test('captures real accepted events, revoked-token errors and malformed JSON without inventing bodies', async ({ page }) => {
+    await login(page);
+    // The public resource read proves the earlier creation persisted, beyond its write response.
+    const persisted = await page.request.get(`${BACKEND_URL}/api/open/v1/resources/${resourceCode}/${devicePid}`, {
+      headers: { Authorization: `Bearer ${machineToken}` },
+    });
+    expect(persisted.status()).toBe(200);
+    expect((await persisted.json()).assetCode).toBe(`UI-${tag}`);
+    await data(page.request, 'put', `${BASE_URL}/api/open-platform/installations/${stagingPid}/scopes`, {
+      data: { scopes: ['openapi.profile.read', 'automation.events.write'] },
+    });
+    const credential = await data(page.request, 'post', `${BASE_URL}/api/open-platform/installations/${stagingPid}/integration-tokens`, {
+      headers: { 'Idempotency-Key': `accepted-event-${tag}` }, data: { name: 'Audit accepted event fixture', expirationMode: 'never' },
+    });
+    const eventId = `audit-http-${tag}`;
+    const accepted = await page.request.post(`${BACKEND_URL}/api/open/v1/event-sources/audit-http/events`, {
+      headers: { Authorization: `Bearer ${credential.token}`, 'Idempotency-Key': `event-${tag}` },
+      data: { id: eventId, type: 'audit.received', schemaVersion: 1, occurredAt: new Date().toISOString(),
+        subject: { type: 'audit-fixture', pid: devicePid }, sequence: 1, data: { reference: 'capture-202' } },
+    });
+    expect(accepted.status()).toBe(202); expect((await accepted.json()).eventId).toBe(eventId);
+    const acceptedId = accepted.headers()['x-request-id'];
+    await navigate(page, appName, stagingPid);
+    await page.getByRole('textbox', { name: '搜索请求 ID 或接口路径' }).fill(acceptedId);
+    await choose(page, acceptedId);
+    const inspector = page.getByTestId('http-audit-inspector');
+    await expect(inspector).toContainText('尚不代表业务处理成功');
+    await expect(inspector.getByTestId('http-request')).toContainText('capture-202');
+    await expect(inspector.getByTestId('http-response')).toContainText(eventId);
+    await page.setViewportSize({ width: 1280, height: 960 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+    await capture(page, 'LOG19');
+    const revoked = await page.request.delete(`${BASE_URL}/api/open-platform/installations/${stagingPid}/integration-tokens/${credential.metadata.pid}`);
+    expect(revoked.status()).toBe(200); expect(String((await revoked.json()).code)).toBe('0');
+    const unauthorized = await page.request.get(`${BACKEND_URL}/api/open/v1/whoami`, { headers: { Authorization: `Bearer ${credential.token}` } });
+    expect(unauthorized.status()).toBe(401);
+    await inspector.getByRole('button', { name: '关闭详情', exact: true }).click();
+    await page.getByRole('textbox', { name: '搜索请求 ID 或接口路径' }).fill(unauthorized.headers()['x-request-id']);
+    await choose(page, unauthorized.headers()['x-request-id']);
+    await expect(inspector.getByTestId('http-response')).toContainText('invalid_token');
+    await capture(page, 'LOG20');
+    const malformed = await page.request.post(`${BACKEND_URL}/api/open/v1/resources/${resourceCode}`, {
+      headers: { Authorization: `Bearer ${machineToken}`, 'Content-Type': 'application/json', 'Idempotency-Key': `malformed-${tag}` },
+      data: '{"password":"audit-malformed-secret',
+    });
+    expect(malformed.status()).toBe(400);
+    const malformedId = malformed.headers()['x-request-id'];
+    await page.setViewportSize({ width: 1600, height: 1100 });
+    await navigate(page);
+    await page.getByRole('textbox', { name: '搜索请求 ID 或接口路径' }).fill(malformedId);
+    await choose(page, malformedId);
+    await expect(inspector.getByTestId('request-body-state')).toContainText('不是有效 JSON');
+    await expect(inspector).not.toContainText('audit-malformed-secret');
+    await capture(page, 'LOG21');
+    expect(sql(`SELECT http_details::text FROM ab_open_api_call_audit WHERE tenant_id='${tenantId}'::bigint AND request_id='${malformedId}'`)).not.toContain('audit-malformed-secret');
+  });
+
 });

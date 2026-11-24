@@ -6991,8 +6991,8 @@
   },
   {
     "key": "openPlatform.logs.acceptedHelp",
-    "zh-CN": "请求已接收，尚不代表最终业务处理成功。请使用原 eventId 查询事件处理结果。",
-    "en-US": "Accepted for processing. Query the original event ID for the final business result."
+    "zh-CN": "请求已接收，尚不代表业务处理成功。请按该接口约定确认最终业务状态。",
+    "en-US": "Accepted for processing, not final business success. Confirm the final result using the contract of this API."
   },
   {
     "key": "openPlatform.logs.failureHelp",
