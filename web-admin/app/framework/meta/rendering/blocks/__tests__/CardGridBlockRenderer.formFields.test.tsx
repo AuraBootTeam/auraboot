@@ -247,17 +247,17 @@ describe('Joined card groups keep source and offer drafts independent', () => {
   it('reads nested child cards and immutable parents from one response without joining unrelated groups', () => {
     setupJoinedGroups(false,false,true,false,true,true);
     const groups=screen.getAllByTestId('card-grid-group');
-    expect(within(groups[0]).getAllByTestId('card-grid-card')).toHaveLength(2);
-    expect(within(groups[1]).getAllByTestId('card-grid-card')).toHaveLength(1);
-    expect(within(groups[2]).queryAllByTestId('card-grid-card')).toHaveLength(0);
-    expect(within(groups[0]).getAllByRole('textbox',{name:'Proposed quantity'})[0]).toHaveAttribute('readonly');
+    expect(groups[0].querySelectorAll('[data-testid="card-grid-card"]')).toHaveLength(2);
+    expect(groups[1].querySelectorAll('[data-testid="card-grid-card"]')).toHaveLength(1);
+    expect(groups[2].querySelectorAll('[data-testid="card-grid-card"]')).toHaveLength(0);
+    expect(within(groups[0].querySelector('[data-testid="card-grid-card"]') as HTMLElement).getByRole('textbox',{name:'Proposed quantity'})).toHaveAttribute('readonly');
   });
   it('keeps supplementary group facts collapsed and read-only without changing allocation drafts', () => {
     const {state}=setupJoinedGroups(false,false,true,true,true);
     const group=screen.getAllByTestId('card-grid-group')[0];
-    const details=within(group).getByTestId('card-group-details') as HTMLDetailsElement;
+    const details=group.querySelector('[data-testid="card-group-details"]') as HTMLDetailsElement;
     expect(details.open).toBe(false);
-    fireEvent.click(within(details).getByText('Quantity basis'));
+    fireEvent.click(details.querySelector('summary')!);
     expect(details.open).toBe(true);
     const basis=within(details).getByRole('textbox',{name:'Frozen basis'});
     expect(basis).toHaveValue('100');expect(basis).toHaveAttribute('readonly');
