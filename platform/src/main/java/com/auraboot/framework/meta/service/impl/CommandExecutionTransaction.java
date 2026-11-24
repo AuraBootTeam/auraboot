@@ -91,6 +91,18 @@ public class CommandExecutionTransaction {
             isolation = serializable ? BusinessResourceAuthorization.ReadIsolation.SERIALIZABLE
                     : BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ;
         }
+        // Chained secondaries run in this same transaction and are verified against it before
+        // they execute, so their requirement must take part in opening it: a secondary that
+        // reads outside the permit scope can neither declare (the guard rejects a transaction
+        // it did not shape) nor stay silent (the coherent-read gate rejects a non-snapshot
+        // transaction). Checked after the domain default so a secondary cannot relax it.
+        for (var secondary : extensions.getSecondaryCommandHandlers(commandCode)) {
+            var required = secondary.commandReadIsolation();
+            if (required == null) continue;
+            if (isolation != null && isolation != required)
+                throw new AccessDeniedException("Conflicting command owner transaction requirements");
+            isolation = required;
+        }
         if (isolation != null) {
             // Preserve the caller's atomic unit: never suspend it just to satisfy an owner.
             // An existing transaction must already attest the exact required isolation.

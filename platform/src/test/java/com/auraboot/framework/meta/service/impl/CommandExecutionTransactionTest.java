@@ -111,6 +111,112 @@ class CommandExecutionTransactionTest {
         verifyNoInteractions(manager);
     }
 
+    private CommandHandlerExtension secondary(String commandCode, BusinessResourceAuthorization.ReadIsolation isolation) {
+        var secondary = mock(CommandHandlerExtension.class);
+        when(secondary.chainsAfterPrimary()).thenReturn(true);
+        when(secondary.commandReadIsolation()).thenReturn(isolation);
+        when(extensions.getSecondaryCommandHandlers(commandCode)).thenReturn(java.util.List.of(secondary));
+        return secondary;
+    }
+
+    // A chained secondary shares the command transaction and is verified against it before it
+    // runs, so its requirement must take part in opening that transaction.
+    @Test void aChainedSecondaryRequirementOpensTheTransactionOfAHandlerlessCommand() {
+        secondary("crm:create_account_relation", BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ);
+        when(manager.getTransaction(any())).thenReturn(status);
+        // The level the coherent-read gate sees before the secondary's first source read.
+        assertThat(transaction.execute("crm:create_account_relation", false,
+                TransactionSynchronizationManager::getCurrentTransactionIsolationLevel))
+                .isEqualTo(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        verify(manager).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_REPEATABLE_READ));
+        verify(manager).commit(status);
+    }
+
+    @Test void agreeingPrimaryAndSecondaryRequirementsStillOpenOneTransaction() {
+        var handler = mock(CommandHandlerExtension.class);
+        when(extensions.getCommandHandler("crm:update_account_relation")).thenReturn(Optional.of(handler));
+        when(handler.commandReadIsolation()).thenReturn(BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ);
+        secondary("crm:update_account_relation", BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ);
+        when(manager.getTransaction(any())).thenReturn(status);
+        assertThat(transaction.execute("crm:update_account_relation", false, () -> "updated")).isEqualTo("updated");
+        verify(manager).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_REPEATABLE_READ));
+        verify(manager).commit(status);
+    }
+
+    @Test void aSecondaryRequirementConflictingWithAnotherOwnerIsRejectedBeforeAnyWorkRuns() {
+        owner();
+        secondary("orders:export", BusinessResourceAuthorization.ReadIsolation.SERIALIZABLE);
+        var operation = mock(java.util.function.Supplier.class);
+        assertThatThrownBy(()->transaction.execute("orders:export",false,operation)).isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("Conflicting command owner transaction requirements");
+        verifyNoInteractions(manager, operation);
+    }
+
+    @Test void aChainedSecondaryRequirementCannotEnterAnIncompatibleCallerTransaction() {
+        secondary("crm:create_account_relation", BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ);
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        var operation = mock(java.util.function.Supplier.class);
+        assertThatThrownBy(()->transaction.execute("crm:create_account_relation",false,operation)).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(manager, operation);
+    }
+
+    @Test void silentSecondariesLeaveTheTransactionUnchanged() {
+        secondary("crm:create_lead_pool", null);
+        when(manager.getTransaction(any())).thenReturn(status);
+        assertThat(transaction.execute("crm:create_lead_pool", false, () -> "created")).isEqualTo("created");
+        verify(manager).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_DEFAULT));
+    }
+
+    private void domainCommand(String commandCode, String handlerParams) {
+        var definitions=mock(com.auraboot.framework.meta.mapper.CommandDefinitionMapper.class);
+        var snapshots=mock(com.auraboot.framework.permission.service.impl.PermissionSnapshotCache.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(transaction,"definitions",definitions);
+        org.springframework.test.util.ReflectionTestUtils.setField(transaction,"snapshots",snapshots);
+        com.auraboot.framework.application.tenant.MetaContext.setContext(100L,1L,"actor","actor");
+        var command=new com.auraboot.framework.meta.entity.CommandDefinition();
+        command.setExecutionConfig("{\"permissions\":[\"example.cap.manage\"],\"handlerParams\":"+handlerParams+"}");
+        when(definitions.findCurrentByCode(commandCode)).thenReturn(command);
+        var permission=new com.auraboot.framework.permission.entity.Permission();
+        permission.setResourceType("operation");permission.setAction("manage");
+        permission.setExtension(java.util.Map.of("domainModels",java.util.Map.of("example",java.util.List.of("read","update"))));
+        when(snapshots.resolvePermissionDefinition(100L,"example.cap.manage")).thenReturn(permission);
+    }
+
+    // The domain default is itself an owner requirement: a secondary may not relax it.
+    @Test void aChainedSecondaryCannotRelaxASerializableDomainCommand() {
+        domainCommand("example:seed","{\"transactionIsolation\":\"serializable\"}");
+        secondary("example:seed", BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ);
+        var operation = mock(java.util.function.Supplier.class);
+        try {
+            assertThatThrownBy(()->transaction.execute("example:seed",false,operation)).isInstanceOf(AccessDeniedException.class)
+                    .hasMessageContaining("Conflicting command owner transaction requirements");
+            verifyNoInteractions(operation, manager);
+        } finally {com.auraboot.framework.application.tenant.MetaContext.clear();}
+    }
+
+    @Test void aChainedSecondaryAgreeingWithTheDomainDefaultKeepsThatTransaction() {
+        domainCommand("example:merge","{}");
+        secondary("example:merge", BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ);
+        when(manager.getTransaction(any())).thenReturn(status);
+        try {
+            assertThat(transaction.execute("example:merge",false,()->"merged")).isEqualTo("merged");
+            verify(manager).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_REPEATABLE_READ));
+            verify(manager).commit(status);
+        } finally {com.auraboot.framework.application.tenant.MetaContext.clear();}
+    }
+
+    @Test void aStricterSecondaryRequirementIsAConflictNotAnUpgrade() {
+        domainCommand("example:merge","{}");
+        secondary("example:merge", BusinessResourceAuthorization.ReadIsolation.SERIALIZABLE);
+        var operation = mock(java.util.function.Supplier.class);
+        try {
+            assertThatThrownBy(()->transaction.execute("example:merge",false,operation)).isInstanceOf(AccessDeniedException.class)
+                    .hasMessageContaining("Conflicting command owner transaction requirements");
+            verifyNoInteractions(operation, manager);
+        } finally {com.auraboot.framework.application.tenant.MetaContext.clear();}
+    }
+
     @Test void ordinary_commands_keep_default_required_transaction_semantics() {
         when(manager.getTransaction(any())).thenReturn(status);
         assertThat(transaction.execute("orders:update", false, () -> "completed")).isEqualTo("completed");
