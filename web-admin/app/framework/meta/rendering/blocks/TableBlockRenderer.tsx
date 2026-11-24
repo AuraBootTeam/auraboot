@@ -41,6 +41,7 @@ import { getLegacyCompatibleRecordPid } from '~/framework/meta/utils/publicRecor
 import { RowActionButtons } from '~/framework/meta/rendering/pages/list/RowActionButtons';
 import { useTimezone } from '~/contexts/TimezoneContext';
 import { useTableBlockPagination } from './useTableBlockPagination';
+import { ToolbarBlockRenderer } from './ToolbarBlockRenderer';
 
 export interface TableBlockRendererProps {
   block: BlockConfig;
@@ -166,7 +167,7 @@ function renderLinkCell(
   );
 }
 
-export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, runtime }) => {
+const TableBlockBodyRenderer: React.FC<TableBlockRendererProps> = ({ block, runtime }) => {
   const context = runtime.getContext();
   const locale = context.locale || 'zh-CN';
   const t = context.t || ((key: string) => key);
@@ -377,31 +378,35 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     } else void dataSourceManager.reload(dataSourceId);
   };
   const acceptedPage = serverPage;
-  const pagination = acceptedPage ? (
-    <fieldset
-      disabled={Boolean(dataSourceState?.loading)}
-      aria-busy={Boolean(dataSourceState?.loading)}
-      className="m-0 min-w-0 border-0 p-0"
-      data-testid="table-server-pagination"
-    >
-      <Pagination
-        alwaysVisible
-        compact
-        current={acceptedPage.current}
-        pageSize={acceptedPage.pageSize}
-        total={acceptedPage.total}
-        t={t}
-        locale={locale}
-        pageSizeOptions={paging?.pageSizeOptions}
-        showPageSizeSelector={paging?.showSizeChanger !== false}
-        showQuickJumper={paging?.showQuickJumper}
-        onChange={(pageNum) => runPageRequest({ pageNum, pageSize: acceptedPage.pageSize })}
-        onPageSizeChange={(pageSize) => runPageRequest({ pageNum: 1, pageSize })}
-      />
-    </fieldset>
-  ) : (
-    statePagination
-  );
+  const pagination =
+    acceptedPage &&
+    paging?.hideOnSinglePage &&
+    acceptedPage.current === 1 &&
+    acceptedPage.total <= acceptedPage.pageSize ? null : acceptedPage ? (
+      <fieldset
+        disabled={Boolean(dataSourceState?.loading)}
+        aria-busy={Boolean(dataSourceState?.loading)}
+        className="m-0 min-w-0 border-0 p-0"
+        data-testid="table-server-pagination"
+      >
+        <Pagination
+          alwaysVisible
+          compact
+          current={acceptedPage.current}
+          pageSize={acceptedPage.pageSize}
+          total={acceptedPage.total}
+          t={t}
+          locale={locale}
+          pageSizeOptions={paging?.pageSizeOptions}
+          showPageSizeSelector={paging?.showSizeChanger !== false}
+          showQuickJumper={paging?.showQuickJumper}
+          onChange={(pageNum) => runPageRequest({ pageNum, pageSize: acceptedPage.pageSize })}
+          onPageSizeChange={(pageSize) => runPageRequest({ pageNum: 1, pageSize })}
+        />
+      </fieldset>
+    ) : (
+      statePagination
+    );
   const dataSourceError = dataSourceState?.error as any;
   const errorStatus = Number(
     dataSourceError?.status ?? dataSourceError?.statusCode ?? dataSourceError?.response?.status,
@@ -441,6 +446,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   const groupedRadioDomPrefix = React.useId().replace(/:/g, '');
   const rowKeyField = block.table?.rowKey || (selectionConfig as any)?.keyField || 'pid';
   const selectionIdField = (selectionConfig as any)?.idField || rowKeyField;
+  const [navigationQuery, setNavigationQuery] = useState('');
   const [localSelectedRowKey, setLocalSelectedRowKey] = useState('');
   const [localSelectedRowKeys, setLocalSelectedRowKeys] = useState<string[]>([]);
   const getRowIdentity = (row: any, index?: number): string =>
@@ -904,7 +910,16 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       );
     }
 
-    if (column.presentation) return <WorkspaceCell value={value} record={row} column={{ ...column, label: getLocalizedText(column.label, locale, t), timezone }} locale={locale} t={t} />;
+    if (column.presentation)
+      return (
+        <WorkspaceCell
+          value={value}
+          record={row}
+          column={{ ...column, label: getLocalizedText(column.label, locale, t), timezone }}
+          locale={locale}
+          t={t}
+        />
+      );
 
     // 自定义 render 表达式
     if (typeof column.render === 'string') {
@@ -1499,6 +1514,91 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     </div>
   ) : null;
 
+  if (selectionPresentation === 'navigation' && !isMultipleSelection) {
+    const labelField = selectionConfig?.labelField || columns[0]?.field || 'name';
+    const countField = selectionConfig?.countField;
+    const placeholder = getLocalizedText(
+      selectionConfig?.searchPlaceholder || { 'zh-CN': '搜索', en: 'Search' },
+      locale,
+      t,
+    );
+    const filtered = data.filter((row: any) =>
+      String(row?.[labelField] ?? '')
+        .toLocaleLowerCase(locale)
+        .includes(navigationQuery.trim().toLocaleLowerCase(locale)),
+    );
+    return (
+      <>
+        {staleState}
+        <nav
+          className="space-y-2 p-3"
+          aria-label={getLocalizedText(block.title || placeholder, locale, t)}
+          data-testid="table-navigation"
+        >
+          {selectionConfig?.searchPlaceholder && (
+            <input
+              type="search"
+              className="border-border bg-panel text-text focus:ring-accent-weak rounded-control w-full border px-3 py-2 text-sm focus:ring-2"
+              aria-label={placeholder}
+              placeholder={placeholder}
+              value={navigationQuery}
+              onChange={(event) => setNavigationQuery(event.target.value)}
+            />
+          )}
+          <div
+            className="space-y-1 overflow-y-auto"
+            style={tableContainerStyle}
+            data-testid="table-navigation-rows"
+          >
+            {filtered.map((row: any, index: number) => (
+              <button
+                type="button"
+                key={getRowIdentity(row, index)}
+                data-testid={`table-navigation-item-${getRowIdentity(row, index)}`}
+                aria-label={String(row?.[labelField] ?? '')}
+                aria-pressed={effectiveSelectedRowKey === getRowIdentity(row, index)}
+                disabled={Boolean(dataSourceState?.loading || dataSourceError)}
+                onClick={() => handleRowClick(row, index)}
+                className={`rounded-control focus-visible:ring-accent-weak flex w-full items-center justify-between gap-3 px-3 py-3 text-left text-sm focus-visible:ring-2 disabled:opacity-50 ${effectiveSelectedRowKey === getRowIdentity(row, index) ? 'bg-accent-weak text-accent font-medium' : 'text-text hover:bg-subtle'}`}
+              >
+                <span className="min-w-0 break-words">{String(row?.[labelField] ?? '')}</span>
+                {countField && (
+                  <span className="text-text-3 shrink-0 text-xs tabular-nums">
+                    {String(row?.[countField] ?? 0)}
+                  </span>
+                )}
+              </button>
+            ))}
+            {!filtered.length && (
+              <p role="status" className="text-text-2 px-3 py-5 text-sm">
+                {navigationQuery.trim()
+                  ? getLocalizedText(
+                      {
+                        'zh-CN': '未找到匹配项，请调整搜索。',
+                        en: 'No matching items. Adjust your search.',
+                      },
+                      locale,
+                      t,
+                    )
+                  : getLocalizedText(
+                      (block as any).empty?.title || { 'zh-CN': '暂无数据', en: 'No data' },
+                      locale,
+                      t,
+                    )}
+              </p>
+            )}
+            {!filtered.length && !navigationQuery.trim() && (block as any).empty?.description && (
+              <p className="text-text-2 px-3 pb-3 text-xs leading-relaxed">
+                {getLocalizedText((block as any).empty.description, locale, t)}
+              </p>
+            )}
+          </div>
+        </nav>
+        {pagination}
+      </>
+    );
+  }
+
   if (groupedRadioPresentation) {
     return (
       <>
@@ -1722,6 +1822,61 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
         </div>
       )}
       {pagination}
+    </>
+  );
+};
+
+/** Panel headings use the standard toolbar dispatcher and the same runtime context. */
+export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, runtime }) => {
+  useRuntimeStateSubscription(runtime);
+  const source = typeof block.dataSource === 'string' ? block.dataSource : undefined;
+  useDataSourceSubscription(runtime, block.table?.showTitle ? source : undefined);
+  const context = runtime.getContext();
+  const locale = context.locale || 'zh-CN';
+  const t = context.t || ((key: string) => key);
+  const title = block.table?.showTitle
+    ? runtime
+        .getEvaluator()
+        .evaluateTemplate(getLocalizedText(block.title || '', locale, t), context)
+    : '';
+  const sourceState = readDataSourceState(runtime, source);
+  const rows = readDataSourceRows(runtime, source);
+  const showCount =
+    block.table?.selection?.presentation === 'navigation' &&
+    !sourceState?.error &&
+    !sourceState?.loading;
+  return (
+    <>
+      {block.table?.showTitle && (
+        <div
+          className="border-border flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3"
+          data-testid="table-panel-heading"
+        >
+          <h2 className="text-text min-w-0 text-sm font-semibold break-words">
+            {String(title ?? '')}
+          </h2>
+          {showCount && (
+            <span className="text-text-3 text-xs">
+              {getLocalizedText(
+                { 'zh-CN': `共 ${rows.length} 个`, en: `${rows.length} total` },
+                locale,
+                t,
+              )}
+            </span>
+          )}
+          {block.buttons?.length ? (
+            <ToolbarBlockRenderer
+              block={{
+                id: `${block.id}_heading_actions`,
+                blockType: 'toolbar',
+                buttons: block.buttons,
+              }}
+              runtime={runtime}
+            />
+          ) : null}
+        </div>
+      )}
+      <TableBlockBodyRenderer block={block} runtime={runtime} />
     </>
   );
 };

@@ -190,7 +190,9 @@ export function renderListPage(model: ListPageModel) {
       >
         {pageHeader}
         <div
-          className={`rounded-card border-border bg-panel relative overflow-hidden border ${workspace ? '' : 'shadow-sm'}`}
+          className={skipListData && schema.extension?.resultsSurface === 'canvas'
+            ? 'relative min-w-0'
+            : `rounded-card border-border bg-panel relative overflow-hidden border ${workspace ? '' : 'shadow-sm'}`}
         >
           {renderListPageFeedback(model, pageHeader)}
 

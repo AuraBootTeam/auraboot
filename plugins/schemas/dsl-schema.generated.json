@@ -2249,6 +2249,10 @@
     "TableConfig": {
       "type": "object",
       "properties": {
+        "showTitle": {
+          "type": "boolean",
+          "description": "Render the block title and existing block buttons together above the rows."
+        },
         "rowKey": {
           "type": "string",
           "minLength": 1
@@ -2423,6 +2427,10 @@
           "const": "server",
           "description": "Explicit opt-in for paged API data sources on a table block."
         },
+        "hideOnSinglePage": {
+          "type": "boolean",
+          "description": "Hide pagination only on the first page when the entire result fits."
+        },
         "pageField": {
           "type": "string",
           "enum": [
@@ -2501,9 +2509,26 @@
           "type": "string",
           "enum": [
             "table",
-            "grouped-radio"
+            "grouped-radio",
+            "navigation"
           ],
           "description": "Renders exclusive multiple-selection rows as one decision card per group. The bound value remains an array containing at most one row per group."
+        },
+        "labelField": {
+          "type": "string"
+        },
+        "countField": {
+          "type": "string"
+        },
+        "searchPlaceholder": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/LocalizedText"
+            }
+          ]
         },
         "exclusiveBy": {
           "type": "string",
@@ -2795,7 +2820,8 @@
               "type": "object",
               "additionalProperties": {}
             }
-          ]
+          ],
+          "description": "Link columns may use render.to (local page target with row placeholders) and render.visibleWhen."
         },
         "cellRenderer": {
           "type": "string",

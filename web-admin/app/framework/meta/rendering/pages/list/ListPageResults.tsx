@@ -248,7 +248,9 @@ export function renderListPageResults(
       {skipListData ? (
         miscListBlocks.length > 0 &&
         runtime && (
-          <div className={schema.layout?.type === 'grid' ? 'p-4' : 'flex flex-col gap-4 p-4'} data-testid="list-misc-blocks">
+          <div className={schema.extension?.resultsSurface === 'canvas'
+            ? (schema.layout?.type === 'grid' ? '' : 'flex flex-col gap-4')
+            : (schema.layout?.type === 'grid' ? 'p-4' : 'flex flex-col gap-4 p-4')} data-testid="list-misc-blocks">
             {schema.layout?.type === 'grid' ? (
               <LayoutRenderer
                 layout={schema.layout}
