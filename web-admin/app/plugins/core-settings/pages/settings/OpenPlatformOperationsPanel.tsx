@@ -236,7 +236,7 @@ export default function OpenPlatformOperationsPanel({
               {audits.length === 0 ? (
                 <Empty label={t('openPlatform.noCalls', undefined, 'No calls match this filter')} />
               ) : (
-                <div className="max-h-72 min-w-0 space-y-2 overflow-auto">
+                <div className="max-h-72 min-w-0 space-y-2 overflow-auto [&:has([aria-expanded=true])]:max-h-[44rem]">
                   {audits.map((audit) => (
                     <div
                       key={`${audit.requestId}-${audit.occurredAt}`}
