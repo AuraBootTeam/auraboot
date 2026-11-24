@@ -49,6 +49,14 @@ const block = {
 } as any;
 
 describe('TableBlockRenderer data-source states', () => {
+  it('discloses the exact long value locally without selecting a different record', () => {
+    const text='Material A\nCODE-A\n'+ 'Full specification '.repeat(12);
+    render(<TableBlockRenderer block={{...block,columns:[{field:'name',label:'Name',textPreviewLength:80,verticalAlign:'top'}]}} runtime={runtime([{pid:'row-a',name:text}],{data:[{pid:'row-a',name:text}]})} />);
+    const details=screen.getByTestId('table-text-details') as HTMLDetailsElement;
+    expect(details.open).toBe(false);fireEvent.click(screen.getByText('Full text'));expect(details.open).toBe(true);
+    expect(details.querySelector('div')?.textContent).toBe(text);
+    expect(details.closest('td')?.style.verticalAlign).toBe('top');
+  });
   it('keeps empty guidance outside the horizontally scrolling column canvas', () => {
     render(
       <TableBlockRenderer

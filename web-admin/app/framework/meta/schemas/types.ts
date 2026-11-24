@@ -121,6 +121,8 @@ export interface CardGroupRows {
   identityField: string;
   titleField: string;
   summaryFields?: FieldConfig[];
+  detailsFields?: FieldConfig[];
+  detailsLabel?: string | LocalizedText;
   fields?: FieldConfig[];
   emptyText?: string | LocalizedText;
   draftRows?: CardDraftRows;
@@ -161,6 +163,8 @@ export interface BlockConfig {
   groupWarningField?: string;
   /** Join child cards to explicit parent rows, including parents without children. */
   groupRows?: CardGroupRows;
+  /** Render nested child arrays while preserving the parent data source for grouping. */
+  childrenField?: string;
   /** Reconcile refreshed facts by stable identity while preserving declared draft fields. */
   draftRows?: CardDraftRows;
   cardActions?: ButtonConfig[];
@@ -370,6 +374,9 @@ export interface EventConfig {
 
 // Column 配置（用于列表）
 export interface ColumnConfig {
+  /** Optional disclosure for long read-only text; the complete value remains available. */
+  textPreviewLength?: number;
+  verticalAlign?: 'top' | 'middle' | 'bottom';
   /** Localized placeholder for explicitly empty values, including empty arrays. */
   emptyText?: string | LocalizedText;
   /** Structured, reusable business cell presentation. */
