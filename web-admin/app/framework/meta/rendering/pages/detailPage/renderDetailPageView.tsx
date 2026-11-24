@@ -234,10 +234,10 @@ export function renderDetailPageView({
   const workspace = schema.extension?.presentation === 'workspace';
   const standardDetail = !presentation && !schema.extension?.presentation;
   const cardTabs = (schema.blocks || []).some(
-    (block) =>
+    (block: BlockConfig) =>
       block.blockType === 'tabs' &&
       block.surface === 'card' &&
-      (block.tabs || []).some((tab) => tab === activeDetailTab?.tab),
+      (block.tabs || []).some((tab: unknown) => tab === activeDetailTab?.tab),
   );
   const compactHeaderActions = schema.extension?.compactHeaderActions ?? standardDetail;
   const workspaceShell = workspace ? resolveWorkspaceShell(schema.extension?.workspaceShell) : null;
