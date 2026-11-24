@@ -44,6 +44,17 @@ describe('Authored collection presentations', () => {
   expect(screen.getByRole('dialog')).toHaveTextContent('Only second trace');
   expect(screen.getByRole('dialog')).not.toHaveTextContent('Only first trace');
  });
+ it('opens only the first displayed group and preserves closed material contents', () => {
+  setup({groupOrder:'reverse',collapsibleGroups:true,groupsDefaultOpen:'first'});
+  const groups=screen.getAllByTestId('card-grid-group');
+  expect(groups[0]).toHaveAttribute('open');
+  expect(groups[0]).toHaveTextContent('Batch two');
+  expect(groups[1]).not.toHaveAttribute('open');
+  expect(groups[1]).toHaveTextContent('25');
+  groups[1].setAttribute('open','');
+  expect(groups[1]).toHaveTextContent('Complete original specification');
+  expect(handleAction).not.toHaveBeenCalled();
+ });
  it('renders a collection review in a modal and routes dismissal through the configured action', async () => {
   handleAction.mockClear();
   setup({collectionDialog:{title:'Review entire plan',headerFields:[{field:'plannedCount',label:'Planned orders',component:'SmartDisplay',valueWhen:'${fn.COUNT(form.groups)}',props:{appearance:'plain'}}],buttons:[],dismissAction:{code:'discard-preview',action:{type:'flow',steps:[]}}}});

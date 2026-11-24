@@ -384,7 +384,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
         const rowSelected = selectionRule ? readOwnPath(row,selectionRule.selectedField) === true : false;
         const visibleActions = cardActions.filter(action => actionAllowed(action, row));
         const rowContext = { ...runtime.getContext(), row } as any;
-        const visibleFields = cardFields.filter(field => field.field !== cfg.primaryField && (!field.visibleWhen
+        const visibleFields = cardFields.filter(field => field.field !== cfg.primaryField && field.field !== cfg.primarySupportingField && (!field.visibleWhen
           || runtime.getEvaluator().evaluateCondition(field.visibleWhen, rowContext)));
         let nextColumn = 0;
         const fieldBlocks = fieldsLayout ? visibleFields.map(field => {
@@ -400,7 +400,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
             key={rowKey}
             data-testid="card-grid-card"
             style={{ scrollMarginBlockStart: 'calc(var(--workspace-header-height, 3.5rem) + 1rem)' }}
-            className={`${lineItems ? 'border-border border-b last:border-b-0 p-4' : `rounded-card border-border bg-panel border ${dense ? 'p-3.5' : compact ? 'p-3 shadow-sm' : 'p-4 shadow-sm'}`} flex min-w-0 flex-col ${dense ? '[&_fieldset]:mb-0 [&_label]:text-xs [&_input]:text-xs' : ''}`}
+            className={`${lineItems ? 'border-border border-b last:border-b-0 p-4' : `rounded-card ${cfg.cardEmphasisWhen && runtime.getEvaluator().evaluateCondition(cfg.cardEmphasisWhen, rowContext) ? 'border-accent' : 'border-border'} bg-panel border ${dense ? 'p-3.5' : compact ? 'p-3 shadow-sm' : 'p-4 shadow-sm'}`} flex min-w-0 flex-col ${dense ? '[&_fieldset]:mb-0 [&_label]:text-xs [&_input]:text-xs' : ''}`}
           >
             {selectionRule && (
               <label className="mb-3 flex items-center gap-2 text-sm">
@@ -471,7 +471,11 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
               </span>
             )}
 
-            {cfg.primaryField && cardFields.find(field => field.field === cfg.primaryField) ? <div className={dense ? "my-1" : "my-3"}>{renderField(cardFields.find(field => field.field === cfg.primaryField)!)}</div> : null}
+            {cfg.primaryField && cardFields.find(field => field.field === cfg.primaryField) ? <div className={`${dense ? 'my-1' : 'my-3'} flex flex-wrap items-baseline gap-x-2 gap-y-1`}>
+              {renderField(cardFields.find(field => field.field === cfg.primaryField)!)}
+              {cfg.primarySupportingField && cardFields.find(field => field.field === cfg.primarySupportingField)
+                ? <div className="text-text-3 min-w-0">{renderField(cardFields.find(field => field.field === cfg.primarySupportingField)!)}</div> : null}
+            </div> : null}
 
             {/* Declared fields; without a form array they are display-only. */}
             {visibleFields.length > 0 && (
@@ -595,14 +599,14 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
         {block.title ? <div className="border-border border-b px-4 py-4"><h2 className="text-text text-base font-semibold">{getLocalizedText(block.title,locale,t)}</h2></div> : null}
         {selectionHint}
         {orderedGroups.map(([key, group], index) => cfg.collapsibleGroups === true ? (
-          <details key={key} data-testid="card-grid-group" open={cfg.groupsDefaultOpen !== false}
+          <details key={key} data-testid="card-grid-group" open={cfg.groupsDefaultOpen === 'first' ? index === 0 : cfg.groupsDefaultOpen !== false}
             style={{ scrollMarginBlockStart: 'calc(var(--workspace-header-height, 3.5rem) + 1rem)' }}
             className={`${cfg.groupLayout === 'divided' ? 'border-border border-b last:border-b-0' : 'rounded-lg border border-border'} ${compact ? 'group overflow-hidden' : 'p-3'} ${cfg.groupWarningField && (group.parent?.[cfg.groupWarningField] === true || group.entries.some(({ row }) => row[cfg.groupWarningField] === true)) ? 'bg-amber-50' : 'bg-surface'}`}>
             <summary className={`cursor-pointer select-none text-sm font-semibold text-text ${compact ? 'list-none p-4' : ''}`}>
               <div data-testid="card-group-heading" style={compact ? { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 24rem), 1fr))', gap: '1rem' } : undefined}>
                 <div className="min-w-0">
                   <span data-testid="card-group-title">{compact && <span aria-hidden="true" className="mr-2 inline-block transition-transform group-open:rotate-90">›</span>}{group.title}{cfg.groupBadgeField && <span className="bg-accent-weak text-accent ml-2 inline-flex rounded px-2 py-0.5 text-xs font-normal">{getLocalizedText(group.parent?.[cfg.groupBadgeField], locale, t)}</span>}</span>
-                  {cfg.groupDescriptionField && <span data-testid="card-group-description" className={`${compact ? 'mt-1 block text-xs' : 'ml-3'} font-normal text-text-2 whitespace-pre-wrap break-words`}>
+                  {cfg.groupDescriptionField && <span data-testid="card-group-description" style={cfg.groupDescriptionLines === 1 || cfg.groupDescriptionLines === 2 ? {display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: cfg.groupDescriptionLines, overflow: 'hidden'} : undefined} className={`${compact ? 'mt-1 block text-xs' : 'ml-3'} font-normal text-text-2 whitespace-pre-wrap break-words`}>
                     {getLocalizedText((group.parent || group.entries[0]?.row)?.[cfg.groupDescriptionField], locale, t)}
                   </span>}
                 </div>

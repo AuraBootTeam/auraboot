@@ -164,7 +164,11 @@ export interface BlockConfig {
   minCardWidth?: number;
   /** Accessible native disclosure groups retain mounted row inputs when closed. */
   collapsibleGroups?: boolean;
-  groupsDefaultOpen?: boolean;
+  groupsDefaultOpen?: boolean | 'first';
+  /** Limit only the group summary; full detail fields remain available. */
+  groupDescriptionLines?: 1 | 2;
+  /** Visual emphasis derived from the current row; does not select or allocate it. */
+  cardEmphasisWhen?: string;
   groupDescriptionField?: string;
   /** Boolean row fact: highlight a group if any member requires attention. */
   groupWarningField?: string;
@@ -176,6 +180,7 @@ export interface BlockConfig {
   itemPresentation?: 'cards' | 'rows' | 'table';
   collectionDialog?: { title: string | LocalizedText; headerFields?: FieldConfig[]; footerFields?: FieldConfig[]; buttons: ButtonConfig[]; dismissAction: ButtonConfig };
   primaryField?: string;
+  primarySupportingField?: string;
   fieldDensity?: 'default' | 'compact';
   groupBadgeField?: string;
   groupLayout?: 'cards' | 'divided';
