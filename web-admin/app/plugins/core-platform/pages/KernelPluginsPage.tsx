@@ -31,7 +31,7 @@ function StateBadge({ state }: { state: PluginState }) {
   const { t } = useI18n()
   const cls = STATE_COLORS[state] ?? 'bg-gray-100 text-gray-700'
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium border rounded-full ${cls}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium whitespace-nowrap border rounded-full ${cls}`}>
       {t(`kernelPlugins.state.${state}`, undefined, state)}
     </span>
   )
@@ -40,7 +40,7 @@ function StateBadge({ state }: { state: PluginState }) {
 function KindBadge({ kind }: { kind: PluginKind }) {
   const { t } = useI18n()
   return (
-    <span className={`inline-flex px-1.5 py-0.5 text-xs font-mono rounded ${KIND_BADGES[kind]}`}>
+    <span className={`inline-flex px-1.5 py-0.5 text-xs font-mono whitespace-nowrap rounded ${KIND_BADGES[kind]}`}>
       {t(`kernelPlugins.kind.${kind}`, undefined, kind)}
     </span>
   )
@@ -87,7 +87,7 @@ export default function KernelPluginsPage() {
   }, [])
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="w-full min-w-0 p-6 max-w-7xl mx-auto">
       <header className="mb-6">
         <h1 className="text-2xl font-semibold text-gray-900">{t('kernelPlugins.title', undefined, 'Kernel Plugin Manager')}</h1>
         <p className="mt-1 text-sm text-gray-600">
@@ -104,8 +104,8 @@ export default function KernelPluginsPage() {
         <SummaryCard label={t('kernelPlugins.summary.installed', undefined, 'Installed')} value={summary.byState.installed ?? 0} accent="bg-blue-50" />
       </section>
 
-      <section className="overflow-x-auto bg-white rounded-lg border border-gray-200">
-        <table className="min-w-full text-sm">
+      <section className="min-w-0 overflow-x-auto bg-white rounded-lg border border-gray-200">
+        <table className="w-full min-w-[960px] text-sm">
           <thead className="bg-gray-50 text-gray-600 text-xs uppercase">
             <tr>
               <th className="px-4 py-3 text-left font-semibold">{t('kernelPlugins.column.plugin', undefined, 'Plugin')}</th>
