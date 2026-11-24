@@ -7403,5 +7403,10 @@
     "key": "openPlatform.webhookDeliveries",
     "zh-CN": "Webhook 投递",
     "en-US": "Webhook deliveries"
+  },
+  {
+    "key": "openPlatform.logs.fullDetails",
+    "zh-CN": "查看请求与响应详情",
+    "en-US": "View requests and responses"
   }
 ]

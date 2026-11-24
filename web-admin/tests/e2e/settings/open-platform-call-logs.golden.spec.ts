@@ -251,6 +251,7 @@ test.describe
     const page = await context.newPage();
     const identity = await login(page);
     tenantId = identity.tenantId;
+    expect(tenantId).toMatch(/^[0-9]+$/);
     const health = await page.request.get(`${BFF_URL}/health`);
     expect(health.status()).toBe(200);
     const h = await health.json();
@@ -376,7 +377,7 @@ test.describe
     // Controlled historical fixture: one owned real call has no pre-existing HTTP capture.
     expect(
       sql(
-        `UPDATE ab_open_api_call_audit SET http_details=NULL WHERE tenant_id=${Number(tenantId)} AND installation_pid='${installationPid}' AND request_id='${historicalRequestId}' RETURNING request_id`,
+        `UPDATE ab_open_api_call_audit SET http_details=NULL WHERE tenant_id='${tenantId}'::bigint AND installation_pid='${installationPid}' AND request_id='${historicalRequestId}' RETURNING request_id`,
       ),
     ).toContain(historicalRequestId);
     otherAppName = `Isolated second application ${tag}`;
@@ -445,9 +446,9 @@ test.describe
       requestIds[id] = audit.auditPid;
     }
     const persisted = sql(
-      `SELECT http_details::text FROM ab_open_api_call_audit WHERE tenant_id=${Number(tenantId)} AND installation_pid='${installationPid}' AND http_details IS NOT NULL`,
+      `SELECT http_details::text FROM ab_open_api_call_audit WHERE tenant_id='${tenantId}'::bigint AND installation_pid='${installationPid}' AND http_details IS NOT NULL`,
     );
-    expect(persisted).not.toContain(machineToken);
+    expect(persisted.includes(machineToken), "Persisted audit must not contain the live token").toBe(false);
     expect(persisted).not.toContain("audit-private-password");
     expect(persisted).not.toContain("audit-private-client-secret");
     expect(persisted).not.toContain("private-query-token");
@@ -487,7 +488,7 @@ test.describe
     await capture(page, "NAV01");
     await page.keyboard.press("Escape");
     const countBefore = sql(
-      `SELECT count(*) FROM ab_open_api_call_audit WHERE tenant_id=${Number(tenantId)} AND installation_pid='${installationPid}'`,
+      `SELECT count(*) FROM ab_open_api_call_audit WHERE tenant_id='${tenantId}'::bigint AND installation_pid='${installationPid}'`,
     );
     await expect(
       page.getByTestId("open-platform-call-logs").locator("tbody tr"),
@@ -520,7 +521,7 @@ test.describe
     const curl = await page.evaluate(() => navigator.clipboard.readText());
     expect(curl).toContain("api.example.com");
     expect(curl).toContain("<YOUR_ACCESS_TOKEN>");
-    expect(curl).not.toContain(machineToken);
+    expect(curl.includes(machineToken), "cURL must not contain the live token").toBe(false);
     const downloadPromise = page.waitForEvent("download");
     await inspector.getByTestId("download-http-audit").click();
     const download = await downloadPromise;
@@ -532,7 +533,7 @@ test.describe
     const artifact = JSON.parse(await readFile(saved, "utf8"));
     expect(artifact.requestId).toBe(createRequestId);
     expect(artifact.httpDetails.request.body.assetCode).toBe(`UI-${tag}`);
-    expect(JSON.stringify(artifact)).not.toContain(machineToken);
+    expect(JSON.stringify(artifact).includes(machineToken), "Download must not contain the live token").toBe(false);
     await inspector.getByRole("tab", { name: "执行信息", exact: true }).click();
     await expect(inspector).toContainText(appName);
     await capture(page, "LOG13");
@@ -633,7 +634,7 @@ test.describe
     await capture(page, "LOG17");
     expect(
       sql(
-        `SELECT count(*) FROM ab_open_api_call_audit WHERE tenant_id=${Number(tenantId)} AND installation_pid='${installationPid}'`,
+        `SELECT count(*) FROM ab_open_api_call_audit WHERE tenant_id='${tenantId}'::bigint AND installation_pid='${installationPid}'`,
       ),
     ).toBe(countBefore);
   });

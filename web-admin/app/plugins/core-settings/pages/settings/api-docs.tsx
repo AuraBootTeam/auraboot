@@ -93,7 +93,7 @@ interface CredentialSecret {
 
 export default function OpenPlatformPage() {
   const { t, locale } = useI18n();
-  const [viewParams, setViewParams] = useSearchParams();
+  const [viewParams] = useSearchParams();
   const { showToast } = useToastContext();
   const [applications, setApplications] = useState<ExternalApplication[]>([]);
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
@@ -683,7 +683,7 @@ export default function OpenPlatformPage() {
                             <button
                               type="button"
                               onClick={() =>
-                                setViewParams({ view: 'calls', application: application.pid, installation: installation.pid })
+                                setOperationsInstallation((current) => current === installation.pid ? null : installation.pid)
                               }
                               className="inline-flex min-w-0 items-center justify-center gap-1 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200"
                               data-testid={`open-platform-operations-${installation.pid}`}
