@@ -574,3 +574,14 @@ describe('PROJECT_ROWS exact payload projection', () => {
     ).toThrow();
   });
 });
+
+describe('Exact decimal line extension totals', () => {
+ it('keeps monetary precision and ignores ineligible offers', () => {
+  expect(fn.DECIMAL_SUM_PRODUCTS([{quantity:'350',price:'0.68',eligible:true},{quantity:'100',price:'2.8',eligible:true},{quantity:'999',price:null,eligible:false}],['quantity','price'],'eligible',true)).toBe('518');
+  expect(fn.DECIMAL_SUM_PRODUCTS([{quantity:'9007199254740993',price:'0.000001'}],['quantity','price'])).toBe('9007199254.740993');
+ });
+ it('rejects incomplete or malformed selected amounts instead of silently undercounting', () => {
+  for (const quantity of ['', null, '1e2', 'NaN']) expect(() => fn.DECIMAL_SUM_PRODUCTS([{quantity,price:'1'}],['quantity','price'])).toThrow();
+  expect(() => fn.DECIMAL_SUM_PRODUCTS([],[])).toThrow();
+ });
+});

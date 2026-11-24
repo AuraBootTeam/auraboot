@@ -50,6 +50,23 @@ function DECIMAL_SUM_BY(rows: unknown, valueField: string, matchField?: string, 
   return decimalText(result.units, result.scale);
 }
 
+/** Sum exact decimal line extensions without converting monetary values to binary floats. */
+function DECIMAL_SUM_PRODUCTS(rows: unknown, valueFields: string[], matchField?: string, matchValue?: unknown): string {
+  if (!Array.isArray(rows) || rows.length > 10000 || !Array.isArray(valueFields) || valueFields.length < 1 || valueFields.length > 8 || valueFields.some(field => typeof field !== 'string' || !field)) throw new Error('Expected bounded decimal product rows');
+  let result: ExactDecimal = { units: 0n, scale: 0 };
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') throw new Error('Expected decimal product row');
+    if (matchField && row[matchField] !== matchValue) continue;
+    let product: ExactDecimal = {units: 1n, scale: 0};
+    for (const field of valueFields) {
+      const factor = exactDecimal(row[field]);
+      product = {units: product.units * factor.units, scale: product.scale + factor.scale};
+    }
+    result = decimalAdd(result, product);
+  }
+  return decimalText(result.units, result.scale);
+}
+
 // ==================== Logical Functions ====================
 
 function IF(condition: any, trueValue: any, falseValue?: any): any {
@@ -537,6 +554,7 @@ export const businessFunctions = {
 
   DECIMAL_SUBTRACT,
   DECIMAL_SUM_BY,
+  DECIMAL_SUM_PRODUCTS,
 
   // Number (12)
   ROUND: ROUND_FN,

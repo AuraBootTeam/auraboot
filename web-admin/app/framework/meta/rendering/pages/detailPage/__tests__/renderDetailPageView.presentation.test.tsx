@@ -159,7 +159,7 @@ describe('detail header business status', () => {
     const renderView = () => <MemoryRouter>{renderDetailPageView({
       ...base,
       schema: { ...base.schema, extension: { ...base.schema.extension,
-        headerStatusField: 'progress', headerStatusDictCode: 'business_status', headerSubtitleFields: ['deadline'],
+        headerStatusField: 'progress', headerStatusDictCode: 'business_status', headerSubtitleFields: ['deadline'], headerFacts: [{field:'buyerName',label:'Buyer'}],
       } },
       recordData: persisted,
       runtime: { getContext: () => ({ form }) } as any,
@@ -168,11 +168,12 @@ describe('detail header business status', () => {
     } as Parameters<typeof renderDetailPageView>[0])}</MemoryRouter>;
     const view = render(renderView());
     expect(screen.getByText('All replied')).toBeInTheDocument();
-    form = { subject: 'Updated title', progress: 'collecting', deadline_display: 'Updated cutoff', rows: [{ quantity: '99' }] };
+    form = { subject: 'Updated title', buyerName: 'Confirmed buyer', progress: 'collecting', deadline_display: 'Updated cutoff', rows: [{ quantity: '99' }] };
     view.rerender(renderView());
     expect(screen.getByRole('heading', { name: 'Updated title', exact: true })).toBeInTheDocument();
     expect(screen.getByText('Awaiting reply')).toBeInTheDocument();
     expect(screen.getByText('Updated cutoff')).toBeInTheDocument();
+    expect(screen.getByTestId('detail-header-facts')).toHaveTextContent('Confirmed buyer');
     expect(persisted.progress).toBe('ready');
     expect(form.rows).toEqual([{ quantity: '99' }]);
   });

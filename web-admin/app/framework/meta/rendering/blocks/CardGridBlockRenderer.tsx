@@ -37,6 +37,9 @@ import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import { useAuth } from '~/contexts/AuthContext';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useDictCache } from '~/framework/meta/rendering/pages/hooks/useDictCache';
+import { cellRendererRegistry } from '~/framework/meta/runtime/renderers/CellRendererRegistry';
+import { Dialog, DialogContent, DialogTitle } from '~/ui/ui/dialog';
+import { ToolbarBlockRenderer } from './ToolbarBlockRenderer';
 import { FieldRenderer } from '~/framework/meta/rendering/FieldRenderer';
 import { GridLayoutRenderer } from '~/framework/meta/rendering/layout/GridLayoutRenderer';
 import { resolveErrorLocale, rootT } from '~/error/root-error-view';
@@ -99,6 +102,9 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   const cardActions: ButtonConfig[] =
     Array.isArray(cfg.cardActions) ? cfg.cardActions : [];
   const compact = cfg.compact === true;
+  const lineItems = cfg.itemPresentation === 'rows';
+  const tableItems = cfg.itemPresentation === 'table';
+  const dense = cfg.fieldDensity === 'compact';
   const autoFitColumns = cfg.autoFitColumns === true;
   const autoFillColumns = cfg.autoFillColumns === true;
   const minCardWidth = Number.isFinite(cfg.minCardWidth) && cfg.minCardWidth >= 180 && cfg.minCardWidth <= 640
@@ -110,9 +116,11 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   // A declared form field stores draft card rows; data-source refreshes never replace edits.
   const formField = typeof cfg.field === 'string' && cfg.field.trim() ? cfg.field : undefined;
   if (cfg.childrenField && formField) throw new Error("Nested child cards require a read-only data source");
+  if (tableItems && formField) throw new Error('Table card groups require read-only rows');
   const parentConfig = cfg.groupRows;
   if (parentConfig && (!cfg.groupByField || !parentConfig.field || !parentConfig.identityField || !parentConfig.titleField))
     throw new Error('Joined card groups require an explicit parent form array and group identity');
+  const [activeDetails, setActiveDetails] = useState<string | null>(null);
   const [groupSearch, setGroupSearch] = useState<Record<string, string>>({});
   const rowSelection = cfg.rowSelection;
   if (rowSelection && !formField) throw new Error('Card row selection requires a form array');
@@ -210,7 +218,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
   if (parentConfig && !parentConfig.dataSource && !Array.isArray(storedParents))
     throw new Error('Joined card parent form rows must be an array');
   const rawParents = parentConfig?.dataSource ? dataSourceManager.getData(parentConfig.dataSource) : storedParents;
-  const parentsReadOnly = Boolean(parentConfig && [...(parentConfig.fields || []), ...(parentConfig.detailsFields || [])].every((field: FieldConfig) => field.readOnly || field.valueWhen));
+  const parentsReadOnly = Boolean(parentConfig && [...(parentConfig.fields || []), ...(parentConfig.detailsFields || []), ...(parentConfig.asideFields || []), ...(parentConfig.asideDetailsFields || []), ...(parentConfig.footerFields || [])].every((field: FieldConfig) => field.readOnly || field.valueWhen));
   const parentRows = parentsReadOnly ? normalizeRows(rawParents) : Array.isArray(storedParents) ? storedParents : normalizeRows(rawParents);
   const previousParents = useRef<unknown>(undefined);
   const previousRows = useRef<unknown>(undefined);
@@ -325,8 +333,8 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
         const rowSelected = selectionRule ? readOwnPath(row,selectionRule.selectedField) === true : false;
         const visibleActions = cardActions.filter(action => actionAllowed(action, row));
         const rowContext = { ...runtime.getContext(), row } as any;
-        const visibleFields = cardFields.filter(field => !field.visibleWhen
-          || runtime.getEvaluator().evaluateCondition(field.visibleWhen, rowContext));
+        const visibleFields = cardFields.filter(field => field.field !== cfg.primaryField && (!field.visibleWhen
+          || runtime.getEvaluator().evaluateCondition(field.visibleWhen, rowContext)));
         let nextColumn = 0;
         const fieldBlocks = fieldsLayout ? visibleFields.map(field => {
           const cols = fieldsLayout.cols ?? 12;
@@ -344,6 +352,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
             key={field.field}
             runtime={runtime}
             field={{ ...field,
+              props: { ...(dense ? { density: 'compact' } : {}), ...field.props },
               field: `${formField || block.id}.${idx}.${field.field}`,
               visibleWhen: undefined, readOnlyWhen: undefined,
               readOnly: !formField || !rowSelectable || field.field===selectionRule?.positiveField || Boolean(field.valueWhen) || conditionalReadOnly || field.readOnly,
@@ -362,7 +371,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
             key={rowKey}
             data-testid="card-grid-card"
             style={{ scrollMarginBlockStart: 'calc(var(--workspace-header-height, 3.5rem) + 1rem)' }}
-            className={`rounded-card border-border bg-panel flex flex-col border shadow-sm ${compact ? 'p-3' : 'p-4'}`}
+            className={`${lineItems ? 'border-border border-b last:border-b-0 p-4' : `rounded-card border-border bg-panel border ${dense ? 'p-3.5' : compact ? 'p-3 shadow-sm' : 'p-4 shadow-sm'}`} flex min-w-0 flex-col ${dense ? '[&_fieldset]:mb-0 [&_label]:text-xs [&_input]:text-xs' : ''}`}
           >
             {selectionRule && (
               <label className="mb-3 flex items-center gap-2 text-sm">
@@ -416,11 +425,11 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
             )}
 
             {/* Title */}
-            <h3 className={`text-text mb-1 break-words font-semibold ${compact ? 'text-sm' : 'text-base'}`}>{title}</h3>
+            <h3 className={`text-text mb-1 break-words font-semibold ${compact || dense ? 'text-sm' : 'text-base'}`}>{title}</h3>
 
             {/* Description */}
             {description && (
-              <p className="text-text-2 mb-3 line-clamp-2 text-sm">{description}</p>
+              <p className={`text-text-3 ${lineItems ? 'mb-3 whitespace-pre-wrap text-xs leading-5' : 'mb-2 line-clamp-2 text-xs'}`}>{description}</p>
             )}
 
             {/* Badge */}
@@ -429,6 +438,8 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
                 {badge}
               </span>
             )}
+
+            {cfg.primaryField && cardFields.find(field => field.field === cfg.primaryField) ? <div className="my-3">{renderField(cardFields.find(field => field.field === cfg.primaryField)!)}</div> : null}
 
             {/* Declared fields; without a form array they are display-only. */}
             {visibleFields.length > 0 && (
@@ -517,34 +528,47 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
         ? group.entries.filter(({ row }) => cfg.searchFields.some((field: string) => String(readOwnPath(row, field) ?? '').toLocaleLowerCase(locale).includes(search.trim().toLocaleLowerCase(locale))))
         : group.entries;
       const searchLabel = getLocalizedText(cfg.searchPlaceholder || { 'zh-CN': '搜索', en: 'Search' }, locale, t);
+      const details = parentConfig?.detailsFields?.length ? <details data-testid="card-group-details" className="border-border border-t px-4 py-3 text-xs">
+        <summary className="text-accent cursor-pointer">{getLocalizedText(parentConfig.detailsLabel || { 'zh-CN': '查看补充信息', en: 'View additional information' }, locale, t)}</summary>
+        <div className="mt-3">{parentFields(group, parentConfig.detailsFields, false)}</div>
+      </details> : null;
+      const items = tableItems ? <div className="overflow-x-auto" data-testid="card-group-table"><table className="w-full text-xs"><thead className="bg-subtle text-text-3"><tr>{(cfg.table?.columns || []).map((column: any) => <th key={column.field} className={`px-4 py-3 font-normal ${column.align === 'right' ? 'text-right' : 'text-left'}`}>{getLocalizedText(column.label || column.field, locale, t)}</th>)}</tr></thead>
+        <tbody>{entries.map(({row, index: originalIndex}) => <tr key={row.pid || originalIndex} data-testid="card-grid-row" className="border-border border-t">{(cfg.table?.columns || []).map((column: any) => <td key={column.field} className={`px-4 py-3 align-top ${column.align === 'right' ? 'text-right tabular-nums whitespace-nowrap' : 'text-left'}`}>{cellRendererRegistry.render(column.presentation ? 'workspace' : column.valueType || 'text', {value: readOwnPath(row, column.field), record: row, column, locale, t, rowIndex: originalIndex})}</td>)}</tr>)}</tbody>
+      </table></div> : <div data-testid="card-grid-tracks" className={lineItems ? 'flex flex-col' : `grid gap-3 ${columnsClass}`} style={lineItems ? undefined : {...columnsStyle, alignItems: compact ? 'start' : undefined}}>
+        {entries.map(({row, index: originalIndex}) => renderCard(row, originalIndex))}
+      </div>;
       return <>
         {parentFields(group, parentConfig?.fields || [], false)}
-        {parentConfig?.detailsFields?.length ? <details data-testid="card-group-details" className="my-3">
-          <summary className="text-primary cursor-pointer text-sm">{getLocalizedText(parentConfig.detailsLabel || { 'zh-CN': '查看补充信息', en: 'View additional information' }, locale, t)}</summary>
-          <div className="mt-3">{parentFields(group, parentConfig.detailsFields, false)}</div>
-        </details> : null}
-        {cfg.searchFields?.length && group.entries.length > 0 ? <div className="my-3 flex justify-end">
+        {parentConfig?.detailsPlacement !== 'after-items' ? details : null}
+        {cfg.searchFields?.length && group.entries.length > 0 ? <div className="mb-3 flex justify-end">
           <input type="search" aria-label={searchLabel} placeholder={searchLabel} value={search}
-            className="rounded-control border-border bg-panel text-text max-w-full border px-3 py-2 text-sm"
+            className="rounded-control border-border bg-panel text-text max-w-full border px-3 py-1.5 text-xs"
             onChange={event => setGroupSearch(current => ({ ...current, [key]: event.target.value }))} />
         </div> : null}
         {group.entries.length === 0 && parentConfig?.emptyText ? <p className="text-text-2 py-3 text-sm">{getLocalizedText(parentConfig.emptyText, locale, t)}</p> : null}
-        <div data-testid="card-grid-tracks" className={`mt-3 grid gap-3 ${columnsClass}`} style={{ ...columnsStyle, alignItems: compact ? 'start' : undefined }}>
-          {entries.map(({ row, index: originalIndex }) => renderCard(row, originalIndex))}
-        </div>
+        {parentConfig?.asideFields?.length ? <div className="grid min-[900px]:grid-cols-[minmax(0,1fr)_220px]">
+          <div className="min-w-0">{items}</div><aside className="border-border min-w-0 border-t p-4 min-[900px]:border-t-0 min-[900px]:border-l">{parentFields(group, parentConfig.asideFields, false)}
+            {parentConfig.asideDetailsFields?.length ? <><button type="button" className="text-accent mt-3 text-xs hover:underline" onClick={() => setActiveDetails(key)}>{getLocalizedText(parentConfig.asideDetailsLabel || {'zh-CN':'查看完整记录',en:'View full record'},locale,t)}</button>
+              <Dialog open={activeDetails === key} onOpenChange={open => {if (!open) setActiveDetails(null);}}><DialogContent className="max-h-[85dvh] w-[calc(100%-2rem)] max-w-[720px] overflow-y-auto" closeLabel={locale.startsWith('zh') ? '关闭' : 'Close'} aria-describedby={undefined}><DialogTitle>{group.title} · {getLocalizedText(parentConfig.asideDetailsLabel,locale,t)}</DialogTitle>{parentFields(group,parentConfig.asideDetailsFields,false)}</DialogContent></Dialog>
+            </> : null}</aside>
+        </div> : items}
+        {parentConfig?.footerFields?.length ? <div className="border-border border-t px-4 py-2">{parentFields(group, parentConfig.footerFields, false)}</div> : null}
+        {parentConfig?.detailsPlacement === 'after-items' ? details : null}
       </>;
+
     };
-    return (
-      <div data-testid="card-grid-block" className="space-y-6">
+    const collection = (
+      <div data-testid="card-grid-block" className={cfg.groupLayout === 'divided' ? 'border-border bg-panel overflow-hidden rounded-lg border' : 'space-y-4'}>
+        {block.title ? <div className="border-border border-b px-4 py-4"><h2 className="text-text text-base font-semibold">{getLocalizedText(block.title,locale,t)}</h2></div> : null}
         {selectionHint}
         {Array.from(groups.entries()).map(([key, group], index) => cfg.collapsibleGroups === true ? (
           <details key={key} data-testid="card-grid-group" open={cfg.groupsDefaultOpen !== false}
             style={{ scrollMarginBlockStart: 'calc(var(--workspace-header-height, 3.5rem) + 1rem)' }}
-            className={`rounded-lg border border-border ${compact ? 'group overflow-hidden' : 'p-3'} ${cfg.groupWarningField && (group.parent?.[cfg.groupWarningField] === true || group.entries.some(({ row }) => row[cfg.groupWarningField] === true)) ? 'bg-amber-50' : 'bg-surface'}`}>
+            className={`${cfg.groupLayout === 'divided' ? 'border-border border-b last:border-b-0' : 'rounded-lg border border-border'} ${compact ? 'group overflow-hidden' : 'p-3'} ${cfg.groupWarningField && (group.parent?.[cfg.groupWarningField] === true || group.entries.some(({ row }) => row[cfg.groupWarningField] === true)) ? 'bg-amber-50' : 'bg-surface'}`}>
             <summary className={`cursor-pointer select-none text-sm font-semibold text-text ${compact ? 'list-none p-4' : ''}`}>
               <div data-testid="card-group-heading" style={compact ? { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 24rem), 1fr))', gap: '1rem' } : undefined}>
                 <div className="min-w-0">
-                  <span data-testid="card-group-title">{compact && <span aria-hidden="true" className="mr-2 inline-block transition-transform group-open:rotate-90">›</span>}{group.title}</span>
+                  <span data-testid="card-group-title">{compact && <span aria-hidden="true" className="mr-2 inline-block transition-transform group-open:rotate-90">›</span>}{group.title}{cfg.groupBadgeField && <span className="bg-accent-weak text-accent ml-2 inline-flex rounded px-2 py-0.5 text-xs font-normal">{getLocalizedText(group.parent?.[cfg.groupBadgeField], locale, t)}</span>}</span>
                   {cfg.groupDescriptionField && <span data-testid="card-group-description" className={`${compact ? 'mt-1 block text-xs' : 'ml-3'} font-normal text-text-2 whitespace-pre-wrap break-words`}>
                     {getLocalizedText((group.parent || group.entries[0]?.row)?.[cfg.groupDescriptionField], locale, t)}
                   </span>}
@@ -552,20 +576,29 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
                 {parentFields(group, parentConfig?.summaryFields || [], true)}
               </div>
             </summary>
-            <div className={compact ? 'border-t border-border bg-subtle p-4' : 'mt-3'}>{groupCards(key, group)}</div>
+            <div className={compact ? `border-t border-border ${tableItems || lineItems ? 'bg-panel' : 'bg-subtle p-4'}` : 'mt-3'}>{groupCards(key, group)}</div>
           </details>
         ) : (
-          <section key={key} data-testid="card-grid-group"
+          <section key={key} data-testid="card-grid-group" className={lineItems ? 'border-border bg-panel overflow-hidden rounded-lg border' : undefined}
             style={{ scrollMarginBlockStart: 'calc(var(--workspace-header-height, 3.5rem) + 1rem)' }}
             aria-labelledby={group.title ? `${block.id}-group-${index}` : undefined}>
             {group.title && <h2 id={`${block.id}-group-${index}`}
-              className="text-text mb-3 text-base font-semibold">{group.title}</h2>}
-            {parentFields(group, parentConfig?.summaryFields || [], true)}
+              className={lineItems ? "border-border bg-accent-weak text-text border-b px-4 py-3 text-sm font-semibold" : "text-text mb-3 text-base font-semibold"}>{group.title}</h2>}
+            <div className={lineItems ? "px-4 py-2" : undefined}>{parentFields(group, parentConfig?.summaryFields || [], true)}</div>
             {groupCards(key, group)}
           </section>
         ))}
       </div>
     );
+    if (!cfg.collectionDialog) return collection;
+    const dialog = cfg.collectionDialog;
+    const dialogFields = (fields: FieldConfig[]) => <div className="grid gap-3 sm:grid-cols-3">{fields.map(field => <FieldRenderer key={field.field} runtime={runtime} field={{...field, readOnly: true}} value={field.valueWhen ? runtime.getEvaluator().evaluate(field.valueWhen, runtime.getContext()) : stateManager.getFieldValue(scopeId, field.field)} />)}</div>;
+    return <Dialog open onOpenChange={open => { if (!open) void runCardAction(dialog.dismissAction, runtime.getContext().form || {}, -1); }}><DialogContent className="flex max-h-[90dvh] w-[calc(100%-2rem)] max-w-[900px] flex-col gap-0 overflow-hidden p-0" closeLabel={locale.startsWith('zh') ? '关闭' : 'Close'} aria-describedby={undefined}>
+      <div className="border-border border-b px-6 py-5"><DialogTitle>{getLocalizedText(dialog.title, locale, t)}</DialogTitle></div>
+      <div className="min-h-0 overflow-y-auto px-6 py-5"><div className="bg-subtle mb-4 rounded-lg p-4">{dialogFields(dialog.headerFields || [])}</div>{collection}
+        {dialog.footerFields?.length ? <div className="bg-subtle mt-4 rounded-lg p-4">{dialogFields(dialog.footerFields)}</div> : null}</div>
+      <div className="border-border border-t px-6 py-4"><ToolbarBlockRenderer block={{id: `${block.id}-dialog-actions`, blockType: 'toolbar', buttons: dialog.buttons}} runtime={runtime} /></div>
+    </DialogContent></Dialog>;
   }
   return <div data-testid="card-grid-block" className={`grid gap-4 ${columnsClass}`} style={columnsStyle}>
     {selectionHint}

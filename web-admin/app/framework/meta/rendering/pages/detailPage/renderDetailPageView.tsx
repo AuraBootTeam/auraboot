@@ -414,8 +414,11 @@ export function renderDetailPageView({
                     {headerSubtitle}
                   </p>
                 ) : null}
+                {Array.isArray(schema.extension?.headerFacts) && <dl data-testid="detail-header-facts" className="text-text-3 mt-3 flex flex-wrap gap-x-6 gap-y-2 text-xs">
+                  {schema.extension.headerFacts.map((fact: {field: string; label: any}) => headerRecord[fact.field] != null && headerRecord[fact.field] !== '' ? <div key={fact.field} className="flex items-baseline gap-2"><dt>{getLocalizedText(fact.label, locale, t)}</dt><dd className="text-text font-medium whitespace-pre-wrap">{String(headerRecord[fact.field])}</dd></div> : null)}
+                </dl>}
                 {relatedLinks.length > 0 && (
-                  <div className="text-text-3 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm" data-testid="detail-related-links">
+                  <div className="text-text-3 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" data-testid="detail-related-links">
                     <span>{getLocalizedText(schema.extension?.headerRelatedLinks?.label, locale, t)}</span>
                     {relatedLinks.map(link => <Link key={link.pid} to={link.to} className="text-accent hover:underline">{link.label} ↗</Link>)}
                   </div>

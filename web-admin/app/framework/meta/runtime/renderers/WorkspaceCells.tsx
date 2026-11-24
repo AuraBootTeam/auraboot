@@ -8,6 +8,8 @@ export interface WorkspaceCellPresentation {
   currencyCode?: string;
   precision?: number;
   subtitleFields?: string[];
+  descriptionField?: string;
+  descriptionPreviewLength?: number;
   displayField?: string;
   completedField?: string;
   completedValues?: string[];
@@ -31,8 +33,12 @@ export function WorkspaceCell({ value, record, column, locale = 'en' }: CellRend
   if (config.kind === 'object') {
     const subtitles = (config.subtitleFields || []).map(field => record[`${field}_display`] ?? record[field])
       .filter(item => item != null && !internalIdentity.test(String(item)));
+    const description = config.descriptionField ? String(record[config.descriptionField] ?? '') : '';
+    const previewLength = config.descriptionPreviewLength ?? 100;
     return <div className="min-w-0"><div className="text-text truncate text-[13px] leading-5 font-semibold" title={String(value ?? '')}>{String(value ?? '')}</div>
-      {subtitles.length > 0 && <div className="text-text-3 mt-1 truncate text-[11px] leading-4" title={subtitles.join(' · ')}>{subtitles.join(' · ')}</div>}</div>;
+      {subtitles.length > 0 && <div className="text-text-3 mt-1 truncate text-[11px] leading-4" title={subtitles.join(' · ')}>{subtitles.join(' · ')}</div>}
+      {description && (description.length > previewLength ? <details className="text-text-3 mt-1 text-xs leading-5" data-testid="object-description-details"><summary className="cursor-pointer">{description.slice(0, previewLength)}… <span className="text-accent">{locale.startsWith('zh') ? '完整规格' : 'Full specification'}</span></summary><p className="mt-2 whitespace-pre-wrap">{description}</p></details> : <p className="text-text-3 mt-1 whitespace-pre-wrap text-xs leading-5">{description}</p>)}
+    </div>;
   }
   if (config.kind === 'member') {
     const name = record[config.displayField || `${column.field}_display`] ?? value;

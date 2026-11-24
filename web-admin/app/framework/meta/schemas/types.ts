@@ -123,6 +123,11 @@ export interface CardGroupRows {
   identityField: string;
   titleField: string;
   summaryFields?: FieldConfig[];
+  asideFields?: FieldConfig[];
+  asideDetailsFields?: FieldConfig[];
+  asideDetailsLabel?: string | LocalizedText;
+  footerFields?: FieldConfig[];
+  detailsPlacement?: 'before-items' | 'after-items';
   detailsFields?: FieldConfig[];
   detailsLabel?: string | LocalizedText;
   fields?: FieldConfig[];
@@ -167,6 +172,13 @@ export interface BlockConfig {
   groupRows?: CardGroupRows;
   /** Render nested child arrays while preserving the parent data source for grouping. */
   childrenField?: string;
+  /** Reuse the same bound rows as cards, document lines, or a read-only table. */
+  itemPresentation?: 'cards' | 'rows' | 'table';
+  collectionDialog?: { title: string | LocalizedText; headerFields?: FieldConfig[]; footerFields?: FieldConfig[]; buttons: ButtonConfig[]; dismissAction: ButtonConfig };
+  primaryField?: string;
+  fieldDensity?: 'default' | 'compact';
+  groupBadgeField?: string;
+  groupLayout?: 'cards' | 'divided';
   /** Reconcile refreshed facts by stable identity while preserving declared draft fields. */
   draftRows?: CardDraftRows;
   cardActions?: ButtonConfig[];
