@@ -107,6 +107,21 @@ describe('SubTableViewer', () => {
     toolbarRendererMock.mockReset();
   });
 
+  it.each([undefined, false])('uses typed column defaults and preserves explicit widths and pinning (%s)', async (pinFirstColumn) => {
+    fetchResultMock.mockResolvedValue({ code: '0', data: { records: [] } });
+    const columns = [
+      { field: 'name', label: 'Item', dataType: 'string' },
+      { field: 'amount', label: 'Amount', dataType: 'decimal' },
+      { field: 'planned', label: 'Planned date', dataType: 'date', width: 144 },
+      { field: 'notes', label: 'Notes', dataType: 'text' },
+    ];
+    render(<SubTableViewer config={buildConfig({ columns, pinFirstColumn })} parentRecordPid="record-1" />);
+    const item = await screen.findByRole('columnheader', { name: 'Item' });
+    expect(item.classList.contains('sticky')).toBe(pinFirstColumn !== false);
+    expect(screen.getByRole('columnheader', { name: 'Amount' })).toHaveClass('text-right');
+    expect(screen.getByRole('columnheader', { name: 'Planned date' })).toHaveStyle({ width: '144px' });
+  });
+
   it('renders a generic delivery collection from actual rows without conflating reported progress', async () => {
     fetchResultMock.mockResolvedValue({ code: '0', data: { records: [
       { pid: 'checkpoint-1', taskName: 'Requirements agreed', status: 'reached', criteria: 'Signed scope' },

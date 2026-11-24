@@ -156,6 +156,19 @@ test.describe('Model Page Workbench E2E', () => {
       await expect(page).toHaveURL(new RegExp(`/view/${recordPid}$`));
       await expect(page.locator('main')).toContainText('供应链接口联调与交付培训');
       await expect(page.locator('main')).toContainText('14');
+      const detailViewport = page.viewportSize();
+      await page.setViewportSize({ width: 480, height: 1000 });
+      const utilityMenu = page.locator('main summary').filter({ hasText: '更多操作' });
+      await expect(utilityMenu).toBeVisible();
+      await utilityMenu.click();
+      await expect(page.getByRole('button', { name: /^(打印|Print)$/ })).toBeVisible();
+      const bounds = await utilityMenu.locator('..').locator(':scope > div').boundingBox();
+      expect(bounds).not.toBeNull();
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(480);
+      await test.info().attach('ZC-02-narrow-detail', { body: await page.screenshot(), contentType: 'image/png' });
+      await utilityMenu.click();
+      if (detailViewport) await page.setViewportSize(detailViewport);
       const readback = await page.request.get(`/api/dynamic/${modelData.code}/${recordPid}`);
       expect(readback.status()).toBe(200);
       expect((await readback.json()).data).toMatchObject({
