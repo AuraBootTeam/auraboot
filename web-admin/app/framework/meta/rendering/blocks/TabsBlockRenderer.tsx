@@ -58,7 +58,7 @@ export const TabsBlockRenderer: React.FC<TabsBlockRendererProps> = ({ block, run
       </div>
 
       {/* Tab content */}
-      <div className="mt-4">
+      <div className={runtime.getSchema?.().kind === 'form' ? 'mt-4 space-y-4' : 'mt-4'}>
         {tabs[activeTab]?.blocks?.map((nestedBlock: BlockConfig, index: number) => (
           <BlockRenderer
             key={nestedBlock.id || index}

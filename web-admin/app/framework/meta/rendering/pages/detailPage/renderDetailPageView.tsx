@@ -231,6 +231,8 @@ export function renderDetailPageView({
   }
 
   const workspace = schema.extension?.presentation === 'workspace';
+  const standardDetail = !presentation && !schema.extension?.presentation;
+  const compactHeaderActions = schema.extension?.compactHeaderActions ?? standardDetail;
   const workspaceShell = workspace ? resolveWorkspaceShell(schema.extension?.workspaceShell) : null;
   // Follow current scoped form facts without replacing the persisted record or body drafts.
   const scopedForm = runtime?.getContext()?.form;
@@ -282,6 +284,47 @@ export function renderDetailPageView({
       placement={presentation ? 'footer' : 'header'}
     />
   ) : null;
+
+  const showShare = schema.extension?.showShare !== false && canManageRecordShares;
+  const reportRecordPid = schema.extension?.showReport !== false ? recordData?.pid : undefined;
+  const showPrint = schema.extension?.showPrint !== false;
+  const showPdfExport = schema.extension?.showPdfExport !== false;
+  const keepShareVisible =
+    compactHeaderActions &&
+    schema.extension?.compactHeaderActions == null &&
+    schema.extension?.showShare === true;
+  const hasUtilityMenu = compactHeaderActions &&
+    ((showShare && !keepShareVisible) || reportRecordPid || showPrint || showPdfExport);
+  const shareAction = showShare ? (
+    <button
+      onClick={() => setShareDialogOpen(true)}
+      className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover border px-3 py-1.5 text-sm font-medium"
+      data-testid={deriveTestId('detail', schema?.modelCode || tableName, 'share-btn')}
+    >
+      {t('action.share')}
+    </button>
+  ) : null;
+  const utilityActions = (
+    <>
+      {!keepShareVisible && shareAction}
+      {reportRecordPid && (
+        <ReportGenerateButton
+          modelCode={schema?.modelCode || tableName}
+          recordPid={reportRecordPid}
+        />
+      )}
+      {showPrint && (
+        <PrintButton title={getLocalizedText(schema.title, locale, t)} showLabel={Boolean(hasUtilityMenu)} />
+      )}
+      {showPdfExport && (
+        <ExportPdfButton
+          targetRef={pdfExportTargetRef}
+          fileName={resolveDetailPdfFileName(schema, recordData, tableName, locale, t)}
+          orientation="portrait"
+        />
+      )}
+    </>
+  );
 
   return (
     <div
@@ -381,32 +424,18 @@ export function renderDetailPageView({
             </div>
 
             {/* Header toolbar buttons */}
-            <div className={headerLayout.actions} data-print="hide">
-              {schema.extension?.showShare !== false && canManageRecordShares && (
-                <button
-                  onClick={() => setShareDialogOpen(true)}
-                  className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover border px-3 py-1.5 text-sm font-medium"
-                  data-testid={deriveTestId('detail', schema?.modelCode || tableName, 'share-btn')}
-                >
-                  {t('action.share')}
-                </button>
-              )}
-              {schema.extension?.showReport !== false && recordData?.pid && (
-                <ReportGenerateButton
-                  modelCode={schema?.modelCode || tableName}
-                  recordPid={recordData.pid}
-                />
-              )}
-              {schema.extension?.showPrint !== false && (
-                <PrintButton title={getLocalizedText(schema.title, locale, t)} />
-              )}
-              {schema.extension?.showPdfExport !== false && (
-                <ExportPdfButton
-                  targetRef={pdfExportTargetRef}
-                  fileName={resolveDetailPdfFileName(schema, recordData, tableName, locale, t)}
-                  orientation="portrait"
-                />
-              )}
+            <div className={hasUtilityMenu ? `${headerLayout.actions} sm:ml-auto` : headerLayout.actions} data-print="hide">
+              {keepShareVisible && shareAction}
+              {hasUtilityMenu ? (
+                <details className="relative">
+                  <summary className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover cursor-pointer list-none border px-3 py-1.5 text-sm font-medium">
+                    {getLocalizedText({ 'zh-CN': '更多操作', en: 'More actions' }, locale, t)}
+                  </summary>
+                  <div className="rounded-card border-border bg-panel absolute left-0 z-30 mt-2 flex w-max max-w-[min(20rem,75vw)] flex-wrap gap-2 border p-2 shadow-lg sm:right-0 sm:left-auto">
+                    {utilityActions}
+                  </div>
+                </details>
+              ) : utilityActions}
               {!presentation && nativeActions}
             </div>
           </div>
@@ -471,7 +500,7 @@ export function renderDetailPageView({
             <div>
               {persistentHeaderBlocks.length > 0 && (
                 <div
-                  className={workspace ? 'mb-5 space-y-3' : 'space-y-3 p-6 pb-0'}
+                  className={workspace || standardDetail ? 'mb-5 space-y-3' : 'space-y-3 p-6 pb-0'}
                   data-testid="detail-persistent-header"
                 >
                   {schema.extension?.detailHeaderLayout ? (
@@ -489,7 +518,7 @@ export function renderDetailPageView({
               {/* Tab headers (hidden in print — only active tab content shows) */}
               <div
                 className={
-                  workspace
+                  workspace || standardDetail
                     ? 'print-hide border-border mb-4 overflow-x-auto border-b'
                     : 'print-hide border-border overflow-x-auto border-b px-6'
                 }
@@ -537,7 +566,7 @@ export function renderDetailPageView({
               {activeDetailTab && (
                 <div
                   key={activeDetailTab.tab.key || activeDetailTab.index}
-                  className={workspace ? '' : 'p-5'}
+                  className={workspace || standardDetail ? 'min-w-0' : 'p-5'}
                 >
                   {workspace ? (
                     <div
@@ -610,7 +639,7 @@ export function renderDetailPageView({
                 </div>
               )}
               {topLevelDetailBlocks.length > 0 && (
-                <div className="space-y-4 border-t p-5">
+                <div className={standardDetail ? 'mt-4 space-y-4 border-t pt-4' : 'space-y-4 border-t p-5'}>
                   {topLevelDetailBlocks.map((block: BlockConfig, blockIndex: number) =>
                     DETAIL_SPECIALIZED_BLOCK_TYPES.has(block.blockType as string) ? (
                       <DetailBlockRenderer
@@ -679,7 +708,7 @@ export function renderDetailPageView({
               </div>
             </div>
           ) : (
-            <div className={presentation ? 'space-y-4' : 'space-y-4 p-5'}>
+            <div className={presentation || standardDetail ? 'min-w-0 space-y-4' : 'space-y-4 p-5'}>
               {workspace && schema.extension?.detailBodyOrder === 'schema' ? (
                 <>
                   {persistentHeaderBlocks.length > 0 && (

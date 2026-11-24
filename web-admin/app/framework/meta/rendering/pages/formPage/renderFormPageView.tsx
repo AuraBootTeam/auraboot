@@ -213,7 +213,7 @@ export function renderFormPageView({
           className={
             embedded
               ? 'w-full min-w-0'
-              : `mx-auto w-full min-w-0 bg-[#F7F7F8] px-4 py-6 sm:px-6 ${fixedActions ? 'pb-24' : ''} ${presentation.width === 'comfortable' ? 'max-w-4xl' : presentation.width === 'wide' ? 'max-w-6xl' : ''}`
+              : `mx-auto w-full min-w-0 px-4 py-6 sm:px-6 ${fixedActions ? 'pb-24' : ''} ${presentation.width === 'comfortable' ? 'max-w-4xl' : presentation.width === 'wide' ? 'max-w-6xl' : ''}`
           }
           data-testid={deriveTestId('form', schema?.modelCode || tableName, 'container')}
         >

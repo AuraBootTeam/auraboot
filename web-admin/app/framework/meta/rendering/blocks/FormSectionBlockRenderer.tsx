@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import type { BlockConfig, FieldConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
+import { FormSection } from '~/framework/meta/rendering/pages/form/FormSection';
+import { resolveFormPresentation } from '~/framework/meta/rendering/pages/formPage/formPresentation';
 import { FieldRenderer } from '~/framework/meta/rendering/FieldRenderer';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 
@@ -194,6 +196,45 @@ export const FormSectionBlockRenderer: React.FC<FormSectionBlockRendererProps> =
   // hand-edited). Every field renders through FieldRenderer with readOnly
   // forced on so inputs cannot masquerade as editable.
   const isBlockReadOnly = Boolean((block as any).readOnly);
+
+  const schema = runtime.getSchema?.();
+  if (block.blockType === 'form-section' && schema?.kind === 'form') {
+    const presentation = resolveFormPresentation(schema.extension);
+    return (
+      <FormSection
+        title={block.title ? getLocalizedText(block.title, locale, t) : ''}
+        description={block.description ? getLocalizedText(block.description, locale, t) : undefined}
+        surface={presentation.surface}
+        density={presentation.density}
+        testId={`form-section-${block.id}`}
+      >
+        <div
+          className="grid grid-cols-1 @[32rem]/form:grid-cols-12"
+          style={{
+            columnGap: block.layout?.colGap ?? (presentation.density === 'compact' ? 16 : 24),
+            rowGap: block.layout?.rowGap ?? (presentation.density === 'compact' ? 12 : 16),
+          }}
+        >
+          {fields.map((field) => (
+            <div
+              key={field.field}
+              data-authoring-node-id={field.field}
+              className="min-w-0 @[32rem]/form:[grid-column:var(--form-section-column)] @[32rem]/form:[grid-row:var(--form-section-row)]"
+              style={{
+                '--form-section-column': `span ${Math.max(1, Math.min(12, field.layout?.colSpan ?? 12))}`,
+                '--form-section-row': field.layout?.rowSpan ? `span ${field.layout.rowSpan}` : 'auto',
+              } as React.CSSProperties}
+            >
+              <FieldRenderer
+                field={isBlockReadOnly ? { ...field, readOnly: true } : field}
+                runtime={runtime}
+              />
+            </div>
+          ))}
+        </div>
+      </FormSection>
+    );
+  }
 
   return (
     <div className="form-section mb-6">

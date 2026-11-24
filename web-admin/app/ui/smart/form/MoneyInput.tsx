@@ -47,7 +47,7 @@ export interface MoneyInputProps extends FormFieldProps {
 
 const SIZE_CONFIG = {
   small: { height: 'h-8', text: 'text-sm', pill: 'px-2 py-0.5 text-xs', input: 'px-2' },
-  medium: { height: 'h-10', text: 'text-sm', pill: 'px-2.5 py-1 text-sm', input: 'px-3' },
+  medium: { height: 'h-[var(--ds-control-field)]', text: 'text-sm', pill: 'px-2.5 py-1 text-sm', input: 'px-3' },
   large: { height: 'h-12', text: 'text-base', pill: 'px-3 py-1.5 text-base', input: 'px-4' },
 } as const;
 

@@ -73,6 +73,20 @@ describe('actual detail presentation body', () => {
     expect(screen.getByRole('button', { name: 'Export PDF' })).toBeInTheDocument();
     expect(screen.getByTestId('ab:detail:case:container')).toHaveStyle({ minHeight: 0 });
   });
+  it.each([undefined, false])('uses the standard utility menu unless explicitly overridden (%s)', (override) => {
+    const view = args(null);
+    view.schema = { ...view.schema, extension: { showReport: false, compactHeaderActions: override } };
+    render(<MemoryRouter>{renderDetailPageView(view)}</MemoryRouter>);
+    const menu = screen.queryByText('More actions');
+    if (override === false) {
+      expect(menu).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Print' })).toBeInTheDocument();
+    } else {
+      expect(menu?.closest('details')).not.toHaveAttribute('open');
+      expect(menu?.closest('details')).toContainElement(screen.getByText('Print'));
+    }
+  });
+
   it('keeps the normal detail heading and reads the same actual-height variable for its minimum height', () => {
     render(<MemoryRouter>{renderDetailPageView(args(null))}</MemoryRouter>);
     expect(screen.getByRole('heading', { name: 'Actual event subject' })).toBeInTheDocument();

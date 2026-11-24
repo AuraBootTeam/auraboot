@@ -48,6 +48,8 @@ export interface PageExtensionConfig {
   workspaceShell?: WorkspaceShellConfig;
   detailHeaderLayout?: LayoutConfig;
   detailBodyOrder?: 'schema';
+  /** Overrides the utility action menu default for standalone detail pages. */
+  compactHeaderActions?: boolean;
 }
 
 // Layout 配置
@@ -804,6 +806,8 @@ export interface SubTableConfig {
   childModel: string;
   parentField: string;
   readOnly?: boolean;
+  /** Overrides automatic first-column pinning for a read-only table. */
+  pinFirstColumn?: boolean;
   editableWhen?: string;
   columns: ColumnConfig[];
   /** Parent-record actions rendered above the child collection, including when it is empty. */
