@@ -1,6 +1,5 @@
 import { Link, useNavigation, useSearchParams } from "react-router";
 import { useAuditText } from "~/ui/smart/diagnostics/HttpAuditInspector";
-import OpenPlatformCallLogs from "./OpenPlatformCallLogs";
 import OpenPlatformOperationsPanel from "./OpenPlatformOperationsPanel";
 
 export interface OperationsApplication {
@@ -24,7 +23,6 @@ export function OpenPlatformOperationsTabs({ view }: { view: string }) {
     >
       {[
         ["applications", text("applications", "Applications")],
-        ["calls", text("callLogs", "API call logs")],
         ["webhooks", text("webhooks", "Webhook deliveries")],
       ].map(([value, label]) => (
         <Link
@@ -54,7 +52,7 @@ export default function OpenPlatformOperationsWorkspace({
   const [params, setParams] = useSearchParams();
   const navigation = useNavigation();
   const contextPending = navigation.state !== "idle";
-  const view = params.get("view") === "webhooks" ? "webhooks" : "calls";
+  const view = "webhooks";
   const readable = applications.filter(
     (application) => application.permissions.readOperations,
   );
@@ -96,20 +94,10 @@ export default function OpenPlatformOperationsWorkspace({
           {text("openPlatform", "Open Platform")}
         </p>
         <h1 className="text-text text-2xl font-semibold">
-          {view === "calls"
-            ? text("callLogs", "API call logs")
-            : text("webhooks", "Webhook deliveries")}
+          {text("webhooks", "Webhook deliveries")}
         </h1>
         <p className="text-text-3 mt-2 text-sm">
-          {view === "calls"
-            ? text(
-                "subtitle",
-                "Trace API calls and inspect their requests, responses and results.",
-              )
-            : text(
-                "webhookSubtitle",
-                "Inspect outbound deliveries, retries and integration health separately.",
-              )}
+          {text("webhookSubtitle", "Inspect outbound deliveries, retries and integration health separately.")}
         </p>
       </header>
       <OpenPlatformOperationsTabs view={view} />
@@ -206,14 +194,6 @@ export default function OpenPlatformOperationsWorkspace({
                 "This application has no installations. Install it before inspecting calls.",
               )}
             </p>
-          ) : view === "calls" ? (
-            <OpenPlatformCallLogs
-              key={installation.pid}
-              installationPid={installation.pid}
-              applicationName={selectedApplication.name}
-              environment={environmentLabel(installation.environment)}
-              contextPending={contextPending} canReadPayload={selectedApplication.permissions.manageRuntime}
-            />
           ) : (
             <OpenPlatformOperationsPanel
               key={installation.pid}

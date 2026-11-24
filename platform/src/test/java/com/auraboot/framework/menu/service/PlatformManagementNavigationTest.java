@@ -16,7 +16,7 @@ class PlatformManagementNavigationTest {
         assertThat(group.getI18nKey()).isEqualTo("sidebar.platformManagement");
         assertThat(group.getChildren()).hasSize(1);
         assertThat(group.getChildren().getFirst().getChildren()).extracting(item->item.getPath())
-                .containsExactly("/settings/api-docs?view=applications","/settings/api-docs?view=calls","/settings/api-docs?view=webhooks");
+                .containsExactly("/settings/api-docs?view=applications","/settings/api-docs?view=webhooks");
     }
     @Test void platformRoleGetsAnExplicitPostSwitchNavigationMarker() {
         when(spaces.listForUser(7L)).thenReturn(List.of(UserSpaceDTO.builder().spaceType("platform").roleCodes(List.of("platform_admin")).build()));

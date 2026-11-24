@@ -24,7 +24,6 @@ public class PlatformManagementNavigation {
         Menu open = entry("open_platform_entry", "Open Platform", "openPlatform.title", "/settings/api-docs", "code");
         open.setChildren(List.of(
                 entry("open_platform_applications", "Applications", "openPlatform.applications", "/settings/api-docs?view=applications", "grid"),
-                entry("open_platform_calls", "API call logs", "openPlatform.callLogs", "/settings/api-docs?view=calls", "list"),
                 entry("open_platform_deliveries", "Webhook deliveries", "openPlatform.webhookDeliveries", "/settings/api-docs?view=webhooks", "send")));
         children.add(open);
         Menu group = entry("platform_management_navigation", "Platform management", "sidebar.platformManagement", "", "settings");

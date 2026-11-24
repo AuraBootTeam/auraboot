@@ -1,4 +1,3 @@
-import { Link } from 'react-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ArrowPathIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useI18n } from '~/contexts/I18nContext';
@@ -220,8 +219,7 @@ export default function OpenPlatformOperationsPanel({
               </div>
               <h4 className="mb-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
                 {t('openPlatform.callAudit', undefined, 'Call audit')}
-                <Link to={`/settings/api-docs?view=calls&installation=${encodeURIComponent(installationPid)}`}
-                  className="text-accent ms-3 normal-case">{t('openPlatform.logs.fullDetails', undefined, 'View requests and responses')}</Link>
+
               </h4>
               {audits.some((audit) => audit.status === 202 && audit.path.startsWith('/api/open/v1/event-sources/')) && (
                 <p className="mb-2 text-xs text-gray-500" data-testid="call-audit-accepted-help">

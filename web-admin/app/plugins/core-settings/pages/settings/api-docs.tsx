@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { Link, redirect, useSearchParams, type LoaderFunctionArgs } from 'react-router';
 import OpenPlatformOperationsWorkspace, { OpenPlatformOperationsTabs } from './OpenPlatformOperationsWorkspace';
 import {
   ArrowPathIcon,
@@ -22,6 +22,16 @@ import { IntegrationTokenPanel } from '~/ui/smart/admin/IntegrationTokenPanel';
 import { OpenApiInstallationNotificationEditor } from '~/ui/smart/admin/OpenApiInstallationNotificationEditor';
 import { openPlatformApiFetch as apiFetch } from './open-platform-api';
 import { MemberPicker } from '~/ui/smart/picker/MemberPicker';
+
+// Retired standalone diagnostics bookmarks return to the existing application entry.
+export function loader({ request }: LoaderFunctionArgs) {
+  const url = new URL(request.url);
+  if (url.searchParams.get('view') === 'calls') {
+    url.searchParams.set('view', 'applications');
+    return redirect(`${url.pathname}?${url.searchParams}`);
+  }
+  return null;
+}
 
 interface Capability {
   code: string;
@@ -419,7 +429,7 @@ export default function OpenPlatformPage() {
     }
   };
 
-  if (['calls', 'webhooks'].includes(viewParams.get('view') ?? '')) {
+  if (viewParams.get('view') === 'webhooks') {
     return <OpenPlatformOperationsWorkspace applications={applications} loading={loading && applications.length === 0} error={error} onRetry={() => void load()} />;
   }
 

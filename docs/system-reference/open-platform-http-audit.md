@@ -6,7 +6,7 @@ created: 2026-11-24
 
 # Open Platform HTTP audit and navigation
 
-The authenticated backend menu tree includes a system navigation group for Platform Management. Open Platform links select applications, API calls or Webhook deliveries on the existing settings route. Platform Console is visible only to users with the platform operator role in a platform space; its navigation action posts to the existing space-switch action before redirecting to `/platform/plugins`. The platform route reuses the existing read-only kernel plugin inventory (backend plugin lifecycle management retains its own permissions) instead of falling through to an unconfigured dynamic page. Navigation visibility does not grant application access. Account menus contain identity actions, About and Sign out.
+The authenticated backend menu tree includes a system navigation group for Platform Management. Open Platform links select applications or Webhook deliveries on the existing settings route. Platform Console is visible only to users with the platform operator role in a platform space; its navigation action posts to the existing space-switch action before redirecting to `/platform/plugins`. The platform route reuses the existing read-only kernel plugin inventory (backend plugin lifecycle management retains its own permissions) instead of falling through to an unconfigured dynamic page. Navigation visibility does not grant application access. Account menus contain identity actions, About and Sign out.
 
 ## Capture contract
 
@@ -20,16 +20,16 @@ Flyway adds a nullable JSONB `http_details` column. NULL means the historical re
 
 ## Query and authorization
 
-`GET /api/open-platform/installations/{installationPid}/audits` retains the list response contract and adds `auditPid` per row. Optional parameters: `requestId` (exact), `status` (exact), `keyword` (literal substring of request ID/path), `method`, `statusClass=all|success|error`, `windowHours=1..720`, `limit=1..200`, and `offset=0..10000`. The UI requests 26 rows for 25-row pages, using the extra row only as a next-page indicator. It never labels a subset count as the total. List queries omit HTTP payloads.
+`GET /api/open-platform/installations/{installationPid}/audits` retains the list response contract and adds `auditPid` per row. Optional parameters: `requestId` (exact), `status` (exact), `keyword` (literal substring of request ID/path), `method`, `statusClass=all|success|error`, `windowHours=1..720`, `limit=1..200`, and `offset=0..10000`. Consumers can use an extra row as a next-page indicator; a subset count is not a total. List queries omit HTTP payloads.
 
 `GET /api/open-platform/installations/{installationPid}/audits/{auditPid}` returns one authorized detail. Summary access retains `canReadOperations`. HTTP detail additionally requires `canManageRuntime`: application owners, maintainers or the existing platform administrator authority. Viewers can inspect summaries but cannot fetch or download bodies. Nonmembers and cross-tenant/cross-installation records cannot resolve through the endpoint. Missing details return 404.
 
 ## Viewer behavior
 
-The existing core-settings page hosts a reusable `HttpAuditInspector`. It exposes request/response headers, query parameters and JSON bodies, with independent availability states. A wider reading mode places request and response side by side; narrow screens use a single column and allow closing back to the list. The display uses account locale/timezone. HTTP 202 is accepted for processing, not final business success. No inferred phase timings are shown.
+The shared `HttpAuditInspector` remains available for contextual integration diagnostics, exposing independently captured request/response content, redacted clipboard/download and credential-free cURL templates. The backend capture and detail APIs remain active.
 
-Copies and JSON downloads use the same already-redacted server detail. The cURL action generates a template using `api.example.com` and `<YOUR_ACCESS_TOKEN>`; it never executes a request or restores credentials. A missing capture cannot enable a payload download. Application/environment changes clear the previous selected record; aborted or outdated requests cannot repopulate another installation's detail.
+The duplicate standalone call-log workspace, sidebar entry and top tab have been removed. Legacy `/settings/api-docs?view=calls` bookmarks redirect to `view=applications`. The existing integration/outbound module owns the user-facing entry; this change does not claim that a new integration-module consumer has been implemented or verified here. Account locale/timezone and the shared inspector's availability states remain unchanged.
 
 The existing Webhook operations panel remains available in a separate tab, including event catalog, health and replay controls. The audit improvement does not expand its authority or change replay semantics.
 
-Related implementation checks are in `OpenApiHttpCaptureTest`, `OpenPlatformAuditAuthorizationTest`, `PlatformManagementNavigationTest`, and the real-stack browser spec `web-admin/tests/e2e/settings/open-platform-call-logs.golden.spec.ts`. Test presence does not imply execution; exact run evidence is reported separately.
+Related implementation checks are in `OpenApiHttpCaptureTest`, `OpenPlatformAuditAuthorizationTest`, `PlatformManagementNavigationTest`, and `web-admin/tests/e2e/settings/open-platform-navigation.golden.spec.ts`. Earlier standalone-workspace browser evidence is historical, not current UI coverage. Test presence does not imply execution; exact run evidence is reported separately.
