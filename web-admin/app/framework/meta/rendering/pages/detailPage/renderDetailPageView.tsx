@@ -233,12 +233,23 @@ export function renderDetailPageView({
 
   const workspace = schema.extension?.presentation === 'workspace';
   const standardDetail = !presentation && !schema.extension?.presentation;
+  const cardTabs = (schema.blocks || []).some(
+    (block) =>
+      block.blockType === 'tabs' &&
+      block.surface === 'card' &&
+      (block.tabs || []).some((tab) => tab === activeDetailTab?.tab),
+  );
   const compactHeaderActions = schema.extension?.compactHeaderActions ?? standardDetail;
   const workspaceShell = workspace ? resolveWorkspaceShell(schema.extension?.workspaceShell) : null;
   // Follow current scoped form facts without replacing the persisted record or body drafts.
   const scopedForm = runtime?.getContext()?.form;
-  const currentHeaderForm = scopedForm && typeof scopedForm === 'object' && !Array.isArray(scopedForm)
-    && (!recordData?.pid || !scopedForm.pid || scopedForm.pid === recordData.pid) ? scopedForm : {};
+  const currentHeaderForm =
+    scopedForm &&
+    typeof scopedForm === 'object' &&
+    !Array.isArray(scopedForm) &&
+    (!recordData?.pid || !scopedForm.pid || scopedForm.pid === recordData.pid)
+      ? scopedForm
+      : {};
   const headerRecord = { ...recordData, ...currentHeaderForm };
   const headerTitleField = String(schema?.extension?.headerTitleField || '').trim();
   const headerTitleValue = headerTitleField ? headerRecord[headerTitleField] : undefined;
@@ -258,7 +269,10 @@ export function renderDetailPageView({
     })
     .filter(Boolean)
     .join(' · ');
-  const relatedLinks = resolveDetailRelatedLinks(schema.extension?.headerRelatedLinks, headerRecord);
+  const relatedLinks = resolveDetailRelatedLinks(
+    schema.extension?.headerRelatedLinks,
+    headerRecord,
+  );
   const preserveListContext = schema?.extension?.preserveListContext === true;
   const preservedReturnTarget = preserveListContext
     ? resolveDetailReturnTarget(location.search)
@@ -294,7 +308,8 @@ export function renderDetailPageView({
     compactHeaderActions &&
     schema.extension?.compactHeaderActions == null &&
     schema.extension?.showShare === true;
-  const hasUtilityMenu = compactHeaderActions &&
+  const hasUtilityMenu =
+    compactHeaderActions &&
     ((showShare && !keepShareVisible) || reportRecordPid || showPrint || showPdfExport);
   const shareAction = showShare ? (
     <button
@@ -315,7 +330,10 @@ export function renderDetailPageView({
         />
       )}
       {showPrint && (
-        <PrintButton title={getLocalizedText(schema.title, locale, t)} showLabel={Boolean(hasUtilityMenu)} />
+        <PrintButton
+          title={getLocalizedText(schema.title, locale, t)}
+          showLabel={Boolean(hasUtilityMenu)}
+        />
       )}
       {showPdfExport && (
         <ExportPdfButton
@@ -402,33 +420,70 @@ export function renderDetailPageView({
                         const field = enrichField({
                           field: schema.extension.headerStatusField,
                         } as FieldConfig);
-                        const item = (getDictItems(schema.extension?.headerStatusDictCode || field.dictCode || '') || []).find(
-                          (item) => String(item.value) === String(headerRecord[field.field]),
-                        );
+                        const item = (
+                          getDictItems(
+                            schema.extension?.headerStatusDictCode || field.dictCode || '',
+                          ) || []
+                        ).find((item) => String(item.value) === String(headerRecord[field.field]));
                         return item ? getLocalizedText(item.label as any, locale, t) : '—';
                       })()}
                     </span>
                   )}
                 </div>
                 {headerSubtitle ? (
-                  <p className="text-text-3 mt-2 break-words text-sm" title={headerSubtitle}>
+                  <p className="text-text-3 mt-2 text-sm break-words" title={headerSubtitle}>
                     {headerSubtitle}
                   </p>
                 ) : null}
-                {Array.isArray(schema.extension?.headerFacts) && <dl data-testid="detail-header-facts" className="text-text-3 mt-3 flex flex-wrap gap-x-6 gap-y-2 text-xs">
-                  {schema.extension.headerFacts.map((fact: {field: string; label: any; format?: string}) => headerRecord[fact.field] != null && headerRecord[fact.field] !== '' ? <div key={fact.field} className="flex items-baseline gap-2"><dt>{getLocalizedText(fact.label, locale, t)}</dt><dd className="text-text font-medium whitespace-pre-wrap">{resolveSettingsCardDisplayValue(headerRecord[fact.field], undefined, {field:fact.field, format:fact.format} as FieldConfig, undefined, timezone)}</dd></div> : null)}
-                </dl>}
+                {Array.isArray(schema.extension?.headerFacts) && (
+                  <dl
+                    data-testid="detail-header-facts"
+                    className="text-text-3 mt-3 flex flex-wrap gap-x-6 gap-y-2 text-xs"
+                  >
+                    {schema.extension.headerFacts.map(
+                      (fact: { field: string; label: any; format?: string }) =>
+                        headerRecord[fact.field] != null && headerRecord[fact.field] !== '' ? (
+                          <div key={fact.field} className="flex items-baseline gap-2">
+                            <dt>{getLocalizedText(fact.label, locale, t)}</dt>
+                            <dd className="text-text font-medium whitespace-pre-wrap">
+                              {resolveSettingsCardDisplayValue(
+                                headerRecord[fact.field],
+                                undefined,
+                                { field: fact.field, format: fact.format } as FieldConfig,
+                                undefined,
+                                timezone,
+                              )}
+                            </dd>
+                          </div>
+                        ) : null,
+                    )}
+                  </dl>
+                )}
                 {relatedLinks.length > 0 && (
-                  <div className="text-text-3 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" data-testid="detail-related-links">
-                    <span>{getLocalizedText(schema.extension?.headerRelatedLinks?.label, locale, t)}</span>
-                    {relatedLinks.map(link => <Link key={link.pid} to={link.to} className="text-accent hover:underline">{link.label} ↗</Link>)}
+                  <div
+                    className="text-text-3 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs"
+                    data-testid="detail-related-links"
+                  >
+                    <span>
+                      {getLocalizedText(schema.extension?.headerRelatedLinks?.label, locale, t)}
+                    </span>
+                    {relatedLinks.map((link) => (
+                      <Link key={link.pid} to={link.to} className="text-accent hover:underline">
+                        {link.label} ↗
+                      </Link>
+                    ))}
                   </div>
                 )}
               </div>
             </div>
 
             {/* Header toolbar buttons */}
-            <div className={hasUtilityMenu ? `${headerLayout.actions} sm:ml-auto` : headerLayout.actions} data-print="hide">
+            <div
+              className={
+                hasUtilityMenu ? `${headerLayout.actions} sm:ml-auto` : headerLayout.actions
+              }
+              data-print="hide"
+            >
               {keepShareVisible && shareAction}
               {hasUtilityMenu ? (
                 <details className="relative">
@@ -439,7 +494,9 @@ export function renderDetailPageView({
                     {utilityActions}
                   </div>
                 </details>
-              ) : utilityActions}
+              ) : (
+                utilityActions
+              )}
               {!presentation && nativeActions}
             </div>
           </div>
@@ -519,131 +576,144 @@ export function renderDetailPageView({
                 </div>
               )}
 
-              {/* Tab headers (hidden in print — only active tab content shows) */}
               <div
-                className={
-                  workspace || standardDetail
-                    ? 'print-hide border-border mb-4 overflow-x-auto border-b'
-                    : 'print-hide border-border overflow-x-auto border-b px-6'
-                }
-                data-print="hide"
+                data-testid="detail-tab-panel"
+                className={cardTabs ? 'border-border bg-panel rounded-lg border' : undefined}
               >
-                <nav
-                  className="-mb-px flex w-max min-w-full space-x-8 whitespace-nowrap"
-                  role="tablist"
-                  aria-label={getLocalizedText({ 'zh-CN': '页签', en: 'Tabs' }, locale, t)}
+                {/* Tab headers (hidden in print — only active tab content shows) */}
+                <div
+                  className={
+                    cardTabs
+                      ? 'print-hide border-border overflow-x-auto border-b px-4'
+                      : workspace || standardDetail
+                        ? 'print-hide border-border mb-4 overflow-x-auto border-b'
+                        : 'print-hide border-border overflow-x-auto border-b px-6'
+                  }
+                  data-print="hide"
                 >
-                  {tabs.map((tab, index) => (
-                    <button
-                      key={tab.key || index}
-                      role="tab"
-                      aria-selected={activeTab === index}
-                      data-testid={deriveTestId(
-                        'detail',
-                        schema?.modelCode || tableName,
-                        'tab',
-                        tab.key || String(index),
-                      )}
-                      onClick={() => handleTabChange(index)}
-                      className={`border-b-2 px-1 py-3 text-sm font-medium ${
-                        activeTab === index
-                          ? 'border-accent text-accent'
-                          : 'text-text-2 hover:border-border-strong hover:text-text-2 border-transparent'
-                      }`}
-                    >
-                      {getLocalizedText(tab.label, locale, t)}
-                      {workspace && (tab as any).count && runtime && (
-                        <WorkspaceTabCount
-                          config={(tab as any).count}
-                          record={recordData}
-                          runtime={runtime}
-                        />
-                      )}
-                    </button>
-                  ))}
-                </nav>
-              </div>
+                  <nav
+                    className="-mb-px flex w-max min-w-full space-x-8 whitespace-nowrap"
+                    role="tablist"
+                    aria-label={getLocalizedText({ 'zh-CN': '页签', en: 'Tabs' }, locale, t)}
+                  >
+                    {tabs.map((tab, index) => (
+                      <button
+                        key={tab.key || index}
+                        role="tab"
+                        aria-selected={activeTab === index}
+                        data-testid={deriveTestId(
+                          'detail',
+                          schema?.modelCode || tableName,
+                          'tab',
+                          tab.key || String(index),
+                        )}
+                        onClick={() => handleTabChange(index)}
+                        className={`border-b-2 px-1 py-3 text-sm font-medium ${
+                          activeTab === index
+                            ? 'border-accent text-accent'
+                            : 'text-text-2 hover:border-border-strong hover:text-text-2 border-transparent'
+                        }`}
+                      >
+                        {getLocalizedText(tab.label, locale, t)}
+                        {workspace && (tab as any).count && runtime && (
+                          <WorkspaceTabCount
+                            config={(tab as any).count}
+                            record={recordData}
+                            runtime={runtime}
+                          />
+                        )}
+                      </button>
+                    ))}
+                  </nav>
+                </div>
 
-              {/* Tab content — mount only the active tab. Workbench pages may reuse
+                {/* Tab content — mount only the active tab. Workbench pages may reuse
                 the same row/test ids across tabs; hidden pre-rendered tabs create
                 duplicate DOM and unnecessary dataSource requests. */}
-              {activeDetailTab && (
-                <div
-                  key={activeDetailTab.tab.key || activeDetailTab.index}
-                  className={workspace || standardDetail ? 'min-w-0' : 'p-5'}
-                >
-                  {workspace ? (
-                    <div
-                      className={`grid min-w-0 grid-cols-1 items-start gap-5 ${(activeDetailTab.tab.blocks || []).some((block) => asideBlockIds.has(block.id) && (!block.permissionCode || hasPermission(block.permissionCode))) ? 'xl:grid-cols-[minmax(0,1fr)_290px]' : ''}`}
-                      data-testid="detail-workspace-layout"
-                    >
-                      <div className="min-w-0 space-y-4" data-testid="detail-workspace-main">
-                        {(activeDetailTab.tab.blocks || [])
-                          .filter((block) => !asideBlockIds.has(block.id))
-                          .map(renderWorkspaceBlock)}
+                {activeDetailTab && (
+                  <div
+                    key={activeDetailTab.tab.key || activeDetailTab.index}
+                    className={
+                      cardTabs ? 'min-w-0 p-4' : workspace || standardDetail ? 'min-w-0' : 'p-5'
+                    }
+                  >
+                    {workspace ? (
+                      <div
+                        className={`grid min-w-0 grid-cols-1 items-start gap-5 ${(activeDetailTab.tab.blocks || []).some((block) => asideBlockIds.has(block.id) && (!block.permissionCode || hasPermission(block.permissionCode))) ? 'xl:grid-cols-[minmax(0,1fr)_290px]' : ''}`}
+                        data-testid="detail-workspace-layout"
+                      >
+                        <div className="min-w-0 space-y-4" data-testid="detail-workspace-main">
+                          {(activeDetailTab.tab.blocks || [])
+                            .filter((block) => !asideBlockIds.has(block.id))
+                            .map(renderWorkspaceBlock)}
+                        </div>
+                        {(activeDetailTab.tab.blocks || []).some((block) =>
+                          asideBlockIds.has(block.id),
+                        ) && (
+                          <aside className="min-w-0 space-y-4" data-testid="detail-workspace-aside">
+                            {(Array.isArray(schema.extension?.detailAsideGroups)
+                              ? schema.extension.detailAsideGroups
+                              : (activeDetailTab.tab.blocks || [])
+                                  .filter((block) => asideBlockIds.has(block.id))
+                                  .map((block) => [block.id])
+                            ).map((ids: string[], groupIndex: number) => {
+                              const group = (activeDetailTab.tab.blocks || []).filter(
+                                (block) =>
+                                  ids.includes(block.id) &&
+                                  (!block.permissionCode || hasPermission(block.permissionCode)),
+                              );
+                              return group.length ? (
+                                <section
+                                  key={groupIndex}
+                                  className={
+                                    group.length === 1 &&
+                                    group[0].blockType === 'detail-section' &&
+                                    (group[0] as any).extension?.displayVariant === 'object'
+                                      ? ''
+                                      : 'border-border bg-panel rounded-card border p-5'
+                                  }
+                                >
+                                  {group.map(renderWorkspaceBlock)}
+                                </section>
+                              ) : null;
+                            })}
+                          </aside>
+                        )}
                       </div>
-                      {(activeDetailTab.tab.blocks || []).some((block) =>
-                        asideBlockIds.has(block.id),
-                      ) && (
-                        <aside className="min-w-0 space-y-4" data-testid="detail-workspace-aside">
-                          {(Array.isArray(schema.extension?.detailAsideGroups)
-                            ? schema.extension.detailAsideGroups
-                            : (activeDetailTab.tab.blocks || [])
-                                .filter((block) => asideBlockIds.has(block.id))
-                                .map((block) => [block.id])
-                          ).map((ids: string[], groupIndex: number) => {
-                            const group = (activeDetailTab.tab.blocks || []).filter(
-                              (block) =>
-                                ids.includes(block.id) &&
-                                (!block.permissionCode || hasPermission(block.permissionCode)),
-                            );
-                            return group.length ? (
-                              <section
-                                key={groupIndex}
-                                className={
-                                  group.length === 1 &&
-                                  group[0].blockType === 'detail-section' &&
-                                  (group[0] as any).extension?.displayVariant === 'object'
-                                    ? ''
-                                    : 'border-border bg-panel rounded-card border p-5'
-                                }
-                              >
-                                {group.map(renderWorkspaceBlock)}
-                              </section>
-                            ) : null;
-                          })}
-                        </aside>
-                      )}
-                    </div>
-                  ) : (
-                    <LayoutRenderer
-                      layout={(activeDetailTab.tab as any).layout}
-                      blocks={activeDetailTab.tab.blocks || []}
-                      renderBlock={(block: BlockConfig) => (
-                        <DetailBlockRenderer
-                          block={block}
-                          recordData={recordData}
-                          rawData={rawData}
-                          recordPid={recordPid!}
-                          token={token || undefined}
-                          locale={locale}
-                          t={t}
-                          modelCode={schema?.modelCode || tableName}
-                          evaluateEditableWhen={evaluateVisibleWhen}
-                          onDataChange={refreshDetailAfterChildChange}
-                          getDictItems={getDictItems}
-                          enrichField={enrichField}
-                          runtime={runtime as SchemaRuntime}
-                          schemaDataSources={schema?.dataSources}
-                          dataSourceManager={dataSourceManager}
-                        />
-                      )}
-                    />
-                  )}
-                </div>
-              )}
+                    ) : (
+                      <LayoutRenderer
+                        layout={(activeDetailTab.tab as any).layout}
+                        blocks={activeDetailTab.tab.blocks || []}
+                        renderBlock={(block: BlockConfig) => (
+                          <DetailBlockRenderer
+                            block={block}
+                            recordData={recordData}
+                            rawData={rawData}
+                            recordPid={recordPid!}
+                            token={token || undefined}
+                            locale={locale}
+                            t={t}
+                            modelCode={schema?.modelCode || tableName}
+                            evaluateEditableWhen={evaluateVisibleWhen}
+                            onDataChange={refreshDetailAfterChildChange}
+                            getDictItems={getDictItems}
+                            enrichField={enrichField}
+                            runtime={runtime as SchemaRuntime}
+                            schemaDataSources={schema?.dataSources}
+                            dataSourceManager={dataSourceManager}
+                          />
+                        )}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
               {topLevelDetailBlocks.length > 0 && (
-                <div className={standardDetail ? 'mt-4 space-y-4 border-t pt-4' : 'space-y-4 border-t p-5'}>
+                <div
+                  className={
+                    standardDetail ? 'mt-4 space-y-4 border-t pt-4' : 'space-y-4 border-t p-5'
+                  }
+                >
                   {topLevelDetailBlocks.map((block: BlockConfig, blockIndex: number) =>
                     DETAIL_SPECIALIZED_BLOCK_TYPES.has(block.blockType as string) ? (
                       <DetailBlockRenderer
