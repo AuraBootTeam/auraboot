@@ -593,7 +593,7 @@ public class HandlerPhase implements CommandPhase {
             return;
         }
 
-        String handlerCode = resolvePluginHandlerCode(commandCode, execConfig);
+        String handlerCode = CommandExecutorUtils.resolvePluginHandlerCode(commandCode, execConfig);
         Optional<CommandHandlerExtension> pluginHandler = extensionRegistry.getCommandHandler(handlerCode);
         // Opt-in secondaries chain AFTER the primary (same transaction + context). Empty for every
         // command with no opt-in secondaries, i.e. every command today — so this is a no-op now.
@@ -984,15 +984,6 @@ public class HandlerPhase implements CommandPhase {
         }
     }
 
-    private String resolvePluginHandlerCode(String commandCode, Map<String, Object> execConfig) {
-        if (execConfig != null) {
-            Object handler = execConfig.get("handler");
-            if (handler instanceof String handlerCode && StringUtils.hasText(handlerCode)) {
-                return handlerCode.trim();
-            }
-        }
-        return commandCode;
-    }
 
     private boolean validateBusinessResources(CommandPipelineContext context,CommandHandlerExtension handler,
             List<CommandHandlerExtension> secondaryHandlers) {

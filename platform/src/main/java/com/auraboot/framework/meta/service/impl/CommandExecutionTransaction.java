@@ -74,15 +74,21 @@ public class CommandExecutionTransaction {
     }
 
     private <T> T executeTransaction(String commandCode, boolean dryRun, Supplier<T> operation) {
+        var config = commandConfiguration(commandCode);
+        // Handlers are resolved by the same key the pipeline phases use. A command may
+        // delegate to a handler registered under another code; looking it up by the
+        // command's own code found nothing, so the transaction opened without that
+        // handler's isolation and the handler phase rejected the command.
+        var handlerCode = CommandExecutorUtils.resolvePluginHandlerCode(commandCode, config);
+        // Code-owned resource protection stays bound to the command code even when metadata changes its handler.
         var owner = extensions.getBusinessResourceOwner(commandCode).orElse(null);
         var resourceIsolation = owner instanceof BusinessResourceAuthorization resource ? resource.resourceReadIsolation() : null;
-        var handler = extensions.getCommandHandler(commandCode).orElse(null);
+        var handler = extensions.getCommandHandler(handlerCode).orElse(null);
         var handlerIsolation = handler == null ? null : handler.commandReadIsolation();
         if (resourceIsolation != null && handlerIsolation != null && resourceIsolation != handlerIsolation)
             throw new AccessDeniedException("Conflicting command owner transaction requirements");
         var isolation = resourceIsolation != null ? resourceIsolation : handlerIsolation;
         var template = new TransactionTemplate(transactions);
-        var config = commandConfiguration(commandCode);
         boolean domain = domainCommand(config);
         if (isolation == null && domain) {
             boolean serializable = com.auraboot.framework.meta.transaction.CommandTransactionIsolationPolicy.requiresSerializable(config)
@@ -96,7 +102,7 @@ public class CommandExecutionTransaction {
         // reads outside the permit scope can neither declare (the guard rejects a transaction
         // it did not shape) nor stay silent (the coherent-read gate rejects a non-snapshot
         // transaction). Checked after the domain default so a secondary cannot relax it.
-        for (var secondary : extensions.getSecondaryCommandHandlers(commandCode)) {
+        for (var secondary : extensions.getSecondaryCommandHandlers(handlerCode)) {
             var required = secondary.commandReadIsolation();
             if (required == null) continue;
             if (isolation != null && isolation != required)

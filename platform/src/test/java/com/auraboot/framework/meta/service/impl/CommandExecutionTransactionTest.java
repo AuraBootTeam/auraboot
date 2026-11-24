@@ -373,4 +373,94 @@ class CommandExecutionTransactionTest {
             }
         }
     }
+
+    // ---- commands that delegate to a handler registered under another code ---------------------------
+    // CRM's opportunity-stage and QDP-release commands name another handler in their
+    // configuration ("handler": "crm:close_opportunity"). The handler phase resolves that
+    // handler by the configured code; the transaction must resolve it the same way, or it
+    // opens without the handler's isolation and the handler-phase guard rejects the command.
+    private void delegatedTo(String commandCode, String handlerCode) {
+        var definitions=mock(com.auraboot.framework.meta.mapper.CommandDefinitionMapper.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(transaction,"definitions",definitions);
+        var command=new com.auraboot.framework.meta.entity.CommandDefinition();
+        command.setExecutionConfig("{\"type\":\"state_transition\",\"handler\":\""+handlerCode
+                +"\",\"handlerParams\":{\"dslPersistence\":false}}");
+        when(definitions.findCurrentByCode(commandCode)).thenReturn(command);
+    }
+
+    @Test void aCommandDelegatingToAnotherHandlerOpensTheTransactionThatHandlerRequires() {
+        delegatedTo("crm:win_opportunity","crm:close_opportunity");
+        var handler=mock(CommandHandlerExtension.class);
+        when(extensions.getCommandHandler("crm:close_opportunity")).thenReturn(Optional.of(handler));
+        when(handler.commandReadIsolation()).thenReturn(BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ);
+        when(manager.getTransaction(any())).thenReturn(status);
+        assertThat(transaction.execute("crm:win_opportunity",false,()->"won")).isEqualTo("won");
+        verify(manager).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_REPEATABLE_READ));
+        verify(extensions,never()).getCommandHandler("crm:win_opportunity");
+    }
+
+    @Test void aDelegatingCommandIsNotOverTightenedWhenItsHandlerDeclaresNothing() {
+        delegatedTo("crm:win_opportunity","crm:close_opportunity");
+        when(extensions.getCommandHandler("crm:close_opportunity")).thenReturn(Optional.of(mock(CommandHandlerExtension.class)));
+        when(manager.getTransaction(any())).thenReturn(status);
+        assertThat(transaction.execute("crm:win_opportunity",false,()->"won")).isEqualTo("won");
+        verify(manager).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_DEFAULT));
+    }
+
+    @Test void secondariesAreResolvedByTheDelegatedHandlerCodeAsWell() {
+        delegatedTo("crm:win_opportunity","crm:close_opportunity");
+        var handler=mock(CommandHandlerExtension.class);
+        when(extensions.getCommandHandler("crm:close_opportunity")).thenReturn(Optional.of(handler));
+        when(handler.commandReadIsolation()).thenReturn(BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ);
+        secondary("crm:close_opportunity",BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ);
+        when(manager.getTransaction(any())).thenReturn(status);
+        assertThat(transaction.execute("crm:win_opportunity",false,()->"won")).isEqualTo("won");
+        verify(manager).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_REPEATABLE_READ));
+    }
+
+    @Test void aDelegatedHandlerAndItsSecondaryCannotDisagreeBeforeAnyWorkRuns() {
+        delegatedTo("crm:win_opportunity","crm:close_opportunity");
+        var handler=mock(CommandHandlerExtension.class);
+        when(extensions.getCommandHandler("crm:close_opportunity")).thenReturn(Optional.of(handler));
+        when(handler.commandReadIsolation()).thenReturn(BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ);
+        secondary("crm:close_opportunity",BusinessResourceAuthorization.ReadIsolation.SERIALIZABLE);
+        var operation=mock(java.util.function.Supplier.class);
+        assertThatThrownBy(()->transaction.execute("crm:win_opportunity",false,operation)).isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("Conflicting command owner transaction requirements");
+        verifyNoInteractions(manager,operation);
+    }
+
+    @Test void aCommandNamingNoHandlerKeepsResolvingHandlersByItsOwnCode() {
+        delegatedTo("crm:qualify_lead","  ");
+        var handler=mock(CommandHandlerExtension.class);
+        when(extensions.getCommandHandler("crm:qualify_lead")).thenReturn(Optional.of(handler));
+        when(handler.commandReadIsolation()).thenReturn(BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ);
+        when(manager.getTransaction(any())).thenReturn(status);
+        assertThat(transaction.execute("crm:qualify_lead",false,()->"qualified")).isEqualTo("qualified");
+        verify(manager).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_REPEATABLE_READ));
+    }
+
+    // ---- one resolver, used everywhere ------------------------------------------------------------------
+    // The bug was four private copies of this rule and a fifth caller without one. Pin a single
+    // implementation and require every handler lookup to go through it.
+    @Test void theHandlerKeyResolverHasExactlyOneImplementationAndEveryHandlerLookupUsesIt() throws Exception {
+        var root=java.nio.file.Path.of("src/main/java/com/auraboot/framework/meta");
+        var declarations=new java.util.ArrayList<String>();
+        var lookups=java.util.Map.of("CommandExecutionTransaction.java",false,"HandlerPhase.java",false,
+                "FieldMapPhase.java",false,"StateCheckPhase.java",false,"PreInvariantPhase.java",false);
+        var used=new java.util.HashSet<String>();
+        var declaration=java.util.regex.Pattern.compile("\\bString\\s+resolvePluginHandlerCode\\s*\\(");
+        try(var files=java.nio.file.Files.walk(root)) {
+            for(var file:files.filter(path->path.toString().endsWith(".java")).toList()) {
+                var source=java.nio.file.Files.readString(file);
+                var name=file.getFileName().toString();
+                if(declaration.matcher(source).find()) declarations.add(root.relativize(file).toString());
+                if(lookups.containsKey(name)&&source.contains("CommandExecutorUtils.resolvePluginHandlerCode(")) used.add(name);
+            }
+        }
+        assertThat(declarations).singleElement().asString().endsWith("service/impl/CommandExecutorUtils.java");
+        assertThat(lookups.keySet()).containsAll(used);
+        var missing=new java.util.TreeSet<>(lookups.keySet());missing.removeAll(used);
+        assertThat(missing).as("handler lookups that bypass the shared resolver").isEmpty();
+    }
 }

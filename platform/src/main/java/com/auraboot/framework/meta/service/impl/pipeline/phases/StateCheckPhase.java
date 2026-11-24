@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
+import com.auraboot.framework.meta.service.impl.CommandExecutorUtils;
 import com.auraboot.framework.meta.service.impl.CommandStateCheckExecutor;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
@@ -103,7 +104,7 @@ public class StateCheckPhase implements CommandPhase {
         if (extensionRegistry == null || ctx.getCommand() == null) {
             return false;
         }
-        String handlerCode = resolvePluginHandlerCode(ctx.getCommand().getCode(), ctx.getExecConfig());
+        String handlerCode = CommandExecutorUtils.resolvePluginHandlerCode(ctx.getCommand().getCode(), ctx.getExecConfig());
         return extensionRegistry.getCommandHandler(handlerCode)
                 .map(handler -> {
                     boolean requiresPersistence = handler.requiresDslPersistence(
@@ -115,13 +116,4 @@ public class StateCheckPhase implements CommandPhase {
                 .orElse(false);
     }
 
-    private String resolvePluginHandlerCode(String commandCode, Map<String, Object> execConfig) {
-        if (execConfig != null) {
-            Object handler = execConfig.get("handler");
-            if (handler instanceof String handlerCode && StringUtils.hasText(handlerCode)) {
-                return handlerCode.trim();
-            }
-        }
-        return commandCode;
-    }
 }
