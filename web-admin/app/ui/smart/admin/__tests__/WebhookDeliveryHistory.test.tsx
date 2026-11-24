@@ -1,18 +1,15 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-const routeState = vi.hoisted(() => ({ parameter: 'recordPid' }));
-vi.mock('react-router', () => ({ useParams: () => ({ [routeState.parameter]: 'owned-subscription' }) }));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WebhookDeliveryHistory } from '../WebhookDeliveryHistory';
 
 const get = vi.hoisted(() => vi.fn());
 vi.mock('~/shared/services/ApiService', () => ({ getApiService: () => ({ get }) }));
 vi.mock('~/contexts/I18nContext', () => ({ useI18n: () => ({ locale: 'en', t: (_key: string, _params: unknown, fallback: string) => fallback }) }));
-const show = () => render(<WebhookDeliveryHistory />);
-beforeEach(() => { get.mockReset(); routeState.parameter = 'recordPid'; });
+const show = () => render(<WebhookDeliveryHistory runtime={{ getContext: () => ({ $page: { recordPid: 'owned-subscription' } }) }} />);
+beforeEach(() => get.mockReset());
 
 describe('existing Webhook DSL delivery history', () => {
-  it.each(['recordPid', 'recordId'])('reads the exact subscription API for the supported %s detail route', async parameter => {
-    routeState.parameter = parameter;
+  it('uses the canonical public PID already resolved by the DSL runtime', async () => {
     get.mockResolvedValue({ success: true, data: [{ pid: 'delivery', deliveryStatus: 'success', responseStatus: 200,
       retryCount: 0, createdAt: '2026-11-24T12:00:00Z', requestBody: '{"order":"P001"}', responseBody: '{"accepted":true}' }] });
     show();
@@ -35,4 +32,10 @@ describe('existing Webhook DSL delivery history', () => {
     expect(await screen.findByText('No delivery records')).toBeVisible();
     expect(get).toHaveBeenCalledTimes(2);
   });
+});
+
+it('does not fetch without a canonical DSL subscription context', () => {
+  render(<WebhookDeliveryHistory />);
+  expect(screen.getByRole('alert')).toHaveTextContent('Subscription context is missing');
+  expect(get).not.toHaveBeenCalled();
 });

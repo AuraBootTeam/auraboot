@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router';
 import { useI18n } from '~/contexts/I18nContext';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { getApiService } from '~/shared/services/ApiService';
@@ -19,9 +18,10 @@ interface Delivery {
 }
 
 /** Read-only history in the existing Webhook DSL detail, using the existing authorized API. */
-export function WebhookDeliveryHistory() {
-  const params = useParams();
-  const recordPid = params.recordPid ?? params.recordId;
+export function WebhookDeliveryHistory({ runtime }: {
+  runtime?: { getContext: () => { $page?: { recordPid?: string } } };
+}) {
+  const recordPid = runtime?.getContext().$page?.recordPid;
   const { locale, t } = useI18n();
   const label = (zh: string, en: string) => getLocalizedText({ 'zh-CN': zh, en }, locale, t);
   const [state, setState] = useState<{ pid?: string; rows?: Delivery[]; failed?: boolean }>({});
