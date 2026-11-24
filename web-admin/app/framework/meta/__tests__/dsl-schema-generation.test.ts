@@ -16,7 +16,7 @@ describe('DSL Generated Schema', () => {
     expect(schema.$ref).toBe('#/definitions/DslSchema');
   });
 
-  it('includes card, workspace presentation and rule types in the 63-definition combined contract', () => {
+  it('includes card, workspace presentation and rule types in the 65-definition combined contract', () => {
     expect(Object.keys(defs).sort()).toEqual([
       'ActionDef',
       'AuthoritativeSourceConfig',
@@ -27,6 +27,8 @@ describe('DSL Generated Schema', () => {
       'BusinessActivityRecordMapping',
       'BusinessActivitySnapshotField',
       'ButtonConfig',
+      'CardDraftRows',
+      'CardGroupRows',
       'CardImageViewport',
       'CardRowSelection',
       'ColumnConfig',
@@ -433,7 +435,7 @@ describe('DSL Generated Schema', () => {
   it('SelectionConfig should publish the grouped-radio contract', () => {
     const selectionDefinition = defs.SelectionConfig;
     const selection = selectionDefinition.properties;
-    expect(selection?.presentation?.enum).toEqual(['table', 'grouped-radio']);
+    expect(selection?.presentation?.enum).toEqual(['table', 'grouped-radio', 'navigation']);
     expect(selection?.exclusiveBy?.type).toBe('string');
     expect(selection?.optionLabelField?.type).toBe('string');
     expect(selection?.recommendedField?.type).toBe('string');
