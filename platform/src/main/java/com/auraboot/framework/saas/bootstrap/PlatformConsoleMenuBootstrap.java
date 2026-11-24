@@ -7,8 +7,6 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -75,14 +73,6 @@ public class PlatformConsoleMenuBootstrap {
             if (result.contains(definition.code()) && definition.parent() != null && !result.contains(definition.parent()))
                 throw new IllegalStateException("Platform console menu requires its parent declaration");
         return Set.copyOf(result);
-    }
-
-    /** Upgrade existing installations as well as first-install bootstrap. */
-    @EventListener(ApplicationReadyEvent.class)
-    @Transactional
-    public void reconcileExistingInstallation() {
-        if (jdbc.queryForObject("SELECT count(*) FROM ab_tenant WHERE id=? AND name='System'", Long.class,
-                SYSTEM_TENANT_ID) == 1L) reconcile(SYSTEM_TENANT_ID, 0L);
     }
 
     @Transactional

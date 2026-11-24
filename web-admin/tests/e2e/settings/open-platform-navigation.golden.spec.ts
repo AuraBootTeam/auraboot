@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { loginViaUI, ensureBusinessSpace } from '../../helpers/auth-fixtures';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
-test.use({ locale: 'zh-CN', viewport: { width: 1440, height: 1000 }, trace: 'off', video: 'off', screenshot: 'off' });
+test.use({ storageState: { cookies: [], origins: [] }, locale: 'zh-CN', viewport: { width: 1440, height: 1000 }, trace: 'off', video: 'off', screenshot: 'off' });
 process.env.PLAYWRIGHT_NO_COPY_PROMPT = '1';
 
 test('keeps supported platform entries and retires the duplicate call-log workspace', async ({ page }) => {
