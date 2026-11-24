@@ -9,6 +9,7 @@ import type { CommandInputPresentation } from '~/framework/meta/schemas/types';
 import { snapshotPromptPresentation } from './promptPresentation';
 import { currentFormDialogScope, cancelCurrentFormDialog } from './formDialogLifecycle';
 import type { RequestKeySession } from './request-key/session';
+import { captureRejectedRequestRelease } from './request-key/rejected-request';
 import {
   downloadWithAuth,
   FileDownloadHttpError,
@@ -1539,6 +1540,7 @@ actionRegistry.register(
   'api.request',
   async ({
     args,
+    requestKeySession,
     fetchResult,
     t,
     locale,
@@ -1613,6 +1615,10 @@ actionRegistry.register(
       // - POST/PUT/PATCH 请求：params 作为 request body
       // 合并 body 和 params，body 优先（POST 请求的主要数据）
       const requestParams = body ?? params;
+      const releaseRejectedRequest = captureRejectedRequestRelease(
+        args?.releaseRequestKeyOnRejection, stateManager, scopeId, requestKeySession,
+        method, requestParams,
+      );
 
       const result = await fetchResult(endpoint, {
         method,
@@ -1622,6 +1628,7 @@ actionRegistry.register(
       // A rejected API response must abort the flow before any state update
       // or subsequent success feedback. HTTP success alone is insufficient.
       if (!ResultHelper.isSuccess(result)) {
+        releaseRejectedRequest(result);
         const fallback = translateOrFallback(
           t,
           'message.operation.failed',
