@@ -44,10 +44,13 @@ public class OpenApiRequestIdFilter extends OncePerRequestFilter {
             completed = true;
         } finally {
             try {
+                boolean captureComplete = capture && completed && !capturedRequest.isAsyncStarted();
+                if (captureComplete) {
+                    capturedResponse.finishCapture();
+                }
                 if (capture && request.getAttribute(OpenApiHttpCapture.TARGET) instanceof OpenApiHttpCapture.Target target
                         && target.tenantId() != null && target.installationPid() != null) {
-                    capturedResponse.finishCapture();
-                    var details = new OpenApiHttpCapture(objectMapper).snapshot(capturedRequest, capturedResponse, completed && !capturedRequest.isAsyncStarted());
+                    var details = new OpenApiHttpCapture(objectMapper).snapshot(capturedRequest, capturedResponse, captureComplete);
                     if (auditMapper.updateHttpDetails(target.pid(), target.tenantId(), target.installationPid(), details) != 1)
                         throw new IllegalStateException("HTTP audit capture target was not found");
                 }
