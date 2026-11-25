@@ -127,6 +127,7 @@ export interface CardGroupRows {
   asideDetailsFields?: FieldConfig[];
   asideDetailsLabel?: string | LocalizedText;
   footerFields?: FieldConfig[];
+  footerLayout?: 'grid' | 'inline';
   detailsPlacement?: 'before-items' | 'after-items';
   detailsFields?: FieldConfig[];
   detailsLabel?: string | LocalizedText;
@@ -169,6 +170,8 @@ export interface BlockConfig {
   groupDescriptionLines?: 1 | 2;
   /** Visual emphasis derived from the current row; does not select or allocate it. */
   cardEmphasisWhen?: string;
+  /** Optional semantic tones keyed by the raw card badge value. */
+  badgeTones?: Record<string, string>;
   groupDescriptionField?: string;
   /** Boolean row fact: highlight a group if any member requires attention. */
   groupWarningField?: string;

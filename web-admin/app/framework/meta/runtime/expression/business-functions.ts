@@ -39,12 +39,13 @@ function DECIMAL_SUBTRACT(left: string, right: string): string {
   const result = decimalAdd(exactDecimal(left), { ...parsed, units: -parsed.units });
   return decimalText(result.units, result.scale);
 }
-function DECIMAL_SUM_BY(rows: unknown, valueField: string, matchField?: string, matchValue?: unknown): string {
+function DECIMAL_SUM_BY(rows: unknown, valueField: string, matchField?: string, matchValue?: unknown, filterField?: string, filterValue?: unknown): string {
   if (!Array.isArray(rows) || rows.length > 10000 || !valueField) throw new Error('Expected bounded decimal rows');
   let result: ExactDecimal = { units: 0n, scale: 0 };
   for (const row of rows) {
     if (!row || typeof row !== 'object') throw new Error('Expected decimal row');
     if (matchField && row[matchField] !== matchValue) continue;
+    if (filterField && row[filterField] !== filterValue) continue;
     result = decimalAdd(result, exactDecimal(row[valueField]));
   }
   return decimalText(result.units, result.scale);

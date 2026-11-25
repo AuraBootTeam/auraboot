@@ -100,6 +100,10 @@ const Display: React.FC<DisplayProps> = ({
   const displayValue = formatValue(value);
   const statusClass = getStatusColorClass(value);
 
+  if (format === 'badge') {
+    return <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${statusClass || 'bg-subtle text-text-2'} ${className}`}>{displayValue}</span>;
+  }
+
   return (
     <div className={`${labelLayout === 'inline' ? 'flex items-baseline justify-between gap-3' : 'space-y-1'} ${className}`}>
       {label && labelLayout !== 'hidden' && <label className={`text-text-3 block ${density === 'compact' ? 'text-xs font-normal' : 'text-sm font-medium'}`}>{label}</label>}

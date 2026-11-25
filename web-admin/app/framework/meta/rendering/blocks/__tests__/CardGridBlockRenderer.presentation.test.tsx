@@ -23,6 +23,24 @@ function setup(config: any = {}) {
  return {state,rows,view:render(<CardGridBlockRenderer block={block as any} runtime={runtime} />)};
 }
 describe('Authored collection presentations', () => {
+ it('colors configured badges by raw status and leaves unconfigured badges neutral', () => {
+  const {view}=setup({itemPresentation:'cards',badgeField:'quantity',badgeTones:{'25':'success','20':'warning'},headerLayout:'inline'});
+  const badges=screen.getAllByTestId('card-grid-badge');
+  expect(badges[0]).toHaveTextContent('25');expect(badges[0]).toHaveClass('bg-status-green-bg','text-status-green');
+  expect(badges[1]).toHaveTextContent('20');expect(badges[1]).toHaveClass('bg-status-amber-bg','text-status-amber');
+  view.unmount();setup({itemPresentation:'cards',badgeField:'quantity'});
+  expect(screen.getAllByTestId('card-grid-badge')[0]).toHaveClass('border-border');
+  expect(screen.getAllByTestId('card-grid-badge')[0]).not.toHaveClass('bg-status-green-bg');
+ });
+ it('keeps inline parent footer facts together without altering the other parent fields', () => {
+  setup({groupRows:{dataSource:'batches',field:'groups',identityField:'pid',titleField:'title',fields:[{field:'address',component:'SmartDisplay',readOnly:true}],footerLayout:'inline',
+    footerFields:[{field:'title',component:'SmartDisplay',readOnly:true,props:{format:'badge',statusColor:{'Batch one':'success','Batch two':'warning'}}},{field:'address',component:'SmartDisplay',readOnly:true,props:{appearance:'plain',labelLayout:'hidden'}}]}});
+  const footer=screen.getAllByTestId('card-group-footer')[0];
+  expect(footer.firstElementChild).toHaveStyle({display:'flex',flexWrap:'wrap',alignItems:'center'});
+  expect(footer).toHaveTextContent('Batch one');expect(footer).toHaveTextContent('Old address');
+  expect(footer.querySelector('.bg-status-green-bg')).toBeTruthy();
+  expect(screen.getAllByTestId('card-group-fields')[0]).toHaveStyle({display:'grid'});
+ });
  it('keeps table children and modal details scoped to their own batch', async () => {
   const {rows} = setup();
   expect(screen.getAllByRole('table')).toHaveLength(2);

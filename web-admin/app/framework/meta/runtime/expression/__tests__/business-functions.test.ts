@@ -525,6 +525,19 @@ describe('Business Functions Library', () => {
 
 
 describe('Exact decimal expressions', () => {
+  it('intersects identity and eligibility filters without rounding or mixing source rows', () => {
+    const rows = [{source:'a',quantity:'0.1',eligible:true},{source:'a',quantity:'0.2',eligible:true},
+      {source:'a',quantity:'350',eligible:false},{source:'b',quantity:'999',eligible:true}];
+    expect(fn.DECIMAL_SUM_BY(rows,'quantity','source','a','eligible',true)).toBe('0.3');
+    expect(fn.DECIMAL_SUM_BY(rows,'quantity','source','a')).toBe('350.3');
+    expect(fn.DECIMAL_SUM_BY(rows,'quantity','source','missing','eligible',true)).toBe('0');
+    expect(fn.DECIMAL_SUBTRACT('0.3',fn.DECIMAL_SUM_BY(rows,'quantity','source','a','eligible',true))).toBe('0');
+    expect(fn.DECIMAL_SUBTRACT('0.299999',fn.DECIMAL_SUM_BY(rows,'quantity','source','a','eligible',true))).toBe('-0.000001');
+    const parser = new ExpressionParser(createExpressionContext({form:{rows}} as any));
+    expect(parser.evaluate("${fn.DECIMAL_SUM_BY(form.rows, 'quantity', 'source', 'a', 'eligible', true)}")).toBe('0.3');
+    rows[1].eligible=false;
+    expect(fn.DECIMAL_SUM_BY(rows,'quantity','source','a','eligible',true)).toBe('0.1');
+  });
   it('preserves large values and mixed scales with source identity filtering', () => {
     const rows = [{ source: 'a', quantity: '9007199254740993.000001' }, { source: 'a', quantity: '0.000009' }, { source: 'b', quantity: '999' }];
     expect(fn.DECIMAL_SUM_BY(rows, 'quantity', 'source', 'a')).toBe('9007199254740993.00001');

@@ -14,6 +14,7 @@ import { reconcileDraftRows } from '../../runtime/state/reconcile-draft-rows';
  *   "categoryField": "category",
  *   "iconField": "icon",           // value = lucide icon name (renders nothing if unresolvable)
  *   "badgeField": "badge",
+ *   "badgeTones": { "complete": "success" }, // optional semantic badge colors
  *   "field": "draftRows",        // optional form array for local card edits
  *   "fields": [{ "field": "quantity", "component": "SmartInput" }],
  *   "fieldsLayout": { "type": "grid", "cols": 12 }, // opt-in, fields use layout.colSpan
@@ -28,6 +29,7 @@ import { reconcileDraftRows } from '../../runtime/state/reconcile-draft-rows';
 
 import { initializeSelectedRows, indexSelectionRows, positiveRowValue, type RowSelectionRule } from '../../runtime/expression/row-selection';
 import { readOwnPath } from '../../runtime/expression/row-projection';
+import { resolveStatusTone } from '../../runtime/renderers/statusTone';
 import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { hasActiveFormDialog, subscribeFormDialogVisibility } from '../../runtime/actions/formDialogLifecycle';
 import { useNavigate } from 'react-router';
@@ -380,6 +382,18 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
                 ? getDictLabel(badgeDictCode, String(rawBadge))
                 : undefined
               : getLocalizedText(rawBadge, locale, t);
+        const configuredTone = rawBadge == null ? undefined : cfg.badgeTones?.[String(rawBadge)];
+        const toneClasses = {
+          green: 'bg-status-green-bg text-status-green',
+          amber: 'bg-status-amber-bg text-status-amber',
+          red: 'bg-status-red-bg text-status-red',
+          blue: 'bg-accent-weak text-accent',
+          gray: 'bg-subtle text-text-2',
+        };
+        const badgeClass = configuredTone
+          ? `rounded px-2 py-0.5 text-xs font-medium ${toneClasses[resolveStatusTone(configuredTone)]}`
+          : 'rounded-pill border-border border px-2 py-0.5 text-xs';
+        const badgeNode = badge ? <span data-testid="card-grid-badge" className={`${badgeClass} self-start`}>{badge}</span> : null;
 
         const currentSelectionRow = selectionRule ? currentSelectionRows?.get(readOwnPath(row,selectionRule.identityField) as string) : undefined;
         const rowSelectable = !selectionRule || Boolean(currentSelectionRow && positiveRowValue(readOwnPath(currentSelectionRow,selectionRule.positiveField)));
@@ -458,7 +472,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
             {/* Title */}
             <div className={cfg.headerLayout === 'inline' ? 'mb-2 flex flex-wrap items-center justify-between gap-2' : undefined}>
               <h3 className={`text-text mb-1 break-words font-semibold ${compact || dense ? 'text-sm' : 'text-base'}`}>{title}</h3>
-              {cfg.headerLayout === 'inline' && badge ? <span className="rounded-pill border-border self-start border px-2 py-0.5 text-xs">{badge}</span> : null}
+              {cfg.headerLayout === 'inline' ? badgeNode : null}
             </div>
 
             {/* Description */}
@@ -468,9 +482,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
 
             {/* Badge */}
             {badge && cfg.headerLayout !== 'inline' && (
-              <span className="rounded-pill border-border mb-3 self-start border px-2 py-0.5 text-xs">
-                {badge}
-              </span>
+              <span data-testid="card-grid-badge" className={`${badgeClass} mb-3 self-start`}>{badge}</span>
             )}
 
             {cfg.primaryField && cardFields.find(field => field.field === cfg.primaryField) ? <div className={`${dense ? 'my-1' : 'my-3'} flex flex-wrap items-baseline gap-x-2 gap-y-1`}>
@@ -542,10 +554,10 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
       group.entries.push({ row, index });
       groups.set(key, group);
     });
-    const parentFields = (group: Group, fields: FieldConfig[], summary: boolean, stacked = false) => {
+    const parentFields = (group: Group, fields: FieldConfig[], summary: boolean, stacked = false, inline = false) => {
       if (!group.parent || !parentConfig) return null;
       const row = group.parent;
-      return <div style={{display: 'grid', gridTemplateColumns: stacked ? '1fr' : compact && summary ? 'repeat(auto-fit, minmax(min(100%, 6rem), 1fr))' : 'repeat(auto-fit, minmax(min(100%, 12rem), 1fr))', gap: '0.75rem', pointerEvents: summary ? 'none' : undefined}} data-testid={summary ? 'card-group-summary' : 'card-group-fields'}>
+      return <div style={{display: inline ? 'flex' : 'grid', flexWrap: inline ? 'wrap' : undefined, alignItems: inline ? 'center' : undefined, gridTemplateColumns: inline ? undefined : stacked ? '1fr' : compact && summary ? 'repeat(auto-fit, minmax(min(100%, 6rem), 1fr))' : 'repeat(auto-fit, minmax(min(100%, 12rem), 1fr))', gap: '0.75rem', pointerEvents: summary ? 'none' : undefined}} data-testid={summary ? 'card-group-summary' : 'card-group-fields'}>
         {fields.map(field => {
           const ctx = { ...runtime.getContext(), row } as any;
           if (field.visibleWhen && !runtime.getEvaluator().evaluateCondition(field.visibleWhen, ctx)) return null;
@@ -589,7 +601,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
               <Dialog open={activeDetails === key} onOpenChange={open => {if (!open) setActiveDetails(null);}}><DialogContent className="max-h-[85dvh] w-[calc(100%-2rem)] max-w-[720px] overflow-y-auto" closeLabel={locale.startsWith('zh') ? '关闭' : 'Close'} aria-describedby={undefined}><DialogTitle>{group.title} · {getLocalizedText(parentConfig.asideDetailsLabel,locale,t)}</DialogTitle>{parentFields(group,parentConfig.asideDetailsFields,false,true)}</DialogContent></Dialog>
             </> : null}</aside>
         </div> : items}
-        {parentConfig?.footerFields?.length ? <div className="border-border border-t px-4 py-2">{parentFields(group, parentConfig.footerFields, false)}</div> : null}
+        {parentConfig?.footerFields?.length ? <div data-testid="card-group-footer" className={parentConfig.footerLayout === 'inline' ? 'pt-3 pb-2' : 'border-border border-t px-4 py-2'}>{parentFields(group, parentConfig.footerFields, false, false, parentConfig.footerLayout === 'inline')}</div> : null}
         {parentConfig?.detailsPlacement === 'after-items' ? details : null}
       </>;
 
