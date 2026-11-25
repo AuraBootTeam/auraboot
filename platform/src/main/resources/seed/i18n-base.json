@@ -2766,6 +2766,11 @@
     "en-US": "Details"
   },
   {
+    "key": "detail.section.empty",
+    "zh-CN": "这一段还没有内容。",
+    "en-US": "Nothing has been recorded in this section yet."
+  },
+  {
     "key": "workbench.recent.empty",
     "zh-CN": "暂无访问记录",
     "en-US": "No recent visits"
