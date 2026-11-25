@@ -52,10 +52,12 @@ public class NotificationQueryServiceImpl implements NotificationQueryService {
                 .eq(request.getIsRead() != null, Notification::getIsRead, request.getIsRead())
                 .apply(hasCategory, "LOWER(category) = {0}", normalizedCategory);
 
+        if (request.getMiniProgramPage() != null)
+            filter.likeRight(Notification::getMiniProgramPath, request.getMiniProgramPage() + "?kind=");
         long total = notificationMapper.selectCount(filter);
 
         LambdaQueryWrapper<Notification> pageQuery = filter.clone()
-                .orderByDesc(Notification::getCreatedAt)
+                .orderByDesc(Notification::getCreatedAt, Notification::getId)
                 .last("LIMIT " + pageSize + " OFFSET " + offset);
         List<Notification> notifications = notificationMapper.selectList(pageQuery);
 
@@ -141,6 +143,7 @@ public class NotificationQueryServiceImpl implements NotificationQueryService {
                 .priority(entity.getPriority())
                 .sourceType(entity.getSourceType())
                 .sourceId(entity.getSourceId())
+                .miniProgramPath(entity.getMiniProgramPath())
                 .isRead(entity.getIsRead())
                 .readAt(entity.getReadAt())
                 .createdAt(entity.getCreatedAt())

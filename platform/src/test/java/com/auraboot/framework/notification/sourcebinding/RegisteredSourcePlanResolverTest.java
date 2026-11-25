@@ -125,6 +125,27 @@ class RegisteredSourcePlanResolverTest {
         assertThat(plans.getFirst().reference()).isEqualTo(SourceBindingCanonical.reference("notice", "src", 1));
     }
     @Test
+    void approvedPresentationUsesOnlyOwnedTargetsAndImportedSourceFields() {
+        var b = f.binding;
+        f.binding = new Binding(b.schemaVersion(), b.code(), b.tenantId(), b.approvals(), b.source(),
+                b.owner(), b.principal(), b.verification(), b.ruleId(), b.templateCode(),
+                Map.of("number", "fact"), new SourceBindingTypes.MiniProgramLink("pages/notification-entry/index", "quote"));
+        f.reapprove();
+        var single = f.resolver.plan(f.binding, "src");
+        assertThat(single).allSatisfy(plan -> {
+            assertThat(plan.miniProgramPath()).isEqualTo("pages/notification-entry/index?kind=quote&id=t1");
+            assertThat(plan.fields()).containsExactlyEntriesOf(Map.of("number", "original"));
+        });
+        f.put("source", "src", Map.of("owner", "o1", "at", "2026-10-13T01:00:00Z",
+                "targets", List.of("t1", "t2"), "state", "pending", "fact", "original"));
+        f.put("target", "t2", Map.of("owner", "o1", "state", "open"));
+        assertThat(f.resolver.plan(f.binding, "src")).allSatisfy(plan ->
+                assertThat(plan.miniProgramPath()).isEqualTo("pages/notification-entry/index?kind=quote"));
+        f.put("target", "t2", Map.of("owner", "foreign", "state", "open"));
+        assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void approvedPhysicalEnumPredicatesRetainExactStringAndChildSemantics() throws Exception {
         remainingFixture(1000);
         for (String model : List.of("source", "target", "owner", "link", "contact", "child")) {
@@ -579,6 +600,42 @@ class RegisteredSourcePlanResolverTest {
         assertThat(f.resolver.plan(f.binding, "src")).hasSize(2);
     }
     @Test
+    void approvedOrderDisplayEnumIsExcludedFromReminderAuthorization() {
+        var graph = f.graphs.get("target");
+        var fields = (com.fasterxml.jackson.databind.node.ArrayNode) graph.path("fields");
+        var bindings = (com.fasterxml.jackson.databind.node.ArrayNode) graph.path("bindings");
+        var tracking = (com.fasterxml.jackson.databind.node.ArrayNode) graph.path("tracking");
+        var computed = SourceBindingCanonical.tree(Map.of("virtualType", "computed_readonly",
+                "computeExpression", "CASE WHEN state = 'open' THEN 'pending' ELSE 'paused' END",
+                "computeDependencies", List.of("state"), "filterable", true));
+        var system = SourceBindingCanonical.tree(Map.of("systemManaged", true));
+        var display = (com.fasterxml.jackson.databind.node.ObjectNode) fields.get(0).deepCopy();
+        display.put("id", 999).put("pid", "display-field").put("code", "fulfillment_bucket").put("data_type", "enum");
+        display.set("feature", computed);
+        display.set("extension", system);
+        fields.add(display);
+        var binding = (com.fasterxml.jackson.databind.node.ObjectNode) bindings.get(0).deepCopy();
+        binding.put("field_id", 999).put("pid", "display-binding").put("alias_code", "fulfillment_bucket");
+        bindings.add(binding);
+        var track = (com.fasterxml.jackson.databind.node.ObjectNode) tracking.get(0).deepCopy();
+        track.put("resource_pid", "display-binding");
+        tracking.add(track);
+
+        assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+        f.reapprove();
+        assertThat(f.resolver.plan(f.binding, "src")).hasSize(2);
+
+        // Reapproval cannot promote a computed enum to a recipient or target predicate.
+        var state = (com.fasterxml.jackson.databind.node.ObjectNode) fields.get(1);
+        assertThat(state.path("code").asText()).isEqualTo("state");
+        state.put("data_type", "enum");
+        state.set("feature", computed);
+        state.set("extension", system);
+        f.reapprove();
+        assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void wrongImportedOwnerOrVersionFailsEvenWithTrustedShape() {
         var graph = f.graphs.get("source");
         ((com.fasterxml.jackson.databind.node.ObjectNode) graph.path("plugins").get(0)).put("version", "2.0.0");
@@ -623,7 +680,7 @@ class RegisteredSourcePlanResolverTest {
         ComposedDelivery pipeline = new ComposedDelivery();
         var event = pipeline.queue("ordinary-reference");
         pipeline.deliver(event, pipeline.host);
-        assertThat(pipeline.isolation).isEqualTo(TransactionDefinition.ISOLATION_DEFAULT);
+        assertThat(pipeline.isolation).isEqualTo(TransactionDefinition.ISOLATION_REPEATABLE_READ);
         assertThat(pipeline.host.requiresSerializableTransaction(event)).isFalse();
         verify(pipeline.notifications).insert(any(Notification.class));
         assertThat(f.reads).isZero();
@@ -682,7 +739,7 @@ class RegisteredSourcePlanResolverTest {
         var other = pipeline.event(ordinary, "other.event", SourceBindingCanonical.reference("notice", "src", 1));
         assertThat(pipeline.host.requiresSerializableTransaction(other)).isFalse();
         assertThatThrownBy(() -> pipeline.deliver(other, pipeline.host)).hasMessage("NOTIFICATION_DELIVERY_UNAVAILABLE");
-        assertThat(pipeline.isolation).isEqualTo(TransactionDefinition.ISOLATION_DEFAULT);
+        assertThat(pipeline.isolation).isEqualTo(TransactionDefinition.ISOLATION_REPEATABLE_READ);
         verify(pipeline.notifications, never()).insert(any(Notification.class));
     }
     @Test
@@ -711,7 +768,7 @@ class RegisteredSourcePlanResolverTest {
             };
         });
         assertThatThrownBy(() -> pipeline.deliver(event,(ReliableEventConsumerExtension) proxy)).isInstanceOf(IllegalArgumentException.class);
-        assertThat(pipeline.isolation).isEqualTo(TransactionDefinition.ISOLATION_DEFAULT);
+        assertThat(pipeline.isolation).isEqualTo(TransactionDefinition.ISOLATION_REPEATABLE_READ);
         assertThat(optInCalls).hasValue(0);
         assertThat(f.reads).isZero();
         verify(pipeline.notifications, never()).insert(any(Notification.class));
@@ -1006,8 +1063,6 @@ class RegisteredSourcePlanResolverTest {
             return queued.getLast();
         }
         void deliver(IntegrationEventEnvelope envelope, ReliableEventConsumerExtension consumer) {
-            when(receipts.lockActiveDeliveryLease(envelope.tenantId(), envelope.eventId(), "test-lease")).thenReturn(1L);
-            when(receipts.countActiveDeliveryLease(envelope.tenantId(), envelope.eventId(), "test-lease")).thenReturn(1);
             executor.deliver(envelope, consumer, "test-lease");
         }
         IntegrationEventEnvelope event(IntegrationEventEnvelope input, String type, String reference) {
@@ -1068,7 +1123,7 @@ class RegisteredSourcePlanResolverTest {
         }
         void reapprove() {
             var approvals = binding.approvals().stream().map(a -> new Approval(a.mode(), a.modelCode(), SourceBindingCanonical.hash(graphs.get(a.modelCode())), a.owners(), a.nativeFieldPids())).toList();
-            binding = new Binding(binding.schemaVersion(), binding.code(), binding.tenantId(), approvals, binding.source(), binding.owner(), binding.principal(), binding.verification(), binding.ruleId(), binding.templateCode(), binding.variableToSourceField());
+            binding = new Binding(binding.schemaVersion(), binding.code(), binding.tenantId(), approvals, binding.source(), binding.owner(), binding.principal(), binding.verification(), binding.ruleId(), binding.templateCode(), binding.variableToSourceField(), binding.miniProgramLink());
             var p = new HostSourceBindingProperties();
             p.setEnabled(true);
             p.setBindings(List.of(binding));

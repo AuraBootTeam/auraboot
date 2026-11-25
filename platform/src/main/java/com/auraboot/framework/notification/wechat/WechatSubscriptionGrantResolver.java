@@ -20,13 +20,24 @@ public interface WechatSubscriptionGrantResolver {
     }
     record Grant(long tenantId, String resolutionReference, String userPid, String appId, String identityPid,
                  String openid, String templateId, String grantReference, String reservationReference,
-                 Instant expiresAt, Map<String,String> values, Instant reservedAt) {
+                 Instant expiresAt, Map<String,String> values, Instant reservedAt,
+                 @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) String miniProgramPath) {
+        public Grant(long tenantId,String resolutionReference,String userPid,String appId,String identityPid,String openid,
+                String templateId,String grantReference,String reservationReference,Instant expiresAt,Map<String,String> values,
+                Instant reservedAt) {
+            this(tenantId,resolutionReference,userPid,appId,identityPid,openid,templateId,grantReference,reservationReference,
+                    expiresAt,values,reservedAt,null);
+        }
         /** Source compatibility for the transport-only seam. Durable enqueue requires a real immutable reservation time. */
         public Grant(long tenantId,String resolutionReference,String userPid,String appId,String identityPid,String openid,
                 String templateId,String grantReference,String reservationReference,Instant expiresAt,Map<String,String> values) {
             this(tenantId,resolutionReference,userPid,appId,identityPid,openid,templateId,grantReference,reservationReference,expiresAt,values,null);
         }
-        public Grant { values = values == null ? Map.of() : Map.copyOf(values); }
+        public Grant {
+            values = values == null ? Map.of() : Map.copyOf(values);
+            if (!com.auraboot.framework.notification.service.NotificationDeliveryPlanResolver.validMiniProgramPath(miniProgramPath))
+                throw new IllegalArgumentException("NOTIFICATION_MINI_PROGRAM_PATH_INVALID");
+        }
         @Override public String toString() { return "WechatSubscriptionGrant[redacted]"; }
     }
 }

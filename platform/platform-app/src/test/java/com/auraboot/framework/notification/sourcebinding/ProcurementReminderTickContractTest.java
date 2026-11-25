@@ -23,13 +23,14 @@ class ProcurementReminderTickContractTest {
                 return null;
             });
     private final ProcurementReminderTickNativeIT.TenantBoundBackground frame =
-            new ProcurementReminderTickNativeIT.TenantBoundBackground(123, "supplier-owned", "quote-owned", delegate);
+            new ProcurementReminderTickNativeIT.TenantBoundBackground(123, "supplier-owned", "rfq-owned", "quote-owned", "RFQ-001", delegate);
 
     @Test
     void exactBoundedSupplierAndOwnedQuoteReadsForwardWithoutReplacingTheHost() {
         frame.proxy().queryPage(123, "pr_supplier_common", Map.of("pr_supplier_status", "enabled"), null, 100);
         frame.proxy().queryPage(123, "s2p_bid", query("supplier-owned"));
-        assertThat(forwarded).containsExactly("queryPage", "queryPage");
+        frame.proxy().getById(123, "s2p_sourcing_event", "rfq-owned");
+        assertThat(forwarded).containsExactly("queryPage", "queryPage", "getById");
         assertThat(frame.actual).isSameAs(delegate);
     }
 
@@ -38,6 +39,8 @@ class ProcurementReminderTickContractTest {
         assertThatThrownBy(() -> frame.proxy().queryPage(124, "pr_supplier_common", Map.of("pr_supplier_status", "enabled"), null, 100))
                 .isInstanceOf(SecurityException.class);
         assertThatThrownBy(() -> frame.proxy().queryPage(123, "s2p_bid", query("foreign-supplier"))).isInstanceOf(SecurityException.class);
+        assertThatThrownBy(() -> frame.proxy().getById(123, "s2p_sourcing_event", "rfq-foreign"))
+                .isInstanceOf(SecurityException.class);
         assertThat(forwarded).isEmpty();
     }
 
@@ -58,8 +61,7 @@ class ProcurementReminderTickContractTest {
     void onlyTheExactSameSlotReminderCanReachRealIdempotentCreate() {
         frame.proxy().tryCreate(123, "qo_procurement_reminder_common", reminder());
         assertThat(forwarded).containsExactly("tryCreate");
-        for (String field : List.of("qo_pr_reminder_key", "qo_pr_reminder_supplier_pid", "qo_pr_reminder_kind",
-                "qo_pr_reminder_slot_at", "qo_pr_reminder_state", "qo_pr_reminder_revision", "qo_pr_reminder_targets")) {
+        for (String field : reminder().keySet()) {
             Map<String, Object> bad = new LinkedHashMap<>(reminder());
             bad.put(field, field.equals("qo_pr_reminder_targets") ? List.of("foreign-quote") : "forged");
             assertThatThrownBy(() -> frame.proxy().tryCreate(123, "qo_procurement_reminder_common", bad)).isInstanceOf(SecurityException.class);
@@ -111,18 +113,18 @@ class ProcurementReminderTickContractTest {
                 List.of(new DataPageQuery.Sort("pid", false)), 1, DataPageQuery.MAX_SIZE);
     }
     private static Map<String, Object> reminder() {
-        return Map.of("qo_pr_reminder_key", ProcurementReminderTickNativeIT.TenantBoundBackground.reminderKey("supplier-owned"),
-                "qo_pr_reminder_supplier_pid", "supplier-owned", "qo_pr_reminder_kind", "quote",
-                "qo_pr_reminder_slot_at", ProcurementReminderTickNativeIT.SLOT.toString(), "qo_pr_reminder_state", "pending",
-                "qo_pr_reminder_revision", 0, "qo_pr_reminder_targets", List.of("quote-owned"));
+        return ProcurementReminderTickNativeIT.exactReminder("supplier-owned", "quote-owned", "quote",
+                ProcurementReminderTickNativeIT.SLOT, "RFQ-001");
     }
     // BEGIN additive automatic-registry contracts.
     @org.junit.jupiter.api.io.TempDir Path automaticResources;
 
     private ProcurementReminderTickNativeIT.AutomaticBackground automaticFrame(String kind, BackgroundDataAccessor actual) {
-        return new ProcurementReminderTickNativeIT.AutomaticBackground(123, "supplier-owned", "quote-owned", "order-owned",
-                kind.equals("quote") ? "quote-owned" : "order-owned", kind,
-                kind.equals("quote") ? ProcurementReminderTickNativeIT.SLOT : ProcurementReminderTickNativeIT.SHIPMENT_SLOT, actual);
+        boolean quote = kind.equals("quote");
+        return new ProcurementReminderTickNativeIT.AutomaticBackground(123, "supplier-owned", "rfq-owned", "quote-owned", "order-owned",
+                quote ? "quote-owned" : "order-owned", kind,
+                quote ? ProcurementReminderTickNativeIT.SLOT : ProcurementReminderTickNativeIT.SHIPMENT_SLOT,
+                quote ? "RFQ-001" : "PO-001", actual);
     }
 
     @Test
@@ -154,8 +156,9 @@ class ProcurementReminderTickContractTest {
 
     @Test
     void everyAutomaticReminderFieldAndAddedAuthorityAreRejectedBeforeTheHostWrite() {
-        for (String field : List.of("qo_pr_reminder_key", "qo_pr_reminder_supplier_pid", "qo_pr_reminder_kind", "qo_pr_reminder_slot_at",
-                "qo_pr_reminder_state", "qo_pr_reminder_revision", "qo_pr_reminder_targets", "tenant_id")) {
+        var fields = new ArrayList<>(automaticFrame("shipment", delegate).exactReminder().keySet());
+        fields.add("tenant_id");
+        for (String field : fields) {
             var f = automaticFrame("shipment", delegate);
             var bad = new LinkedHashMap<String, Object>(f.exactReminder());
             bad.put(field, field.equals("qo_pr_reminder_targets") ? List.of("foreign-order") : "forged");
@@ -189,8 +192,8 @@ class ProcurementReminderTickContractTest {
                 "pr_pol_order_id", "pr_pol_qty", "qo_pr_order_line_submitted_qty", 1000));
         assertThat(ProductQuoteReminderNativeFacet.automaticShipmentEntity().equals())
                 .contains(new SourceBindingTypes.Exact("qo_pr_reminder_kind", "shipment"));
-        assertThatThrownBy(() -> new ProcurementReminderTickNativeIT.AutomaticBackground(123, "s", "q", "o", "q", "shipment",
-                ProcurementReminderTickNativeIT.SHIPMENT_SLOT, delegate)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ProcurementReminderTickNativeIT.AutomaticBackground(123, "s", "rfq", "q", "o", "q", "shipment",
+                ProcurementReminderTickNativeIT.SHIPMENT_SLOT, "PO-001", delegate)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> ProductQuoteNativeInitialization.validateAutomaticPayload("pr_purchase_order_line", Map.of("pr_pol_order_id", "o")))
                 .isInstanceOf(IllegalArgumentException.class);
     }
@@ -241,10 +244,10 @@ class ProcurementReminderTickContractTest {
         Path root = sourceDirectory();
         // dcccc905a807ec2315f90baf9c349d5d225ec7d1 replaces two machine-specific
         // paths outside the additive section with NativeProcurementWorkspace.root().
-        // All other protected bytes, assertions and both companion digests are unchanged.
+        // The controlled tick now admits the exact business summary and claims an actual delivery lease.
+        // The companion fixture digests continue to pin the prior reviewed sources.
         Map<String, String> originalHashes = Map.of(
-                // Frozen source51751c9c already included prior Native runner fixes.
-                "ProcurementReminderTickNativeIT.java", "3a6e7aeda36155148abc29521b2ab3ba5f72f4c666880ccd31933179ce17f866",
+                "ProcurementReminderTickNativeIT.java", "32b00319aec98bb753023d9c594c08a6416f4ba59e87d47622a4e5b3108f9abd",
                 "ProductQuoteNativeInitialization.java", "af7f97c3c9308efc4f39063392c8dbe76dbd0f34b1d6410b8955ede3fa7b936a",
                 "ProductQuoteReminderNativeFacet.java", "759436112d6412371baceae75519b84b2104e94948f306a2a239a62e4a8234d0");
         for (var entry : originalHashes.entrySet()) {
