@@ -498,8 +498,9 @@ public class PostExecutionPhase implements CommandPhase {
         if (recordTemplates != null && !recordTemplates.isEmpty()) {
             int created = 0;
             for (Map<String, Object> template : recordTemplates) {
+                // The data service sets tenant_id itself; a payload that carries it is refused by
+                // the native field authorization outside the command's permit scope.
                 Map<String, Object> data = new HashMap<>();
-                data.put("tenant_id", tenantId);
                 for (Map.Entry<String, Object> entry : template.entrySet()) {
                     data.put(entry.getKey(), entry.getValue());
                 }
@@ -531,7 +532,6 @@ public class PostExecutionPhase implements CommandPhase {
 
         for (int i = 0; i < recordCount; i++) {
             Map<String, Object> data = new HashMap<>();
-            data.put("tenant_id", tenantId);
 
             for (Map.Entry<String, Object> entry : fieldMapping.entrySet()) {
                 Object value = entry.getValue();

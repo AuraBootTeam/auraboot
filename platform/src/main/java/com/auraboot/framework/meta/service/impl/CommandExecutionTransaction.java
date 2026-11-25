@@ -47,6 +47,46 @@ public class CommandExecutionTransaction {
                 snapshots.resolvePermissionDefinition(com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId(), value)).isEmpty());
     }
 
+    private static final java.util.Set<String> CREATING_SIDE_EFFECTS =
+            java.util.Set.of("create_record", "batch_create_record", "batch_create_records", "document_flow");
+    private static final java.util.Set<String> CREATING_POST_ACTIONS = java.util.Set.of("create_record", "create_children");
+
+    /** True when the command declares an effect that inserts records through the ordinary record write. */
+    static boolean declaresRecordCreation(java.util.Map<String,Object> config) {
+        if (config == null) return false;
+        return declares(config.get("sideEffects"), "action", CREATING_SIDE_EFFECTS)
+                || declares(config.get("postActions"), "type", CREATING_POST_ACTIONS);
+    }
+
+    // Each executor reads the named key first and falls back to the other one. A side effect is
+    // either one action or holds nested `actions`, which name their kind by `type`.
+    private static boolean declares(Object effects, String first, java.util.Set<String> creating) {
+        if (!(effects instanceof java.util.List<?> list)) return false;
+        for (Object effect : list) {
+            if (!(effect instanceof java.util.Map<?,?> entry)) continue;
+            if (creating.contains(kind(entry, first))) return true;
+            if ("action".equals(first) && entry.get("actions") instanceof java.util.List<?> actions)
+                for (Object action : actions)
+                    if (action instanceof java.util.Map<?,?> item && creating.contains(kind(item, "type"))) return true;
+        }
+        return false;
+    }
+
+    private static String kind(java.util.Map<?,?> effect, String first) {
+        Object value = effect.get(first);
+        if (!(value instanceof String text)) value = effect.get("action".equals(first) ? "type" : "action");
+        return value instanceof String text ? text : "";
+    }
+
+    /** The automatic minimum: repeatable read, raised to serializable by declaration or by the caller's transaction. */
+    private static BusinessResourceAuthorization.ReadIsolation coherentMinimum(java.util.Map<String,Object> config) {
+        boolean serializable = com.auraboot.framework.meta.transaction.CommandTransactionIsolationPolicy.requiresSerializable(config)
+                || Integer.valueOf(org.springframework.transaction.TransactionDefinition.ISOLATION_SERIALIZABLE).equals(
+                        TransactionSynchronizationManager.getCurrentTransactionIsolationLevel());
+        return serializable ? BusinessResourceAuthorization.ReadIsolation.SERIALIZABLE
+                : BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ;
+    }
+
     public <T> T execute(String commandCode, boolean dryRun, Supplier<T> operation) {
         boolean ownsTransaction = !TransactionSynchronizationManager.isActualTransactionActive();
         try {
@@ -90,13 +130,7 @@ public class CommandExecutionTransaction {
         var isolation = resourceIsolation != null ? resourceIsolation : handlerIsolation;
         var template = new TransactionTemplate(transactions);
         boolean domain = domainCommand(config);
-        if (isolation == null && domain) {
-            boolean serializable = com.auraboot.framework.meta.transaction.CommandTransactionIsolationPolicy.requiresSerializable(config)
-                    || Integer.valueOf(org.springframework.transaction.TransactionDefinition.ISOLATION_SERIALIZABLE).equals(
-                        TransactionSynchronizationManager.getCurrentTransactionIsolationLevel());
-            isolation = serializable ? BusinessResourceAuthorization.ReadIsolation.SERIALIZABLE
-                    : BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ;
-        }
+        if (isolation == null && domain) isolation = coherentMinimum(config);
         // Chained secondaries run in this same transaction and are verified against it before
         // they execute, so their requirement must take part in opening it: a secondary that
         // reads outside the permit scope can neither declare (the guard rejects a transaction
@@ -109,14 +143,27 @@ public class CommandExecutionTransaction {
                 throw new AccessDeniedException("Conflicting command owner transaction requirements");
             isolation = required;
         }
+        // A declared record-creating effect is an ordinary write outside the command's permit
+        // scope: the native field authorization decides it on the locked row and admits it only
+        // from a coherent transaction. Checked after the secondaries, so a declared requirement
+        // is neither contradicted nor relaxed. Update and aggregate effects write through the
+        // scoped SQL path and keep their own guards.
+        boolean effectDerived = isolation == null && declaresRecordCreation(config);
+        if (effectDerived) isolation = coherentMinimum(config);
         if (isolation != null) {
             // Preserve the caller's atomic unit: never suspend it just to satisfy an owner.
             // An existing transaction must already attest the exact required isolation.
             if (TransactionSynchronizationManager.isActualTransactionActive()
                     && !Objects.equals(TransactionSynchronizationManager.getCurrentTransactionIsolationLevel(), isolation.jdbcLevel())) {
-                throw new AccessDeniedException("The existing command transaction does not satisfy the resource isolation contract");
-            }
-            template.setIsolationLevel(isolation.jdbcLevel());
+                // Only an owner contract closes a weaker caller transaction. The minimum derived
+                // from a declared effect does not: a delivery that runs the command inside its
+                // own transaction keeps that transaction (machine deliveries never reach the
+                // native field authorization), and a write that is gated there is refused with
+                // the level it needs.
+                if (!effectDerived)
+                    throw new AccessDeniedException("The existing command transaction does not satisfy the resource isolation contract");
+                isolation = null;
+            } else template.setIsolationLevel(isolation.jdbcLevel());
         }
         Integer previousIsolation = TransactionSynchronizationManager.getCurrentTransactionIsolationLevel();
         if (isolation != null) {
