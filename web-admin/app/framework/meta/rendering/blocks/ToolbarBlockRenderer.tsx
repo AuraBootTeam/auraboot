@@ -13,6 +13,7 @@ import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import { useAuth } from '~/contexts/AuthContext';
 import { useToastContext } from '~/contexts/ToastContext';
+import { FieldRenderer } from '../FieldRenderer';
 import { LoadingOverlay } from '~/ui/LoadingOverlay';
 import { getLegacyCompatibleRecordPid } from '~/framework/meta/utils/publicRecordId';
 import { useActionTriggerFocus } from '~/hooks/useActionTriggerFocus';
@@ -144,7 +145,9 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
   return (
     <>
       <LoadingOverlay visible={busy} label={t('common.loading')} />
-      <div className="toolbar-block flex space-x-2">
+      <div className={`toolbar-block flex flex-wrap items-center gap-2 ${(block as any).summaryFields?.length ? 'border-border bg-panel justify-between rounded-lg border p-4' : ''}`}>
+        {(block as any).summaryFields?.length ? <div className="min-w-0 space-y-1">{(block as any).summaryFields.map((field: any) => <FieldRenderer key={field.field} runtime={runtime} field={{...field,readOnly:true}} value={field.valueWhen ? evaluator.evaluate(field.valueWhen,runtime.getContext()) : runtime.getStateManager().getFieldValue(runtime.getScopeId(),field.field)} />)}</div> : null}
+        <div className="flex flex-wrap items-center gap-2">
         {buttons.map((button) => {
           if (!hasButtonPermissions(button, hasPermission)) {
             return null;
@@ -183,6 +186,7 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
             </button>
           );
         })}
+        </div>
       </div>
     </>
   );

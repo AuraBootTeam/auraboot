@@ -123,6 +123,12 @@ export interface CardGroupRows {
   identityField: string;
   titleField: string;
   summaryFields?: FieldConfig[];
+  asideFields?: FieldConfig[];
+  asideDetailsFields?: FieldConfig[];
+  asideDetailsLabel?: string | LocalizedText;
+  footerFields?: FieldConfig[];
+  footerLayout?: 'grid' | 'inline';
+  detailsPlacement?: 'before-items' | 'after-items';
   detailsFields?: FieldConfig[];
   detailsLabel?: string | LocalizedText;
   fields?: FieldConfig[];
@@ -159,7 +165,13 @@ export interface BlockConfig {
   minCardWidth?: number;
   /** Accessible native disclosure groups retain mounted row inputs when closed. */
   collapsibleGroups?: boolean;
-  groupsDefaultOpen?: boolean;
+  groupsDefaultOpen?: boolean | 'first';
+  /** Limit only the group summary; full detail fields remain available. */
+  groupDescriptionLines?: 1 | 2;
+  /** Visual emphasis derived from the current row; does not select or allocate it. */
+  cardEmphasisWhen?: string;
+  /** Optional semantic tones keyed by the raw card badge value. */
+  badgeTones?: Record<string, string>;
   groupDescriptionField?: string;
   /** Boolean row fact: highlight a group if any member requires attention. */
   groupWarningField?: string;
@@ -167,6 +179,16 @@ export interface BlockConfig {
   groupRows?: CardGroupRows;
   /** Render nested child arrays while preserving the parent data source for grouping. */
   childrenField?: string;
+  /** Reuse the same bound rows as cards, document lines, or a read-only table. */
+  itemPresentation?: 'cards' | 'rows' | 'table';
+  collectionDialog?: { title: string | LocalizedText; headerFields?: FieldConfig[]; footerFields?: FieldConfig[]; buttons: ButtonConfig[]; dismissAction: ButtonConfig };
+  primaryField?: string;
+  primarySupportingField?: string;
+  /** Separate an editing area from the preceding card facts. */
+  separatedFields?: string[];
+  fieldDensity?: 'default' | 'compact';
+  groupBadgeField?: string;
+  groupLayout?: 'cards' | 'divided';
   /** Reconcile refreshed facts by stable identity while preserving declared draft fields. */
   draftRows?: CardDraftRows;
   cardActions?: ButtonConfig[];
@@ -191,6 +213,8 @@ export interface BlockConfig {
   previewLimit?: number;
 
   // List tabs
+  /** Optional unified panel around tab navigation and its content. */
+  surface?: 'bare' | 'card';
   tabs?: ListTabConfig[] | DetailTabConfig[];
 
   // Sub-table (master-detail)
@@ -622,7 +646,7 @@ export interface ButtonConfig {
   label?: string | LocalizedText;
   primary?: boolean;
   danger?: boolean;
-  variant?: 'default' | 'primary' | 'danger';
+  variant?: 'default' | 'primary' | 'danger' | 'link';
   icon?: string;
   /**
    * Row actions only — render this button inline in the action column instead of

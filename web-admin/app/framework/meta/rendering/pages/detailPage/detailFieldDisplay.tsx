@@ -30,6 +30,16 @@ export function resolveDetailSectionIcon(block: BlockConfig): LucideIcon {
   return key && DETAIL_SECTION_ICONS[key] ? DETAIL_SECTION_ICONS[key] : FileText;
 }
 
+/** Declared status tones never infer business meaning from translated labels. */
+export function getDetailHeaderStatusTone(tone: unknown): string {
+  switch (tone) {
+    case 'success': return 'bg-status-green-bg text-status-green';
+    case 'warning': return 'bg-status-amber-bg text-status-amber';
+    case 'neutral': return 'bg-subtle text-text-2';
+    default: return 'bg-accent-weak text-accent';
+  }
+}
+
 export function getDetailValueTone(value: unknown): string {
   const text = String(value ?? '').toLowerCase();
   if (text.includes('已启用') || text.includes('enabled') || text.includes('管理员托管')) {

@@ -525,6 +525,19 @@ describe('Business Functions Library', () => {
 
 
 describe('Exact decimal expressions', () => {
+  it('intersects identity and eligibility filters without rounding or mixing source rows', () => {
+    const rows = [{source:'a',quantity:'0.1',eligible:true},{source:'a',quantity:'0.2',eligible:true},
+      {source:'a',quantity:'350',eligible:false},{source:'b',quantity:'999',eligible:true}];
+    expect(fn.DECIMAL_SUM_BY(rows,'quantity','source','a','eligible',true)).toBe('0.3');
+    expect(fn.DECIMAL_SUM_BY(rows,'quantity','source','a')).toBe('350.3');
+    expect(fn.DECIMAL_SUM_BY(rows,'quantity','source','missing','eligible',true)).toBe('0');
+    expect(fn.DECIMAL_SUBTRACT('0.3',fn.DECIMAL_SUM_BY(rows,'quantity','source','a','eligible',true))).toBe('0');
+    expect(fn.DECIMAL_SUBTRACT('0.299999',fn.DECIMAL_SUM_BY(rows,'quantity','source','a','eligible',true))).toBe('-0.000001');
+    const parser = new ExpressionParser(createExpressionContext({form:{rows}} as any));
+    expect(parser.evaluate("${fn.DECIMAL_SUM_BY(form.rows, 'quantity', 'source', 'a', 'eligible', true)}")).toBe('0.3');
+    rows[1].eligible=false;
+    expect(fn.DECIMAL_SUM_BY(rows,'quantity','source','a','eligible',true)).toBe('0.1');
+  });
   it('preserves large values and mixed scales with source identity filtering', () => {
     const rows = [{ source: 'a', quantity: '9007199254740993.000001' }, { source: 'a', quantity: '0.000009' }, { source: 'b', quantity: '999' }];
     expect(fn.DECIMAL_SUM_BY(rows, 'quantity', 'source', 'a')).toBe('9007199254740993.00001');
@@ -573,4 +586,43 @@ describe('PROJECT_ROWS exact payload projection', () => {
       ),
     ).toThrow();
   });
+});
+
+describe('Exact decimal line extension totals', () => {
+ it('keeps monetary precision and ignores ineligible offers', () => {
+  expect(fn.DECIMAL_SUM_PRODUCTS([{quantity:'350',price:'0.68',eligible:true},{quantity:'100',price:'2.8',eligible:true},{quantity:'999',price:null,eligible:false}],['quantity','price'],'eligible',true)).toBe('518');
+  expect(fn.DECIMAL_SUM_PRODUCTS([{quantity:'9007199254740993',price:'0.000001'}],['quantity','price'])).toBe('9007199254.740993');
+ });
+ it('rejects incomplete or malformed selected amounts instead of silently undercounting', () => {
+  for (const quantity of ['', null, '1e2', 'NaN']) expect(() => fn.DECIMAL_SUM_PRODUCTS([{quantity,price:'1'}],['quantity','price'])).toThrow();
+  expect(() => fn.DECIMAL_SUM_PRODUCTS([],[])).toThrow();
+ });
+});
+
+
+describe('Exact independent quantity balances', () => {
+  const count = (parents: unknown, children: unknown) => fn.DECIMAL_BALANCE_SUMMARY(parents,'id','demand',children,'parent','quantity').balanced;
+  it('counts exact balances per identity without cancelling differences across units', () => {
+    const parents=[{id:'pcs',demand:'350'},{id:'box',demand:'100'}];
+    expect(count(parents,[{parent:'pcs',quantity:'100'},{parent:'box',quantity:'350'}])).toBe(0);
+    expect(count(parents,[{parent:'pcs',quantity:'100'},{parent:'pcs',quantity:'250'},{parent:'box',quantity:'100'}])).toBe(2);
+    expect(count(parents,[{parent:'pcs',quantity:'100'},{parent:'box',quantity:'100'}])).toBe(1);
+    expect(count(parents,[{parent:'foreign',quantity:'450'}])).toBe(0);
+  });
+  it('retains decimal differences beyond safe floating precision and rejects ambiguous parents', () => {
+    const parents=[{id:'a',demand:'9007199254740993.000001'}];
+    expect(count(parents,[{parent:'a',quantity:'9007199254740993.000000'}])).toBe(0);
+    expect(count(parents,[{parent:'a',quantity:'9007199254740993'},{parent:'a',quantity:'0.000001'}])).toBe(1);
+    expect(() => count([...parents,...parents],[])).toThrow('Duplicate');
+    expect(() => count(parents,[{parent:'a',quantity:'-1'}])).toThrow('nonnegative');
+    expect(fn.DECIMAL_BALANCE_SUMMARY([{id:'a',demand:'0'}],'id','demand',[],'parent','quantity')).toEqual({balanced:0,total:0});
+  });
+});
+
+describe('Quantity summary DSL access', () => {
+ it('exposes balanced and applicable counts through the real expression parser', () => {
+  const parser = new ExpressionParser(createExpressionContext({form:{parents:[{id:'a',demand:'2.0'},{id:'b',demand:'0'}],children:[{parent:'a',quantity:'2'}]}} as any));
+  expect(parser.evaluate("fn.DECIMAL_BALANCE_SUMMARY(form.parents, 'id', 'demand', form.children, 'parent', 'quantity').balanced")).toBe(1);
+  expect(parser.evaluate("fn.DECIMAL_BALANCE_SUMMARY(form.parents, 'id', 'demand', form.children, 'parent', 'quantity').total")).toBe(1);
+ });
 });

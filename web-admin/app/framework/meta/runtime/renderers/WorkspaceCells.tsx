@@ -8,6 +8,8 @@ export interface WorkspaceCellPresentation {
   currencyCode?: string;
   precision?: number;
   subtitleFields?: string[];
+  descriptionField?: string;
+  descriptionPreviewLength?: number;
   displayField?: string;
   completedField?: string;
   completedValues?: string[];
@@ -31,8 +33,12 @@ export function WorkspaceCell({ value, record, column, locale = 'en' }: CellRend
   if (config.kind === 'object') {
     const subtitles = (config.subtitleFields || []).map(field => record[`${field}_display`] ?? record[field])
       .filter(item => item != null && !internalIdentity.test(String(item)));
-    return <div className="min-w-0"><div className="text-text truncate text-[13px] leading-5 font-semibold" title={String(value ?? '')}>{String(value ?? '')}</div>
-      {subtitles.length > 0 && <div className="text-text-3 mt-1 truncate text-[11px] leading-4" title={subtitles.join(' · ')}>{subtitles.join(' · ')}</div>}</div>;
+    const description = config.descriptionField ? String(record[config.descriptionField] ?? '') : '';
+    const previewLength = config.descriptionPreviewLength ?? 100;
+    return <div className="min-w-0 font-normal"><div className="text-text truncate text-[13px] leading-5 font-semibold" title={String(value ?? '')}>{String(value ?? '')}</div>
+      {subtitles.length > 0 && <div className="text-text-3 mt-1 truncate text-[11px] leading-4" title={subtitles.join(' · ')}>{subtitles.join(' · ')}</div>}
+      {description && (description.length > previewLength ? <details className="group/specification text-text-3 mt-1 text-xs font-normal leading-5" data-testid="object-description-details"><summary className="cursor-pointer"><span className="group-open/specification:hidden">{description.slice(0, previewLength)}… </span><span className="text-accent group-open/specification:hidden">{locale.startsWith('zh') ? '完整规格' : 'Full specification'}</span><span className="text-accent hidden group-open/specification:inline">{locale.startsWith('zh') ? '收起规格' : 'Collapse specification'}</span></summary><p className="text-text-2 mt-2 whitespace-pre-wrap font-normal">{description}</p></details> : <p className="text-text-3 mt-1 whitespace-pre-wrap text-xs font-normal leading-5">{description}</p>)}
+    </div>;
   }
   if (config.kind === 'member') {
     const name = record[config.displayField || `${column.field}_display`] ?? value;

@@ -1,5 +1,25 @@
 /** UI lifecycle only: no record, permission, request-key or command state. */
 const scopes: Array<{ signal: AbortSignal; priority: number }> = [];
+const activeDialogs = new Set<symbol>();
+const visibilityListeners = new Set<() => void>();
+
+export function subscribeFormDialogVisibility(listener: () => void): () => void {
+  visibilityListeners.add(listener);
+  return () => { visibilityListeners.delete(listener); };
+}
+
+export function hasActiveFormDialog(): boolean { return activeDialogs.size > 0; }
+
+/** Suspend an enclosing modal's focus trap while the shared form owns input. */
+export function registerActiveFormDialog(): () => void {
+  const identity = Symbol('form-dialog');
+  activeDialogs.add(identity);
+  visibilityListeners.forEach(listener => listener());
+  return () => {
+    activeDialogs.delete(identity);
+    visibilityListeners.forEach(listener => listener());
+  };
+}
 
 export function registerFormDialogScope(signal: AbortSignal, priority = 0): () => void {
   const scope = { signal, priority };

@@ -276,6 +276,7 @@ export default defineConfig({
       'react-router',
       'react/jsx-runtime',
       'react/jsx-dev-runtime',
+      'tailwind-merge',
       'react-grid-layout',
       'react-grid-layout/legacy',
       'react-draggable',

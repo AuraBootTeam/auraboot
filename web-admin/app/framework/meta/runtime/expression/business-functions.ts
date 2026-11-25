@@ -39,13 +39,60 @@ function DECIMAL_SUBTRACT(left: string, right: string): string {
   const result = decimalAdd(exactDecimal(left), { ...parsed, units: -parsed.units });
   return decimalText(result.units, result.scale);
 }
-function DECIMAL_SUM_BY(rows: unknown, valueField: string, matchField?: string, matchValue?: unknown): string {
+function DECIMAL_SUM_BY(rows: unknown, valueField: string, matchField?: string, matchValue?: unknown, filterField?: string, filterValue?: unknown): string {
   if (!Array.isArray(rows) || rows.length > 10000 || !valueField) throw new Error('Expected bounded decimal rows');
   let result: ExactDecimal = { units: 0n, scale: 0 };
   for (const row of rows) {
     if (!row || typeof row !== 'object') throw new Error('Expected decimal row');
     if (matchField && row[matchField] !== matchValue) continue;
+    if (filterField && row[filterField] !== filterValue) continue;
     result = decimalAdd(result, exactDecimal(row[valueField]));
+  }
+  return decimalText(result.units, result.scale);
+}
+
+/** Count balanced parent quantities independently; different units never share a total. */
+function DECIMAL_BALANCE_SUMMARY(parents: unknown, identityField: string, demandField: string,
+  children: unknown, parentField: string, quantityField: string): { balanced: number; total: number } {
+  const demands = new Map<unknown, ExactDecimal>();
+  const totals = new Map<unknown, ExactDecimal>();
+  for (const row of boundedRecordRows(parents)) {
+    const identity = readOwnPath(row, identityField);
+    if ((typeof identity !== 'string' || !identity.trim()) && (typeof identity !== 'number' || !Number.isFinite(identity)))
+      throw new Error('Expected a stable quantity identity');
+    if (demands.has(identity)) throw new Error('Duplicate quantity identity');
+    const demand = exactDecimal(readOwnPath(row, demandField));
+    if (demand.units < 0n) throw new Error('Expected nonnegative demand');
+    demands.set(identity, demand);
+  }
+  for (const row of boundedRecordRows(children)) {
+    const identity = readOwnPath(row, parentField);
+    if (!demands.has(identity)) continue;
+    const quantity = exactDecimal(readOwnPath(row, quantityField));
+    if (quantity.units < 0n) throw new Error('Expected nonnegative quantity');
+    totals.set(identity, decimalAdd(totals.get(identity) || {units: 0n, scale: 0}, quantity));
+  }
+  let count = 0;
+  for (const [identity, demand] of demands) {
+    const total = totals.get(identity);
+    if (demand.units > 0n && total && decimalText(total.units,total.scale) === decimalText(demand.units,demand.scale)) count++;
+  }
+  return {balanced:count,total:[...demands.values()].filter(value => value.units > 0n).length};
+}
+
+/** Sum exact decimal line extensions without converting monetary values to binary floats. */
+function DECIMAL_SUM_PRODUCTS(rows: unknown, valueFields: string[], matchField?: string, matchValue?: unknown): string {
+  if (!Array.isArray(rows) || rows.length > 10000 || !Array.isArray(valueFields) || valueFields.length < 1 || valueFields.length > 8 || valueFields.some(field => typeof field !== 'string' || !field)) throw new Error('Expected bounded decimal product rows');
+  let result: ExactDecimal = { units: 0n, scale: 0 };
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') throw new Error('Expected decimal product row');
+    if (matchField && row[matchField] !== matchValue) continue;
+    let product: ExactDecimal = {units: 1n, scale: 0};
+    for (const field of valueFields) {
+      const factor = exactDecimal(row[field]);
+      product = {units: product.units * factor.units, scale: product.scale + factor.scale};
+    }
+    result = decimalAdd(result, product);
   }
   return decimalText(result.units, result.scale);
 }
@@ -537,6 +584,8 @@ export const businessFunctions = {
 
   DECIMAL_SUBTRACT,
   DECIMAL_SUM_BY,
+  DECIMAL_SUM_PRODUCTS,
+  DECIMAL_BALANCE_SUMMARY,
 
   // Number (12)
   ROUND: ROUND_FN,

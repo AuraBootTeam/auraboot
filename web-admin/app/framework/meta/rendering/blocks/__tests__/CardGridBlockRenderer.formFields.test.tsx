@@ -17,11 +17,11 @@ vi.mock('~/framework/meta/rendering/pages/hooks/useDictCache', () => ({
 }));
 // Keep actual field/card renderers and form state; substitute only the leaf widget.
 vi.mock('../../components/ComponentLoader', () => ({ ComponentLoader: ({ props }: any) => (
-  <label>{props.label}<input aria-label={props.label} value={props.value ?? ''}
+  <label>{props.label}<input aria-label={props['aria-label'] || props.label} value={props.value ?? ''}
     readOnly={props.readOnly} onChange={(event) => props.onChange(event.target.value)} /></label>
 ) }));
 
-function setup(bind = true, grouped = false, computed = false, grid = false, reconcile = false, actions?: any[], conditionalCapacity = false) {
+function setup(bind = true, grouped = false, computed = false, grid = false, reconcile = false, actions?: any[], conditionalCapacity = false, table = false) {
   const state = new ScopedStateManager({} as any);
   state.createScope('review');
   let rows: any[] = [
@@ -45,6 +45,7 @@ function setup(bind = true, grouped = false, computed = false, grid = false, rec
     ...(reconcile ? { draftRows: { identityFields: ['pid'], preserveFields: ['proposedQty'], preserveWhen: 'record.eligible !== false' } } : {}),
     ...(grid ? { fieldsLayout: { type: 'grid', cols: 12, rowGap: 12, colGap: 12 } } : {}),
     ...(grouped ? { groupByField: 'sourcePid', groupTitleField: 'sourceLabel' } : {}),
+    ...(table ? {itemPresentation: 'table', rowSelection: {identityField:'pid', selectedField:'selected', positiveField:'availableQty', defaultSelected:true, label:'Include'}, table: {columns:[{field:'supplierName',label:'Supplier'},{field:'availableQty',label:'Available capacity'},{field:'proposedQty',label:'Proposed quantity'}]}} : {}),
     fields: [
       { field: 'availableQty', label: 'Available capacity', component: 'SmartInput', readOnly: true,
         ...(conditionalCapacity ? { visibleWhen: '${row.sourcePid === "source-a"}' } : {}) },
@@ -52,7 +53,7 @@ function setup(bind = true, grouped = false, computed = false, grid = false, rec
       { field: 'score', label: 'Score', component: 'SmartInput', readOnly: true, ...(grid ? { layout: { colSpan: 12 } } : {}) },
       ...(computed ? [{ field: 'groupTotal', label: 'Group total', component: 'SmartInput', valueWhen: '${fn.DECIMAL_SUM_BY(form.choices, "proposedQty", "sourcePid", row.sourcePid)}' }] : []),
     ],
-    cardActions: actions || [{ code: 'preview', label: 'Preview', action: { type: 'command', command: 'test:preview' } }],
+    cardActions: table ? [] : actions || [{ code: 'preview', label: 'Preview', action: { type: 'command', command: 'test:preview' } }],
   } as any} />);
   return { state, refresh: (replacement?: any[]) => {
     rows = replacement || rows.map(row => ({ ...row, proposedQty: '999' }));
@@ -62,6 +63,29 @@ function setup(bind = true, grouped = false, computed = false, grid = false, rec
 
 describe('Card-grid draft form fields', () => {
   beforeEach(() => {handleAction.mockReset(); hasPermission.mockReset().mockReturnValue(true);});
+
+  it('edits flat table drafts independently and refreshes authoritative availability without replacing quantities', () => {
+    const {state,refresh} = setup(true,false,false,false,false,undefined,false,true);
+    const quantity = () => screen.getByRole('textbox',{name:'Supplier A · Proposed quantity'});
+    fireEvent.change(quantity(),{target:{value:'12.000001'}});
+    fireEvent.click(screen.getByRole('checkbox',{name:'Include · Supplier B'}));
+    expect(state.getFieldValue('review','choices')).toMatchObject([
+      {pid:'quote-a',proposedQty:'12.000001',selected:true},
+      {pid:'quote-b',proposedQty:'40',selected:false},
+    ]);
+    act(() => refresh([
+      {pid:'quote-a',supplierName:'Supplier A',availableQty:'0',proposedQty:'999'},
+      {pid:'quote-b',supplierName:'Supplier B',availableQty:'25',proposedQty:'999'},
+    ]));
+    expect(quantity()).toHaveValue('12.000001');
+    expect(quantity()).toHaveProperty('readOnly',true);
+    expect(screen.getByRole('checkbox',{name:'Include · Supplier A'})).toBeDisabled();
+    const tableRows = screen.getAllByTestId('card-grid-row');
+    expect(within(tableRows[0]).getByRole('cell',{name:'0',exact:true})).toBeInTheDocument();
+    expect(within(tableRows[1]).getByRole('cell',{name:'25',exact:true})).toBeInTheDocument();
+    expect(screen.getByRole('textbox',{name:'Supplier B · Proposed quantity'})).toHaveValue('40');
+    expect(handleAction).not.toHaveBeenCalled();
+  });
 
   it('removes invisible fields before placing each card in its own grid', () => {
     setup(true, false, false, true, false, undefined, true);

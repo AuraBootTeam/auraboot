@@ -35,7 +35,8 @@ export function resolveMenuLabel(
 
 function isPathInSubmenu(items: SubmenuItem[], pathname: string): boolean {
   for (const item of items) {
-    if (item.path.split('?')[0] === pathname) return true;
+    // Group and action-only menus legitimately have no navigation path.
+    if (typeof item.path === 'string' && item.path.split('?')[0] === pathname) return true;
     if (item.submenu && isPathInSubmenu(item.submenu, pathname)) return true;
   }
   return false;
