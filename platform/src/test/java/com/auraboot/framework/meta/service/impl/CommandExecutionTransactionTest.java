@@ -536,6 +536,85 @@ class CommandExecutionTransactionTest {
         verify(manager,times(2)).getTransaction(argThat(definition -> definition.getIsolationLevel() >= TransactionDefinition.ISOLATION_REPEATABLE_READ));
     }
 
+    // A query without a plugin handler is read by the executor through the native read projection,
+    // which answers a record only from a coherent transaction. Nothing states that requirement
+    // for the command, so the opener derives the minimum from the command itself.
+
+    private void defines(CommandExecutionTransaction opener, String commandCode, String modelCode, String executionConfig) {
+        var definitions=mock(com.auraboot.framework.meta.mapper.CommandDefinitionMapper.class);
+        var command=new com.auraboot.framework.meta.entity.CommandDefinition();
+        command.setModelCode(modelCode);
+        command.setExecutionConfig(executionConfig);
+        when(definitions.findCurrentByCode(commandCode)).thenReturn(command);
+        org.springframework.test.util.ReflectionTestUtils.setField(opener,"definitions",definitions);
+    }
+
+    @Test void aQueryReadByTheExecutorOpensARepeatableReadTransaction() {
+        defines(transaction,"crm:list_accounts","crm_account","{\"type\":\"query\"}");
+        when(manager.getTransaction(any())).thenReturn(status);
+        // The level the native read projection sees when the executor reads.
+        assertThat(transaction.execute("crm:list_accounts",false,
+                TransactionSynchronizationManager::getCurrentTransactionIsolationLevel))
+                .isEqualTo(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        verify(manager).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_REPEATABLE_READ));
+        verify(manager).commit(status);
+        assertThat(TransactionSynchronizationManager.getCurrentTransactionIsolationLevel()).isNull();
+    }
+
+    @Test void aQueryWithAPluginHandlerKeepsThatHandlersTransactionContract() {
+        defines(transaction,"crm:list_accounts","crm_account","{\"type\":\"query\"}");
+        when(extensions.getCommandHandler("crm:list_accounts")).thenReturn(Optional.of(mock(CommandHandlerExtension.class)));
+        when(manager.getTransaction(any())).thenReturn(status);
+        assertThat(transaction.execute("crm:list_accounts",false,()->"done")).isEqualTo("done");
+        // The handler states nothing, so no level is imposed on it.
+        verify(manager).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_DEFAULT));
+    }
+
+    @Test void aQueryWithAChainedSecondaryKeepsThatSecondariesTransactionContract() {
+        defines(transaction,"crm:list_accounts","crm_account","{\"type\":\"query\"}");
+        when(extensions.getSecondaryCommandHandlers("crm:list_accounts"))
+                .thenReturn(java.util.List.of(mock(CommandHandlerExtension.class)));
+        when(manager.getTransaction(any())).thenReturn(status);
+        assertThat(transaction.execute("crm:list_accounts",false,()->"done")).isEqualTo("done");
+        verify(manager).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_DEFAULT));
+    }
+
+    @Test void aCommandOfAnotherTypeOrWithoutAModelKeepsTheDefaultTransaction() {
+        defines(transaction,"crm:create_activity","crm_activity","{\"type\":\"create\"}");
+        when(manager.getTransaction(any())).thenReturn(status);
+        transaction.execute("crm:create_activity",false,()->"done");
+        verify(manager).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_DEFAULT));
+
+        var opener=new CommandExecutionTransaction(manager,extensions);
+        defines(opener,"system:ping","","{\"type\":\"query\"}");
+        when(manager.getTransaction(any())).thenReturn(status);
+        opener.execute("system:ping",false,()->"done");
+        verify(manager,times(2)).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_DEFAULT));
+    }
+
+    @Test void aQueryReadByTheExecutorDoesNotCloseAWeakerCallerTransaction() {
+        defines(transaction,"crm:list_accounts","crm_account","{\"type\":\"query\"}");
+        when(manager.getTransaction(any())).thenReturn(status);
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        assertThat(transaction.execute("crm:list_accounts",false,
+                TransactionSynchronizationManager::getCurrentTransactionIsolationLevel))
+                .isEqualTo(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        verify(manager).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_DEFAULT));
+    }
+
+    @Test void aQueryReadByTheExecutorRunsInsideACoherentCallerTransaction() {
+        defines(transaction,"crm:list_accounts","crm_account","{\"type\":\"query\"}");
+        when(manager.getTransaction(any())).thenReturn(status);
+        for (int level : new int[]{TransactionDefinition.ISOLATION_REPEATABLE_READ,TransactionDefinition.ISOLATION_SERIALIZABLE}) {
+            TransactionSynchronizationManager.setActualTransactionActive(true);
+            TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(level);
+            assertThat(transaction.execute("crm:list_accounts",false,
+                    TransactionSynchronizationManager::getCurrentTransactionIsolationLevel)).isEqualTo(level);
+        }
+        verify(manager,times(2)).getTransaction(argThat(definition -> definition.getIsolationLevel() >= TransactionDefinition.ISOLATION_REPEATABLE_READ));
+    }
+
     // The leniency above is for the derived minimum only: a domain command keeps closing a
     // weaker caller transaction, with or without a declared effect.
     @Test void aDomainCommandStillClosesAWeakerCallerTransaction() {

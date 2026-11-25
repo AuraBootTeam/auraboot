@@ -109,6 +109,28 @@ links only its original root target. Backend qualification and explicitly unexec
 layers are recorded in the [file capability verification report](./2026-10-27-maritime-combined-files-testing-gate-acceptance-report.md).
 
 
+## A query command without a handler
+
+A command of type `query` that declares no handler has nothing of its own that reads for it. It used to complete with an empty result: on the CRM stack all 57 query commands answered `{}`. The executor now reads the command's model itself.
+
+- The request names a record, with `targetRecordId` or with the payload's `recordPid`: the answer is `{ "record": { … } }`. A record that does not exist is a record-not-found error. A target the caller may not read is refused by the target scope gate, as for any command that names a record.
+- Otherwise the answer is a page, `{ "total": 3, "records": [ … ] }`.
+
+The data service holds every returned record to the caller's READ authority, as it does for the list endpoint. The declared command permissions and the target scope gate still run before the read.
+
+The parameters are the ones the agent tool accepts, from one implementation (`QueryCommandParams`): `pageNum` (or `page`), `pageSize`, `keyword` (or `search`), `filters` (a list of conditions), `sortFields`, or `sortField` with `sortOrder`. The executor takes them strictly. A malformed filter or sort order, a paging value that is not a number and any other parameter are refused as a bad request instead of being dropped: a dropped filter answers a filtered question with every record. The agent tool keeps the lenient reading for a caller that cannot tell a malformed filter from a valid one.
+
+A query read by the executor never writes:
+
+- Its inputs are filters, never an edit attempt. The input field authorization does not hold a field the caller cannot edit against them.
+- No field map runs for it. A declared input field used to take the implicit field-map path, whose fall-through is INSERT, and saved the filter as a record. The field-map executor now refuses that path for a query.
+- Its result is the response and is never persisted onto the record the request named.
+
+The transaction is derived as it is for a declared record-creating effect: repeatable read, raised to serializable by declaration or by the caller's transaction. It is not an owner contract, so a weaker caller transaction is kept rather than closed; a native read inside it is then refused with the level it needs.
+
+A query that declares a handler, as a binding rule or as a plugin handler, keeps that handler's own contract unchanged. Declaring write configuration on a query (a side effect, a post action, an auto-set field) is a definition error that is not detected at publish time.
+
+
 ## Query result reuse
 
 A published query command can explicitly declare `executionConfig.cacheResult: false`:

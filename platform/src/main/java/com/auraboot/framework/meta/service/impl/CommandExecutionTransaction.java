@@ -35,9 +35,12 @@ public class CommandExecutionTransaction {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.auraboot.framework.permission.service.impl.PermissionSnapshotCache snapshots;
 
-    private java.util.Map<String,Object> commandConfiguration(String commandCode) {
-        if (definitions == null) return java.util.Map.of();
-        var command = definitions.findCurrentByCode(commandCode);
+    private com.auraboot.framework.meta.entity.CommandDefinition currentCommand(String commandCode) {
+        return definitions == null ? null : definitions.findCurrentByCode(commandCode);
+    }
+
+    private static java.util.Map<String,Object> configuration(
+            com.auraboot.framework.meta.entity.CommandDefinition command) {
         if (command == null || command.getExecutionConfig() == null) return java.util.Map.of();
         return com.auraboot.framework.common.util.JsonUtil.parse(command.getExecutionConfig(), new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String,Object>>() {});
     }
@@ -114,7 +117,8 @@ public class CommandExecutionTransaction {
     }
 
     private <T> T executeTransaction(String commandCode, boolean dryRun, Supplier<T> operation) {
-        var config = commandConfiguration(commandCode);
+        var command = currentCommand(commandCode);
+        var config = configuration(command);
         // Handlers are resolved by the same key the pipeline phases use. A command may
         // delegate to a handler registered under another code; looking it up by the
         // command's own code found nothing, so the transaction opened without that
@@ -150,18 +154,30 @@ public class CommandExecutionTransaction {
         // scoped SQL path and keep their own guards.
         boolean effectDerived = isolation == null && declaresRecordCreation(config);
         if (effectDerived) isolation = coherentMinimum(config);
+        // The executor's own read for a query takes the native read projection, which answers a
+        // record only from a coherent transaction. A query without a plugin handler has nothing
+        // that states that requirement, so the minimum is derived from the command itself. It is
+        // the same derived minimum as a declared effect: not an owner contract.
+        boolean readDerived = isolation == null && handler == null
+                && extensions.getSecondaryCommandHandlers(handlerCode).isEmpty()
+                && command != null && command.getModelCode() != null && !command.getModelCode().isBlank()
+                && ExecutorReadQuery.isQuery(config);
+        if (readDerived) {
+            isolation = coherentMinimum(config);
+        }
         if (isolation != null) {
             // Preserve the caller's atomic unit: never suspend it just to satisfy an owner.
             // An existing transaction must already attest the exact required isolation.
             if (TransactionSynchronizationManager.isActualTransactionActive()
                     && !Objects.equals(TransactionSynchronizationManager.getCurrentTransactionIsolationLevel(), isolation.jdbcLevel())) {
                 // Only an owner contract closes a weaker caller transaction. The minimum derived
-                // from a declared effect does not: a delivery that runs the command inside its
-                // own transaction keeps that transaction (machine deliveries never reach the
-                // native field authorization), and a write that is gated there is refused with
-                // the level it needs.
-                if (!effectDerived)
+                // from a declared effect or from the executor's own read does not: a delivery that
+                // runs the command inside its own transaction keeps that transaction (machine
+                // deliveries never reach the native field authorization), and a write that is
+                // gated there is refused with the level it needs.
+                if (!effectDerived && !readDerived) {
                     throw new AccessDeniedException("The existing command transaction does not satisfy the resource isolation contract");
+                }
                 isolation = null;
             } else template.setIsolationLevel(isolation.jdbcLevel());
         }

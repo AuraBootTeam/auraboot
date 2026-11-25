@@ -57,7 +57,12 @@ public class FieldMapPhase implements CommandPhase {
 
         // Field map
         Map<String, Object> fieldMapResults;
-        if (isPluginHandledWithoutDslPersistence(ctx) || isSpringHandledWithoutDslPersistence(ctx)) {
+        if (com.auraboot.framework.meta.service.impl.ExecutorReadQuery.isReadByExecutor(ctx, extensionRegistry)) {
+            // A query read by the executor selects records with its inputs. Left here, a declared
+            // input field took the implicit path, whose fall-through is INSERT.
+            fieldMapResults = new HashMap<>();
+            log.debug("Skipping FIELD_MAP for a query read by the executor: {}", ctx.getCommand().getCode());
+        } else if (isPluginHandledWithoutDslPersistence(ctx) || isSpringHandledWithoutDslPersistence(ctx)) {
             ctx.setHandlerOwnedMutation(true);
             fieldMapResults = new HashMap<>();
             log.info("Skipping FIELD_MAP for handler-owned mutation: {}", ctx.getCommand().getCode());

@@ -239,6 +239,12 @@ public class CommandFieldMapExecutor {
             log.warn("No modelCode on command {}, skipping implicit field map", command.getCode());
             return results;
         }
+        if (ExecutorReadQuery.isQuery(execConfig)) {
+            // A query selects records; its inputs are never field values. The branches below end
+            // in INSERT, which a query command with declared input fields used to reach.
+            throw new IllegalStateException("A query command must not reach the field-map write path (command="
+                    + command.getCode() + ")");
+        }
 
         String operationType = resolveOperationType(execConfig, request);
 

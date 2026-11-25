@@ -2,16 +2,14 @@ package com.auraboot.framework.agent.provider;
 
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.CommandExecuteResult;
-import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.NamedQueryTestRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
-import com.auraboot.framework.meta.dto.QueryCondition;
-import com.auraboot.framework.meta.dto.SortField;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.CommandExecutor;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.NamedQueryService;
+import com.auraboot.framework.meta.service.QueryCommandParams;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.agent.runtime.policy.RiskScale;
@@ -21,7 +19,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -554,8 +551,8 @@ public class DslToolProvider implements ToolProvider {
     }
 
     private ProviderExecutionResult executeList(String modelCode, Map<String, Object> params, long start) {
-        DynamicQueryRequest qr = buildQueryRequest(params);
-        PaginationResult<Map<String, Object>> result = dynamicDataService.list(modelCode, qr);
+        PaginationResult<Map<String, Object>> result = dynamicDataService.list(modelCode,
+                QueryCommandParams.toRequest(objectMapper, params, false));
         List<Map<String, Object>> records = result.getRecords() != null ? result.getRecords() : List.of();
         return ProviderExecutionResult.builder()
                 .success(true)
@@ -589,25 +586,6 @@ public class DslToolProvider implements ToolProvider {
     }
 
     // ========== Helpers ==========
-
-    private DynamicQueryRequest buildQueryRequest(Map<String, Object> params) {
-        if (params == null) params = Map.of();
-        Integer pageNum = params.get("pageNum") instanceof Number n ? n.intValue()
-                : params.get("page") instanceof Number n ? n.intValue()
-                : 1;
-        Integer pageSize = params.get("pageSize") instanceof Number n ? n.intValue() : 20;
-        String keyword = params.get("keyword") instanceof String s ? s
-                : params.get("search") instanceof String s ? s
-                : null;
-        return DynamicQueryRequest.builder()
-                .pageNum(pageNum)
-                .pageSize(pageSize)
-                .keyword(keyword)
-                .conditions(parseConditions(params.get("filters")))
-                .sortFields(parseSortFields(params))
-                .extraParams(extractExtraParams(params))
-                .build();
-    }
 
     private Map<String, Object> loadCommandMetadata(Long tenantId, String commandCode) {
         String sql = "SELECT model_code, execution_config, cmd_risk_level " +
@@ -685,55 +663,5 @@ public class DslToolProvider implements ToolProvider {
             return code.contains(":detail_") || code.contains(":get_");
         }
         return false;
-    }
-
-    private List<QueryCondition> parseConditions(Object rawFilters) {
-        if (rawFilters == null) return null;
-        try {
-            List<QueryCondition> conditions;
-            if (rawFilters instanceof String text) {
-                if (text.isBlank()) return null;
-                conditions = objectMapper.readValue(text, new TypeReference<List<QueryCondition>>() {});
-            } else {
-                conditions = objectMapper.convertValue(rawFilters, new TypeReference<List<QueryCondition>>() {});
-            }
-            return conditions == null || conditions.isEmpty() ? null : conditions;
-        } catch (Exception e) {
-            log.warn("Ignoring invalid DSL query filters from tool params: {}", rawFilters, e);
-            return null;
-        }
-    }
-
-    private List<SortField> parseSortFields(Map<String, Object> params) {
-        if (params == null) return null;
-        Object sortFields = params.get("sortFields");
-        if (sortFields instanceof List<?> list && !list.isEmpty()) {
-            try {
-                return objectMapper.convertValue(sortFields, new TypeReference<List<SortField>>() {});
-            } catch (Exception e) {
-                log.warn("Ignoring invalid DSL query sortFields from tool params: {}", sortFields, e);
-            }
-        }
-
-        Object sortField = params.get("sortField");
-        if (!(sortField instanceof String fieldName) || fieldName.isBlank()) {
-            return null;
-        }
-        SortField.SortDirection direction = "asc".equalsIgnoreCase(String.valueOf(params.get("sortOrder")))
-                ? SortField.SortDirection.ASC
-                : SortField.SortDirection.DESC;
-        return List.of(SortField.builder()
-                .fieldName(fieldName)
-                .direction(direction)
-                .build());
-    }
-
-    private Map<String, Object> extractExtraParams(Map<String, Object> params) {
-        if (params == null || params.isEmpty()) return Collections.emptyMap();
-        Map<String, Object> extra = new LinkedHashMap<>(params);
-        extra.keySet().removeAll(List.of(
-                "pageNum", "page", "pageSize", "keyword", "search", "filters",
-                "sortField", "sortOrder", "sortFields", "recordPid"));
-        return extra.isEmpty() ? Collections.emptyMap() : extra;
     }
 }
