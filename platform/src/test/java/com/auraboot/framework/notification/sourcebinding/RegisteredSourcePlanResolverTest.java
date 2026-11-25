@@ -600,6 +600,42 @@ class RegisteredSourcePlanResolverTest {
         assertThat(f.resolver.plan(f.binding, "src")).hasSize(2);
     }
     @Test
+    void approvedOrderDisplayEnumIsExcludedFromReminderAuthorization() {
+        var graph = f.graphs.get("target");
+        var fields = (com.fasterxml.jackson.databind.node.ArrayNode) graph.path("fields");
+        var bindings = (com.fasterxml.jackson.databind.node.ArrayNode) graph.path("bindings");
+        var tracking = (com.fasterxml.jackson.databind.node.ArrayNode) graph.path("tracking");
+        var computed = SourceBindingCanonical.tree(Map.of("virtualType", "computed_readonly",
+                "computeExpression", "CASE WHEN state = 'open' THEN 'pending' ELSE 'paused' END",
+                "computeDependencies", List.of("state"), "filterable", true));
+        var system = SourceBindingCanonical.tree(Map.of("systemManaged", true));
+        var display = (com.fasterxml.jackson.databind.node.ObjectNode) fields.get(0).deepCopy();
+        display.put("id", 999).put("pid", "display-field").put("code", "fulfillment_bucket").put("data_type", "enum");
+        display.set("feature", computed);
+        display.set("extension", system);
+        fields.add(display);
+        var binding = (com.fasterxml.jackson.databind.node.ObjectNode) bindings.get(0).deepCopy();
+        binding.put("field_id", 999).put("pid", "display-binding").put("alias_code", "fulfillment_bucket");
+        bindings.add(binding);
+        var track = (com.fasterxml.jackson.databind.node.ObjectNode) tracking.get(0).deepCopy();
+        track.put("resource_pid", "display-binding");
+        tracking.add(track);
+
+        assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+        f.reapprove();
+        assertThat(f.resolver.plan(f.binding, "src")).hasSize(2);
+
+        // Reapproval cannot promote a computed enum to a recipient or target predicate.
+        var state = (com.fasterxml.jackson.databind.node.ObjectNode) fields.get(1);
+        assertThat(state.path("code").asText()).isEqualTo("state");
+        state.put("data_type", "enum");
+        state.set("feature", computed);
+        state.set("extension", system);
+        f.reapprove();
+        assertThatThrownBy(() -> f.resolver.plan(f.binding, "src")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void wrongImportedOwnerOrVersionFailsEvenWithTrustedShape() {
         var graph = f.graphs.get("source");
         ((com.fasterxml.jackson.databind.node.ObjectNode) graph.path("plugins").get(0)).put("version", "2.0.0");
