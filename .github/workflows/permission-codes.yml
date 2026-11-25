@@ -20,6 +20,8 @@ on:
       - 'platform/src/main/resources/tenant-templates/default-bootstrap.json'
       - 'web-admin/app/plugins/**/resources.ts'
       - 'scripts/validate-permission-codes.mjs'
+      - 'scripts/application/plugin-role-grants.mjs'
+      - 'scripts/application/plugin-role-grants.test.mjs'
       - '.github/workflows/permission-codes.yml'
   pull_request:
     branches: [main]
@@ -30,6 +32,8 @@ on:
       - 'platform/src/main/resources/tenant-templates/default-bootstrap.json'
       - 'web-admin/app/plugins/**/resources.ts'
       - 'scripts/validate-permission-codes.mjs'
+      - 'scripts/application/plugin-role-grants.mjs'
+      - 'scripts/application/plugin-role-grants.test.mjs'
       - '.github/workflows/permission-codes.yml'
   workflow_dispatch:
 
@@ -57,6 +61,9 @@ jobs:
 
       - name: Test registration-source parsing
         run: node --test scripts/permission-sql-registrations.test.mjs
+
+      - name: Test the plugin role grant script (grants only, never revokes)
+        run: node --test scripts/application/plugin-role-grants.test.mjs
 
       - name: Validate permission codes (strict — every reference must resolve)
         run: node scripts/validate-permission-codes.mjs --oss-only
