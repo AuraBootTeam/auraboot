@@ -124,11 +124,13 @@ export function RecentWidget({
     return prettifyPath(visit.path) || visit.path;
   };
 
-  const resolveVisitSubtitle = (visit: RecentVisit, primaryTitle: string) => {
+  /** The row's second line is the record's own title. A title that is only the path or a code
+   *  says nothing the menu-derived first line has not said, so the row gets no second line. */
+  const resolveVisitSubtitle = (visit: RecentVisit, primaryTitle: string): string | null => {
     if (!isRawVisitTitle(visit.title, visit.path) && visit.title !== primaryTitle) {
       return visit.title;
     }
-    return visit.path;
+    return null;
   };
 
   const visibleVisits = useMemo(() => {
@@ -194,7 +196,9 @@ export function RecentWidget({
                 <span className="block truncate text-sm font-medium text-gray-800 transition-colors group-hover:text-gray-900">
                   {primaryTitle}
                 </span>
-                <span className="block truncate text-[11px] text-gray-400">{secondaryTitle}</span>
+                {secondaryTitle ? (
+                  <span className="block truncate text-[11px] text-gray-400">{secondaryTitle}</span>
+                ) : null}
               </div>
               <span className="flex-shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-500">
                 {formatTime(visit.visitedAt)}

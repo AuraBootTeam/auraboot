@@ -76,4 +76,34 @@ describe('RecentWidget menu focus', () => {
     expect(await findByText('客户')).toBeInTheDocument();
     expect(queryByText('销售订单')).toBeNull();
   });
+
+  it("shows the record's own title as the second line", async () => {
+    const { findByText } = render(<RecentWidget />);
+
+    expect(await findByText('客户')).toBeInTheDocument();
+    expect(await findByText('客户详情')).toBeInTheDocument();
+  });
+
+  it('gives a visit without a title of its own no second line instead of its path', async () => {
+    recentVisits.value = [
+      {
+        title: '/p/crm_account_common',
+        path: '/p/crm_account_common',
+        modelCode: 'crm_account_common',
+        visitedAt: '2026-06-15T10:00:00.000Z',
+      },
+      {
+        title: 'crm_account_common',
+        path: '/p/crm_account_common',
+        modelCode: 'crm_account_common',
+        visitedAt: '2026-06-15T09:00:00.000Z',
+      },
+    ];
+
+    const { findAllByText, queryByText } = render(<RecentWidget />);
+
+    expect(await findAllByText('客户')).toHaveLength(2);
+    expect(queryByText('/p/crm_account_common')).toBeNull();
+    expect(queryByText('crm_account_common')).toBeNull();
+  });
 });
