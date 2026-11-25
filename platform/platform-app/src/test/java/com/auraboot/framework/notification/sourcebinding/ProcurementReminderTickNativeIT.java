@@ -201,14 +201,15 @@ class ProcurementReminderTickNativeIT {
             assertThat(count("ab_integration_receipt", fixture.tenantId())).isEqualTo(2);
             List<String> inbox = rows("ab_notification", fixture.tenantId());
             List<String> receipts = rows("ab_integration_receipt", fixture.tenantId());
-            for (var event : events) executor.deliver(event, host, leases.get(event.eventId()));
+            for (var event : events) executor.deliver(event, host, leases.get(event.eventId()).token());
             assertThat(rows("ab_notification", fixture.tenantId())).isEqualTo(inbox);
             assertThat(rows("ab_integration_receipt", fixture.tenantId())).isEqualTo(receipts);
             assertThat(snapshot(fixture.tables(), fixture.tenantId(), true)).isEqualTo(afterTick);
             assertThat(snapshot(baselineTables, fixture.tenantId(), false)).isEqualTo(protectedBefore);
             assertThat(metadata(fixture.tenantId(), true)).isEqualTo(newMetadataBefore);
             receipt.put("sourcePid", sourcePid);
-            receipt.put("ownedOutboxRowsBeforeTeardown", originalOutbox.stream().map(SourceBindingCanonical::parse).toList());
+            deferFixtureIntents(leases);
+            receipt.put("ownedOutboxRowsBeforeTeardown", actualOwnedOutboxRows(rows("ab_outbox", fixture.tenantId())));
             receipt.put("protectedSnapshot", protectedBefore);
             receipt.put("businessAfterTick", afterTick);
             receipt.put("inboxCount", inbox.size());
@@ -545,7 +546,7 @@ class ProcurementReminderTickNativeIT {
                         Long.class, q.tenantId(), binding.code(), source)).containsExactlyInAnyOrderElementsOf(q.recipientIds());
                 var inbox = rows("ab_notification", q.tenantId());
                 var deliveryReceipts = rows("ab_integration_receipt", q.tenantId());
-                for (var event : events) executor.deliver(event, host, leases.get(event.eventId()));
+                for (var event : events) executor.deliver(event, host, leases.get(event.eventId()).token());
                 assertThat(rows("ab_notification", q.tenantId())).isEqualTo(inbox);
                 assertThat(rows("ab_integration_receipt", q.tenantId())).isEqualTo(deliveryReceipts);
                 phase.put("sourcePid", source);
@@ -554,8 +555,9 @@ class ProcurementReminderTickNativeIT {
                 phase.put("transactionThreads", frame.transactionThreads); phase.put("backgroundCalls", frame.calls);
                 assertThat(outbox.stream().map(SourceBindingCanonical::parse).map(row -> row.path("event_id").asText()).collect(java.util.stream.Collectors.toSet()))
                         .isEqualTo(events.stream().map(IntegrationEventEnvelope::eventId).collect(java.util.stream.Collectors.toSet()));
-                // The unchanged teardown snapshot uses ORDER BY id, not event hash or JSON lexical order.
-                phase.put("ownedOutboxRows", actualOwnedOutboxRows(outbox));
+                deferFixtureIntents(leases);
+                // Seal the persisted rows after releasing the test-owned dispatch lease.
+                phase.put("ownedOutboxRows", actualOwnedOutboxRows(rows("ab_outbox", q.tenantId())));
                 var after = new LinkedHashMap<>(automaticSnapshot(tables, q.tenantId(), true));
                 var before = new LinkedHashMap<>(ownedBusinessBefore);
                 after.remove("qo_procurement_reminder_common"); before.remove("qo_procurement_reminder_common");
@@ -633,20 +635,33 @@ class ProcurementReminderTickNativeIT {
         }
     }
 
-    private Map<String, String> deliverClaimed(List<IntegrationEventEnvelope> events, ReliableEventDeliveryExecutor executor,
+    private record DeliveryLease(long outboxId, String token) {}
+
+    private Map<String, DeliveryLease> deliverClaimed(List<IntegrationEventEnvelope> events, ReliableEventDeliveryExecutor executor,
                                                PluginNotificationDeliveryAccessorImpl host) {
         var outbox = context.getBean(OutboxEventMapper.class);
         var transaction = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
-        var leases = new LinkedHashMap<String, String>();
+        var leases = new LinkedHashMap<String, DeliveryLease>();
         for (var event : events) {
             String lease = UniqueIdGenerator.generate();
             var claimed = transaction.execute(status -> outbox.claimKnownEvent(event.tenantId(), event.eventId(),
                     "native-reminder-test-worker", lease, Instant.now().plusSeconds(60)));
             assertThat(claimed).hasSize(1);
             executor.deliver(event, host, lease);
-            leases.put(event.eventId(), lease);
+            leases.put(event.eventId(), new DeliveryLease(claimed.getFirst().getId(), lease));
         }
         return leases;
+    }
+
+    private void deferFixtureIntents(Map<String, DeliveryLease> leases) {
+        // The test deliberately stops before dispatcher acknowledgment. Transition only its leases
+        // through the dispatcher failure path so the cleanup helper can remove the pending intents.
+        var outbox = context.getBean(OutboxEventMapper.class);
+        Instant retryAt = Instant.now().plusSeconds(600);
+        for (var lease : leases.values()) {
+            assertThat(outbox.recordFailureFenced(lease.outboxId(), lease.token(), retryAt,
+                    "TEST_OWNED_DISPATCH_NOT_ACKNOWLEDGED")).isEqualTo(1);
+        }
     }
 
     static void registerAutomaticScheduling(org.springframework.context.annotation.AnnotationConfigApplicationContext child) {

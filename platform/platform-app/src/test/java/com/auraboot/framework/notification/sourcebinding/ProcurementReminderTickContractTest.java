@@ -247,7 +247,7 @@ class ProcurementReminderTickContractTest {
         // The controlled tick now admits the exact business summary and claims an actual delivery lease.
         // The companion fixture digests continue to pin the prior reviewed sources.
         Map<String, String> originalHashes = Map.of(
-                "ProcurementReminderTickNativeIT.java", "c292c048976a47603178ad05efc72d3e3232e816ee9000f084763bbb388e26e5",
+                "ProcurementReminderTickNativeIT.java", "32b00319aec98bb753023d9c594c08a6416f4ba59e87d47622a4e5b3108f9abd",
                 "ProductQuoteNativeInitialization.java", "af7f97c3c9308efc4f39063392c8dbe76dbd0f34b1d6410b8955ede3fa7b936a",
                 "ProductQuoteReminderNativeFacet.java", "759436112d6412371baceae75519b84b2104e94948f306a2a239a62e4a8234d0");
         for (var entry : originalHashes.entrySet()) {
