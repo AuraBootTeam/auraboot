@@ -3,6 +3,7 @@ package com.auraboot.framework.permission.service.impl;
 import com.auraboot.framework.application.security.AdminRoleChecker;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.permission.enums.RoleCodes;
+import com.auraboot.framework.permission.service.SnapshotTransactionMemo;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import io.micrometer.observation.annotation.Observed;
 import lombok.RequiredArgsConstructor;
@@ -277,9 +278,12 @@ public class UserPermissionServiceImpl implements UserPermissionService {
 
         if (applicationRuntimePrimaryEnabled && defaultApplicationCode != null
                 && !defaultApplicationCode.isBlank()) {
-            Set<String> roles = roleMapper.findByMemberIdAndTenantId(memberId, tenantId).stream()
-                    .map(com.auraboot.framework.rbac.entity.Role::getCode)
-                    .filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+            // Role codes are read from the database; inside one read-only snapshot transaction they cannot change.
+            Set<String> roles = SnapshotTransactionMemo.get(new RoleCodesKey(tenantId, memberId),
+                    () -> roleMapper.findByMemberIdAndTenantId(memberId, tenantId).stream()
+                            .map(com.auraboot.framework.rbac.entity.Role::getCode)
+                            .filter(Objects::nonNull)
+                            .collect(java.util.stream.Collectors.toUnmodifiableSet()));
             if (applicationRuntimeDefinitionCatalog.permissionsForRoles(
                     tenantId, defaultApplicationCode.trim(), roles).contains(permissionCode)
                     || (roles.contains(RoleCodes.TENANT_ADMIN)
@@ -414,4 +418,7 @@ public class UserPermissionServiceImpl implements UserPermissionService {
                 && !defaultApplicationCode.isBlank() && MetaContext.exists()
                 && MetaContext.getCurrentTenantId() != null;
     }
+
+    /** The two inputs the member's role-code lookup depends on. */
+    private record RoleCodesKey(Long tenantId, Long memberId) {}
 }

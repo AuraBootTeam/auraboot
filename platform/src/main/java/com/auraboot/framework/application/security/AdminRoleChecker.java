@@ -1,6 +1,7 @@
 package com.auraboot.framework.application.security;
 
 import com.auraboot.framework.permission.enums.RoleCodes;
+import com.auraboot.framework.permission.service.SnapshotTransactionMemo;
 import com.auraboot.framework.rbac.constant.RoleConstants;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -24,7 +25,10 @@ import java.time.Duration;
  *
  * <p>Privileged tenant/platform administration is checked against current database state on every
  * call. A cached positive result must never outlive a revocation, expiry or subject deactivation.
- * Non-privileged role lookups retain the bounded cache; cache metrics cover those lookups only.
+ * The one reuse is inside a read-only snapshot transaction, which can neither change the grants
+ * nor see a change made while it runs: there the answer holds until that transaction ends and is
+ * read once. Non-privileged role lookups retain the bounded cache; cache metrics cover those
+ * lookups only.
  */
 @Component
 public class AdminRoleChecker {
@@ -57,14 +61,16 @@ public class AdminRoleChecker {
      * @return {@code true} when an active, non-deleted {@code ab_user_role} row
      * binds {@code userId} (via {@code ab_tenant_member}) to an active,
      * non-deleted role with {@code code = roleCode} in {@code tenantId}.
-     * Privileged role results are never cached. Other results are cached for 60 seconds.
+     * Privileged role results are never cached between calls; inside one read-only snapshot
+     * transaction the lookup is made once. Other results are cached for 60 seconds.
      */
     public boolean hasRole(Long tenantId, Long userId, String roleCode) {
         if (tenantId == null || userId == null || roleCode == null) {
             return false;
         }
         if (RoleCodes.TENANT_ADMIN.equals(roleCode) || RoleCodes.PLATFORM_ADMIN.equals(roleCode)) {
-            return lookupFromDb(tenantId, userId, roleCode);
+            RoleCacheKey key = new RoleCacheKey(tenantId, userId, roleCode);
+            return SnapshotTransactionMemo.get(key, () -> lookupFromDb(tenantId, userId, roleCode));
         }
         return cache.get(new RoleCacheKey(tenantId, userId, roleCode),
                 k -> lookupFromDb(k.tenantId(), k.userId(), k.roleCode()));

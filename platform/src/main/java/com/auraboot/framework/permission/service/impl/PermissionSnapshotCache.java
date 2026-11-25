@@ -2,6 +2,7 @@ package com.auraboot.framework.permission.service.impl;
 
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
+import com.auraboot.framework.permission.service.SnapshotTransactionMemo;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.entity.UserRole;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
@@ -385,9 +386,15 @@ public class PermissionSnapshotCache {
 
     @SuppressWarnings("unchecked")
     private <T> T getOrLoad(String cacheName, Object key, Supplier<T> loader) {
+        FreshLookupKey lookup = new FreshLookupKey(cacheName, key);
+        // A read-only snapshot transaction cannot see different data for a repeated lookup; one read answers all.
+        return SnapshotTransactionMemo.get(lookup, () -> load(cacheName, key, loader, lookup));
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> T load(String cacheName, Object key, Supplier<T> loader, FreshLookupKey lookup) {
         Map<FreshLookupKey, Object> values = freshReadValues.get();
         if (values != null) {
-            FreshLookupKey lookup = new FreshLookupKey(cacheName, key);
             if (values.containsKey(lookup)) return (T) values.get(lookup);
             T loaded = loader.get();
             values.put(lookup, loaded);

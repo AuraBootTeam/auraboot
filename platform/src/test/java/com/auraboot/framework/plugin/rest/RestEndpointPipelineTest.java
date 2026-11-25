@@ -3,6 +3,7 @@ package com.auraboot.framework.plugin.rest;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.meta.service.IdempotencyService;
 import com.auraboot.framework.meta.service.impl.CommandEffectExecutor;
+import com.auraboot.framework.meta.service.impl.DynamicDataQueryScope;
 import com.auraboot.framework.plugin.extension.PluginHttpRequest;
 import com.auraboot.framework.plugin.extension.PluginHttpResponse;
 import com.auraboot.framework.plugin.extension.PluginRequestContext;
@@ -201,5 +202,73 @@ class RestEndpointPipelineTest {
         assertThat(definition.getValue().getIsolationLevel()).isEqualTo(TransactionDefinition.ISOLATION_DEFAULT);
         verify(idempotency).claimScopedIdempotency(eq("read-key"), anyString(), anyMap(), eq(7L));
         verify(idempotency).recordScopedOutcome(eq("read-key"), anyString(), anyMap(), anyMap(), eq(7L));
+    }
+
+    /** Extension that records whether a request-local query scope was open while it ran. */
+    static final class ScopeRecordingExt implements RestEndpointExtension {
+        boolean ran;
+        boolean scopeOpen;
+
+        @Override public String namespace() { return "probe"; }
+        @Override public List<RestRoute> routes() { return List.of(); }
+        @Override public void handle(PluginHttpRequest req, PluginHttpResponse res, PluginRequestContext ctx)
+                throws Exception {
+            ran = true;
+            scopeOpen = DynamicDataQueryScope.isActive();
+            res.status(200).contentType("application/json");
+            res.out().write("{\"ok\":true}".getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    @Test
+    void readOnlyRoute_derivesQueryGuardsOnceForTheWholeHandler() {
+        ScopeRecordingExt ext = new ScopeRecordingExt();
+        RestRoute route = new RestRoute("GET", "/echo", "probe.echo.read", null, false, true, null);
+
+        pipeline.execute(match(route, ext), req("GET", null, null), ctx());
+
+        assertThat(ext.ran).isTrue();
+        assertThat(ext.scopeOpen).as("one query scope for every data operation of the handler").isTrue();
+        assertThat(DynamicDataQueryScope.isActive()).as("the scope ends with the handler").isFalse();
+    }
+
+    @Test
+    void readOnlyRoute_closesTheQueryScopeWhenTheHandlerFails() {
+        RecordingExt ext = new RecordingExt();
+        ext.toThrow = new IllegalStateException("boom");
+        RestRoute route = new RestRoute("GET", "/boom", "probe.boom.read", null, false, true, null);
+
+        assertThatThrownBy(() -> pipeline.execute(match(route, ext), req("GET", null, null), ctx()))
+                .hasMessageContaining("boom");
+
+        assertThat(ext.ran).isTrue();
+        assertThat(DynamicDataQueryScope.isActive()).as("the scope ends with the handler").isFalse();
+    }
+
+    @Test
+    void writableRoute_runsWithoutAQueryScope() {
+        ScopeRecordingExt ext = new ScopeRecordingExt();
+        RestRoute route = new RestRoute("POST", "/echo", "probe.echo.write", null, false, false, null);
+
+        pipeline.execute(match(route, ext), req("POST", null, null), ctx());
+
+        assertThat(ext.ran).isTrue();
+        assertThat(ext.scopeOpen).isFalse();
+        assertThat(DynamicDataQueryScope.isActive()).isFalse();
+    }
+
+    @Test
+    void idempotentReadClaim_runsWithoutAQueryScope() {
+        // The claim keeps a writable transaction: nothing is reused there.
+        ScopeRecordingExt ext = new ScopeRecordingExt();
+        RestRoute route = new RestRoute("GET", "/echo", "probe.echo.read", null, true, true, null);
+        when(idempotency.claimScopedIdempotency(eq("read-key"), anyString(), anyMap(), eq(7L)))
+                .thenReturn(null);
+
+        pipeline.execute(match(route, ext), req("GET", null, "read-key"), ctx());
+
+        assertThat(ext.ran).isTrue();
+        assertThat(ext.scopeOpen).isFalse();
+        assertThat(DynamicDataQueryScope.isActive()).isFalse();
     }
 }

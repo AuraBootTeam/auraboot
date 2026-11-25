@@ -2,6 +2,7 @@ package com.auraboot.framework.plugin.rest;
 
 import com.auraboot.framework.meta.service.IdempotencyService;
 import com.auraboot.framework.meta.service.impl.CommandEffectExecutor;
+import com.auraboot.framework.meta.service.impl.DynamicDataQueryScope;
 import com.auraboot.framework.plugin.extension.PluginHttpRequest;
 import com.auraboot.framework.plugin.extension.PluginRequestContext;
 import com.auraboot.framework.plugin.extension.RestEndpointExtension;
@@ -116,12 +117,17 @@ public class RestEndpointPipeline {
                 // 3) Handler into the in-memory buffer.
                 phase[0] = "handler";
                 BufferingPluginHttpResponse b = new BufferingPluginHttpResponse();
-                try {
-                    ext.handle(req, b, ctx);
-                } catch (RuntimeException re) {
-                    throw re;
-                } catch (Exception e) {
-                    throw new RuntimeException(e.getMessage(), e);
+                // A read-only route runs in one repeatable-read transaction. Its query guards and
+                // permission metadata cannot change inside it, so they are derived once for the
+                // whole handler instead of once per data operation. (A null resource is not closed.)
+                try (DynamicDataQueryScope queryScope = tx.isReadOnly() ? DynamicDataQueryScope.open() : null) {
+                    try {
+                        ext.handle(req, b, ctx);
+                    } catch (RuntimeException re) {
+                        throw re;
+                    } catch (Exception e) {
+                        throw new RuntimeException(e.getMessage(), e);
+                    }
                 }
 
                 // 4) Record idempotency outcome inside the tx (rolled back if the tx later fails).
