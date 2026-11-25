@@ -4,6 +4,8 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.AsyncTaskDTO;
 import com.auraboot.framework.meta.dto.AsyncTaskSubmitRequest;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
+import com.auraboot.framework.meta.dto.DynamicQueryRequest;
+import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.entity.BindingRule;
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
@@ -197,6 +199,104 @@ class HandlerPhaseTest {
         ctx.setRulesByType(Map.of("handler",List.of(rule)));
         phase.execute(ctx);
         assertThat(ctx.getHandlerResults()).containsEntry("recordPid","created-record");
+    }
+
+    @Test
+    void aQueryWithNoHandlerAnswersAPage() {
+        ReflectionTestUtils.setField(phase, "objectMapper", new ObjectMapper());
+        var ctx = buildContext("crm:list_accounts", "crm_account", Map.of("type", "query"));
+        ctx.getRequest().setTargetRecordId(null);
+        ctx.setPayload(new HashMap<>(Map.of("keyword", "north", "pageSize", 5,
+                "filters", List.of(Map.of("fieldName", "crm_acc_stage", "operator", "EQ", "value", "won")))));
+        when(dynamicDataService.list(eq("crm_account"), any(DynamicQueryRequest.class)))
+                .thenReturn(new PaginationResult<>(List.of(Map.of("pid", "a"), Map.of("pid", "b")), 2L, 1, 5));
+
+        phase.execute(ctx);
+
+        ArgumentCaptor<DynamicQueryRequest> read = ArgumentCaptor.forClass(DynamicQueryRequest.class);
+        verify(dynamicDataService).list(eq("crm_account"), read.capture());
+        assertThat(read.getValue().getPageNum()).isEqualTo(1);
+        assertThat(read.getValue().getPageSize()).isEqualTo(5);
+        assertThat(read.getValue().getKeyword()).isEqualTo("north");
+        assertThat(read.getValue().getConditions()).hasSize(1);
+        assertThat(ctx.getHandlerResults()).containsEntry("total", 2L);
+        assertThat((List<?>) ctx.getHandlerResults().get("records")).hasSize(2);
+        verify(dynamicDataService, never()).getById(any(), any());
+        // The page is the response: no result field is looked up for the target record.
+        verify(metaModelService, never()).getModelDefinition("crm_account");
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataMapper);
+    }
+
+    @Test
+    void aQueryNamingATargetRecordAnswersThatRecord() {
+        var ctx = buildContext("crm:detail_account", "crm_account", Map.of("type", "query"));
+        when(dynamicDataService.getById("crm_account", "po-1")).thenReturn(Map.of("pid", "po-1"));
+
+        phase.execute(ctx);
+
+        assertThat(ctx.getHandlerResults()).containsExactly(Map.entry("record", Map.of("pid", "po-1")));
+        verify(dynamicDataService, never()).list(any(), any());
+        verify(metaModelService, never()).getModelDefinition("crm_account");
+        org.mockito.Mockito.verifyNoInteractions(dynamicDataMapper);
+    }
+
+    @Test
+    void aQueryNamesARecordThroughItsPayloadToo() {
+        var ctx = buildContext("crm:detail_account", "crm_account", Map.of("type", "query"));
+        ctx.getRequest().setTargetRecordId(null);
+        ctx.setPayload(new HashMap<>(Map.of("recordPid", "po-9")));
+        when(dynamicDataService.getById("crm_account", "po-9")).thenReturn(Map.of("pid", "po-9"));
+
+        phase.execute(ctx);
+
+        assertThat(ctx.getHandlerResults()).containsExactly(Map.entry("record", Map.of("pid", "po-9")));
+        verify(dynamicDataService, never()).list(any(), any());
+    }
+
+    @Test
+    void aQueryNamingAnAbsentRecordIsNotFound() {
+        var ctx = buildContext("crm:detail_account", "crm_account", Map.of("type", "query"));
+        when(dynamicDataService.getById("crm_account", "po-1")).thenReturn(null);
+
+        assertThatThrownBy(() -> phase.execute(ctx))
+                .isInstanceOf(com.auraboot.framework.meta.exception.MetaRecordNotFoundException.class);
+    }
+
+    @Test
+    void aQueryRefusesAFilterItCannotReadAndAParameterThatIsNotOne() {
+        ReflectionTestUtils.setField(phase, "objectMapper", new ObjectMapper());
+        var unreadable = buildContext("crm:list_accounts", "crm_account", Map.of("type", "query"));
+        unreadable.getRequest().setTargetRecordId(null);
+        unreadable.setPayload(new HashMap<>(Map.of("filters", "not a list")));
+        assertThatThrownBy(() -> phase.execute(unreadable))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("filters");
+
+        var notAParameter = buildContext("crm:list_accounts", "crm_account", Map.of("type", "query"));
+        notAParameter.getRequest().setTargetRecordId(null);
+        notAParameter.setPayload(new HashMap<>(Map.of("crm_acc_stage", "won")));
+        assertThatThrownBy(() -> phase.execute(notAParameter))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("crm_acc_stage");
+
+        verifyNoInteractions(dynamicDataService);
+    }
+
+    @Test
+    void aQueryWhoseBindingRuleHandlerRanKeepsThatHandlersAnswer() {
+        CommandHandler owner = new CommandHandler() {
+            @Override public String getHandlerName() { return "accountQuery"; }
+            @Override public Map<String,Object> execute(com.auraboot.framework.meta.service.CommandHandlerContext ctx) {
+                return Map.of("account", "read by the handler");
+            }
+        };
+        when(applicationContext.getBean("accountQuery", CommandHandler.class)).thenReturn(owner);
+        var ctx = buildContext("crm:detail_account", "crm_account", Map.of("type", "query"));
+        BindingRule rule = new BindingRule(); rule.setHandlerClass("accountQuery");
+        ctx.setRulesByType(Map.of("handler", List.of(rule)));
+
+        phase.execute(ctx);
+
+        assertThat(ctx.getHandlerResults()).containsExactly(Map.entry("account", "read by the handler"));
+        verifyNoInteractions(dynamicDataService);
     }
 
     @Test

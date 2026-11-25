@@ -34,6 +34,11 @@ public class CommandInputFieldAuthorizationPhase implements CommandPhase {
 
     @Override public void execute(CommandPipelineContext context) {
         if (authorizeControlInputs(context)) return;
+        // A query read by the executor selects records with its inputs; none of them is an edit attempt.
+        if (com.auraboot.framework.meta.service.impl.ExecutorReadQuery.isReadByExecutor(context, extensions)) {
+            com.auraboot.framework.meta.service.impl.NativeHumanActor.requireCompleteIdentity();
+            return;
+        }
         if (context.getCommand() == null || submittedKeys(context).isEmpty()) {
             com.auraboot.framework.meta.service.impl.NativeHumanActor.requireCompleteIdentity();
             return;

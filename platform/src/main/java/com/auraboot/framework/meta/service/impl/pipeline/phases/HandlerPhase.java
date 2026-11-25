@@ -12,14 +12,17 @@ import com.auraboot.framework.infrastructure.storage.StorageProvider;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelDefinition;
+import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.entity.BindingRule;
 import com.auraboot.framework.meta.entity.CommandDefinition;
+import com.auraboot.framework.meta.exception.MetaRecordNotFoundException;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.CommandHandler;
 import com.auraboot.framework.meta.service.CommandHandlerContext;
 import com.auraboot.framework.meta.service.DryRunSafe;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.service.QueryCommandParams;
 import com.auraboot.framework.meta.dto.AsyncTaskDTO;
 import com.auraboot.framework.meta.dto.AsyncTaskSubmitRequest;
 import com.auraboot.framework.meta.service.DataDomainService;
@@ -27,6 +30,7 @@ import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.meta.service.impl.AsyncTaskServiceImpl;
 import com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutor;
 import com.auraboot.framework.meta.service.impl.CommandExecutorUtils;
+import com.auraboot.framework.meta.service.impl.ExecutorReadQuery;
 import com.auraboot.framework.meta.service.impl.ModelMutationGuard;
 import com.auraboot.framework.meta.service.impl.FieldWriterGuard;
 import com.auraboot.framework.meta.service.impl.RecordCommandWriterGuard;
@@ -179,7 +183,9 @@ public class HandlerPhase implements CommandPhase {
                             && ctx.getPermitPlan() != null && ctx.getPermitPlan().isPermitted()
                             && ctx.getAuthorizationVerdict() != null && ctx.getAuthorizationVerdict().isAuthorized(), ctx))));
         ctx.setHandlerResults(handlerResults);
-        if (!ctx.isHandlerOwnedMutation()) {
+        // A query read by the executor answers with records. They are the response, never
+        // field values to copy onto the record the request named.
+        if (!ctx.isHandlerOwnedMutation() && !ExecutorReadQuery.isReadByExecutor(ctx, extensionRegistry)) {
             persistHandlerResults(ctx.getCommand().getModelCode(), ctx.getPayload(),
                     handlerResults, ctx.getTenantId(), ctx.getRequest(), ctx.getFieldMapResults());
         }
@@ -205,6 +211,7 @@ public class HandlerPhase implements CommandPhase {
                                                      CommandPipelineContext pipelineContext) {
         Map<String, Object> handlerResults = new HashMap<>();
         boolean dryRun = request.isDryRun();
+        boolean springHandlerExecuted = false;
 
         // 1. Execute Spring Bean handlers from binding rules.
         //    Under dry-run (PR-56) we SKIP every handler whose implementation
@@ -240,6 +247,7 @@ public class HandlerPhase implements CommandPhase {
                         .build();
 
                 Map<String, Object> result = handler.execute(context);
+                springHandlerExecuted = true;
                 if (result != null) {
                     handlerResults.putAll(result);
                 }
@@ -255,17 +263,52 @@ public class HandlerPhase implements CommandPhase {
             }
         }
 
-        // 2. Execute plugin command handlers from ExtensionRegistry
+        // 2. A query that declares no handler of its own is read here. A binding-rule handler
+        //    that ran defines the command's own reading; a plugin handler excludes the read.
+        if (!springHandlerExecuted && ExecutorReadQuery.isReadByExecutor(pipelineContext, extensionRegistry)) {
+            handlerResults.putAll(readQuery(command.getModelCode(), request, payload));
+        }
+
+        // 3. Execute plugin command handlers from ExtensionRegistry
         executePluginCommandHandler(command.getCode(), command.getModelCode(), payload, tenantId, userId, request,
                 fieldMapResults, handlerResults, execConfig, relatedUpdateBoundaryAuthorized, pipelineContext);
 
-        // 3. Declarative BPM trigger — skipped under dry-run since BPM
+        // 4. Declarative BPM trigger — skipped under dry-run since BPM
         // process state lives outside the command's transaction envelope.
         if (!request.isDryRun()) {
             executeBpmTrigger(execConfig, command, payload, request, handlerResults);
         }
 
         return handlerResults;
+    }
+
+    /**
+     * The executor's own read for a query command: the record the request names, or a page.
+     * The data service holds every returned record to the caller's READ authority. The
+     * request's parameters are taken strictly: one that is not part of the query contract is
+     * refused, because it was never a filter.
+     */
+    private Map<String, Object> readQuery(String modelCode, CommandExecuteRequest request,
+                                         Map<String, Object> payload) {
+        String recordId = StringUtils.hasText(request.getTargetRecordId()) ? request.getTargetRecordId()
+                : QueryCommandParams.recordPid(payload);
+        Map<String, Object> result = new HashMap<>();
+        if (StringUtils.hasText(recordId)) {
+            Map<String, Object> record = dynamicDataService.getById(modelCode, recordId);
+            if (record == null) {
+                throw new MetaRecordNotFoundException(modelCode, recordId);
+            }
+            result.put("record", record);
+            return result;
+        }
+        PaginationResult<Map<String, Object>> page = dynamicDataService.list(modelCode,
+                QueryCommandParams.toRequest(objectMapper, payload, true));
+        if (page == null) {
+            throw new IllegalStateException("The data service returned no page for a query command on " + modelCode);
+        }
+        result.put("total", page.getTotal());
+        result.put("records", page.getRecords() != null ? page.getRecords() : List.of());
+        return result;
     }
 
     private CommandHandler resolveCommandHandler(String handlerClass) {

@@ -69,10 +69,20 @@ class CommandInputFieldAuthorizationPhaseTest {
         assertThatThrownBy(()->phase.execute(context)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
     }
     @Test void readOnlyFilterInputIsNotAnEditAttempt() {
-        when(policies.getNonWritableFields(7L,"orders",20L)).thenReturn(Set.of());
+        // "cost" is non-writable for this caller (see prepare); on a query read by the executor it is only a filter.
+        context.captureSubmittedInput(Map.of("cost",99));
         context.setExecConfig(Map.of("type","query","inputFields",List.of("cost")));
-        context.setPayload(Map.of("cost",99)); phase.execute(context);
-        verifyNoInteractions(metadata,fields);
+        context.setPayload(new HashMap<>(Map.of("cost",99))); phase.execute(context);
+        verifyNoInteractions(policies,metadata,fields);
+        assertThat(context.getPayload()).containsExactly(Map.entry("cost",99));
+    }
+    @Test void aQueryThatDeclaresAHandlerKeepsItsInputFieldRestrictions() {
+        var rule = new com.auraboot.framework.meta.entity.BindingRule(); rule.setHandlerClass("costQuery");
+        context.setRulesByType(Map.of("handler",List.of(rule)));
+        context.captureSubmittedInput(Map.of("cost",99));
+        context.setExecConfig(Map.of("type","query","inputFields",List.of("cost")));
+        context.setPayload(new HashMap<>(Map.of("cost",99)));
+        assertThatThrownBy(() -> phase.execute(context)).isInstanceOf(com.auraboot.framework.exception.BusinessException.class);
     }
     @Test void derivedTransitionFieldsDoNotRequireUserEditRights() {
         dsl("orders");
