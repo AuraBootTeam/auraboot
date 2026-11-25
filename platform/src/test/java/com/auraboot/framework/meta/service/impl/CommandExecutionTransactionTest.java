@@ -440,6 +440,135 @@ class CommandExecutionTransactionTest {
         verify(manager).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_REPEATABLE_READ));
     }
 
+    // ---- declared record-creating effects -----------------------------------------------------------------
+    // A declared effect that inserts records is an ordinary write outside the command's permit
+    // scope. The native field authorization admits it only from a coherent transaction, so a
+    // command that owns its transaction must open a coherent one for it.
+
+    private void declares(CommandExecutionTransaction opener, String commandCode, String executionConfig) {
+        var definitions=mock(com.auraboot.framework.meta.mapper.CommandDefinitionMapper.class);
+        var command=new com.auraboot.framework.meta.entity.CommandDefinition();
+        command.setExecutionConfig(executionConfig);
+        when(definitions.findCurrentByCode(commandCode)).thenReturn(command);
+        org.springframework.test.util.ReflectionTestUtils.setField(opener,"definitions",definitions);
+    }
+
+    private static final java.util.List<String> RECORD_CREATING_CONFIGS=java.util.List.of(
+            // side effects name their kind by action or type, flat or nested
+            "{\"sideEffects\":[{\"action\":\"create_record\",\"targetModel\":\"m\"}]}",
+            "{\"sideEffects\":[{\"type\":\"batch_create_record\",\"targetModel\":\"m\"}]}",
+            "{\"sideEffects\":[{\"actions\":[{\"modelCode\":\"m\",\"action\":\"batch_create_records\"}]}]}",
+            "{\"sideEffects\":[{\"actions\":[{\"type\":\"document_flow\",\"modelCode\":\"m\"}]}]}",
+            // post actions name their kind by type or action
+            "{\"postActions\":[{\"type\":\"create_record\",\"targetModel\":\"m\"}]}",
+            "{\"postActions\":[{\"action\":\"create_children\",\"childModel\":\"m\"}]}");
+
+    @Test void aDeclaredCreateSideEffectOpensARepeatableReadTransactionForAHandlerlessCommand() {
+        declares(transaction,"crm:log_lead_activity",
+                "{\"sideEffects\":[{\"actions\":[{\"type\":\"create_record\",\"modelCode\":\"crm_activity_relation_common\"}]}]}");
+        when(manager.getTransaction(any())).thenReturn(status);
+        // The level the native field authorization sees when the effect writes.
+        assertThat(transaction.execute("crm:log_lead_activity",false,
+                TransactionSynchronizationManager::getCurrentTransactionIsolationLevel))
+                .isEqualTo(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        verify(manager).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_REPEATABLE_READ));
+        verify(manager).commit(status);
+        assertThat(TransactionSynchronizationManager.getCurrentTransactionIsolationLevel()).isNull();
+    }
+
+    @Test void everyRecordCreatingEffectKindNeedsTheCoherentMinimum() {
+        for (var config : RECORD_CREATING_CONFIGS) {
+            var local=mock(PlatformTransactionManager.class);
+            var opener=new CommandExecutionTransaction(local,extensions);
+            declares(opener,"orders:seed",config);
+            when(local.getTransaction(any())).thenReturn(status);
+            assertThat(opener.execute("orders:seed",false,()->"done")).as(config).isEqualTo("done");
+            verify(local).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_REPEATABLE_READ));
+        }
+    }
+
+    @Test void effectsThatWriteThroughTheScopedSqlPathKeepTheDefaultTransaction() {
+        declares(transaction,"orders:ship",
+                "{\"sideEffects\":[{\"action\":\"update_record\",\"targetModel\":\"m\"},{\"action\":\"batch_update_record\",\"targetModel\":\"m\"},"
+                        +"{\"action\":\"aggregate\",\"targetModel\":\"m\"}],\"postActions\":[{\"type\":\"start_approval_chain\"}]}");
+        when(manager.getTransaction(any())).thenReturn(status);
+        assertThat(transaction.execute("orders:ship",false,()->"shipped")).isEqualTo("shipped");
+        verify(manager).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_DEFAULT));
+    }
+
+    @Test void declaresRecordCreationIgnoresShapesThatCreateNothing() {
+        assertThat(CommandExecutionTransaction.declaresRecordCreation(null)).isFalse();
+        for (var config : java.util.List.<java.util.Map<String,Object>>of(
+                java.util.Map.of(),
+                java.util.Map.of("sideEffects","create_record"),
+                java.util.Map.of("sideEffects",java.util.List.of("create_record")),
+                java.util.Map.of("sideEffects",java.util.List.of(java.util.Map.of("actions",java.util.List.of()))),
+                java.util.Map.of("sideEffects",java.util.List.of(java.util.Map.of("action","update_record"))),
+                java.util.Map.of("postActions",java.util.List.of(java.util.Map.of("type","send_notification")))))
+            assertThat(CommandExecutionTransaction.declaresRecordCreation(config)).as(String.valueOf(config)).isFalse();
+        assertThat(CommandExecutionTransaction.declaresRecordCreation(
+                java.util.Map.of("postActions",java.util.List.of(java.util.Map.of("type","create_children"))))).isTrue();
+    }
+
+    // A machine delivery runs the command inside its own transaction and its writes never reach
+    // the native field authorization. The derived minimum keeps that transaction; it is not an
+    // owner contract and must not close it.
+    @Test void aDeclaredCreateEffectDoesNotCloseAWeakerCallerTransaction() {
+        declares(transaction,"orders:seed",RECORD_CREATING_CONFIGS.getFirst());
+        when(manager.getTransaction(any())).thenReturn(status);
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        assertThat(transaction.execute("orders:seed",false,
+                TransactionSynchronizationManager::getCurrentTransactionIsolationLevel))
+                .isEqualTo(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        verify(manager).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_DEFAULT));
+    }
+
+    @Test void aDeclaredCreateEffectRunsInsideACoherentCallerTransaction() {
+        declares(transaction,"orders:seed",RECORD_CREATING_CONFIGS.getFirst());
+        when(manager.getTransaction(any())).thenReturn(status);
+        for (int level : new int[]{TransactionDefinition.ISOLATION_REPEATABLE_READ,TransactionDefinition.ISOLATION_SERIALIZABLE}) {
+            TransactionSynchronizationManager.setActualTransactionActive(true);
+            TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(level);
+            assertThat(transaction.execute("orders:seed",false,
+                    TransactionSynchronizationManager::getCurrentTransactionIsolationLevel)).isEqualTo(level);
+        }
+        verify(manager,times(2)).getTransaction(argThat(definition -> definition.getIsolationLevel() >= TransactionDefinition.ISOLATION_REPEATABLE_READ));
+    }
+
+    // The leniency above is for the derived minimum only: a domain command keeps closing a
+    // weaker caller transaction, with or without a declared effect.
+    @Test void aDomainCommandStillClosesAWeakerCallerTransaction() {
+        var snapshots=mock(com.auraboot.framework.permission.service.impl.PermissionSnapshotCache.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(transaction,"snapshots",snapshots);
+        var permission=new com.auraboot.framework.permission.entity.Permission();permission.setResourceType("operation");permission.setAction("manage");
+        permission.setExtension(java.util.Map.of("domainModels",java.util.Map.of("example",java.util.List.of("read","update"))));
+        when(snapshots.resolvePermissionDefinition(100L,"example.cap.manage")).thenReturn(permission);
+        com.auraboot.framework.application.tenant.MetaContext.setContext(100L,1L,"actor","actor");
+        try {
+            for (var config : java.util.List.of("{\"permissions\":[\"example.cap.manage\"]}",
+                    "{\"permissions\":[\"example.cap.manage\"],\"sideEffects\":[{\"action\":\"create_record\",\"targetModel\":\"other\"}]}")) {
+                declares(transaction,"example:seed",config);
+                TransactionSynchronizationManager.setActualTransactionActive(true);
+                TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+                var operation=mock(java.util.function.Supplier.class);
+                assertThatThrownBy(()->transaction.execute("example:seed",false,operation)).isInstanceOf(AccessDeniedException.class)
+                        .hasMessageContaining("does not satisfy the resource isolation contract");
+                verifyNoInteractions(operation,manager);
+            }
+        } finally {com.auraboot.framework.application.tenant.MetaContext.clear();}
+    }
+
+    // A declared secondary requirement is exactly verified before the secondary runs, so it is
+    // neither contradicted nor relaxed by the command's own declared effect.
+    @Test void aDeclaredSecondaryRequirementIsNotContradictedByACreateEffect() {
+        declares(transaction,"crm:log_lead_activity",RECORD_CREATING_CONFIGS.getFirst());
+        secondary("crm:log_lead_activity",BusinessResourceAuthorization.ReadIsolation.READ_COMMITTED);
+        when(manager.getTransaction(any())).thenReturn(status);
+        assertThat(transaction.execute("crm:log_lead_activity",false,()->"logged")).isEqualTo("logged");
+        verify(manager).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_READ_COMMITTED));
+    }
+
     // ---- one resolver, used everywhere ------------------------------------------------------------------
     // The bug was four private copies of this rule and a fifth caller without one. Pin a single
     // implementation and require every handler lookup to go through it.
