@@ -6,6 +6,7 @@ import { WidgetPropertyPanel } from '../WidgetPropertyPanel';
 import { useDashboardStore } from '../../store/useDashboardStore';
 import { widgetRegistry } from '../../widgets/widgetRegistry';
 import { dashboardPropertySchemas } from '../dashboardPropertySchemas';
+import { supportsDrillDown } from '../../registry/widgetManifest';
 
 // Complex editors have their own tests; this suite exercises the real basic schema/store seam.
 vi.mock('../DataSourceConfig', () => ({ DataSourceConfig: () => null }));
@@ -29,6 +30,45 @@ it('keeps every registered widget schema and its custom-control declarations rea
     expect(schema.find((field) => field.key === 'dataSource')?.editor).toBe(
       'dashboard.data-source',
     );
+  }
+});
+it('offers the drill-down configuration only for a widget whose renderer honours it', () => {
+  // A drill-down saved on any other widget would never open anything.
+  for (const definition of widgetRegistry.getAll()) {
+    const keys = dashboardPropertySchemas(
+      definition.configSchema ?? [],
+      (k) => k,
+      'en-US',
+      definition.type,
+    ).map((field) => field.key);
+    expect(keys.includes('drillDown'), definition.type).toBe(supportsDrillDown(definition.type));
+  }
+  expect(supportsDrillDown('smart-shortcuts')).toBe(false);
+  expect(supportsDrillDown('smart-bar-chart')).toBe(true);
+  // Through the real property panel.
+  useDashboardStore.getState().createDashboard('Drill-down board');
+  for (const [type, offered] of [
+    ['smart-shortcuts', false],
+    ['smart-bar-chart', true],
+  ] as const) {
+    const id = useDashboardStore.getState().addWidget({
+      type,
+      componentType: type,
+      props: {},
+      x: 0,
+      y: 0,
+      w: 3,
+      h: 2,
+      config: { title: type },
+    });
+    useDashboardStore.getState().selectWidget(id);
+    const view = render(
+      <I18nProvider initialLocale="en-US" initialData={{ fixture: 'loaded' }}>
+        <WidgetPropertyPanel />
+      </I18nProvider>,
+    );
+    expect(Boolean(screen.queryByTestId('schema-config-field-drillDown')), type).toBe(offered);
+    view.unmount();
   }
 });
 describe('dashboard schema document properties', () => {

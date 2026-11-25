@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "description": "What each dashboard widget type can do. drillDown: the renderer honours the drillDown configuration; a drill-down configured on another type is saved and never opens anything. A product gate reads this to tell a missing drill-down from a widget that has none.",
+  "source": "web-admin/app/plugins/core-dashboard/registry/widgetManifest.ts",
+  "widgets": {
+    "smart-announcement": {
+      "drillDown": false
+    },
+    "smart-area-chart": {
+      "drillDown": true
+    },
+    "smart-bar-chart": {
+      "drillDown": true
+    },
+    "smart-calendar": {
+      "drillDown": false
+    },
+    "smart-combo-chart": {
+      "drillDown": true
+    },
+    "smart-countdown": {
+      "drillDown": false
+    },
+    "smart-filter-bar": {
+      "drillDown": false
+    },
+    "smart-funnel-chart": {
+      "drillDown": true
+    },
+    "smart-gallery": {
+      "drillDown": false
+    },
+    "smart-gantt-chart": {
+      "drillDown": true
+    },
+    "smart-gauge-chart": {
+      "drillDown": false
+    },
+    "smart-heatmap-chart": {
+      "drillDown": false
+    },
+    "smart-iframe": {
+      "drillDown": false
+    },
+    "smart-image": {
+      "drillDown": false
+    },
+    "smart-inbox": {
+      "drillDown": false
+    },
+    "smart-kanban": {
+      "drillDown": true
+    },
+    "smart-leaderboard": {
+      "drillDown": false
+    },
+    "smart-line-chart": {
+      "drillDown": true
+    },
+    "smart-map-chart": {
+      "drillDown": false
+    },
+    "smart-nps-chart": {
+      "drillDown": false
+    },
+    "smart-number-card": {
+      "drillDown": true
+    },
+    "smart-pareto-chart": {
+      "drillDown": true
+    },
+    "smart-pie-chart": {
+      "drillDown": true
+    },
+    "smart-progress": {
+      "drillDown": false
+    },
+    "smart-quick-note": {
+      "drillDown": false
+    },
+    "smart-radar-chart": {
+      "drillDown": true
+    },
+    "smart-recent": {
+      "drillDown": false
+    },
+    "smart-rich-text": {
+      "drillDown": false
+    },
+    "smart-scatter-chart": {
+      "drillDown": true
+    },
+    "smart-shortcuts": {
+      "drillDown": false
+    },
+    "smart-stats-card": {
+      "drillDown": false
+    },
+    "smart-stats-row": {
+      "drillDown": false
+    },
+    "smart-table-chart": {
+      "drillDown": true
+    },
+    "smart-treemap-chart": {
+      "drillDown": true
+    },
+    "smart-waterfall-chart": {
+      "drillDown": true
+    },
+    "smart-wordcloud-chart": {
+      "drillDown": true
+    }
+  }
+}
