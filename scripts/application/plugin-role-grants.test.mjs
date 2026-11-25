@@ -285,20 +285,18 @@ test('the command grants through the additive endpoint, reads back and leaves a 
       { method: 'PUT', path: `/api/permissions/matrix/${admin.pid}/batch`, body: [{ permissionId: 3, granted: true }, { permissionId: 4, granted: true }] },
     ]);
     assert.equal(held.get(admin.pid).size, 4);
-    // Read through one descriptor: the mode checked is the mode of what was read.
-    const receiptFd = openSync(receipt, 'r');
-    try {
-      const saved = JSON.parse(readFileSync(receiptFd, 'utf8'));
-      assert.equal(saved.kind, 'plugin-role-grants');
-      assert.equal(saved.result.failed, false);
-      assert.equal(fstatSync(receiptFd).mode & 0o077, 0);
-    } finally {
-      closeSync(receiptFd);
-    }
+    const first = readWhole(receipt);
+    assert.equal(JSON.parse(first.text).kind, 'plugin-role-grants');
+    assert.equal(JSON.parse(first.text).result.failed, false);
+    assert.equal(JSON.parse(first.text).result.roles[0].granted, 2);
+    assert.equal(first.mode & 0o077, 0);
+    // A second run with the same receipt is refused and leaves the first one as it was.
     const again = await run(['--roles', roles, '--base-url', baseUrl, '--token-file', token, '--receipt', receipt]);
     assert.equal(again.status, 1);
     assert.match(again.stderr, /must name a new file/);
-    assert.equal(JSON.parse(readFileSync(receipt, 'utf8')).result.roles[0].granted, 2);
+    const second = readWhole(receipt);
+    assert.equal(second.text, first.text);
+    assert.equal(second.mtimeMs, first.mtimeMs);
   });
 });
 
@@ -328,6 +326,17 @@ test('a token file other accounts can read is refused before any request is made
     assert.deepEqual(calls, []);
   });
 });
+
+// One descriptor for the mode, the modification time and the content, so each describes what was read.
+function readWhole(path) {
+  const descriptor = openSync(path, 'r');
+  try {
+    const stat = fstatSync(descriptor);
+    return { mode: stat.mode, mtimeMs: stat.mtimeMs, text: readFileSync(descriptor, 'utf8') };
+  } finally {
+    closeSync(descriptor);
+  }
+}
 
 function writeRoles(code, permissions) {
   const file = join(mkdtempSync(join(tmpdir(), 'role-grants-')), 'roles.json');
