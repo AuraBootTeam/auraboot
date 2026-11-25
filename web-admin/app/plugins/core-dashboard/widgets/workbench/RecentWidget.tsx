@@ -3,10 +3,11 @@
  * Data source: backend engagement API with localStorage as instant cache.
  */
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { getRecentVisits, fetchRecentVisits, type RecentVisit } from './useRecentVisits';
 import { useI18n } from '~/contexts/I18nContext';
 import { useRootLoaderData } from '~/root-data';
+import { useFittingRows } from './useFittingRows';
 
 interface RecentWidgetProps {
   title?: string;
@@ -140,6 +141,16 @@ export function RecentWidget({
     );
   }, [visibleMenuPaths, visits]);
 
+  // Whole rows only: the rows that fit in the card are shown and the rest sit behind a "More" control.
+  const listRef = useRef<HTMLDivElement>(null);
+  const fittingRows = useFittingRows(listRef, [visibleVisits.length]);
+  const [expanded, setExpanded] = useState(false);
+  const shownVisits =
+    !expanded && fittingRows !== null && visibleVisits.length > fittingRows
+      ? visibleVisits.slice(0, fittingRows)
+      : visibleVisits;
+  const hiddenCount = visibleVisits.length - shownVisits.length;
+
   if (visibleVisits.length === 0) {
     return (
       <div className={`flex h-full flex-col ${className}`}>
@@ -167,16 +178,31 @@ export function RecentWidget({
     <div className={`flex h-full flex-col ${className}`}>
       <div className="mb-3 flex items-center justify-between px-3 pt-3">
         <span className="text-sm font-semibold text-gray-900">{resolvedTitle}</span>
-        <span className="text-gray-400">
-          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-            <circle cx="4" cy="10" r="1.5" />
-            <circle cx="10" cy="10" r="1.5" />
-            <circle cx="16" cy="10" r="1.5" />
-          </svg>
-        </span>
+        <div className="flex items-center gap-3">
+          {(hiddenCount > 0 || expanded) && (
+            <button
+              type="button"
+              onClick={() => setExpanded((prev) => !prev)}
+              aria-expanded={expanded}
+              className="text-xs text-gray-400 transition-colors hover:text-blue-500"
+              data-testid="recent-more-button"
+            >
+              {expanded
+                ? t('workbench.recent.collapse', undefined, '收起')
+                : `${t('workbench.recent.more', undefined, '更多')} (${hiddenCount})`}
+            </button>
+          )}
+          <span className="text-gray-400">
+            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+              <circle cx="4" cy="10" r="1.5" />
+              <circle cx="10" cy="10" r="1.5" />
+              <circle cx="16" cy="10" r="1.5" />
+            </svg>
+          </span>
+        </div>
       </div>
-      <div className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-3">
-        {visibleVisits.map((visit, idx) => {
+      <div ref={listRef} data-testid="recent-list" className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-3">
+        {shownVisits.map((visit, idx) => {
           const icon = visit.icon || (visit.modelCode && MODEL_ICONS[visit.modelCode]) || '📄';
           const bgColor = (visit.modelCode && MODEL_BG_COLORS[visit.modelCode]) || 'bg-gray-100';
           const primaryTitle = resolveVisitTitle(visit);

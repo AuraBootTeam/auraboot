@@ -1,5 +1,5 @@
-import { beforeEach, describe, it, expect, vi } from 'vitest';
-import { render } from '@testing-library/react';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
+import { fireEvent, render } from '@testing-library/react';
 import { ShortcutsWidget } from '../ShortcutsWidget';
 
 const { listFavoritesMock, rootLoaderData, translateMock } = vi.hoisted(() => ({
@@ -180,5 +180,96 @@ describe('ShortcutsWidget — redesign', () => {
       expect.stringContaining('客户'),
     ]);
     expect(await findByText('编辑')).not.toBeNull();
+  });
+});
+
+describe('ShortcutsWidget — whole rows only', () => {
+  // jsdom has no layout. The numbers are the ones measured on the real card: a 180 px list with an
+  // 8 px bottom padding and 48 px rows. Before this change 3.75 rows showed and the fourth was cut.
+  function giveTheListAHeight(listHeight: number, bottomPadding: number) {
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+      configurable: true,
+      get(this: HTMLElement) {
+        return this.getAttribute('data-testid') === 'shortcuts-list' ? listHeight : 0;
+      },
+    });
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return { height: this.tagName === 'LI' ? 48 : 0 } as DOMRect;
+    });
+    vi.spyOn(window, 'getComputedStyle').mockImplementation(
+      () => ({ paddingBottom: `${bottomPadding}px` }) as CSSStyleDeclaration,
+    );
+    (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
+  }
+
+  const eightMenus = Array.from({ length: 8 }, (_, i) => ({
+    name: `菜单${i + 1}`,
+    path: `/p/menu_${i + 1}`,
+    icon: 'FileText',
+  }));
+
+  beforeEach(() => {
+    listFavoritesMock.mockReset();
+    listFavoritesMock.mockResolvedValue([]);
+    rootLoaderData.value = { menus: eightMenus };
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete (HTMLElement.prototype as { clientHeight?: unknown }).clientHeight;
+  });
+
+  it('shows only the whole rows that fit and counts the rest on the More control', async () => {
+    giveTheListAHeight(180, 8);
+
+    const { findAllByTestId, findByTestId } = render(<ShortcutsWidget />);
+
+    expect(await findAllByTestId('shortcut-row')).toHaveLength(3);
+    expect(await findByTestId('shortcuts-more-button')).toHaveTextContent('更多 (5)');
+  });
+
+  it('More shows every row and turns into Show less, which folds the list again', async () => {
+    giveTheListAHeight(180, 8);
+
+    const { findAllByTestId, findByTestId } = render(<ShortcutsWidget />);
+    fireEvent.click(await findByTestId('shortcuts-more-button'));
+
+    expect(await findAllByTestId('shortcut-row')).toHaveLength(8);
+    const showLess = await findByTestId('shortcuts-more-button');
+    expect(showLess).toHaveTextContent('收起');
+
+    fireEvent.click(showLess);
+
+    expect(await findAllByTestId('shortcut-row')).toHaveLength(3);
+    expect(await findByTestId('shortcuts-more-button')).toHaveTextContent('更多 (5)');
+  });
+
+  it('follows a taller card instead of a fixed number of rows', async () => {
+    giveTheListAHeight(250, 8);
+
+    const { findAllByTestId, findByTestId } = render(<ShortcutsWidget />);
+
+    expect(await findAllByTestId('shortcut-row')).toHaveLength(5);
+    expect(await findByTestId('shortcuts-more-button')).toHaveTextContent('更多 (3)');
+  });
+
+  it('has no More control when every row fits', async () => {
+    giveTheListAHeight(400, 8);
+
+    const { findAllByTestId, queryByTestId } = render(<ShortcutsWidget />);
+
+    expect(await findAllByTestId('shortcut-row')).toHaveLength(8);
+    expect(queryByTestId('shortcuts-more-button')).toBeNull();
+  });
+
+  it('shows every row while the list cannot be measured', async () => {
+    const { findAllByTestId, queryByTestId } = render(<ShortcutsWidget />);
+
+    expect(await findAllByTestId('shortcut-row')).toHaveLength(8);
+    expect(queryByTestId('shortcuts-more-button')).toBeNull();
   });
 });

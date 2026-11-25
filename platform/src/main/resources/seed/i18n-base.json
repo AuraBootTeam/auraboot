@@ -2721,6 +2721,16 @@
     "en-US": "Reports"
   },
   {
+    "key": "workbench.shortcuts.more",
+    "zh-CN": "更多",
+    "en-US": "More"
+  },
+  {
+    "key": "workbench.shortcuts.collapse",
+    "zh-CN": "收起",
+    "en-US": "Show less"
+  },
+  {
     "key": "workbench.shortcuts.customize_hint",
     "zh-CN": "点击编辑自定义",
     "en-US": "Click Edit to customize"
@@ -2729,6 +2739,16 @@
     "key": "workbench.recent.title",
     "zh-CN": "最近访问",
     "en-US": "Recent Visits"
+  },
+  {
+    "key": "workbench.recent.more",
+    "zh-CN": "更多",
+    "en-US": "More"
+  },
+  {
+    "key": "workbench.recent.collapse",
+    "zh-CN": "收起",
+    "en-US": "Show less"
   },
   {
     "key": "workbench.recent.empty",
