@@ -13259,7 +13259,8 @@ CREATE TABLE public.ab_notification (
     source_id character varying(64),
     is_read boolean DEFAULT false NOT NULL,
     read_at timestamp with time zone,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    mini_program_path character varying(220)
 );
 
 

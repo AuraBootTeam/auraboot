@@ -68,6 +68,8 @@ class WechatSubscriptionDeliveryPostgresIT {
     @Autowired ReliableIntegrationAccessor reliable;
     @Autowired ReliableEventDeliveryExecutor executor;
     @Autowired ObjectMapper json;
+    @Autowired com.auraboot.framework.notification.service.impl.StrictInAppDeliveryWriter inboxWriter;
+    @Autowired com.auraboot.framework.notification.service.NotificationQueryService inbox;
     private final Map<String,WechatSubscriptionGrantResolver.Grant> facts=new ConcurrentHashMap<>();
     private final List<Long> tenants=new ArrayList<>(),users=new ArrayList<>(),members=new ArrayList<>(),identityIds=new ArrayList<>();
     private long tenant,user,foreignTenant;
@@ -75,6 +77,7 @@ class WechatSubscriptionDeliveryPostgresIT {
     private HttpServer server;
     private ExecutorService serverThreads;
     private final AtomicInteger tokenCalls=new AtomicInteger(),sendCalls=new AtomicInteger();
+    private final java.util.concurrent.atomic.AtomicReference<String> providerBody = new java.util.concurrent.atomic.AtomicReference<>();
     private volatile long responseDelay;
     private volatile String tokenResponse="{\"access_token\":\"synthetic-native-token\",\"expires_in\":7200}";
     private volatile String sendResponse="{\"errcode\":0}";
@@ -95,7 +98,7 @@ class WechatSubscriptionDeliveryPostgresIT {
         server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);serverThreads=Executors.newCachedThreadPool();server.setExecutor(serverThreads);
         server.createContext("/cgi-bin/stable_token",exchange->{tokenCalls.incrementAndGet();exchange.getRequestBody().readAllBytes();
             byte[] body=tokenResponse.getBytes(StandardCharsets.UTF_8);exchange.sendResponseHeaders(200,body.length);exchange.getResponseBody().write(body);exchange.close();});
-        server.createContext("/cgi-bin/message/subscribe/send",exchange->{sendCalls.incrementAndGet();exchange.getRequestBody().readAllBytes();
+        server.createContext("/cgi-bin/message/subscribe/send",exchange->{sendCalls.incrementAndGet();providerBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             try {if(responseDelay>0)Thread.sleep(responseDelay);byte[] body=sendResponse.getBytes(StandardCharsets.UTF_8);
                 exchange.sendResponseHeaders(200,body.length);exchange.getResponseBody().write(body);
             } catch(InterruptedException interrupted){Thread.currentThread().interrupt();}
@@ -114,7 +117,7 @@ class WechatSubscriptionDeliveryPostgresIT {
     @AfterEach void cleanup() throws Exception {
         MetaContext.clear();if(server!=null)server.stop(0);
         if(serverThreads!=null){serverThreads.shutdownNow();assertThat(serverThreads.awaitTermination(2,TimeUnit.SECONDS)).isTrue();}
-        for(long id:tenants){jdbc.update("DELETE FROM ab_notification_send_log WHERE tenant_id=?",id);jdbc.update("DELETE FROM ab_integration_receipt WHERE tenant_id=?",id);jdbc.update("DELETE FROM ab_outbox WHERE tenant_id=?",id);}
+        for(long id:tenants){jdbc.update("DELETE FROM ab_notification WHERE tenant_id=?",id);jdbc.update("DELETE FROM ab_notification_send_log WHERE tenant_id=?",id);jdbc.update("DELETE FROM ab_integration_receipt WHERE tenant_id=?",id);jdbc.update("DELETE FROM ab_outbox WHERE tenant_id=?",id);}
         for(long id:identityIds)jdbc.update("DELETE FROM ab_auth_identity WHERE id=?",id);
         for(long id:members)jdbc.update("DELETE FROM ab_tenant_member WHERE id=?",id);
         for(long id:users)jdbc.update("DELETE FROM ab_user WHERE id=?",id);
@@ -142,6 +145,55 @@ class WechatSubscriptionDeliveryPostgresIT {
             var first=workers.submit(run);var second=workers.submit(run);assertThat(ready.await(10,TimeUnit.SECONDS)).isTrue();release.countDown();return List.of(first.get(20,TimeUnit.SECONDS),second.get(20,TimeUnit.SECONDS));
         } finally {release.countDown();workers.shutdownNow();assertThat(workers.awaitTermination(2,TimeUnit.SECONDS)).isTrue();}
     }
+    @Test void authorizedMiniProgramRouteSurvivesInboxAndWechatPersistence() throws Exception {
+        String path = "pages/notification-entry/index?kind=quote&id=quote-123";
+        String foreignPage = "pages/other/index?kind=quote";
+        var request = request("route");
+        var original = facts.get(request.resolutionReference());
+        facts.put(request.resolutionReference(), new WechatSubscriptionGrantResolver.Grant(
+                tenant, request.resolutionReference(), userPid, appId, identityPid, openid, original.templateId(),
+                original.grantReference(), original.reservationReference(), original.expiresAt(),
+                Map.of("thing1", "RFQ-26001"), original.reservedAt(), path));
+        var query = new com.auraboot.framework.notification.dto.NotificationQueryRequest();
+        query.setMiniProgramPage("pages/notification-entry/index");
+        var plan = new com.auraboot.framework.notification.service.NotificationDeliveryPlanResolver.Plan(
+                tenant, request.resolutionReference(), userPid, "version-1", "test_reminder", "source-1",
+                Instant.now(), "Inquiry reminder", "RFQ-26001", path, Map.of());
+        long id = new TransactionTemplate(transactions).execute(status -> {
+            inboxWriter.persist(new com.auraboot.framework.notification.service.NotificationDeliveryPlanResolver.Plan(
+                    tenant, "different", userPid, "version-1", "test_reminder", "source-2", Instant.now(),
+                    "Other notification", "Other body", foreignPage, Map.of()));
+            return inboxWriter.persist(plan);
+        });
+        var listed = inbox.listByUser(user, query).getRecords();
+        assertThat(listed).hasSize(1);
+        assertThat(listed.getFirst().getMiniProgramPath()).isEqualTo(path);
+        assertThat(listed.getFirst().getIsRead()).isFalse();
+        MetaContext.setContext(foreignTenant, user, userPid, "Foreign tenant counterexample");
+        try {
+            assertThat(inbox.listByUser(user, query).getRecords()).isEmpty();
+            inbox.markAsRead(id);
+        } finally {
+            MetaContext.setContext(tenant, user, userPid, "Notification route fixture");
+        }
+        assertThat(inbox.listByUser(user, query).getRecords().getFirst().getIsRead()).isFalse();
+        inbox.markAsRead(id);
+        assertThat(inbox.listByUser(user, query).getRecords().getFirst().getIsRead()).isTrue();
+
+        var journal = fresh();
+        String key = queue(journal, request).deliveryKey();
+        String lease = UniqueIdGenerator.generate();
+        var claimed = new TransactionTemplate(transactions).execute(status -> outbox.claimKnownEvent(
+                tenant, key, "native-test-worker", lease, Instant.now().plusSeconds(60)));
+        assertThat(claimed).hasSize(1);
+        executor.deliver(event(key), journal, lease);
+        assertThat(fresh().attempt(tenant, key).getStatus()).isEqualTo("accepted");
+        assertThat(sendCalls).hasValue(1);
+        var body = json.readTree(providerBody.get());
+        assertThat(body.path("page").asText()).isEqualTo(path);
+        assertThat(body.path("data").path("thing1").path("value").asText()).isEqualTo("RFQ-26001");
+    }
+
     @Test void concurrentQueueAndRestartedConsumersKeepOneIntentAndOneProviderSend() throws Exception {
         var request=request("concurrent");var journal=fresh();var results=concurrent(()->queue(fresh(),request));
         assertThat(results).extracting(WechatSubscriptionDeliveryJournal.QueueResult::status)

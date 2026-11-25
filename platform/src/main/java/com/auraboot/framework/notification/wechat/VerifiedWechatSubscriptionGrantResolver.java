@@ -87,7 +87,7 @@ public class VerifiedWechatSubscriptionGrantResolver implements WechatSubscripti
         String reservation = hash(tenant + "\n" + reference + "\n" + available.reference());
         Grant grant = new Grant(tenant, reference, current.plan().recipientUserPid(), mini.getAppId(),
                 current.identity().getPid(), current.identity().getOpenid(), current.templateId(),
-                available.reference(), reservation, available.expiresAt(), current.values(), now);
+                available.reference(), reservation, available.expiresAt(), current.values(), now, current.plan().miniProgramPath());
         int inserted = reservations.append(tenant, reference, reservation, available.reference(),
                 current.plan().configurationVersion(), encode(grant), now);
         if (inserted != 1) throw new IllegalStateException("WECHAT_RESERVATION_INSERT_FAILED");
@@ -118,6 +118,7 @@ public class VerifiedWechatSubscriptionGrantResolver implements WechatSubscripti
                 || !mini.getAppId().equals(grant.appId()) || !current.templateId().equals(grant.templateId())
                 || !current.identity().getPid().equals(grant.identityPid())
                 || !current.identity().getOpenid().equals(grant.openid()) || !current.values().equals(grant.values())
+                || !Objects.equals(current.plan().miniProgramPath(), grant.miniProgramPath())
                 || (reservation != null && !reservation.equals(grant.reservationReference()))
                 || grant.reservedAt() == null || grant.reservedAt().isAfter(clock.instant())
                 || grant.expiresAt() == null || !grant.expiresAt().isAfter(clock.instant())) return Optional.empty();
@@ -148,6 +149,10 @@ public class VerifiedWechatSubscriptionGrantResolver implements WechatSubscripti
                 case TITLE -> plan.title(); case CONTENT -> plan.content(); case SOURCE_ID -> plan.sourceId();
                 // Notification occurrence is an immutable source fact, never the worker's current clock.
                 case OCCURRED_AT -> plan.occurredAt() == null ? null : SOURCE_OCCURRENCE.format(plan.occurredAt());
+                case BUSINESS_NUMBER -> plan.fields().get("number");
+                case DEADLINE -> plan.fields().get("deadline");
+                case SHORT_MEMO -> plan.fields().get("memo");
+                case BUSINESS_STATUS -> plan.fields().get("status");
             };
             Integer max = route.limits().get(field.getKey());
             if (blank(value) || max == null || value.codePointCount(0, value.length()) > max) return Optional.empty();

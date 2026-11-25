@@ -198,6 +198,36 @@ class WechatSubscriptionMessageSenderTest {
         assertThat(sender().sendOnce(request()).reason()).isEqualTo(Reason.GRANT_UNAVAILABLE);assertThat(requests).hasSize(2);
         assertThat(grant.toString()).doesNotContain("synthetic-openid","报价提醒");
     }
+    @Test void acceptsTheOfficialUnderscoredBusinessNumberField() throws Exception {
+        configuration.setEnabled(true);
+        configuration.setFieldMaxLengths(Map.of("character_string19", 32, "time21", 16, "thing17", 20, "phrase13", 5));
+        grant = new Grant(42, grant.resolutionReference(), grant.userPid(), grant.appId(), grant.identityPid(),
+                grant.openid(), grant.templateId(), grant.grantReference(), grant.reservationReference(),
+                grant.expiresAt(), Map.of("character_string19", "RFQ-26001", "time21", "2026-11-26 16:00",
+                        "thing17", "请在截止前提交报价", "phrase13", "待报价"), clock.instant(),
+                "pages/notification-entry/index?kind=quote&id=quote-1");
+        assertThat(sender().sendOnce(request()).status()).isEqualTo(Status.PROVIDER_ACCEPTED);
+        var request = requests.getLast();
+        var body = new ObjectMapper().readTree(request.substring(request.indexOf('{')));
+        assertThat(body.path("data").path("character_string19").path("value").asText()).isEqualTo("RFQ-26001");
+        assertThat(body.path("data").path("time21").path("value").asText()).isEqualTo("2026-11-26 16:00");
+    }
+
+    @Test void sendsTheReservedMiniProgramPageForSingleAndAggregateReminders() throws Exception {
+        configuration.setEnabled(true);
+        for (String path : List.of("pages/notification-entry/index?kind=quote&id=quote-1",
+                "pages/notification-entry/index?kind=order")) {
+            claimed.set(false);
+            grant = new Grant(42, grant.resolutionReference(), grant.userPid(), grant.appId(), grant.identityPid(),
+                    grant.openid(), grant.templateId(), grant.grantReference(), grant.reservationReference(),
+                    grant.expiresAt(), grant.values(), clock.instant(), path);
+            assertThat(sender().sendOnce(request()).status()).isEqualTo(Status.PROVIDER_ACCEPTED);
+            var request = requests.getLast();
+            var json = new ObjectMapper().readTree(request.substring(request.indexOf('{')));
+            assertThat(json.path("page").asText()).isEqualTo(path);
+        }
+    }
+
     @ParameterizedTest @ValueSource(strings={"{}","{\"errcode\":1}","{\"access_token\":\"synthetic-token\",\"expires_in\":0}"})
     void tokenFailureIsNotAttemptedAndNeverCallsMessageEndpoint(String response) {
         configuration.setEnabled(true);tokenResponse=response;

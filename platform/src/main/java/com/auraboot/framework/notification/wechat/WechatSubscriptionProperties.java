@@ -44,7 +44,7 @@ public class WechatSubscriptionProperties {
     }
     private static boolean validFields(Map<String, Integer> values) {
         return values != null && !values.isEmpty() && values.size() <= 16 && values.entrySet().stream().allMatch(entry ->
-                entry.getKey() != null && entry.getKey().matches("[A-Za-z][A-Za-z0-9]*")
+                entry.getKey() != null && entry.getKey().matches("(?:[A-Za-z][A-Za-z0-9]*|character_string[0-9]+)")
                         && entry.getValue() != null && entry.getValue() > 0);
     }
     private long connectTimeoutMs = 10_000;

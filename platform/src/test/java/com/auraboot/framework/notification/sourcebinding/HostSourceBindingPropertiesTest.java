@@ -51,6 +51,19 @@ class HostSourceBindingPropertiesTest {
     }
 
     @Test
+    void preservesTheHostConfiguredLinkAndVariableNames() {
+        var source = binding(false, false);
+        var expected = new Binding(source.schemaVersion(), source.code(), source.tenantId(), source.approvals(),
+                source.source(), source.owner(), source.principal(), source.verification(), source.ruleId(),
+                source.templateCode(), Map.of("number", "quote_number"),
+                new MiniProgramLink("pages/notification-entry/index", "quote"));
+        runner.withPropertyValues(properties(expected).toArray(String[]::new)).run(context -> {
+            assertThat(context).hasNotFailed();
+            assertThat(context.getBean(HostSourceBindingProperties.class).getBindings()).containsExactly(expected);
+        });
+    }
+
+    @Test
     void quoteDescriptorBindsCanonicalConstructorsAndRetainsTypedConditions() {
         var expected = binding(false, false);
         runner.withPropertyValues(properties(expected).toArray(String[]::new)).run(context -> {

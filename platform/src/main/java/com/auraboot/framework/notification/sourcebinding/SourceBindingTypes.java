@@ -143,7 +143,25 @@ public final class SourceBindingTypes {
             code(ownerField);
         }
     }
-    public record Binding(int schemaVersion, String code, long tenantId, List<Approval> approvals, Source source, Entity owner, Principal principal, Verification verification, long ruleId, String templateCode, Map<String, String> variableToSourceField) {
+    public record MiniProgramLink(String page, String kind) {
+        public MiniProgramLink {
+            require(page != null && page.length() <= 120 && page.matches("pages/[a-z0-9-]+(?:/[a-z0-9-]+)+"));
+            require(kind != null && kind.matches("[a-z][a-z0-9_-]{0,23}"));
+        }
+        String path(List<String> targets) {
+            require(!targets.isEmpty());
+            return page + "?kind=" + kind + (targets.size() == 1 ? "&id=" + pid(targets.getFirst()) : "");
+        }
+    }
+    public record Binding(int schemaVersion, String code, long tenantId, List<Approval> approvals, Source source, Entity owner, Principal principal, Verification verification, long ruleId, String templateCode, Map<String, String> variableToSourceField,
+                          @JsonInclude(JsonInclude.Include.NON_NULL) MiniProgramLink miniProgramLink) {
+        public Binding(int schemaVersion, String code, long tenantId, List<Approval> approvals, Source source, Entity owner,
+                       Principal principal, Verification verification, long ruleId, String templateCode,
+                       Map<String, String> variableToSourceField) {
+            this(schemaVersion, code, tenantId, approvals, source, owner, principal, verification, ruleId, templateCode,
+                    variableToSourceField, null);
+        }
+        @ConstructorBinding
         public Binding {
             require(schemaVersion == 1 && tenantId> 0 && ruleId> 0);
             SourceBindingTypes.code(code);

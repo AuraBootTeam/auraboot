@@ -143,8 +143,9 @@ public class WechatSubscriptionMessageSender {
         try { token=tokens.acquire().accessToken(); }
         catch (WechatMiniStableTokenClient.TokenFailure failure) { return new Result(Status.NOT_ATTEMPTED,Reason.TOKEN_FAILED,null); }
         Map<String,Object> data=new TreeMap<>();grant.values().forEach((key,value)->data.put(key,Map.of("value",value)));
-        Map<String,Object> payload=Map.of("touser",grant.openid(),"template_id",grant.templateId(),
-                "miniprogram_state",prepared.miniprogramState(),"data",data);
+        Map<String,Object> payload = new TreeMap<>(Map.of("touser", grant.openid(), "template_id", grant.templateId(),
+                "miniprogram_state", prepared.miniprogramState(), "data", data));
+        if (grant.miniProgramPath() != null) payload.put("page", grant.miniProgramPath());
         try {
             // One HTTP invocation. Token refresh, retry and raw provider diagnostics are deliberately absent.
             return http.post().uri(base+"/cgi-bin/message/subscribe/send?access_token="
