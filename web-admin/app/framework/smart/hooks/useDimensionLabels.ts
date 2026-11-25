@@ -34,13 +34,22 @@ import { ResultHelper } from '~/utils/type';
 type FieldDictMap = Record<string, string>;
 /** raw value -> display label, for one dict */
 type DictLabelMap = Record<string, string>;
+/** raw value -> the colour its dictionary item declares; only items that declare one are listed */
+type DictToneMap = Record<string, string>;
+/** one dictionary, loaded once: the labels every chart needs and the colours status tables need */
+interface DictMaps {
+  labels: DictLabelMap;
+  tones: DictToneMap;
+}
 /** dimension field -> (raw value -> display label) */
 export type DimensionLabelMap = Record<string, DictLabelMap>;
+/** dimension field -> (raw value -> declared colour) */
+export type DimensionToneMap = Record<string, DictToneMap>;
 
 const fieldDictCache = new Map<string, FieldDictMap>();
 const fieldDictInFlight = new Map<string, Promise<FieldDictMap>>();
-const dictLabelCache = new Map<string, DictLabelMap>();
-const dictLabelInFlight = new Map<string, Promise<DictLabelMap>>();
+const dictCache = new Map<string, DictMaps>();
+const dictInFlight = new Map<string, Promise<DictMaps>>();
 
 interface FieldMetaRow {
   code?: string;
@@ -51,8 +60,8 @@ interface FieldMetaRow {
 export function __resetDimensionLabelCaches(): void {
   fieldDictCache.clear();
   fieldDictInFlight.clear();
-  dictLabelCache.clear();
-  dictLabelInFlight.clear();
+  dictCache.clear();
+  dictInFlight.clear();
 }
 
 /** field code -> dict code for a model, from field metadata. */
@@ -81,12 +90,12 @@ async function loadFieldDicts(modelCode: string): Promise<FieldDictMap> {
   return promise;
 }
 
-/** raw value -> label for one dict. */
-async function loadDictLabels(dictCode: string): Promise<DictLabelMap> {
-  const cached = dictLabelCache.get(dictCode);
+/** labels and declared colours for one dict, fetched once and shared by every widget that asks. */
+async function loadDict(dictCode: string): Promise<DictMaps> {
+  const cached = dictCache.get(dictCode);
   if (cached) return cached;
 
-  const inFlight = dictLabelInFlight.get(dictCode);
+  const inFlight = dictInFlight.get(dictCode);
   if (inFlight) return inFlight;
 
   const promise = (async () => {
@@ -95,31 +104,42 @@ async function loadDictLabels(dictCode: string): Promise<DictLabelMap> {
     const result = await internalRequest('get', '/api/meta/dict/by-code/{code}/data', {
       path: { code: dictCode },
     });
-    const map: DictLabelMap = {};
+    const maps: DictMaps = { labels: {}, tones: {} };
     if (result.code === '0' && result.data) {
       for (const item of dictionaryData(result.data).items) {
-        if (item.label) map[item.value] = item.label;
+        if (item.label) maps.labels[item.value] = item.label;
+        // The same `extension.color` the list and detail cells read: a dictionary item that
+        // declares a colour is a status, anything else stays plain text.
+        const color = item.extension?.color;
+        if (typeof color === 'string' && color.trim()) maps.tones[item.value] = color;
       }
     }
-    dictLabelCache.set(dictCode, map);
-    return map;
-  })().finally(() => dictLabelInFlight.delete(dictCode));
+    dictCache.set(dictCode, maps);
+    return maps;
+  })().finally(() => dictInFlight.delete(dictCode));
 
-  dictLabelInFlight.set(dictCode, promise);
+  dictInFlight.set(dictCode, promise);
   return promise;
 }
 
+interface DimensionDicts {
+  labels: DimensionLabelMap;
+  tones: DimensionToneMap;
+}
+
 /**
- * Resolve display labels for the dict-coded dimensions of a data source.
+ * Resolve, for the dict-coded dimensions of a data source, both the display labels and the
+ * colours the dictionary items declare. Shared by `useDimensionLabels` and `useDimensionTones`.
  *
- * Returns an empty map until the lookups land, and on any failure — a missing dict
- * degrades to showing the raw code, which is what charts did before this existed.
+ * Returns empty maps until the lookups land, and on any failure — a missing dict degrades to
+ * showing the raw code, which is what charts did before this existed.
  */
-export function useDimensionLabels(
+function useDimensionDicts(
   dataSource: ChartDataSource | undefined,
   dimensions: string[] | undefined,
-): DimensionLabelMap {
-  const [labels, setLabels] = useState<DimensionLabelMap>({});
+): DimensionDicts {
+  const EMPTY = useMemo<DimensionDicts>(() => ({ labels: {}, tones: {} }), []);
+  const [resolved, setResolved] = useState<DimensionDicts>(EMPTY);
   const mountedRef = useRef(true);
 
   const modelCode = dataSource?.type === 'aggregate' ? dataSource.modelCode : undefined;
@@ -162,7 +182,7 @@ export function useDimensionLabels(
       ...new Set([...(dimensionsKey ? dimensionsKey.split(',') : []), ...Object.keys(explicit)]),
     ];
     if (fields.length === 0) {
-      setLabels({});
+      setResolved(EMPTY);
       return;
     }
 
@@ -178,26 +198,47 @@ export function useDimensionLabels(
         if (dictCode) dictByField[field] = dictCode;
       }
 
-      const resolved: DimensionLabelMap = {};
+      const next: DimensionDicts = { labels: {}, tones: {} };
       await Promise.all(
         Object.entries(dictByField).map(async ([field, dictCode]) => {
-          const map = await loadDictLabels(dictCode);
-          if (Object.keys(map).length > 0) resolved[field] = map;
+          const maps = await loadDict(dictCode);
+          if (Object.keys(maps.labels).length > 0) next.labels[field] = maps.labels;
+          if (Object.keys(maps.tones).length > 0) next.tones[field] = maps.tones;
         }),
       );
 
-      if (!cancelled && mountedRef.current) setLabels(resolved);
+      if (!cancelled && mountedRef.current) setResolved(next);
     })().catch(() => {
       // A failed dict lookup is not a chart failure — fall back to raw codes.
-      if (!cancelled && mountedRef.current) setLabels({});
+      if (!cancelled && mountedRef.current) setResolved(EMPTY);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [modelCode, dimensionsKey, explicitDictsKey]);
+  }, [modelCode, dimensionsKey, explicitDictsKey, EMPTY]);
 
-  return labels;
+  return resolved;
+}
+
+/** Display labels for the dict-coded dimensions of a data source (field -> value -> label). */
+export function useDimensionLabels(
+  dataSource: ChartDataSource | undefined,
+  dimensions: string[] | undefined,
+): DimensionLabelMap {
+  return useDimensionDicts(dataSource, dimensions).labels;
+}
+
+/**
+ * Colours declared by the dictionary items of the dict-coded dimensions (field -> value -> colour).
+ * A value is listed only when its dictionary item sets `extension.color`, so a table can draw the
+ * same 色点 + 文字 as list pages for statuses and leave categories as plain text.
+ */
+export function useDimensionTones(
+  dataSource: ChartDataSource | undefined,
+  dimensions: string[] | undefined,
+): DimensionToneMap {
+  return useDimensionDicts(dataSource, dimensions).tones;
 }
 
 export default useDimensionLabels;

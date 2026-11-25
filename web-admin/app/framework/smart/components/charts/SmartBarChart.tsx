@@ -264,6 +264,46 @@ export function buildBarOptionLegacy(
 }
 
 /**
+ * A value axis that counts things has no half units. ECharts otherwise labels a 0–2 axis as
+ * 0 / 0.5 / 1 / 1.5 / 2, which reads as a mistake for "number of releases". When every plotted value
+ * is a whole number, the value axis is told to keep whole-number intervals; one fractional value
+ * leaves the option untouched, and an explicit `minInterval` from `chartOptions` always wins.
+ *
+ * Applied after the shared ChartSpec→ECharts adapter, on purpose: the adapter and the equivalence
+ * oracle that pins it (`buildBarOptionLegacy`) stay exactly as they are.
+ */
+export function withWholeNumberTicks<T extends EChartsOption>(option: T): T {
+  const seriesList = (Array.isArray(option.series) ? option.series : option.series ? [option.series] : []) as Array<{
+    data?: unknown;
+  }>;
+  const plotted = seriesList.flatMap((series) => (Array.isArray(series?.data) ? series.data : []));
+  if (plotted.length === 0) return option;
+  const allWhole = plotted.every((entry) => {
+    const value = typeof entry === 'object' && entry !== null ? (entry as { value?: unknown }).value : entry;
+    return typeof value === 'number' && Number.isInteger(value);
+  });
+  if (!allWhole) return option;
+
+  const limit = (axis: unknown) => {
+    const list = Array.isArray(axis) ? axis : [axis];
+    let changed = false;
+    const next = list.map((item) => {
+      const itemRecord = item as { type?: string; minInterval?: number } | undefined;
+      if (itemRecord?.type === 'value' && itemRecord.minInterval === undefined) {
+        changed = true;
+        return { ...itemRecord, minInterval: 1 };
+      }
+      return item;
+    });
+    return { axis: (Array.isArray(axis) ? next : next[0]) as unknown, changed };
+  };
+  const xAxis = limit(option.xAxis);
+  const yAxis = limit(option.yAxis);
+  if (!xAxis.changed && !yAxis.changed) return option;
+  return { ...option, ...(xAxis.changed ? { xAxis: xAxis.axis as T['xAxis'] } : {}), ...(yAxis.changed ? { yAxis: yAxis.axis as T['yAxis'] } : {}) };
+}
+
+/**
  * Check if data source is configured enough to fetch data
  */
 function isDataSourceConfigured(dataSource: ChartDataSource): boolean {
@@ -359,7 +399,10 @@ export const SmartBarChart: React.FC<SmartBarChartProps> = ({
       metricLabels,
     });
     const adapterOption = chartSpecToEChartsOption(spec, data?.rows ?? []) as EChartsOption;
-    return chartOptions ? { ...adapterOption, ...chartOptions } : adapterOption;
+    // `chartOptions` is the caller's renderer override, so whole-number ticks are applied before it:
+    // an explicit axis setting from the dashboard author is never second-guessed.
+    const ticksOption = withWholeNumberTicks(adapterOption);
+    return chartOptions ? { ...ticksOption, ...chartOptions } : ticksOption;
   }, [data, title, orientation, stacked, showLabel, metricLabels, chartOptions]);
 
   /**
