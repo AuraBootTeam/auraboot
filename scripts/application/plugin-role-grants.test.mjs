@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { chmodSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, closeSync, fstatSync, mkdtempSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -285,10 +285,16 @@ test('the command grants through the additive endpoint, reads back and leaves a 
       { method: 'PUT', path: `/api/permissions/matrix/${admin.pid}/batch`, body: [{ permissionId: 3, granted: true }, { permissionId: 4, granted: true }] },
     ]);
     assert.equal(held.get(admin.pid).size, 4);
-    const saved = JSON.parse(readFileSync(receipt, 'utf8'));
-    assert.equal(saved.kind, 'plugin-role-grants');
-    assert.equal(saved.result.failed, false);
-    assert.equal(statSync(receipt).mode & 0o077, 0);
+    // Read through one descriptor: the mode checked is the mode of what was read.
+    const receiptFd = openSync(receipt, 'r');
+    try {
+      const saved = JSON.parse(readFileSync(receiptFd, 'utf8'));
+      assert.equal(saved.kind, 'plugin-role-grants');
+      assert.equal(saved.result.failed, false);
+      assert.equal(fstatSync(receiptFd).mode & 0o077, 0);
+    } finally {
+      closeSync(receiptFd);
+    }
     const again = await run(['--roles', roles, '--base-url', baseUrl, '--token-file', token, '--receipt', receipt]);
     assert.equal(again.status, 1);
     assert.match(again.stderr, /must name a new file/);
