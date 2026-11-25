@@ -90,6 +90,8 @@ Agent 的 `OVERWRITE_SAFE` 使用锁定的强类型修改状态；读取异常�
 
 **升级影响**：旧页面和看板在安全导入下可能保留，即使实际上未修改；需检查差异后显式选择 OVERWRITE。新安装/新导入在此迁移后正常形成未修改基线，后续安全升级可更新。迁移不修改页面/看板内容，不自动发布，也不需要用户重新创建页面。
 
+**已有角色的授权**：插件 `roles.json` 只在导入**新建**角色时生效；角色已存在时导入一律 SKIP，不改租户现有的授权。新版本给角色增加的权限要到达已有环境，用 `scripts/application/plugin-role-grants.mjs --plugin <插件根目录> --base-url <地址>` 补齐。它默认只演练，列出每个已有角色缺哪些授权；`--apply` 才授予，并且只走只加不减的 `PUT /api/permissions/matrix/{rolePid}/batch`，每个条目都是 `granted: true`。写完逐个角色回读：原有授权少了一条也算失败。`POST /api/roles/{pid}/permissions` 的语义是替换成提交的清单，脚本从不写它。模板里租户没有的权限、租户没有的角色都只报告，不发送、不创建。入口测试：`node --test scripts/application/plugin-role-grants.test.mjs`。
+
 ## 模块自有 seed 的重导入
 
 Automation、决策、条件片段和事件策略复用同一导入请求的 conflictStrategy，但保留各模块版本/发布机制，不并入另一套版本库。新定义正常创建；既有定义在 ERROR 下拒绝，SKIP 保留；OVERWRITE_SAFE 仅在当前模块状态与本插件上次成功导入基线一致时更新，否则保留并在 warnings 说明。显式 OVERWRITE 进入模块原有更新/新版本/校验/发布流程。OVERWRITE 不绕过不可变版本、冲突 draft 或其他模块校验。
