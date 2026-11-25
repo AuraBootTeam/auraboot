@@ -73,7 +73,14 @@ export function useSubTableData({
   }, [config.defaultValues, resolveDefaultValue]);
 
   useEffect(() => {
-    if (!parentRecordPid) return;
+    if (!parentRecordPid) {
+      // A detail page opened without a record has no parent, so nothing will ever load. The
+      // block starts in its loading state: end it here, or it stays on "loading" for good.
+      setRows([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
 
     const loadData = async () => {
       setLoading(true);

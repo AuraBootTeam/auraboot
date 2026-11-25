@@ -298,6 +298,28 @@ describe('SubTableViewer', () => {
     expect(screen.getByTestId('subtable-viewer').textContent).toMatch(/No data|暂无数据/i);
   });
 
+  it('shows the empty state instead of loading for good when the page has no parent record', async () => {
+    // A detail page opened without a record id (2026-11-24: three product pages kept a
+    // sub-table on "loading" for good). Nothing is fetched; the block must leave its loading state.
+    const { rerender } = render(
+      <SubTableViewer config={buildConfig()} parentRecordPid="" t={(key) => (key === 'common.noData' ? 'No data' : key)} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('subtable-viewer').textContent).toMatch(/No data|暂无数据/i);
+    });
+    expect(fetchResultMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId('subtable-viewer').textContent).not.toMatch(/common\.loading/);
+
+    // The same block rendered again with a parent loads as before.
+    fetchResultMock.mockResolvedValue({ code: '0', data: { records: [{ pid: 'row-1', taskName: 'Loaded', status: 'done' }] } });
+    rerender(<SubTableViewer config={buildConfig()} parentRecordPid="record-1" t={(key) => key} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('subtable-viewer').textContent).toContain('Loaded');
+    });
+    expect(fetchResultMock).toHaveBeenCalled();
+  });
+
   it('loads API dataSource rows from endpoint configs with interpolated params', async () => {
     fetchResultMock.mockResolvedValue({
       code: '0',
