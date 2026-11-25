@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.schema;
 
+import com.auraboot.framework.meta.constant.DslRegistry;
 import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;
@@ -8,14 +9,31 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SystemTabRegistryTest {
 
     @Test
-    void documentModel_shouldReturn4SystemTabs() {
+    void documentModel_shouldReturn3SystemTabs() {
+        // No approval tab: "approval-comments" was never implemented and has no renderer.
         List<Map<String, Object>> tabs = SystemTabRegistry.getSystemTabs("document");
-        assertThat(tabs).hasSize(4);
+        assertThat(tabs).hasSize(3);
         assertThat(tabs.get(0).get("key")).isEqualTo("__comments__");
         assertThat(tabs.get(1).get("key")).isEqualTo("__activity__");
-        assertThat(tabs.get(2).get("key")).isEqualTo("__approval_comments__");
-        assertThat(tabs.get(3).get("key")).isEqualTo("__field_history__");
+        assertThat(tabs.get(2).get("key")).isEqualTo("__field_history__");
         tabs.forEach(t -> assertThat(t.get("system")).isEqualTo(true));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void everySystemTab_shouldUseARegisteredBlockType() {
+        // A system tab is injected into every detail page of its category. A block type that is
+        // not registered has no renderer, and the tab shows "Unknown block type: …" instead.
+        for (String category : List.of("document", "master", "transaction", "entity", "reference", "activity")) {
+            for (Map<String, Object> tab : SystemTabRegistry.getSystemTabs(category)) {
+                List<Map<String, Object>> blocks = (List<Map<String, Object>>) tab.get("blocks");
+                for (Map<String, Object> block : blocks) {
+                    assertThat(DslRegistry.BlockType.codes())
+                            .as("system tab %s of category %s", tab.get("key"), category)
+                            .contains(String.valueOf(block.get("blockType")));
+                }
+            }
+        }
     }
 
     @Test
