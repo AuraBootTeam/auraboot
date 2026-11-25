@@ -26,6 +26,12 @@ import { buildDrillDownTarget, type DrillDownPayload } from '../utils/drillDownN
 import { createDashboardUsageId } from '../utils/usageId';
 import { DashboardQueryContext } from '~/framework/smart/hooks/DashboardQueryContext';
 
+// Ensure this plugin's workbench widgets are registered before resolution.
+// The plugin entry registers them, but the async plugin boot evaluates that
+// entry in the browser after the first render — so the server-rendered home
+// page stayed "Unknown widget" until something else re-rendered it.
+import '~/plugins/core-dashboard';
+
 type LinkageFiltersMap = Record<string, FilterConfig[]>;
 
 interface DashboardViewerProps {

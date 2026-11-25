@@ -16,6 +16,8 @@ vi.mock('~/contexts/I18nContext', () => ({
 
 vi.mock('~/framework/smart/charts/SharedChartFactory', () => ({
   normalizeChartType: (type: string) => type.replace(/^smart-/, '').replace(/-chart$/, ''),
+  subscribeChartRegistry: () => () => {},
+  getChartRegistryVersion: () => 0,
   getChartComponent: () => (props: Record<string, unknown>) => {
     chartMock.props.push(props);
     return null;

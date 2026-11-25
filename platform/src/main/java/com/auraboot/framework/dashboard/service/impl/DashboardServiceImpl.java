@@ -633,8 +633,14 @@ public class DashboardServiceImpl implements DashboardService {
         // Try to find existing workbench
         Dashboard existing = dashboardMapper.findWorkbench(tenantId, currentUserPid);
         if (existing != null) {
-            return composeWorkbenchContributions(toDTO(existing),
-                    workbenchContributions(tenantId));
+            DashboardDTO workbench = toDTO(existing);
+            // Nothing is written here: a workbench that still has the positions of the template
+            // which overlapped itself is shown on the current rows, and its next save keeps them.
+            if (WorkbenchTemplateProvider.upgradeOverlappingDefaultLayout(objectMapper, workbench.getWidgets())) {
+                log.info("Workbench had the overlapping default layout; shown on the current rows: pid={}",
+                        existing.getPid());
+            }
+            return composeWorkbenchContributions(workbench, workbenchContributions(tenantId));
         }
 
         // Create from template
