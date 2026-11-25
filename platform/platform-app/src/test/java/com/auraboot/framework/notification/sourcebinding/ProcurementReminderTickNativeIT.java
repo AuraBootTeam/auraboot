@@ -4,6 +4,7 @@ import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.crypto.FieldEncryptionService;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.integration.DeclaredTestInfrastructure;
 import com.auraboot.framework.integration.ReliableEventDeliveryExecutor;
 import com.auraboot.framework.integration.ReliableOutboxDispatchListener;
 import com.auraboot.framework.meta.mapper.OutboxEventMapper;
@@ -39,6 +40,7 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
@@ -77,6 +79,7 @@ class ProcurementReminderTickNativeIT {
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper json;
     @Autowired DataSource dataSource;
+    @Autowired DataRedisProperties redis;
     @MockitoBean SchedulerEngine schedulerEngine;
     @MockitoBean ReliableOutboxDispatchListener commitDispatcher;
 
@@ -90,18 +93,30 @@ class ProcurementReminderTickNativeIT {
                 .ifPresent(path -> properties.add("aura.plugins.dir", path::toString));
     }
 
+    private void requireLocalTestDatabase() throws Exception {
+        var profile = NativeProcurementWorkspace.profile();
+        assertThat(redis.getDatabase()).isEqualTo(profile.redisDatabase());
+        try (var connection = dataSource.getConnection()) {
+            assertThat(connection.getMetaData().getDatabaseProductName()).isEqualTo("PostgreSQL");
+            assertThat(connection.getCatalog()).isEqualTo(profile.database());
+            String jdbc = connection.getMetaData().getURL().substring("jdbc:".length());
+            var address = java.net.URI.create(jdbc);
+            assertThat(address.getHost()).isIn("127.0.0.1", "localhost");
+            assertThat(address.getPort()).isEqualTo(5432);
+            assertThat(address.getPath()).isEqualTo("/" + profile.database());
+        }
+        if (NativeProcurementWorkspace.runtime().equals("procurement-fixed-reminders")) {
+            DeclaredTestInfrastructure.assertSelected(dataSource, redis);
+        }
+    }
+
     @Test
     void actualControlledTickQueuesOnceAndDeliversTwoExplicitInAppRecipients() throws Exception {
         Path evidence = Path.of(required("PROCUREMENT_REMINDER_TICK_EVIDENCE_DIR")).toRealPath();
         assertThat(evidence.startsWith(NativeProcurementWorkspace.root().resolve(".workspace/evidence").resolve(NativeProcurementWorkspace.runtime()).toRealPath())).isTrue();
         assertThat(context.getBeansOfType(ScheduledAnnotationBeanPostProcessor.class)).isEmpty();
         assertThat(context.getBean(com.auraboot.framework.notification.wechat.WechatSubscriptionProperties.class).isEnabled()).isFalse();
-        assertThat(System.getenv("TEST_REDIS_DATABASE")).isEqualTo("13");
-        try (var connection = dataSource.getConnection()) {
-            assertThat(connection.getMetaData().getDatabaseProductName()).isEqualTo("PostgreSQL");
-            assertThat(connection.getCatalog()).isEqualTo("enterprise_22");
-            assertThat(connection.getMetaData().getURL()).matches("jdbc:postgresql://(?:127\\.0\\.0\\.1|localhost):5432/enterprise_22(?:\\?.*)?");
-        }
+        requireLocalTestDatabase();
         Map<String, Object> receipt = new LinkedHashMap<>();
         receipt.put("matchingEncryptionAdmission", S06NativeEncryptionAdmission.admit(System.getenv(), json,
                 context.getBean(FieldEncryptionService.class), getClass(), context.getEnvironment().getActiveProfiles()));
@@ -425,12 +440,7 @@ class ProcurementReminderTickNativeIT {
         Path evidence = Files.createDirectory(parent.resolve("pf4j-automatic-native"));
         assertThat(context.getBeansOfType(ScheduledAnnotationBeanPostProcessor.class)).isEmpty();
         assertThat(context.getBean(com.auraboot.framework.notification.wechat.WechatSubscriptionProperties.class).isEnabled()).isFalse();
-        assertThat(System.getenv("TEST_REDIS_DATABASE")).isEqualTo("13");
-        try (var connection = dataSource.getConnection()) {
-            assertThat(connection.getMetaData().getDatabaseProductName()).isEqualTo("PostgreSQL");
-            assertThat(connection.getCatalog()).isEqualTo("enterprise_22");
-            assertThat(connection.getMetaData().getURL()).matches("jdbc:postgresql://(?:127\\.0\\.0\\.1|localhost):5432/enterprise_22(?:\\?.*)?");
-        }
+        requireLocalTestDatabase();
         var receipt = new LinkedHashMap<String, Object>();
         receipt.put("kind", "procurement-pf4j-automatic-quote-shipment-native-v1");
         receipt.put("matchingEncryptionAdmission", S06NativeEncryptionAdmission.admit(System.getenv(), json,
