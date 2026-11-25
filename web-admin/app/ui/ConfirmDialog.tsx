@@ -97,8 +97,13 @@ export default function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[1200] flex items-center justify-center"
+      className="pointer-events-auto fixed inset-0 z-[1200] flex items-center justify-center"
       data-testid="confirm-dialog"
+      onPointerDown={(event) => {
+        // A parent modal may disable outside pointer events and listen for
+        // document-level dismissal. This confirmation owns its whole surface.
+        event.stopPropagation();
+      }}
     >
       {/* Backdrop */}
       <div
