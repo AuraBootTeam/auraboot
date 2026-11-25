@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.exception.MetaServiceException;
+import com.auraboot.framework.meta.exception.ModelMutationDeniedException;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -45,7 +46,7 @@ class ModelMutationGuardTest {
                 .build();
         try {
             assertThatThrownBy(() -> ModelMutationGuard.assertMutableForOperation(model, "DELETE"))
-                    .isInstanceOf(MetaServiceException.class)
+                    .isInstanceOf(ModelMutationDeniedException.class)
                     .hasMessageContaining("authorized command");
             assertThatCode(() -> ModelMutationGuard.assertMutableForOperation(model, "update"))
                     .doesNotThrowAnyException();
@@ -127,7 +128,7 @@ class ModelMutationGuardTest {
                 .build();
 
         assertThatThrownBy(() -> ModelMutationGuard.assertCreateAllowed(model))
-                .isInstanceOf(MetaServiceException.class)
+                .isInstanceOf(ModelMutationDeniedException.class)
                 .hasMessageContaining("authorized command");
         assertThatCode(() -> MetaContext.runWithCommandPermitPlan(
                 "ALL", null, "crm_customer_request_common", "cr-1",
@@ -141,17 +142,18 @@ class ModelMutationGuardTest {
         ModelDefinition model=ModelDefinition.builder().code("ab_announcement").extension(Map.of(
             "commandWriters", Map.of("create",java.util.List.of("notice:create"),
                 "update",java.util.List.of("notice:save"),"delete",java.util.List.of("notice:delete")))).build();
-        assertThatThrownBy(()->ModelMutationGuard.assertCreateAllowed(model)).isInstanceOf(MetaServiceException.class);
+        assertThatThrownBy(()->ModelMutationGuard.assertCreateAllowed(model))
+                .isInstanceOf(ModelMutationDeniedException.class).hasMessageContaining("MODEL_MUTATION_DENIED:");
         try {
             MetaContext.runWithCommandPermitPlan("ALL",null,"ab_announcement","n-1",()-> {
                 MetaContext.runWithAuthorizedCommandCode("other:save",()-> {
                     assertThatThrownBy(()->ModelMutationGuard.assertMutable(model,"updated"))
-                        .isInstanceOf(MetaServiceException.class);
+                        .isInstanceOf(ModelMutationDeniedException.class);
                 });
                 MetaContext.runWithAuthorizedCommandCode("notice:save",()-> {
                     assertThatCode(()->ModelMutationGuard.assertMutable(model,"updated")).doesNotThrowAnyException();
                     assertThatThrownBy(()->ModelMutationGuard.assertDeleteAllowed(model))
-                        .isInstanceOf(MetaServiceException.class);
+                        .isInstanceOf(ModelMutationDeniedException.class);
                 });
             });
         } finally { MetaContext.clear(); }
@@ -172,25 +174,25 @@ class ModelMutationGuardTest {
                         "create", List.of("audit:create"), "update", List.of(), "delete", List.of())))
                 .build();
         assertThatThrownBy(() -> ModelMutationGuard.assertCreateAllowed(model))
-                .isInstanceOf(MetaServiceException.class).hasMessageContaining("exact authorized command");
+                .isInstanceOf(ModelMutationDeniedException.class).hasMessageContaining("exact authorized command");
         try {
             MetaContext.runWithCommandPermitPlan("ALL", null, "audit_record", "audit-1", () -> {
                 assertThatThrownBy(() -> ModelMutationGuard.assertCreateAllowed(model))
-                        .isInstanceOf(MetaServiceException.class).hasMessageContaining("exact authorized command");
+                        .isInstanceOf(ModelMutationDeniedException.class).hasMessageContaining("exact authorized command");
                 MetaContext.runWithAuthorizedCommandCode("other:create", () ->
                         assertThatThrownBy(() -> ModelMutationGuard.assertCreateAllowed(model))
-                                .isInstanceOf(MetaServiceException.class)
+                                .isInstanceOf(ModelMutationDeniedException.class)
                                 .hasMessageContaining("exact authorized command"));
                 MetaContext.runWithAuthorizedCommandCode("audit:create", () -> {
                     assertThatCode(() -> ModelMutationGuard.assertCreateAllowed(model)).doesNotThrowAnyException();
                     for (String operation : List.of("update", "delete", "state_transition")) {
                         assertThatThrownBy(() -> ModelMutationGuard.assertMutableForOperation(model, operation))
-                                .isInstanceOf(MetaServiceException.class)
+                                .isInstanceOf(ModelMutationDeniedException.class)
                                 .hasMessageContaining("exact authorized command");
                     }
                     assertThatThrownBy(() -> ModelMutationGuard.assertMutableOrInsertedInThisCommand(
                             model, "completed", Map.of("audit_record_inserted", 1, "recordPid", "audit-1"), "audit-1"))
-                            .isInstanceOf(MetaServiceException.class).hasMessageContaining("exact authorized command");
+                            .isInstanceOf(ModelMutationDeniedException.class).hasMessageContaining("exact authorized command");
                 });
             });
         } finally {
@@ -209,7 +211,7 @@ class ModelMutationGuardTest {
                     MetaContext.runWithAuthorizedCommandCode("record:write", () -> {
                         for (String operation : List.of("create", "update", "delete", "state_transition")) {
                             assertThatThrownBy(() -> ModelMutationGuard.assertMutableForOperation(model, operation))
-                                    .isInstanceOf(MetaServiceException.class)
+                                    .isInstanceOf(ModelMutationDeniedException.class)
                                     .hasMessageContaining("exact authorized command");
                         }
                     }));
