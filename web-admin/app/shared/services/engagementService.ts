@@ -21,7 +21,10 @@ export interface UserEngagement {
   };
   engagementType: string;
   sortOrder: number;
+  /** When the record was created — for a page visit, the first visit. */
   createdAt?: string;
+  /** When the record was last touched — for a page visit, the latest visit. */
+  updatedAt?: string;
 }
 
 const ENGAGEMENT_TYPE_FAVORITE = 'favorite';
@@ -115,21 +118,41 @@ export async function reorderFavorites(orderedIds: string[]): Promise<void> {
 }
 
 /**
- * List recent page visits for the current user.
- * Backend returns results sorted by createdAt desc.
+ * When a page was last visited, as a timestamp (0 when neither date parses). A visit record keeps
+ * the first visit as `createdAt` and stamps every later visit on `updatedAt`.
+ */
+export function lastVisitedAt(engagement: UserEngagement): number {
+  const latest = Date.parse(engagement.updatedAt ?? '');
+  if (!Number.isNaN(latest)) return latest;
+  const first = Date.parse(engagement.createdAt ?? '');
+  return Number.isNaN(first) ? 0 : first;
+}
+
+/** Most recently visited first; records with the same time keep the order they came in. */
+export function byLastVisitDesc(a: UserEngagement, b: UserEngagement): number {
+  return lastVisitedAt(b) - lastVisitedAt(a);
+}
+
+/**
+ * List recent page visits for the current user, most recently visited first.
+ *
+ * The backend returns its rows in its own order (first-visit order), so the order the list stands
+ * for is made here, before the limit is applied — otherwise "the latest 8" are the 8 visited first.
+ * The request itself is shared, the limit is the caller's.
  */
 export async function listRecentVisits(limit = 10): Promise<UserEngagement[]> {
-  return dedup('recent_visits', async () => {
+  const sorted = dedup('recent_visits', async () => {
     const params: Record<string, string> = {
       engagementType: ENGAGEMENT_TYPE_RECENT_VIEW,
       targetType: TARGET_TYPE_PAGE,
     };
     const result = await get<UserEngagement[]>('/api/user-engagement', params);
     if (!ResultHelper.isSuccess(result) || !result.data) {
-      return [];
+      return [] as UserEngagement[];
     }
-    return result.data.slice(0, limit);
+    return [...result.data].sort(byLastVisitDesc);
   });
+  return (await sorted).slice(0, limit);
 }
 
 /**

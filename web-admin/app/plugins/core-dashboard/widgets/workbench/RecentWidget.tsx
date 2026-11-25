@@ -4,7 +4,7 @@
  */
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { getRecentVisits, fetchRecentVisits, type RecentVisit } from './useRecentVisits';
+import { dedupeVisits, getRecentVisits, fetchRecentVisits, type RecentVisit } from './useRecentVisits';
 import { useI18n } from '~/contexts/I18nContext';
 import { useRootLoaderData } from '~/root-data';
 import { useFittingRows } from './useFittingRows';
@@ -61,6 +61,50 @@ function isRawVisitTitle(title: string, path: string): boolean {
   return !title || title === path || title.startsWith('/') || /^[a-z0-9/_-]+$/i.test(title);
 }
 
+type Translate = (key: string, params?: unknown, fallback?: string) => string;
+
+/** What a sub-page of a menu entry is called on the row's second line. */
+const SUBPAGE_LABELS: Array<[segment: string, key: string, fallback: string]> = [
+  ['new', 'workbench.recent.subpage.new', '新建'],
+  ['edit', 'workbench.recent.subpage.edit', '编辑'],
+  ['view', 'workbench.recent.subpage.view', '详情'],
+];
+
+/** The page a visit points at, without its query string or hash: `/p/x?page=2` is the page `/p/x`. */
+function pathnameOf(path: string): string {
+  return path.split(/[?#]/)[0];
+}
+
+/**
+ * The menu entry a visit sits under: the entry itself, or the longest path it is a sub-page of.
+ * Pages do not set a document title, so this is where the row's name comes from.
+ */
+function resolveMenuEntry(
+  visit: RecentVisit,
+  menuTitleMap: Map<string, string | undefined>,
+): { title: string; menuPath: string } | null {
+  const pathname = pathnameOf(visit.path);
+  const exact = menuTitleMap.get(pathname);
+  if (exact) return { title: exact, menuPath: pathname };
+  const parent = [...menuTitleMap.keys()]
+    .filter((menuPath) => pathname.startsWith(`${menuPath}/`))
+    .sort((a, b) => b.length - a.length)[0];
+  return parent ? { title: menuTitleMap.get(parent) || parent, menuPath: parent } : null;
+}
+
+/**
+ * A page under a menu entry is not that entry: its "new" form, a record's detail, an edit page.
+ * Left unnamed, the list, its create form and a record all read as the same line.
+ */
+function subpageLabel(path: string, menuPath: string, t: Translate): string | null {
+  const rest = path.split(/[?#]/)[0].slice(menuPath.replace(/\/$/, '').length + 1);
+  const segment = rest.split('/')[0];
+  if (!segment) return null;
+  const known = SUBPAGE_LABELS.find(([name]) => name === segment);
+  if (known) return t(known[1], undefined, known[2]);
+  return humanizeSegment(segment) || null;
+}
+
 export function RecentWidget({
   title,
   maxItems = 8,
@@ -113,33 +157,36 @@ export function RecentWidget({
   };
 
   const resolveVisitTitle = (visit: RecentVisit) => {
-    const exactMenuTitle = menuTitleMap.get(visit.path);
-    if (exactMenuTitle) return exactMenuTitle;
-
-    const bestPrefixMatch = [...menuTitleMap.entries()]
-      .filter(([path]) => visit.path === path || visit.path.startsWith(`${path}/`))
-      .sort((a, b) => b[0].length - a[0].length)[0]?.[1];
-    if (bestPrefixMatch) return bestPrefixMatch;
+    const entry = resolveMenuEntry(visit, menuTitleMap);
+    if (entry) return entry.title;
 
     if (!isRawVisitTitle(visit.title, visit.path)) return visit.title;
     return prettifyPath(visit.path) || visit.path;
   };
 
-  /** The row's second line is the record's own title. A title that is only the path or a code
-   *  says nothing the menu-derived first line has not said, so the row gets no second line. */
+  /** The row's second line names the record when the visit carries its title, else the kind of
+   * sub-page (新建 / 编辑 / 详情). A title that is only the path, a code or the site's name says
+   * nothing the menu-derived first line has not said. */
   const resolveVisitSubtitle = (visit: RecentVisit, primaryTitle: string): string | null => {
     if (!isRawVisitTitle(visit.title, visit.path) && visit.title !== primaryTitle) {
       return visit.title;
     }
-    return null;
+    const entry = resolveMenuEntry(visit, menuTitleMap);
+    // the entry's own page has nothing after its path, so it gets no second line
+    return entry ? subpageLabel(visit.path, entry.menuPath, t as Translate) : null;
   };
 
-  const visibleVisits = useMemo(() => {
-    if (visibleMenuPaths.size === 0) return visits;
-    return visits.filter((visit) =>
-      [...visibleMenuPaths].some((menuPath) => pathMatchesMenu(visit.path, menuPath)),
-    );
-  }, [visibleMenuPaths, visits]);
+  const visibleVisits = useMemo(
+    () =>
+      dedupeVisits(
+        visibleMenuPaths.size === 0
+          ? visits
+          : visits.filter((visit) =>
+              [...visibleMenuPaths].some((menuPath) => pathMatchesMenu(visit.path, menuPath)),
+            ),
+      ),
+    [visibleMenuPaths, visits],
+  );
 
   // Whole rows only: the rows that fit in the card are shown and the rest sit behind a "More" control.
   const listRef = useRef<HTMLDivElement>(null);

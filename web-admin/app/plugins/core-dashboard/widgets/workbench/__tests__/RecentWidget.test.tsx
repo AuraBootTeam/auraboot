@@ -29,7 +29,9 @@ const { recentVisits, rootLoaderData } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('../useRecentVisits', () => ({
+// the widget also takes dedupeVisits from this module; keep the real one
+vi.mock('../useRecentVisits', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../useRecentVisits')>()),
   getRecentVisits: vi.fn(() => recentVisits.value),
   fetchRecentVisits: vi.fn(async () => recentVisits.value),
 }));
@@ -85,6 +87,7 @@ describe('RecentWidget menu focus', () => {
   });
 
   it('gives a visit without a title of its own no second line instead of its path', async () => {
+    // two shapes of a title that is only a code: the path, and the page's key
     recentVisits.value = [
       {
         title: '/p/crm_account_common',
@@ -93,18 +96,20 @@ describe('RecentWidget menu focus', () => {
         visitedAt: '2026-06-15T10:00:00.000Z',
       },
       {
-        title: 'crm_account_common',
-        path: '/p/crm_account_common',
-        modelCode: 'crm_account_common',
+        title: 'qo_quote_common',
+        path: '/p/qo_quote_common',
+        modelCode: 'qo_quote_common',
         visitedAt: '2026-06-15T09:00:00.000Z',
       },
     ];
 
     const { findAllByText, queryByText } = render(<RecentWidget />);
 
-    expect(await findAllByText('客户')).toHaveLength(2);
+    expect(await findAllByText('客户')).toHaveLength(1);
+    expect(await findAllByText('报价单')).toHaveLength(1);
     expect(queryByText('/p/crm_account_common')).toBeNull();
     expect(queryByText('crm_account_common')).toBeNull();
+    expect(queryByText('qo_quote_common')).toBeNull();
   });
 });
 
