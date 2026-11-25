@@ -7,6 +7,7 @@ import {
 } from '~/shared/designer/PropertyEditorRegistry';
 import { getLocalizedText } from '~/utils/i18n';
 import { widgetAppearanceCapabilities } from '../utils/widgetAppearance';
+import { supportsDrillDown } from '../registry/widgetManifest';
 import { DataSourceConfig } from './DataSourceConfig';
 import { DrilldownConfig } from './DrilldownConfig';
 import type { ChartDataSource, DrillDownConfig } from '~/framework/smart/types/chart';
@@ -57,6 +58,13 @@ export function dashboardPropertySchemas(
   // The same schema declares every basic field. Complex controls are named extensions.
   const capability = widgetAppearanceCapabilities(widgetType);
   const basic = config.filter((schema) => !schema.key.startsWith('dataSource.'));
+  const drillDownSchema: Schema<string> = {
+    key: 'drillDown',
+    label: label('panel.drilldown'),
+    group: label('panel.drilldown'),
+    type: 'text',
+    editor: 'dashboard.drilldown',
+  };
   return [
     ...(config
       .filter((schema) => !schema.key.startsWith('dataSource.'))
@@ -90,13 +98,9 @@ export function dashboardPropertySchemas(
       return true;
     }),
     ...linkageSchemas(label('panel.linkage'), locale),
-    {
-      key: 'drillDown',
-      label: label('panel.drilldown'),
-      group: label('panel.drilldown'),
-      type: 'text',
-      editor: 'dashboard.drilldown',
-    },
+    // Only where the widget's renderer honours a drill-down. Elsewhere the configuration
+    // would be saved and never open anything.
+    ...(supportsDrillDown(widgetType) ? [drillDownSchema] : []),
     {
       key: 'refreshInterval',
       label: label('panel.refresh'),
