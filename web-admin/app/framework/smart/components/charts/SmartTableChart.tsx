@@ -385,7 +385,13 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
 
   const handleRowClick = useCallback(
     (row: Record<string, unknown>) => {
+      // A target page that names a record field (/p/model/view/{pid}) is about that record: the
+      // click passes that field, not the first column of the table.
+      const targetField = [...(drillDown?.targetPage ?? '').matchAll(/\{(\w+)\}/g)]
+        .map(([, field]) => field)
+        .find((field) => Object.prototype.hasOwnProperty.call(row, field));
       const dimension =
+        targetField ||
         data?.meta?.dimensions?.[0] ||
         Object.keys(drillDown?.paramMapping || {}).find((field) =>
           Object.prototype.hasOwnProperty.call(row, field),
@@ -398,6 +404,11 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
       if (linkage?.enabled && linkage?.emitFilter && onLinkageEmit) onLinkageEmit([filter]);
     },
     [data, drillDown, linkage, onDrillDown, onLinkageEmit],
+  );
+  // A row only looks clickable when clicking it does something: a drill-down, or a filter passed
+  // to the other widgets of the dashboard.
+  const rowIsActionable = Boolean(
+    (drillDown?.enabled && onDrillDown) || (linkage?.enabled && linkage?.emitFilter && onLinkageEmit),
   );
 
   if (!isConfigured) {
@@ -501,7 +512,7 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
                 key={idx}
                 onClick={() => handleRowClick(row)}
                 className={cn(
-                  'cursor-pointer transition-colors hover:bg-blue-50',
+                  rowIsActionable && 'cursor-pointer transition-colors hover:bg-blue-50',
                   striped && idx % 2 === 1 && 'bg-gray-50/50',
                 )}
               >
