@@ -37755,6 +37755,9 @@
           "isRead": {
             "type": "boolean"
           },
+          "miniProgramPath": {
+            "type": "string"
+          },
           "priority": {
             "type": "string"
           },
@@ -37820,6 +37823,12 @@
           },
           "isRead": {
             "type": "boolean"
+          },
+          "miniProgramPage": {
+            "maxLength": 120,
+            "minLength": 0,
+            "pattern": "pages/[a-z0-9-]+(?:/[a-z0-9-]+)+",
+            "type": "string"
           },
           "pageNum": {
             "format": "int32",
@@ -97194,7 +97203,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
+                  "$ref": "#/components/schemas/ApiResponseMapStringBoolean"
                 }
               }
             },

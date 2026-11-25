@@ -103,12 +103,14 @@ public class PluginNotificationDeliveryAccessorImpl implements NotificationDeliv
             byte[] identity = (p.tenantId() + "\n" + p.reference() + "\nin_app").getBytes(StandardCharsets.UTF_8);
             key = "notification-" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(identity));
         } catch (NoSuchAlgorithmException e) { throw new IllegalStateException("SHA-256 unavailable", e); }
+        Map<String, Object> payload = new HashMap<>(Map.of("resolutionReference", p.reference(),
+                "recipientUserPid", p.recipientUserPid(), "configurationVersion", p.configurationVersion(),
+                "sourceType", p.sourceType(), "sourceId", p.sourceId(), "title", p.title(), "content", p.content()));
+        if (p.miniProgramPath() != null) payload.put("miniProgramPath", p.miniProgramPath());
         // This notification contract stores occurrence at PostgreSQL microsecond precision.
         // Preserve the source plan's timestamp; only the immutable notification envelope truncates sub-microsecond digits.
         return new IntegrationEventEnvelope("1.0", key, EVENT_TYPE, "core.notification", p.sourceId(),
                 p.occurredAt().truncatedTo(java.time.temporal.ChronoUnit.MICROS),
-                p.tenantId(), key, null, key, 0, Map.of("resolutionReference", p.reference(),
-                "recipientUserPid", p.recipientUserPid(), "configurationVersion", p.configurationVersion(),
-                "sourceType", p.sourceType(), "sourceId", p.sourceId(), "title", p.title(), "content", p.content()), Map.of());
+                p.tenantId(), key, null, key, 0, payload, Map.of());
     }
 }

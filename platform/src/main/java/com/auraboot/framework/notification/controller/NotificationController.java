@@ -41,7 +41,7 @@ public class NotificationController {
      * GET /api/notifications
      */
     @GetMapping
-    public ApiResponse<PaginationResult<NotificationDTO>> list(NotificationQueryRequest request) {
+    public ApiResponse<PaginationResult<NotificationDTO>> list(@Valid NotificationQueryRequest request) {
         Long userId = MetaContext.getCurrentUserId();
         return ApiResponse.success(notificationQueryService.listByUser(userId, request));
     }
@@ -62,9 +62,9 @@ public class NotificationController {
      * PUT /api/notifications/{id}/read
      */
     @PutMapping("/{id}/read")
-    public ApiResponse<Void> markAsRead(@PathVariable Long id) {
+    public ApiResponse<Map<String, Boolean>> markAsRead(@PathVariable Long id) {
         notificationQueryService.markAsRead(id);
-        return ApiResponse.success();
+        return ApiResponse.success(Map.of("read", true));
     }
 
     /**

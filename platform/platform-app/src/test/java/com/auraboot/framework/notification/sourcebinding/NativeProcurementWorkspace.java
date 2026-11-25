@@ -17,7 +17,8 @@ final class NativeProcurementWorkspace {
 
     static String runtime(Map<String, String> environment) {
         String value = environment.getOrDefault("PROCUREMENT_NATIVE_RUNTIME", "procurement-web-stack-20261010");
-        if (!java.util.Set.of("procurement-web-stack-20261010", "procurement-main-validation", "procurement-scope-gaps").contains(value)) {
+        if (!java.util.Set.of("procurement-web-stack-20261010", "procurement-main-validation", "procurement-scope-gaps",
+                "procurement-fixed-reminders").contains(value)) {
             throw new IllegalStateException("PROCUREMENT_NATIVE_RUNTIME_NOT_OWNED");
         }
         return value;
@@ -30,6 +31,7 @@ final class NativeProcurementWorkspace {
     static Profile profile(Map<String, String> environment) {
         return switch (runtime(environment)) {
             case "procurement-scope-gaps" -> new Profile("enterprise_1", 7);
+            case "procurement-fixed-reminders" -> new Profile("auraquote_87", 3);
             case "procurement-web-stack-20261010", "procurement-main-validation" -> new Profile("enterprise_22", 13);
             default -> throw new IllegalStateException("PROCUREMENT_NATIVE_RUNTIME_NOT_OWNED");
         };

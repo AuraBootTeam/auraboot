@@ -129,8 +129,16 @@ public final class RegisteredSourcePlanResolver implements NotificationDeliveryP
         String title = render(template.path("subject_template").asText(""), b, source, targetPids.size());
         String body = render(template.path("body_template").asText(), b, source, targetPids.size());
         SourceBindingTypes.require(!title.isBlank() && title.length() <= 256 && !body.isBlank());
+        String path = b.miniProgramLink() == null ? null : b.miniProgramLink().path(targetPids);
+        Map<String, String> fields = new HashMap<>();
+        b.variableToSourceField().forEach((name, field) -> {
+            if (source.get(field) != null) fields.put(name, renderFact(source, field));
+        });
         List<Plan> plans = new ArrayList<>();
-        for (int i = 0; i<users.size(); i++) plans.add(new Plan(b.tenantId(), SourceBindingCanonical.reference(b.code(), sourcePid, users.get(i)), userPids.get(i), version, b.code(), sourcePid, occurred, title, body));
+        for (int i = 0; i < users.size(); i++) {
+            plans.add(new Plan(b.tenantId(), SourceBindingCanonical.reference(b.code(), sourcePid, users.get(i)),
+                    userPids.get(i), version, b.code(), sourcePid, occurred, title, body, path, fields));
+        }
         return List.copyOf(plans);
     }
     /** Traverse the entire approved relation even after finding a positive balance. */
@@ -277,12 +285,15 @@ public final class RegisteredSourcePlanResolver implements NotificationDeliveryP
         while (m.find()) {
             String field = b.variableToSourceField().get(m.group(1));
             SourceBindingTypes.require(field != null);
-            Object fact = source.get(field);
-            String replacement = fact instanceof Instant || fact instanceof java.time.OffsetDateTime || fact instanceof java.time.ZonedDateTime || fact instanceof java.sql.Timestamp ? instant(fact).toString() : string(source, field);
-            m.appendReplacement(out, Matcher.quoteReplacement(replacement));
+            m.appendReplacement(out, Matcher.quoteReplacement(renderFact(source, field)));
         }
         m.appendTail(out);
         SourceBindingTypes.require(out.indexOf("${")<0 && out.indexOf("{{")<0);
         return out.toString();
+    }
+    private String renderFact(Map<String, Object> source, String field) {
+        Object value = source.get(field);
+        return value instanceof Instant || value instanceof java.time.OffsetDateTime || value instanceof java.time.ZonedDateTime
+                || value instanceof java.sql.Timestamp ? instant(value).toString() : string(source, field);
     }
 }

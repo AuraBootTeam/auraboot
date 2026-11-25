@@ -47,6 +47,9 @@ public class Notification {
     @TableField("source_id")
     private String sourceId;
 
+    @TableField("mini_program_path")
+    private String miniProgramPath;
+
     @TableField("is_read")
     private Boolean isRead;
 
