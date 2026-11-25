@@ -456,7 +456,10 @@ class ProcurementReminderTickNativeIT {
         String stage = "automatic-fixture-starting";
         boolean completed = false;
         try {
-            fixture = ProductQuoteReminderNativeFacet.prepareAutomaticFixture(services(), evidence);
+            Instant quoteCutoff = NativeProcurementWorkspace.runtime().equals("procurement-fixed-reminders")
+                    ? Instant.parse(required("PROCUREMENT_NATIVE_QUOTE_CUTOFF")) : SLOT.plusSeconds(3600);
+            assertThat(quoteCutoff).isAfter(SLOT);
+            fixture = ProductQuoteReminderNativeFacet.prepareAutomaticFixture(services(), evidence, quoteCutoff);
             var q = fixture.quote();
             var tables = new LinkedHashMap<>(physicalTables(q.tenantId()));
             tables.put("qo_procurement_reminder_common", q.tables().get("qo_procurement_reminder_common"));
@@ -473,7 +476,7 @@ class ProcurementReminderTickNativeIT {
                 var clock = Clock.fixed(slot, ZoneId.of("UTC"));
                 String number = kind.equals("quote") ? q.namespace() : q.namespace() + "-auto";
                 var frame = new AutomaticBackground(q.tenantId(), q.supplierPid(), q.taskPid(), q.quotePid(), fixture.orderPid(),
-                        target, kind, slot, number, context.getBean(BackgroundDataAccessor.class));
+                        target, kind, slot, number, fixture.quoteCutoff(), context.getBean(BackgroundDataAccessor.class));
                 var phase = new LinkedHashMap<String, Object>();
                 phase.put("kind", kind); phase.put("slot", slot.toString());
                 phase.put("backgroundCalls", frame.calls); phase.put("transactionThreads", frame.transactionThreads);
@@ -796,6 +799,11 @@ class ProcurementReminderTickNativeIT {
     }
 
     static Map<String, Object> exactReminder(String supplier, String target, String kind, Instant slot, String number) {
+        return exactReminder(supplier, target, kind, slot, number, SLOT.plusSeconds(3600));
+    }
+
+    private static Map<String, Object> exactReminder(String supplier, String target, String kind, Instant slot,
+                                                     String number, Instant quoteCutoff) {
         var local = slot.atZone(ZoneId.of("Asia/Shanghai"));
         StringBuilder key = new StringBuilder();
         for (String part : List.of(supplier, kind, local.toLocalDate().toString(), local.toLocalTime().toString()))
@@ -806,7 +814,8 @@ class ProcurementReminderTickNativeIT {
                 "qo_pr_reminder_state", "pending", "qo_pr_reminder_revision", 0,
                 "qo_pr_reminder_targets", List.of(target), "qo_pr_reminder_business_number", number));
         if (kind.equals("quote")) {
-            String deadline = "2026-10-13 10:30";
+            String deadline = java.time.format.DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm")
+                    .withZone(ZoneId.of("Asia/Shanghai")).format(quoteCutoff);
             fields.put("qo_pr_reminder_deadline_text", deadline);
             fields.put("qo_pr_reminder_business_status", "待报价");
             fields.put("qo_pr_reminder_short_memo", "请在截止前提交报价");
@@ -822,7 +831,7 @@ class ProcurementReminderTickNativeIT {
     static final class AutomaticBackground implements java.lang.reflect.InvocationHandler {
         final long tenant;
         final String supplier, task, quote, order, target, kind, number;
-        final Instant slot;
+        final Instant slot, quoteCutoff;
         final BackgroundDataAccessor actual;
         final java.util.concurrent.CountDownLatch committed = new java.util.concurrent.CountDownLatch(2);
         final java.util.concurrent.atomic.AtomicInteger completedTransactions = new java.util.concurrent.atomic.AtomicInteger();
@@ -833,6 +842,12 @@ class ProcurementReminderTickNativeIT {
         final ThreadLocal<Boolean> transaction = ThreadLocal.withInitial(() -> false);
         AutomaticBackground(long tenant, String supplier, String task, String quote, String order,
                             String target, String kind, Instant slot, String number, BackgroundDataAccessor actual) {
+            this(tenant, supplier, task, quote, order, target, kind, slot, number, SLOT.plusSeconds(3600), actual);
+        }
+
+        AutomaticBackground(long tenant, String supplier, String task, String quote, String order,
+                            String target, String kind, Instant slot, String number, Instant quoteCutoff,
+                            BackgroundDataAccessor actual) {
             if (tenant <= 0 || List.of(supplier, task, quote, order, target, number).stream().anyMatch(String::isBlank)
                     || !(kind.equals("quote") && target.equals(quote) && slot.equals(SLOT)
                     || kind.equals("shipment") && target.equals(order) && slot.equals(SHIPMENT_SLOT)))
@@ -846,6 +861,7 @@ class ProcurementReminderTickNativeIT {
             this.kind = kind;
             this.slot = slot;
             this.number = number;
+            this.quoteCutoff = quoteCutoff;
             this.actual = java.util.Objects.requireNonNull(actual);
         }
         BackgroundDataAccessor proxy() {
@@ -876,7 +892,7 @@ class ProcurementReminderTickNativeIT {
             } catch (Throwable error) { failure.compareAndSet(null, error); throw error; }
         }
         Map<String, Object> exactReminder() {
-            return ProcurementReminderTickNativeIT.exactReminder(supplier, target, kind, slot, number);
+            return ProcurementReminderTickNativeIT.exactReminder(supplier, target, kind, slot, number, quoteCutoff);
         }
         void validate(String op, Object[] args) {
             if (op.equals("executeInTransaction") && args.length == 1 && args[0] instanceof Runnable && !transaction.get()) return;
