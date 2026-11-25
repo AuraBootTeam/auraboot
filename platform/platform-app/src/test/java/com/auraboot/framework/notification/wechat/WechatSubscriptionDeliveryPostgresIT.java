@@ -6,6 +6,7 @@ import org.springframework.boot.data.redis.autoconfigure.DataRedisProperties;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.ReliableEventDeliveryExecutor;
+import com.auraboot.framework.integration.ReliableOutboxDispatchListener;
 import com.auraboot.framework.meta.mapper.OutboxEventMapper;
 import com.auraboot.framework.notification.mapper.NotificationMapper;
 import com.auraboot.framework.notification.mapper.NotificationSendLogMapper;
@@ -56,6 +57,8 @@ class WechatSubscriptionDeliveryPostgresIT {
         };}
     }
     @MockitoBean SchedulerEngine scheduler;
+    // Explicit test claims exercise the real delivery transaction without an asynchronous claimant.
+    @MockitoBean ReliableOutboxDispatchListener commitDispatcher;
     @Autowired ApplicationContext context;
     @Autowired JdbcTemplate jdbc;
     @Autowired DataSource source;
@@ -136,7 +139,19 @@ class WechatSubscriptionDeliveryPostgresIT {
         try{return new IntegrationEventEnvelope(r.getString("schema_version"),r.getString("event_id"),r.getString("event_type"),r.getString("event_source"),r.getString("subject"),r.getTimestamp("occurred_at").toInstant(),r.getLong("tenant_id"),r.getString("correlation_id"),r.getString("causation_id"),r.getString("ordering_key"),r.getLong("event_sequence"),json.readValue(r.getString("payload"),new TypeReference<Map<String,Object>>(){}),json.readValue(r.getString("headers"),new TypeReference<Map<String,String>>(){}));}
         catch(java.io.IOException invalid){throw new IllegalStateException("invalid native fixture envelope");}
     },tenant,key);}
-    private String materialize(WechatSubscriptionDeliveryJournal journal,WechatSubscriptionMessageSender.Request request){String key=queue(journal,request).deliveryKey();executor.deliver(event(key),journal,UniqueIdGenerator.generate());return key;}
+    private Optional<String> tryClaimDelivery(String key) {
+        String lease = UniqueIdGenerator.generate();
+        var claimed = new TransactionTemplate(transactions).execute(status -> outbox.claimKnownEvent(
+                tenant, key, "native-test-worker", lease, Instant.now().plusSeconds(60)));
+        assertThat(claimed).hasSizeLessThanOrEqualTo(1);
+        return claimed.isEmpty() ? Optional.empty() : Optional.of(lease);
+    }
+
+    private String materialize(WechatSubscriptionDeliveryJournal journal, WechatSubscriptionMessageSender.Request request) {
+        String key = queue(journal, request).deliveryKey();
+        executor.deliver(event(key), journal, tryClaimDelivery(key).orElseThrow());
+        return key;
+    }
     private Map<String,Object> raw(String key){return jdbc.queryForMap("SELECT * FROM ab_notification_send_log WHERE tenant_id=? AND delivery_key=?",tenant,key);}
     private int count(String table){if(!Set.of("ab_notification_send_log","ab_integration_receipt","ab_outbox").contains(table))throw new IllegalArgumentException();return jdbc.queryForObject("SELECT COUNT(*) FROM "+table+" WHERE tenant_id=?",Integer.class,tenant);}
     private <T> List<T> concurrent(Callable<T> action) throws Exception {
@@ -182,11 +197,7 @@ class WechatSubscriptionDeliveryPostgresIT {
 
         var journal = fresh();
         String key = queue(journal, request).deliveryKey();
-        String lease = UniqueIdGenerator.generate();
-        var claimed = new TransactionTemplate(transactions).execute(status -> outbox.claimKnownEvent(
-                tenant, key, "native-test-worker", lease, Instant.now().plusSeconds(60)));
-        assertThat(claimed).hasSize(1);
-        executor.deliver(event(key), journal, lease);
+        executor.deliver(event(key), journal, tryClaimDelivery(key).orElseThrow());
         assertThat(fresh().attempt(tenant, key).getStatus()).isEqualTo("accepted");
         assertThat(sendCalls).hasValue(1);
         var body = json.readTree(providerBody.get());
@@ -199,7 +210,12 @@ class WechatSubscriptionDeliveryPostgresIT {
         assertThat(results).extracting(WechatSubscriptionDeliveryJournal.QueueResult::status)
                 .containsExactlyInAnyOrder(WechatSubscriptionDeliveryJournal.Status.QUEUED,WechatSubscriptionDeliveryJournal.Status.REPLAYED);
         String key=results.getFirst().deliveryKey();assertThat(count("ab_outbox")).isEqualTo(1);
-        var event=event(key);concurrent(()->{executor.deliver(event,fresh(),UniqueIdGenerator.generate());return true;});
+        var activeLeases = concurrent(() -> tryClaimDelivery(key)).stream().flatMap(Optional::stream).toList();
+        assertThat(activeLeases).hasSize(1);
+        String lease = activeLeases.getFirst();
+        var event = event(key);
+        executor.deliver(event, fresh(), lease);
+        executor.deliver(event, fresh(), lease);
         assertThat(count("ab_notification_send_log")).isEqualTo(1);assertThat(count("ab_integration_receipt")).isEqualTo(1);
         concurrent(()->fresh().attempt(tenant,key).getStatus());
         assertThat(raw(key).get("status")).isEqualTo("accepted");assertThat(sendCalls).hasValue(1);assertThat(tokenCalls).hasValue(1);
@@ -211,9 +227,10 @@ class WechatSubscriptionDeliveryPostgresIT {
         var request=request("atomic");var journal=fresh();String key=queue(journal,request).deliveryKey();var event=event(key);
         var crash=new ReliableEventConsumerExtension(){public String consumerCode(){return journal.consumerCode();}public Set<String> subscribedEventTypes(){return journal.subscribedEventTypes();}
             public void consume(IntegrationEventEnvelope input){journal.consume(input);assertThat(count("ab_notification_send_log")).isEqualTo(1);throw new IllegalStateException("synthetic crash after intent");}};
-        assertThatThrownBy(()->executor.deliver(event,crash,"native-crash-fence")).hasMessage("synthetic crash after intent");
+        String lease = tryClaimDelivery(key).orElseThrow();
+        assertThatThrownBy(()->executor.deliver(event,crash,lease)).hasMessage("synthetic crash after intent");
         assertThat(count("ab_notification_send_log")).isZero();assertThat(count("ab_integration_receipt")).isZero();assertThat(tokenCalls).hasValue(0);assertThat(sendCalls).hasValue(0);
-        executor.deliver(event,journal,"native-recovery-fence");assertThat(count("ab_notification_send_log")).isEqualTo(1);assertThat(count("ab_integration_receipt")).isEqualTo(1);
+        executor.deliver(event,journal,lease);assertThat(count("ab_notification_send_log")).isEqualTo(1);assertThat(count("ab_integration_receipt")).isEqualTo(1);
     }
     @Test void timeoutAfterProviderObservedRequestIsDurableUnknownAndCannotReopen() {
         settings.setReadTimeoutMs(100);responseDelay=500;var journal=fresh();String key=materialize(journal,request("timeout"));
