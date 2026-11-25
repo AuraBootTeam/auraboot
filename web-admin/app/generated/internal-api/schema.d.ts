@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 87e9d87de5802c0af44b5fbce7786636126aa49606e179b242a6a9a081a3d130
+ * Contract SHA-256: 47713865d7b1d742f20404e061117c5945e44b1e40198a3d6e23266c6a0ae087
  */
 export interface paths {
     "/api/activities": {
@@ -36693,6 +36693,7 @@ export interface components {
             /** Format: int64 */
             id?: number;
             isRead?: boolean;
+            miniProgramPath?: string;
             priority?: string;
             /** Format: date-time */
             readAt?: string;
@@ -36715,6 +36716,7 @@ export interface components {
         NotificationQueryRequest: {
             category?: string;
             isRead?: boolean;
+            miniProgramPage?: string;
             /** Format: int32 */
             pageNum?: number;
             /** Format: int32 */
@@ -71241,7 +71243,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseVoid"];
+                    "*/*": components["schemas"]["ApiResponseMapStringBoolean"];
                 };
             };
         };
