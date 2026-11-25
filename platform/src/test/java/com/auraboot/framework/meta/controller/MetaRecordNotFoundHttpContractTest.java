@@ -57,11 +57,26 @@ class MetaRecordNotFoundHttpContractTest {
                 .andExpect(jsonPath("$.code").value("403"));
     }
 
+    @Test
+    void modelMutationPolicyRefusalIsA403ThatNamesThePolicy() throws Exception {
+        mvc.perform(get("/model-mutation-denied-contract"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("403"))
+                .andExpect(jsonPath("$.context")
+                        .value("MODEL_MUTATION_DENIED: Model 'ledger_entry' can only be created through an authorized command"));
+    }
+
     // Non-static: this explicit standalone fixture is not a component-scan candidate.
     @RestController
     class ProbeController {
         @GetMapping("/missing-record-contract")
         String missing() { throw new MetaRecordNotFoundException("scheduled_task", "internal-fixture-pid"); }
+
+        @GetMapping("/model-mutation-denied-contract")
+        String mutationDenied() {
+            throw new com.auraboot.framework.meta.exception.ModelMutationDeniedException(
+                    "Model 'ledger_entry' can only be created through an authorized command");
+        }
 
         @GetMapping("/denied-projection-contract")
         String deniedProjection() {

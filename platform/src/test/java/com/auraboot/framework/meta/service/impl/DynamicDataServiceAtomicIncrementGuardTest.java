@@ -5,6 +5,7 @@ import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.exception.MetaServiceException;
+import com.auraboot.framework.meta.exception.ModelMutationDeniedException;
 import com.auraboot.framework.meta.service.MetaModelService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,7 +40,7 @@ class DynamicDataServiceAtomicIncrementGuardTest {
         service = spy(service);
         lenient().doThrow(new AssertionError("raw deletion reached record lookup"))
                 .when(service).getById("cr_cj_profile", "rec-1");
-        var error = assertThrows(MetaServiceException.class,
+        var error = assertThrows(ModelMutationDeniedException.class,
                 () -> service.delete("cr_cj_profile", "rec-1"));
         assertTrue(error.getMessage().contains("authorized command"));
         verifyNoInteractions(mapper);
@@ -50,7 +51,7 @@ class DynamicDataServiceAtomicIncrementGuardTest {
         testModel.setExtension(Map.of("commandOnlyDelete", true));
         lenient().when(metadataService.getPrimaryKeyField("cr_cj_profile"))
                 .thenThrow(new AssertionError("raw deletion reached primary-key lookup"));
-        var error = assertThrows(MetaServiceException.class,
+        var error = assertThrows(ModelMutationDeniedException.class,
                 () -> service.batchDelete("cr_cj_profile", List.of("rec-1", "rec-2")));
         assertTrue(error.getMessage().contains("authorized command"));
         verifyNoInteractions(mapper);
@@ -201,7 +202,7 @@ class DynamicDataServiceAtomicIncrementGuardTest {
         when(metadataService.getModelDefinition("cr_cj_profile"))
                 .thenReturn(Optional.of(protectedModel));
 
-        MetaServiceException error = assertThrows(MetaServiceException.class,
+        ModelMutationDeniedException error = assertThrows(ModelMutationDeniedException.class,
                 () -> service.create("cr_cj_profile", new java.util.HashMap<>(Map.of(
                         "cr_cj_name", "forged"))));
 

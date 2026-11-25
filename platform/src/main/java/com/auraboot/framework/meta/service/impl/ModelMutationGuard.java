@@ -4,12 +4,17 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.exception.ImmutableModelMutationException;
 import com.auraboot.framework.meta.exception.MetaServiceException;
+import com.auraboot.framework.meta.exception.ModelMutationDeniedException;
 
 import java.util.Map;
 import java.util.Objects;
 
 /**
  * Enforces model mutation invariants at runtime write boundaries.
+ *
+ * <p>A policy that refuses the request (the model accepts this write only through its
+ * authorized command) is a {@link ModelMutationDeniedException}: the client is told why. A
+ * malformed policy is a {@link MetaServiceException}: the server is misconfigured.</p>
  */
 public final class ModelMutationGuard {
 
@@ -37,7 +42,7 @@ public final class ModelMutationGuard {
                 .anyMatch(code -> MetaContext.isCommandCreateWriter(model.getCode(), (String) code))) return;
         if (allowed == null || !MetaContext.hasCommandPermitScope()
                 || commandCode == null || !allowed.contains(commandCode)) {
-            throw new MetaServiceException("Model mutation requires its exact authorized command");
+            throw new ModelMutationDeniedException("Model mutation requires its exact authorized command");
         }
     }
 
@@ -87,7 +92,7 @@ public final class ModelMutationGuard {
                     + "' has invalid commandOnlyDelete policy; expected a boolean");
         }
         if (Boolean.TRUE.equals(policy) && !MetaContext.hasCommandPermitScope()) {
-            throw new MetaServiceException("Model '" + model.getCode()
+            throw new ModelMutationDeniedException("Model '" + model.getCode()
                     + "' can only be deleted through an authorized command");
         }
     }
@@ -104,7 +109,7 @@ public final class ModelMutationGuard {
                 && commands.stream().anyMatch(code -> code instanceof String text
                     && MetaContext.isCommandCreateWriter(model.getCode(),text))) return;
         String modelCode = model.getCode() != null ? model.getCode() : "<unknown>";
-        throw new MetaServiceException(
+        throw new ModelMutationDeniedException(
                 "Model '" + modelCode + "' can only be created through an authorized command");
     }
 
