@@ -7,6 +7,7 @@ import {
   ProgressField,
   DateRelativeField,
 } from '../cardFields';
+import { relativeDayLabel } from '../cardFields/DateRelativeField';
 
 describe('CurrencyField', () => {
   it('renders CNY-formatted currency for numeric values', () => {
@@ -139,5 +140,31 @@ describe('DateRelativeField', () => {
 
     const { container: c2 } = render(<DateRelativeField value={'not-a-date'} />);
     expect(c2.querySelector('[data-field-type="date-relative"]')!.textContent).toBe('—');
+  });
+
+  // A Chinese opportunity board read `139d ago` on every card: the labels were English only.
+  it('labels the date in Chinese for a Chinese locale, with the same styling', () => {
+    const past = render(<DateRelativeField value={new Date('2026-05-01T00:00:00Z').toISOString()} locale="zh-CN" />);
+    expect(past.container.querySelector('[data-field-type="date-relative"]')!.textContent).toBe('7 天前');
+    expect(past.container.querySelector('[data-field-type="date-relative"]')!.className).toContain('text-gray-500');
+
+    const soon = render(<DateRelativeField value={new Date('2026-05-11T00:00:00Z').toISOString()} locale="zh-CN" />);
+    expect(soon.container.querySelector('[data-field-type="date-relative"]')!.textContent).toBe('3 天后');
+    expect(soon.container.querySelector('[data-field-type="date-relative"]')!.className).toContain('text-red-600');
+
+    const today = render(<DateRelativeField value={new Date('2026-05-08T06:00:00Z').toISOString()} locale="zh-CN" />);
+    expect(today.container.querySelector('[data-field-type="date-relative"]')!.textContent).toBe('今天');
+  });
+
+  it('labels the date in English for every other locale and for no locale', () => {
+    const value = new Date('2026-05-01T00:00:00Z').toISOString();
+    expect(relativeDayLabel(-139, 'zh-CN')).toBe('139 天前');
+    expect(relativeDayLabel(57, 'zh-TW')).toBe('57 天后');
+    expect(relativeDayLabel(0, 'zh-CN')).toBe('今天');
+    expect(relativeDayLabel(-139, 'en-US')).toBe('139d ago');
+    expect(relativeDayLabel(57)).toBe('in 57d');
+    expect(relativeDayLabel(0)).toBe('today');
+    const english = render(<DateRelativeField value={value} locale="en-US" />);
+    expect(english.container.querySelector('[data-field-type="date-relative"]')!.textContent).toBe('7d ago');
   });
 });
