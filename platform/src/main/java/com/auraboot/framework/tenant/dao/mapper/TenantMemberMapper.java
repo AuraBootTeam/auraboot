@@ -3,6 +3,8 @@ package com.auraboot.framework.tenant.dao.mapper;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.apache.ibatis.annotations.Arg;
+import org.apache.ibatis.annotations.ConstructorArgs;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -134,6 +136,33 @@ public interface TenantMemberMapper extends BaseMapper<TenantMember> {
     TenantMember findActiveByTenantIdAndUserPid(
             @Param("tenantId") Long tenantId,
             @Param("userPid") String userPid);
+
+    /** Resolve one replacement audience in one database statement. */
+    @Select("""
+            <script>
+            SELECT u.pid AS user_pid, tm.pid AS member_pid, tm.id AS member_id
+            FROM ab_tenant_member tm
+            INNER JOIN ab_user u ON u.id = tm.user_id
+            WHERE tm.tenant_id = #{tenantId}
+              AND u.pid IN
+              <foreach collection="userPids" item="pid" open="(" separator="," close=")">
+                 #{pid}
+              </foreach>
+              AND LOWER(tm.status) = 'active'
+              AND tm.deleted_flag = FALSE
+              AND u.deleted_flag = FALSE
+            </script>
+            """)
+    @ConstructorArgs({
+        @Arg(column = "user_pid", javaType = String.class),
+        @Arg(column = "member_pid", javaType = String.class),
+        @Arg(column = "member_id", javaType = Long.class)
+    })
+    List<ActiveMemberRecipient> findActiveRecipients(
+            @Param("tenantId") Long tenantId,
+            @Param("userPids") List<String> userPids);
+
+    record ActiveMemberRecipient(String userPid, String memberPid, Long memberId) {}
 
     /**
      * Find a tenant member by public PID within a tenant.

@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.extension;
 
 import java.util.Collection;
+import java.util.List;
 
 /**
  * Host-owned bridge for synchronising record-level read grants from user PIDs.
@@ -27,4 +28,19 @@ public interface RecordShareAccessor {
             Collection<String> userPids) {
         replaceReadSharesForUsers(tenantId, resourceCode, recordPid, userPids);
     }
+
+    /** Replace direct member shares for related records in one command. */
+    default void replaceSharesForRecords(long tenantId, List<Replacement> replacements) {
+        for (Replacement replacement : replacements) {
+            if (replacement.allowUpdate()) {
+                replaceReadUpdateSharesForUsers(tenantId, replacement.resourceCode(),
+                        replacement.recordPid(), replacement.userPids());
+            } else {
+                replaceReadSharesForUsers(tenantId, replacement.resourceCode(),
+                        replacement.recordPid(), replacement.userPids());
+            }
+        }
+    }
+
+    record Replacement(String resourceCode, String recordPid, Collection<String> userPids, boolean allowUpdate) {}
 }
