@@ -4,6 +4,7 @@ import com.auraboot.framework.currency.dto.ConversionResult;
 import com.auraboot.framework.currency.service.CurrencyService;
 import com.auraboot.framework.currency.spi.CurrencyConversionSpi;
 import com.auraboot.framework.meta.service.CommandHandlerContext;
+import com.auraboot.framework.meta.service.impl.pipeline.RecordSnapshotReader;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class DefaultCurrencyConversionHandlerTest {
@@ -28,6 +30,7 @@ class DefaultCurrencyConversionHandlerTest {
     @Mock ObjectProvider<JdbcTemplate> jdbc;
     @Mock ObjectProvider<CurrencyService> platformCurrency;
     @Mock CurrencyService currencyService;
+    @Mock RecordSnapshotReader snapshotReader;
 
     @Test
     void appliesPlatformRatesWithoutFinanceConfiguration() {
@@ -53,8 +56,36 @@ class DefaultCurrencyConversionHandlerTest {
                 .containsEntry("amount_base", new BigDecimal("10000.00"));
     }
 
+    @Test
+    void anAmountOnlyUpdateRetainsTheTargetCurrency() {
+        var rate = new BigDecimal("7.8");
+        when(snapshotReader.readRecordSnapshot(42L, "opportunity", "target"))
+                .thenReturn(Map.of("currency", "eur", "amount", 5000));
+        when(platformCurrency.getIfAvailable()).thenReturn(currencyService);
+        when(currencyService.convert(eq(BigDecimal.ONE), eq("eur"), eq("CNY"), any(LocalDate.class), eq(42L)))
+                .thenReturn(new ConversionResult(BigDecimal.ONE, "eur", rate, "CNY", rate, LocalDate.now(), false));
+        var context = context();
+        context.setOperationType("update");
+        context.setTargetRecordId("target");
+        context.setModelCode("opportunity");
+        context.setPayload(Map.of("amount", 6000));
+
+        assertThat(handler().execute(context)).containsEntry("rate", rate)
+                .containsEntry("amount_base", new BigDecimal("46800.00"));
+    }
+
+    @Test
+    void unrelatedUpdatesDoNotRefreshArithmeticOrLookupTheRecord() {
+        var context = context();
+        context.setOperationType("update");
+        context.setPayload(Map.of("name", "Updated opportunity name"));
+
+        assertThat(handler().execute(context)).isEmpty();
+        verifyNoInteractions(snapshotReader, platformCurrency);
+    }
+
     private DefaultCurrencyConversionHandler handler() {
-        return new DefaultCurrencyConversionHandler(new ObjectMapper(), spi, jdbc, platformCurrency);
+        return new DefaultCurrencyConversionHandler(new ObjectMapper(), spi, jdbc, platformCurrency, snapshotReader);
     }
 
     private static CommandHandlerContext context() {

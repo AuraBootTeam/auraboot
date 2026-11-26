@@ -3,8 +3,10 @@ package com.auraboot.framework.currency.handler;
 import com.auraboot.framework.currency.service.CurrencyService;
 import com.auraboot.framework.currency.spi.CurrencyConversionSpi;
 import com.auraboot.framework.currency.spi.ExchangeRateResult;
+import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.service.CommandHandler;
 import com.auraboot.framework.meta.service.CommandHandlerContext;
+import com.auraboot.framework.meta.service.impl.pipeline.RecordSnapshotReader;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +44,7 @@ public class DefaultCurrencyConversionHandler implements CommandHandler {
     private final ObjectProvider<CurrencyConversionSpi> currencyConversionSpiProvider;
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
     private final ObjectProvider<CurrencyService> currencyServiceProvider;
+    private final RecordSnapshotReader snapshotReader;
 
     @Override
     public String getHandlerName() {
@@ -58,7 +61,7 @@ public class DefaultCurrencyConversionHandler implements CommandHandler {
         if ("line".equals(mode)) {
             executeLineConversion(config, payload, updates);
         } else {
-            executeHeaderConversion(config, payload, updates, context.getTenantId());
+            executeHeaderConversion(config, payload, updates, context);
         }
 
         return updates;
@@ -67,12 +70,34 @@ public class DefaultCurrencyConversionHandler implements CommandHandler {
     private void executeHeaderConversion(Map<String, Object> config,
                                          Map<String, Object> payload,
                                          Map<String, Object> updates,
-                                         Long tenantId) {
+                                         CommandHandlerContext context) {
         String currencyField = asText(config.get("currencyField"));
         String rateField = asText(config.get("rateField"));
         String rateIdField = asText(config.get("rateIdField"));
         String baseCurrencyField = asText(config.get("baseCurrencyField"));
         List<String> amountFields = stringList(config.get("amountFields"));
+        Long tenantId = context.getTenantId();
+
+        if ("update".equalsIgnoreCase(context.getOperationType())) {
+            boolean includesCurrency = currencyField != null && payload.containsKey(currencyField);
+            if (!includesCurrency && amountFields.stream().noneMatch(payload::containsKey)) return;
+
+            if ((currencyField != null && !includesCurrency)
+                    || !amountFields.stream().allMatch(payload::containsKey)) {
+                // The pipeline has already applied the scoped write. Resolve omitted inputs
+                // from that same tenant and target so partial edits don't reinterpret the currency.
+                Map<String, Object> target = snapshotReader.readRecordSnapshot(
+                        tenantId, context.getModelCode(), context.getTargetRecordId());
+                if (target == null) {
+                    throw new BusinessException("Unable to read currency inputs for the command target");
+                }
+                Map<String, Object> effectiveInputs = new HashMap<>();
+                if (currencyField != null) effectiveInputs.put(currencyField, target.get(currencyField));
+                for (String field : amountFields) effectiveInputs.put(field, target.get(field));
+                effectiveInputs.putAll(payload);
+                payload = effectiveInputs;
+            }
+        }
 
         String baseCurrency = resolveBaseCurrency(tenantId);
         putIfConfigured(updates, baseCurrencyField, baseCurrency);
