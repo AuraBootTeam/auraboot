@@ -5,13 +5,27 @@ import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
+import com.auraboot.framework.meta.entity.CommandDefinition;
+import com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization;
+import com.auraboot.framework.plugin.extension.BusinessResourceAuthorization;
+import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
+import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 /**
  * Which verdicts may open the command's authority (DDR-2026-07-22 step 3).
@@ -118,6 +132,41 @@ class HandlerPhaseCommandAuthorityTest {
         org.mockito.Mockito.clearInvocations(authorization);context.setBusinessTargetAuthorization(null);
         assertThat(phase.withHandlerReadProjection(context,()->"ordinary")).isEqualTo("ordinary");
         org.mockito.Mockito.verifyNoInteractions(authorization);
+    }
+
+    @Test
+    void permissionConfigurationIsReusedOnlyForAnAuthorizedOptedInHandler() {
+        var registry = mock(ExtensionRegistry.class);
+        var handler = mock(CommandHandlerExtension.class);
+        var authorization = mock(BusinessCommandRecordAuthorization.class);
+        var phase = new HandlerPhase(null, registry, null, null, null, null, null, null, null);
+        ReflectionTestUtils.setField(phase, "documentAuthorization", authorization);
+        when(authorization.withReadProjectionSnapshot(any()))
+                .thenAnswer(call -> ((java.util.function.Supplier<?>) call.getArgument(0)).get());
+        var context = context(CommandAuthorizationVerdict.authorized("qo.cap.write"));
+        context.setCommand(new CommandDefinition());
+        MetaContext.setMemberId(3L);
+        String commandCode = context.getCommandCode();
+        when(registry.getCommandHandler(commandCode)).thenReturn(Optional.of(handler));
+        when(registry.getSecondaryCommandHandlers(commandCode)).thenReturn(List.of());
+        when(handler.commandReadIsolation()).thenReturn(BusinessResourceAuthorization.ReadIsolation.REPEATABLE_READ);
+
+        assertThat(phase.withHandlerReadProjection(context, () -> "ordinary")).isEqualTo("ordinary");
+        verifyNoInteractions(authorization);
+
+        when(handler.supportsPermissionConfigurationSnapshot(commandCode)).thenReturn(true);
+        assertThat(phase.withHandlerReadProjection(context, () -> "snapshot")).isEqualTo("snapshot");
+        verify(authorization).withReadProjectionSnapshot(any());
+
+        clearInvocations(authorization);
+        when(registry.getSecondaryCommandHandlers(commandCode)).thenReturn(List.of(handler));
+        assertThat(phase.withHandlerReadProjection(context, () -> "secondary")).isEqualTo("secondary");
+        verifyNoInteractions(authorization);
+
+        when(registry.getSecondaryCommandHandlers(commandCode)).thenReturn(List.of());
+        context.setAuthorizationVerdict(null);
+        assertThat(phase.withHandlerReadProjection(context, () -> "without permission")).isEqualTo("without permission");
+        verifyNoInteractions(authorization);
     }
 
     /**

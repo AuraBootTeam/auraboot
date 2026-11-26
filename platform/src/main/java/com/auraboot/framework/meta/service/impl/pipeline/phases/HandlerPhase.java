@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.meta.service.impl.AsyncTaskExecutionContext;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
@@ -192,11 +193,30 @@ public class HandlerPhase implements CommandPhase {
     }
 
     <T> T withHandlerReadProjection(CommandPipelineContext context, java.util.function.Supplier<T> execution) {
-        if(documentAuthorization!=null && context.getBusinessTargetAuthorization()!=null && context.getCommand()!=null
+        if (documentAuthorization == null || context.getCommand() == null) return execution.get();
+        boolean hasDocumentProjection = context.getBusinessTargetAuthorization() != null
                 && com.auraboot.framework.meta.security.DocumentArtifactContract.from(
-                        context.getExecConfig(),context.getCommand().getModelCode())!=null)
+                        context.getExecConfig(), context.getCommand().getModelCode()) != null;
+        if (hasDocumentProjection || supportsPermissionConfigurationSnapshot(context)) {
             return documentAuthorization.withReadProjectionSnapshot(execution);
+        }
         return execution.get();
+    }
+
+    private boolean supportsPermissionConfigurationSnapshot(CommandPipelineContext context) {
+        if (extensionRegistry == null || MetaContext.getCurrentMemberId() == null
+                || AsyncTaskExecutionContext.isActive()
+                || context.getAuthorizationVerdict() == null || !context.getAuthorizationVerdict().isAuthorized()
+                || context.getPermitPlan() == null || !context.getPermitPlan().isPermitted()) {
+            return false;
+        }
+        String commandCode = context.getCommandCode();
+        String handlerCode = CommandExecutorUtils.resolvePluginHandlerCode(commandCode, context.getExecConfig());
+        return extensionRegistry.getCommandHandler(handlerCode)
+                .filter(handler -> handler.commandReadIsolation() != null
+                        && handler.supportsPermissionConfigurationSnapshot(commandCode)
+                        && extensionRegistry.getSecondaryCommandHandlers(handlerCode).isEmpty())
+                .isPresent();
     }
 
     // ==================== Inlined delegate methods ====================
