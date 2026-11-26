@@ -17,8 +17,8 @@ public interface TenantMemberMapper extends BaseMapper<TenantMember> {
 
     /** Only owner identities for the actor's department filter. No employee record fields are returned. */
     @Select("""
-            WITH RECURSIVE department_scope(pid) AS (
-                SELECT d.pid
+            WITH RECURSIVE department_scope(pid, tenant_id) AS (
+                SELECT d.pid, d.tenant_id
                 FROM ab_tenant_member actor
                 JOIN mt_org_employee e ON e.tenant_id = actor.tenant_id
                     AND e.org_emp_member_id = actor.pid AND e.deleted_flag = FALSE
@@ -28,15 +28,16 @@ public interface TenantMemberMapper extends BaseMapper<TenantMember> {
                     AND actor.user_id = #{userId} AND actor.status = 'active'
                     AND actor.deleted_flag = FALSE
                 UNION
-                SELECT child.pid
+                SELECT child.pid, child.tenant_id
                 FROM mt_org_department child
                 JOIN department_scope parent ON child.org_dept_parent_id = parent.pid
+                    AND child.tenant_id = parent.tenant_id
                 WHERE child.tenant_id = #{tenantId} AND child.deleted_flag = FALSE
                     AND #{includeSubDepartments}
             )
             SELECT DISTINCT u.pid
             FROM department_scope d
-            JOIN mt_org_employee e ON e.tenant_id = #{tenantId}
+            JOIN mt_org_employee e ON e.tenant_id = d.tenant_id
                 AND e.org_emp_dept_id = d.pid AND e.deleted_flag = FALSE
             JOIN ab_user u ON u.pid = e.org_emp_user_id AND u.deleted_flag = FALSE
             JOIN ab_tenant_member member ON member.tenant_id = #{tenantId}
