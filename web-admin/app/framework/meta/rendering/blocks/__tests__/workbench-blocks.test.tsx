@@ -1855,6 +1855,9 @@ describe('StageRailBlockRenderer', () => {
       'data-stage-state',
       'current',
     );
+    expect(screen.getByTestId('stage-rail-terminal-closed_lost')).toHaveClass('text-status-red');
+    expect(screen.getAllByText('Lost')).toHaveLength(1);
+    expect(screen.queryByRole('list', { name: 'Sales stage' })).not.toBeInTheDocument();
   });
 
   it('uses the detail page record binding before a stale runtime context', () => {

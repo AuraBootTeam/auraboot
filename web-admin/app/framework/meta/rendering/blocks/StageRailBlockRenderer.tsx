@@ -15,6 +15,13 @@ type StageConfig = {
   tone?: 'blue' | 'green' | 'red' | 'gray';
 };
 
+const outcomeClasses = {
+  blue: 'bg-accent-weak text-accent',
+  green: 'bg-status-green-bg text-status-green',
+  red: 'bg-status-red-bg text-status-red',
+  gray: 'bg-subtle text-text-2',
+} as const;
+
 const stateClass = {
   complete: {
     dot: 'border-accent bg-accent text-white',
@@ -64,13 +71,20 @@ export const StageRailBlockRenderer: React.FC<StageRailBlockRendererProps> = ({
       className="rounded-card border-border bg-panel border px-4 py-4 shadow-sm sm:px-5"
       data-testid={`stage-rail-${block.id || 'block'}`}
     >
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+      <div className={`flex flex-wrap items-center justify-between gap-2 ${activeTerminalStage ? '' : 'mb-4'}`}>
         <h3 className="text-text text-sm font-semibold">{title}</h3>
-        {currentValue ? (
+        {activeTerminalStage ? (
+          <span
+            data-testid={`stage-rail-terminal-${activeTerminalStage.value}`}
+            data-stage-state="current"
+            className={`rounded-pill px-3 py-1 text-xs font-medium ${outcomeClasses[activeTerminalStage.tone ?? 'red']}`}
+          >
+            {getLocalizedText(activeTerminalStage.label, locale, t)}
+          </span>
+        ) : currentValue ? (
           <span className="rounded-pill bg-accent-weak text-accent px-2.5 py-1 text-xs font-medium">
             {getLocalizedText(
-              [...stages, ...terminalStages].find((stage) => stage.value === currentValue)?.label ||
-                currentValue,
+              stages[currentIndex]?.label || currentValue,
               locale,
               t,
             )}
@@ -81,53 +95,43 @@ export const StageRailBlockRenderer: React.FC<StageRailBlockRendererProps> = ({
         ) : null}
       </div>
 
-      <div className="overflow-x-auto pb-1">
-        <ol className="flex items-start" style={{ minWidth: stages.length * 44 }} aria-label={title}>
-          {stages.map((stage, index) => {
-            const state =
-              currentIndex === index ? 'current' : currentIndex > index ? 'complete' : 'upcoming';
-            const classes = stateClass[state];
-            return (
-              <li
-                key={stage.value}
-                className="relative flex min-w-0 flex-1 flex-col items-center px-1 text-center"
-                data-testid={`stage-rail-step-${stage.value}`}
-                data-stage-state={state}
-                aria-current={state === 'current' ? 'step' : undefined}
-              >
-                {index > 0 ? (
-                  <span
-                    aria-hidden="true"
-                    className={`absolute top-3 right-1/2 h-0.5 w-full ${
-                      currentIndex >= index ? stateClass.complete.line : classes.line
-                    }`}
-                  />
-                ) : null}
-                <span
-                  className={`relative z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 text-[11px] font-bold ${classes.dot}`}
+      {!activeTerminalStage && (
+        <div className="overflow-x-auto pb-1">
+          <ol className="flex items-start" style={{ minWidth: stages.length * 44 }} aria-label={title}>
+            {stages.map((stage, index) => {
+              const state =
+                currentIndex === index ? 'current' : currentIndex > index ? 'complete' : 'upcoming';
+              const classes = stateClass[state];
+              return (
+                <li
+                  key={stage.value}
+                  className="relative flex min-w-0 flex-1 flex-col items-center px-1 text-center"
+                  data-testid={`stage-rail-step-${stage.value}`}
+                  data-stage-state={state}
+                  aria-current={state === 'current' ? 'step' : undefined}
                 >
-                  {state === 'complete' ? '✓' : index + 1}
-                </span>
-                <span className={`mt-2 text-xs font-medium break-words ${classes.text}`}>
-                  {getLocalizedText(stage.label, locale, t)}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
-      </div>
-
-      {activeTerminalStage ? (
-        <div className="border-border mt-3 flex flex-wrap justify-end gap-2 border-t pt-3">
-          <span
-            data-testid={`stage-rail-terminal-${activeTerminalStage.value}`}
-            data-stage-state="current"
-            className="rounded-pill bg-status-red-bg text-status-red ring-status-red/20 px-3 py-1 text-xs font-medium ring-2"
-          >
-            {getLocalizedText(activeTerminalStage.label, locale, t)}
-          </span>
+                  {index > 0 ? (
+                    <span
+                      aria-hidden="true"
+                      className={`absolute top-3 right-1/2 h-0.5 w-full ${
+                        currentIndex >= index ? stateClass.complete.line : classes.line
+                      }`}
+                    />
+                  ) : null}
+                  <span
+                    className={`relative z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 text-[11px] font-bold ${classes.dot}`}
+                  >
+                    {state === 'complete' ? '✓' : index + 1}
+                  </span>
+                  <span className={`mt-2 text-xs font-medium break-words ${classes.text}`}>
+                    {getLocalizedText(stage.label, locale, t)}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
         </div>
-      ) : null}
+      )}
     </section>
   );
 };
