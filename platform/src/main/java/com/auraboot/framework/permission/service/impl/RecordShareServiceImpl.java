@@ -276,11 +276,9 @@ public class RecordShareServiceImpl implements RecordShareService {
         if (normalized.isEmpty() || normalized.size() != sharePids.size()) {
             throw new RootUnCheckedException(BadParam, "sharePids must be unique and non-blank");
         }
-        for (String sharePid : normalized) {
-            int deleted = recordShareMapper.deleteByPidInTenant(tenantId, sharePid);
-            if (deleted != 1) {
-                throw new RootUnCheckedException(BadParam, "Share not found");
-            }
+        int deleted = recordShareMapper.deleteByPidsInTenant(tenantId, normalized.toArray(String[]::new));
+        if (deleted != normalized.size()) {
+            throw new RootUnCheckedException(BadParam, "Share not found");
         }
         log.info("Removed {} record shares for tenant={}", normalized.size(), tenantId);
     }

@@ -2,13 +2,16 @@ package com.auraboot.framework.permission.mapper;
 
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.permission.entity.RecordShare;
+import com.auraboot.framework.permission.service.RecordShareService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
@@ -17,6 +20,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Real-PostgreSQL contract for record-share tenant, expiry, subject and permission-mask filters.
@@ -38,6 +42,9 @@ class RecordShareMapperIT {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private RecordShareService recordShareService;
 
     @Test
     @DisplayName("shared record queries enforce action mask, expiry and tenant isolation")
@@ -153,6 +160,39 @@ class RecordShareMapperIT {
                     assertThat(share.getCreatedAt()).isEqualTo(persistedExpired.getCreatedAt());
                     assertThat(share.getCreatedBy()).isEqualTo(persistedExpired.getCreatedBy());
                 });
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void batchRemovalRollsBackWhenAnyShareIsOutsideTheTenant() {
+        RecordShare first = publicShare(UniqueIdGenerator.generate(), UniqueIdGenerator.generate(), "read");
+        RecordShare second = publicShare(UniqueIdGenerator.generate(), UniqueIdGenerator.generate(), "read");
+        RecordShare otherTenant = publicShare(
+                UniqueIdGenerator.generate(), UniqueIdGenerator.generate(), "read");
+        otherTenant.setTenantId(OTHER_TENANT_ID);
+
+        try {
+            mapper.upsertByPublicPids(first);
+            mapper.upsertByPublicPids(second);
+            mapper.upsertByPublicPids(otherTenant);
+
+            assertThatThrownBy(() -> recordShareService.removeByPids(
+                    TENANT_ID, List.of(first.getPid(), otherTenant.getPid(), second.getPid())))
+                    .isInstanceOf(RootUnCheckedException.class)
+                    .hasMessageContaining("Share not found");
+            assertThat(mapper.findByPidInTenant(TENANT_ID, first.getPid())).isNotNull();
+            assertThat(mapper.findByPidInTenant(TENANT_ID, second.getPid())).isNotNull();
+            assertThat(mapper.findByPidInTenant(OTHER_TENANT_ID, otherTenant.getPid())).isNotNull();
+
+            recordShareService.removeByPids(TENANT_ID, List.of(first.getPid(), second.getPid()));
+            assertThat(mapper.findByPidInTenant(TENANT_ID, first.getPid())).isNull();
+            assertThat(mapper.findByPidInTenant(TENANT_ID, second.getPid())).isNull();
+            assertThat(mapper.findByPidInTenant(OTHER_TENANT_ID, otherTenant.getPid())).isNotNull();
+        } finally {
+            for (RecordShare share : List.of(first, second, otherTenant)) {
+                mapper.deleteByPidInTenant(share.getTenantId(), share.getPid());
+            }
+        }
     }
 
     private RecordShare publicShare(String sharePid, String recordPid, String permissionMask) {

@@ -444,13 +444,12 @@ class RecordShareServiceImplTest {
 
     @Test
     void removeByPidsDeletesEachUniqueTenantScopedShare() {
-        when(recordShareMapper.deleteByPidInTenant(100L, "share-1")).thenReturn(1);
-        when(recordShareMapper.deleteByPidInTenant(100L, "share-2")).thenReturn(1);
+        var normalized = new String[]{"share-1", "share-2"};
+        when(recordShareMapper.deleteByPidsInTenant(100L, normalized)).thenReturn(2);
 
-        service.removeByPids(100L, List.of("share-1", "share-2"));
+        service.removeByPids(100L, List.of(" share-1 ", "share-2"));
 
-        verify(recordShareMapper).deleteByPidInTenant(100L, "share-1");
-        verify(recordShareMapper).deleteByPidInTenant(100L, "share-2");
+        verify(recordShareMapper).deleteByPidsInTenant(100L, normalized);
     }
 
     @Test
@@ -459,6 +458,6 @@ class RecordShareServiceImplTest {
                 .isInstanceOf(RootUnCheckedException.class)
                 .hasMessageContaining("unique");
 
-        verify(recordShareMapper, never()).deleteByPidInTenant(anyLong(), anyString());
+        verify(recordShareMapper, never()).deleteByPidsInTenant(anyLong(), any(String[].class));
     }
 }

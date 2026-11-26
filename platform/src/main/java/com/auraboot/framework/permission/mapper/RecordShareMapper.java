@@ -65,6 +65,15 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
             @Param("tenantId") Long tenantId,
             @Param("sharePid") String sharePid);
 
+    @Delete("""
+        DELETE FROM ab_record_share
+        WHERE tenant_id = #{tenantId}
+          AND pid = ANY (#{sharePids, typeHandler=org.apache.ibatis.type.ArrayTypeHandler})
+        """)
+    int deleteByPidsInTenant(
+            @Param("tenantId") Long tenantId,
+            @Param("sharePids") String[] sharePids);
+
     /**
      * Find shares for a specific record.
      */
