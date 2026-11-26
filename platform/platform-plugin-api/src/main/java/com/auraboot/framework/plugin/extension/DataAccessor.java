@@ -195,6 +195,11 @@ public interface DataAccessor extends RecordReadAccessor {
      */
     Map<String, Object> update(String modelCode, String recordId, Map<String, Object> data);
 
+    /** Apply the ordinary audited update without returning a caller-facing record. */
+    default void updateWithoutResult(String modelCode, String recordId, Map<String, Object> data) {
+        update(modelCode, recordId, data);
+    }
+
     /**
      * Atomically replace one field only when its stored value still equals {@code expectedValue}.
      *

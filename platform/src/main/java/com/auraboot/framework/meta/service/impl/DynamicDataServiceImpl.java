@@ -1284,6 +1284,17 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public Map<String, Object> update(String modelCode, String recordId, Map<String, Object> inputData) {
+        return updateInternal(modelCode, recordId, inputData, true);
+    }
+
+    @Override
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public void updateWithoutResult(String modelCode, String recordId, Map<String, Object> inputData) {
+        updateInternal(modelCode, recordId, inputData, false);
+    }
+
+    private Map<String, Object> updateInternal(String modelCode, String recordId, Map<String, Object> inputData,
+                                               boolean returnPublicResult) {
         requireDomainAction(modelCode, "update");
         BusinessResourceDataScope.update(modelCode, recordId, inputData);
         validateModelCode(modelCode);
@@ -1456,6 +1467,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                             modelCode, recordId, automationBefore, automationAfter));
 
             MetaContext.advanceCommandExpectedVersion(modelCode, recordId);
+            if (!returnPublicResult) return null;
             return nativeReadFields.publicWriteResult(model, updatedRecord,
                     () -> getById(modelCode, recordId));
 

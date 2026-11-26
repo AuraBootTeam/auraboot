@@ -213,6 +213,14 @@ public class DynamicDataAccessorImpl implements DataAccessor {
     }
 
     @Override
+    public void updateWithoutResult(String modelCode, String recordId, Map<String, Object> data) {
+        withCommandAuthority(() -> {
+            dynamicDataService.updateWithoutResult(modelCode, recordId, mutableCopy(data));
+            return null;
+        });
+    }
+
+    @Override
     public boolean compareAndSet(String modelCode,
                                  String recordId,
                                  String fieldCode,

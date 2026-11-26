@@ -89,6 +89,11 @@ public interface DynamicDataService {
      */
     Map<String, Object> update(String modelCode, String recordId, Map<String, Object> data);
 
+    /** Apply the ordinary audited update without returning a caller-facing record. */
+    default void updateWithoutResult(String modelCode, String recordId, Map<String, Object> data) {
+        update(modelCode, recordId, data);
+    }
+
     /**
      * Atomic, tenant/data-scope-guarded field transition for mechanical ledger/control state.
      * Unlike the general update path it intentionally skips materialization, automation and the

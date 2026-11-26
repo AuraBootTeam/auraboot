@@ -384,6 +384,28 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
     }
 
     @Test
+    void updateWithoutResultRetainsScopedWriteAndAuditWithoutPublicProjection() {
+        stubReadVerdict(true);
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, "update", USER_ID))
+                .thenReturn("AND created_by = 42");
+        when(dynamicDataMapper.updateByQuery(anyString(), anyMap())).thenReturn(1);
+        when(changeTracker.diff(anyMap(), anyMap(), eq(MODEL_CODE)))
+                .thenReturn(List.of(mock(com.auraboot.framework.meta.dto.FieldChange.class)));
+        var automation = mock(com.auraboot.framework.automation.trigger.AutomationTriggerService.class);
+        when(applicationContext.getBean(com.auraboot.framework.automation.trigger.AutomationTriggerService.class))
+                .thenReturn(automation);
+
+        service.updateWithoutResult(MODEL_CODE, RECORD_ID, Map.of("name", "changed"));
+
+        verify(applicationContext.getBean(NativeRecordFieldAuthorization.class))
+                .requireUpdate(eq(MODEL_CODE), eq(RECORD_ID), anyMap());
+        verify(dynamicDataMapper).updateByQuery(argThat(sql -> sql.contains("AND created_by = 42")), anyMap());
+        verify(changeTracker).recordChange(argThat(change -> "update".equals(change.getOperation())));
+        verify(automation).onRecordUpdate(eq(MODEL_CODE), eq(RECORD_ID), anyMap(), anyMap());
+        verify(nativeReadFields, never()).publicWriteResult(any(), anyMap(), any());
+    }
+
+    @Test
     void machineChildWriteRequiresExactTargetScopeAndKeepsNativeSqlGuards() {
         MetaContext.clear();
         MetaContext.setContext(TENANT_ID,0L,"installation:test","Integration");
