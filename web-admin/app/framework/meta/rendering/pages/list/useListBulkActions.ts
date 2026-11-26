@@ -12,6 +12,7 @@ import {
   buildCommandTargetParams,
   getPublicRecordKey,
 } from '~/framework/meta/utils/publicRecordId';
+import { buildApiEndpoint } from '~/routes/_shared/dynamic-route-utils';
 import { dynamicService } from '~/shared/services/dynamicService';
 import { fetchResult } from '~/shared/services/http-client';
 import { confirmDialog } from '~/utils/confirmDialog';
@@ -83,6 +84,7 @@ export function useListBulkActions({
   bulkFieldCommand,
   setBulkEditOpen,
 }: ListBulkActionsInput) {
+  const resultLabelField = schema?.extension?.bulkResultLabelField;
   const handleImportComplete = useCallback(() => {
     setImportOpen(false);
     loadData({ page: 0, size: pagination.pageSize, filters });
@@ -140,7 +142,13 @@ export function useListBulkActions({
       const recordLabelById = new Map(
         data.map((record) => {
           const id = getPublicRecordKey(record) || '';
-          const recordLabel = record.name || record.title || record.code || id;
+          const configuredLabel = resultLabelField ? record[resultLabelField] : undefined;
+          const recordLabel =
+            (typeof configuredLabel === 'string' && configuredLabel.trim()) ||
+            record.name ||
+            record.title ||
+            record.code ||
+            id;
           return [id, String(recordLabel)] as const;
         }),
       );
@@ -179,6 +187,39 @@ export function useListBulkActions({
             recordLabel: recordLabelById.get(id) || id,
             reason: error instanceof Error ? error.message : String(error),
           });
+        }
+      }
+
+      if (resultLabelField && modelCode) {
+        const missingLabels = failures
+          .filter(({ recordPid }) => !recordLabelById.has(recordPid))
+          .map(({ recordPid }) => recordPid);
+        for (let index = 0; index < missingLabels.length; index += 50) {
+          const ids = missingLabels.slice(index, index + 50);
+          const result = await fetchResult<{ records: DynamicEntity[] } | DynamicEntity[]>(
+            `${buildApiEndpoint(modelCode)}/list`,
+            {
+              method: 'get',
+              params: {
+                pageNum: 1,
+                pageSize: ids.length,
+                filters: JSON.stringify([{ fieldName: 'pid', operator: 'IN', value: ids }]),
+              },
+              token: token || undefined,
+            },
+          ).catch(() => undefined);
+          if (!result || !ResultHelper.isSuccess(result)) continue;
+          const rows = Array.isArray(result.data) ? result.data : (result.data?.records ?? []);
+          for (const row of rows) {
+            const pid = getPublicRecordKey(row);
+            const title = row[resultLabelField];
+            if (pid && typeof title === 'string' && title.trim()) {
+              recordLabelById.set(pid, title.trim());
+            }
+          }
+        }
+        for (const failure of failures) {
+          failure.recordLabel = recordLabelById.get(failure.recordPid) ?? failure.recordLabel;
         }
       }
 
@@ -227,7 +268,19 @@ export function useListBulkActions({
       }
       return outcome;
     },
-    [data, filters, loadData, locale, pagination.pageSize, resolveButtonLabel, showToast, t, token],
+    [
+      data,
+      filters,
+      loadData,
+      locale,
+      modelCode,
+      pagination.pageSize,
+      resolveButtonLabel,
+      resultLabelField,
+      showToast,
+      t,
+      token,
+    ],
   );
 
   const handleBulkAction = useCallback(

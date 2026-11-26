@@ -48,6 +48,8 @@ export interface PageExtensionConfig {
   workspaceShell?: WorkspaceShellConfig;
   /** Custom composed lists may supply their own individual panel surfaces. */
   resultsSurface?: 'panel' | 'canvas';
+  /** List record field shown as the label in per-record bulk results. */
+  bulkResultLabelField?: string;
   detailHeaderLayout?: LayoutConfig;
   detailBodyOrder?: 'schema';
   /** Overrides the utility action menu default for standalone detail pages. */

@@ -583,9 +583,13 @@ function Bulk({
   refresh,
   ids = ['A'],
   onResult = vi.fn(),
+  records = ids.map(row),
+  labelField,
 }: {
   refresh: () => Promise<void>;
   ids?: string[];
+  records?: RecordRow[];
+  labelField?: string;
   onResult?: Parameters<typeof useListBulkActions>[0]['setBulkActionResult'];
 }) {
   const actions = useListBulkActions({
@@ -595,11 +599,11 @@ function Bulk({
     filters: {},
     setSelectionState: vi.fn(),
     pageRowIds: ids,
-    schema: { modelCode: 'case' },
+    schema: { modelCode: 'case', extension: { bulkResultLabelField: labelField } },
     tableName: 'case',
     resolveButtonLabel: () => 'Bulk close',
     locale: 'en',
-    data: ids.map(row),
+    data: records,
     token: undefined,
     t,
     showToast: vi.fn(),
@@ -754,12 +758,18 @@ describe('all native command prompt consumers acknowledge the same UI protocol',
     expect(refresh).toHaveBeenCalledOnce();
     expect(screen.getByTestId('form-dialog-submit')).toBeDisabled();
   });
-  it('shows a targeted bulk rejection reason from a normalized HTTP failure', async () => {
+  it('shows labels for failures on the current and other pages with their rejection reasons', async () => {
     const refresh = vi.fn().mockResolvedValue(undefined);
     const onResult = vi.fn();
     io.fetch.mockImplementation(
-      async (_url: string, options: { params: { targetRecordPid: string } }) =>
-        options.params.targetRecordPid === 'A'
+      async (url: string, options: { params: { targetRecordPid?: string; filters?: string } }) => {
+        if (url.endsWith('/list')) {
+          expect(JSON.parse(options.params.filters ?? '[]')).toEqual([
+            { fieldName: 'pid', operator: 'IN', value: ['C'] },
+          ]);
+          return { code: '0', data: { records: [{ ...row('C'), contact_name: 'Other Page' }] } };
+        }
+        return options.params.targetRecordPid === 'A'
           ? { code: '0', data: {} }
           : {
               code: '35000',
@@ -767,11 +777,18 @@ describe('all native command prompt consumers acknowledge the same UI protocol',
               success: false,
               message: 'Bad parameter',
               context: 'Plugin handler execution failed: Resolve the open association first',
-            },
+            };
+      },
     );
     render(
       <Root>
-        <Bulk refresh={refresh} ids={['A', 'B']} onResult={onResult} />
+        <Bulk
+          refresh={refresh}
+          ids={['A', 'B', 'C']}
+          records={[row('A'), { ...row('B'), contact_name: 'Visible Contact' }]}
+          labelField="contact_name"
+          onResult={onResult}
+        />
       </Root>,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Open action' }));
@@ -784,6 +801,12 @@ describe('all native command prompt consumers acknowledge the same UI protocol',
           failures: [
             expect.objectContaining({
               recordPid: 'B',
+              recordLabel: 'Visible Contact',
+              reason: 'Resolve the open association first',
+            }),
+            expect.objectContaining({
+              recordPid: 'C',
+              recordLabel: 'Other Page',
               reason: 'Resolve the open association first',
             }),
           ],
