@@ -10,6 +10,8 @@ import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
@@ -54,7 +56,8 @@ public class RecordShareAccessorImpl implements RecordShareAccessor {
     }
 
     @Override
-    @org.springframework.transaction.annotation.Transactional
+    // A recycle command may catch one record group's failure and keep processing the pool.
+    @Transactional(propagation = Propagation.NESTED)
     public void replaceSharesForRecords(long tenantId, List<Replacement> replacements) {
         withTenantContext(tenantId, () -> {
             var inputs = replacements.stream()
