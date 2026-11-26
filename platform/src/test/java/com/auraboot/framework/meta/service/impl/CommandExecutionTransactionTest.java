@@ -25,6 +25,74 @@ class CommandExecutionTransactionTest {
 
     @AfterEach void clear() { TransactionSynchronizationManager.clear(); }
 
+    private void concurrency(String key, com.auraboot.framework.meta.service.ConcurrencyGuard guard) {
+        var definitions=mock(com.auraboot.framework.meta.mapper.CommandDefinitionMapper.class);
+        var command=new com.auraboot.framework.meta.entity.CommandDefinition();
+        command.setExecutionConfig("{\"concurrencyKey\":\""+key+"\",\"lockTimeoutMs\":2500}");
+        when(definitions.findCurrentByCode("example:append")).thenReturn(command);
+        org.springframework.test.util.ReflectionTestUtils.setField(transaction,"definitions",definitions);
+        org.springframework.test.util.ReflectionTestUtils.setField(transaction,"concurrency",guard);
+        when(manager.getTransaction(any())).thenReturn(status);
+    }
+
+    @Test void constantConcurrencyKeyIsHeldBeforeTransactionAndThroughCommitWithoutReacquisition() {
+        var guard=mock(com.auraboot.framework.meta.service.ConcurrencyGuard.class);
+        concurrency("example-append",guard);
+        doAnswer(call->{
+            verifyNoInteractions(manager);
+            assertThat(CommandExecutionTransaction.insideCommandTransaction()).isFalse();
+            Object result=((java.util.function.Supplier<?>)call.getArgument(2)).get();
+            verify(manager).commit(status);
+            return result;
+        }).when(guard).executeWithLock(eq("example-append"),eq(2500L),any());
+        assertThat(transaction.execute("example:append",false,()->{
+            assertThat(transaction.holdsConcurrencyGuard("example:append","example-append")).isTrue();
+            assertThat(transaction.holdsConcurrencyGuard("other:command","other-key")).isFalse();
+            return "appended";
+        })).isEqualTo("appended");
+        verify(guard,times(1)).executeWithLock(eq("example-append"),eq(2500L),any());
+        assertThat(transaction.holdsConcurrencyGuard("example:append","example-append")).isFalse();
+    }
+
+    @Test void constantGuardDoesNotOutliveRollbackOrReplayAHandlerFailure() {
+        var guard=mock(com.auraboot.framework.meta.service.ConcurrencyGuard.class);
+        concurrency("example-append",guard);
+        doAnswer(call->((java.util.function.Supplier<?>)call.getArgument(2)).get())
+                .when(guard).executeWithLock(anyString(),anyLong(),any());
+        assertThatThrownBy(()->transaction.execute("example:append",false,()->{throw new IllegalStateException("handler failed");}))
+                .isInstanceOf(IllegalStateException.class).hasMessage("handler failed");
+        verify(manager).rollback(status);
+        verify(guard,times(1)).executeWithLock(anyString(),anyLong(),any());
+        assertThat(transaction.holdsConcurrencyGuard("example:append","example-append")).isFalse();
+    }
+
+    @Test void payloadKeysAndCallerOwnedTransactionsKeepTheirExistingGuardBoundary() {
+        var guard=mock(com.auraboot.framework.meta.service.ConcurrencyGuard.class);
+        concurrency("example:${payload.parent}",guard);
+        assertThat(transaction.execute("example:append",false,()->"dynamic")).isEqualTo("dynamic");
+        verifyNoInteractions(guard);
+        concurrency("example-append",guard);
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        assertThat(transaction.execute("example:append",false,()->"caller")).isEqualTo("caller");
+        verifyNoInteractions(guard);
+    }
+
+    @Test void changingTheGuardKeyWhileWaitingRejectsBeforeOpeningTheTransaction() {
+        var guard=mock(com.auraboot.framework.meta.service.ConcurrencyGuard.class);
+        concurrency("example-append",guard);
+        doAnswer(call->{
+            var definitions=(com.auraboot.framework.meta.mapper.CommandDefinitionMapper)
+                    org.springframework.test.util.ReflectionTestUtils.getField(transaction,"definitions");
+            var changed=new com.auraboot.framework.meta.entity.CommandDefinition();changed.setExecutionConfig("{\"concurrencyKey\":\"other\"}");
+            when(definitions.findCurrentByCode("example:append")).thenReturn(changed);
+            return ((java.util.function.Supplier<?>)call.getArgument(2)).get();
+        }).when(guard).executeWithLock(anyString(),anyLong(),any());
+        assertThatThrownBy(()->transaction.execute("example:append",false,()->"must not run"))
+                .isInstanceOf(AccessDeniedException.class).hasMessageContaining("concurrency configuration changed");
+        verifyNoInteractions(manager);
+        assertThat(transaction.holdsConcurrencyGuard("example:append","example-append")).isFalse();
+    }
+
     private void owner() {
         var handler = mock(CommandHandlerExtension.class, withSettings().extraInterfaces(BusinessResourceAuthorization.class));
         when(extensions.getBusinessResourceOwner("orders:export")).thenReturn(Optional.of(handler));

@@ -95,6 +95,7 @@ public class CommandRecordActionScopeAccessorFactory {
             if (!lifetime.getAsBoolean() || !MetaContext.exists() || !actor.equals(current())) return false;
             var read = new TransactionTemplate(transactions);
             read.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            read.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
             read.setReadOnly(true);
             return Boolean.TRUE.equals(read.execute(status -> permits(actor, model, pid, action)));
         };

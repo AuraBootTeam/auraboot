@@ -18,6 +18,8 @@ import java.util.function.Supplier;
 @lombok.extern.slf4j.Slf4j
 public class CommandExecutionTransaction {
     private static final ThreadLocal<Boolean> IN_COMMAND_TRANSACTION = new ThreadLocal<>();
+    private record HeldConcurrency(String commandCode, String key) {}
+    private static final ThreadLocal<HeldConcurrency> HELD_CONCURRENCY = new ThreadLocal<>();
 
     /** True while a command's own (contractually REPEATABLE_READ) transaction is active on this thread. */
     public static boolean insideCommandTransaction() {
@@ -26,6 +28,18 @@ public class CommandExecutionTransaction {
 
     private final PlatformTransactionManager transactions;
     private final ExtensionRegistry extensions;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.auraboot.framework.meta.service.ConcurrencyGuard concurrency;
+
+    /** The executor must not reacquire a lock already held around its complete transaction. */
+    public boolean holdsConcurrencyGuard(String commandCode, String key) {
+        var held = HELD_CONCURRENCY.get();
+        if (held == null || !held.commandCode().equals(commandCode)) return false;
+        if (!Objects.equals(held.key(), key))
+            throw new AccessDeniedException("Command concurrency configuration changed before execution");
+        return true;
+    }
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.auraboot.framework.permission.service.DomainCommandAuthorization domains;
@@ -119,6 +133,22 @@ public class CommandExecutionTransaction {
     private <T> T executeTransaction(String commandCode, boolean dryRun, Supplier<T> operation) {
         var command = currentCommand(commandCode);
         var config = configuration(command);
+        Object configured = config.get("concurrencyKey");
+        boolean held = holdsConcurrencyGuard(commandCode, configured instanceof String key ? key : null);
+        // A constant server-authored key needs no payload/record evaluation. Acquire it before
+        // opening the physical transaction, and retain it through commit: taking it after an RR
+        // snapshot exists cannot make an immutable child's newly committed head visible.
+        if (!held && !TransactionSynchronizationManager.isActualTransactionActive()
+                && configured instanceof String key && !key.isBlank() && !key.contains("${")) {
+            if (concurrency == null) throw new IllegalStateException("The command concurrency guard is unavailable");
+            long timeout = config.get("lockTimeoutMs") instanceof Number number ? number.longValue() : 5000L;
+            return concurrency.executeWithLock(key, timeout, () -> {
+                var previous = HELD_CONCURRENCY.get();
+                HELD_CONCURRENCY.set(new HeldConcurrency(commandCode, key));
+                try { return executeTransaction(commandCode, dryRun, operation); }
+                finally { if (previous == null) HELD_CONCURRENCY.remove(); else HELD_CONCURRENCY.set(previous); }
+            });
+        }
         // Handlers are resolved by the same key the pipeline phases use. A command may
         // delegate to a handler registered under another code; looking it up by the
         // command's own code found nothing, so the transaction opened without that
