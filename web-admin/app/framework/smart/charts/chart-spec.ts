@@ -91,6 +91,10 @@ export interface ChartDimension {
   valueLabels?: Record<string, string>;
 }
 
+export type ChartNumberFormat =
+  | { format: 'number' }
+  | { format: 'currency'; currency: string };
+
 /**
  * A measure = a numeric value plotted. Mirrors `MetricConfig` from ../types/chart
  * but is the chart-facing view (aggregation is optional: pre-aggregated named
@@ -100,6 +104,7 @@ export interface ChartMeasure {
   field: string;
   aggregation?: 'count' | 'count_distinct' | 'sum' | 'avg' | 'max' | 'min';
   label?: string;
+  numberFormat?: ChartNumberFormat;
 }
 
 /**

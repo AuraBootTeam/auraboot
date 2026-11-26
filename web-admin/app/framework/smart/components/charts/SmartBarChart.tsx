@@ -16,7 +16,8 @@ import type {
   LinkageConfig,
   FilterConfig,
 } from '~/framework/smart/types/chart';
-import type { ChartSpec } from '~/framework/smart/charts/chart-spec';
+import { useI18n } from '~/contexts/I18nContext';
+import type { ChartNumberFormat, ChartSpec } from '~/framework/smart/charts/chart-spec';
 import type { MetricLabels } from '~/framework/smart/utils/chartLabels';
 import { chartSpecToEChartsOption } from '~/framework/smart/charts/chart-spec-echarts';
 import { cn } from '~/utils/cn';
@@ -34,6 +35,8 @@ export interface SmartBarChartProps {
    * the legend shows the raw column name.
    */
   metricLabels?: MetricLabels;
+  /** Optional number formatting keyed by the metric alias. */
+  metricFormats?: Record<string, ChartNumberFormat>;
   /** Chart title */
   title?: string;
   /** Data source configuration */
@@ -119,6 +122,8 @@ export interface BarOptionProps {
    * this the legend shows the raw column name.
    */
   metricLabels?: MetricLabels;
+  /** Optional number formatting keyed by the metric alias. */
+  metricFormats?: Record<string, ChartNumberFormat>;
   title?: string;
   orientation?: 'vertical' | 'horizontal';
   stacked?: boolean;
@@ -150,7 +155,11 @@ function specFromBarChartData(
       role: i === 0 ? 'category' : 'series',
       valueLabels: data?.meta?.dimensionLabels?.[field],
     })),
-    measures: metrics.map((field) => ({ field, label: props.metricLabels?.[field] })),
+    measures: metrics.map((field) => ({
+      field,
+      label: props.metricLabels?.[field],
+      numberFormat: props.metricFormats?.[field],
+    })),
     visual: { orientation, stacked, dataLabels: showLabel },
   };
 }
@@ -324,6 +333,7 @@ export const SmartBarChart: React.FC<SmartBarChartProps> = ({
   title,
   dataSource,
   metricLabels,
+  metricFormats,
   orientation = 'vertical',
   stacked = false,
   showLabel = false,
@@ -337,6 +347,7 @@ export const SmartBarChart: React.FC<SmartBarChartProps> = ({
   style,
   chartOptions,
 }) => {
+  const { locale } = useI18n();
   const isConfigured = isDataSourceConfigured(dataSource);
 
   const { data, loading, error } = useChartData({
@@ -397,13 +408,28 @@ export const SmartBarChart: React.FC<SmartBarChartProps> = ({
       stacked,
       showLabel,
       metricLabels,
+      metricFormats,
     });
-    const adapterOption = chartSpecToEChartsOption(spec, data?.rows ?? []) as EChartsOption;
+    const adapterOption = chartSpecToEChartsOption(spec, data?.rows ?? [], locale) as EChartsOption;
     // `chartOptions` is the caller's renderer override, so whole-number ticks are applied before it:
     // an explicit axis setting from the dashboard author is never second-guessed.
     const ticksOption = withWholeNumberTicks(adapterOption);
-    return chartOptions ? { ...ticksOption, ...chartOptions } : ticksOption;
-  }, [data, title, orientation, stacked, showLabel, metricLabels, chartOptions]);
+    if (!chartOptions) return ticksOption;
+    const merged = { ...ticksOption, ...chartOptions };
+    const valueAxisKey = orientation === 'horizontal' ? 'xAxis' : 'yAxis';
+    const generatedAxis = ticksOption[valueAxisKey];
+    const overrideAxis = chartOptions[valueAxisKey];
+    if (metricFormats && generatedAxis && !Array.isArray(generatedAxis) &&
+        typeof generatedAxis.axisLabel?.formatter === 'function' &&
+        overrideAxis && !Array.isArray(overrideAxis) &&
+        (overrideAxis.type === 'value' || overrideAxis.type === undefined)) {
+      merged[valueAxisKey] = {
+        ...overrideAxis,
+        axisLabel: { formatter: generatedAxis.axisLabel.formatter, ...overrideAxis.axisLabel },
+      };
+    }
+    return merged;
+  }, [data, title, orientation, stacked, showLabel, metricLabels, metricFormats, locale, chartOptions]);
 
   /**
    * ECharts event handlers

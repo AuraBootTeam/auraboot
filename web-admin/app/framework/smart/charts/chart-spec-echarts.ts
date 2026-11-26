@@ -27,7 +27,7 @@
  * FUNCTIONS reproduced byte-for-byte). The remaining non-bar/non-line/non-scatter
  * branches stay the deliberately minimal, consolidation-oriented mapping.
  */
-import type { ChartSpec } from './chart-spec';
+import type { ChartNumberFormat, ChartSpec } from './chart-spec';
 
 export type EChartsOption = Record<string, unknown>;
 
@@ -72,7 +72,16 @@ function titleText(spec: ChartSpec): string | undefined {
  * BASE option (sans the `chartOptions` prop-merge, which stays a call-site merge).
  * Must match legacy EXACTLY; covered by the B2d equivalence test.
  */
-function barOption(spec: ChartSpec, rows: Record<string, unknown>[]): EChartsOption {
+function makeNumberFormatter(locale: string, format?: ChartNumberFormat) {
+  const currency = format?.format === 'currency' && /^[A-Z]{3}$/.test(format.currency)
+    ? format.currency
+    : undefined;
+  return new Intl.NumberFormat(locale, currency
+    ? { style: 'currency', currency }
+    : { maximumFractionDigits: 2 });
+}
+
+function barOption(spec: ChartSpec, rows: Record<string, unknown>[], locale: string): EChartsOption {
   const title = titleText(spec);
   const orientation = spec.visual?.orientation ?? 'vertical';
   const stacked = spec.visual?.stacked ?? false;
@@ -94,19 +103,36 @@ function barOption(spec: ChartSpec, rows: Record<string, unknown>[]): EChartsOpt
   const dimensionKey = dimField(spec, 'category');
   const categories = categoryLabels(spec, rows, dimensionKey);
 
-  const series = metrics.map((metricKey) => ({
-    name: measureLabel(spec, metricKey),
-    type: 'bar' as const,
-    stack: stacked ? 'total' : undefined,
-    data: rows.map((row) => Number(row[metricKey]) || 0),
-    label: {
-      show: showLabel,
-      position: (orientation === 'vertical' ? 'top' : 'right') as 'top' | 'right',
-    },
-    emphasis: {
-      focus: 'series' as const,
-    },
-  }));
+  const formats = spec.measures.map((measure) => measure.numberFormat);
+  const firstFormat = formats[0];
+  const axisFormat = firstFormat?.format === 'currency' && formats.every(
+    (format) => format?.format === 'currency' && format.currency === firstFormat.currency,
+  ) ? firstFormat : undefined;
+  const valueAxis = formats.some(Boolean)
+    ? { type: 'value', axisLabel: { formatter: makeNumberFormatter(locale, axisFormat).format } }
+    : { type: 'value' };
+
+  const series = spec.measures.map(({ field: metricKey, numberFormat }) => {
+    const formatter = numberFormat ? makeNumberFormatter(locale, numberFormat) : undefined;
+    const formatValue = formatter && ((value: unknown) =>
+      typeof value === 'number' && Number.isFinite(value) ? formatter.format(value) : String(value ?? '')
+    );
+    return {
+      name: measureLabel(spec, metricKey),
+      type: 'bar' as const,
+      stack: stacked ? 'total' : undefined,
+      data: rows.map((row) => Number(row[metricKey]) || 0),
+      label: {
+        show: showLabel,
+        position: (orientation === 'vertical' ? 'top' : 'right') as 'top' | 'right',
+        ...(formatValue && { formatter: ({ value }: { value: unknown }) => formatValue(value) }),
+      },
+      ...(formatValue && { tooltip: { valueFormatter: formatValue } }),
+      emphasis: {
+        focus: 'series' as const,
+      },
+    };
+  });
 
   return {
     title: title
@@ -144,14 +170,10 @@ function barOption(spec: ChartSpec, rows: Record<string, unknown>[]): EChartsOpt
               hideOverlap: true,
             },
           }
-        : {
-            type: 'value',
-          },
+        : valueAxis,
     yAxis:
       orientation === 'vertical'
-        ? {
-            type: 'value',
-          }
+        ? valueAxis
         : {
             type: 'category',
             data: categories,
@@ -519,10 +541,11 @@ function waterfallOption(spec: ChartSpec, rows: Record<string, unknown>[]): ECha
 export function chartSpecToEChartsOption(
   spec: ChartSpec,
   rows: Record<string, unknown>[],
+  locale = 'en',
 ): EChartsOption {
   // BAR is the canonical SmartBarChart builder (B2d): legacy-equivalent base option.
   if (spec.type === 'bar') {
-    return barOption(spec, rows);
+    return barOption(spec, rows, locale);
   }
 
   // LINE / AREA is the canonical SmartLineChart builder (B2d): legacy-equivalent base.
