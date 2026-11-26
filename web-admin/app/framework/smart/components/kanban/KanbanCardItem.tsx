@@ -204,9 +204,11 @@ export function KanbanCardItem({
             if (!isNewFieldType && (value === undefined || value === null)) return null;
 
             return (
-              <div key={field.field} className="flex min-w-0 max-w-full items-start gap-1 text-xs text-gray-600">
-                {label && <span className="max-w-[45%] shrink-0 text-gray-400 [overflow-wrap:anywhere]">{label}:</span>}
-                <span className="min-w-0 [overflow-wrap:anywhere]">{renderFieldValue(field, value, locale)}</span>
+              <div key={field.field} className="flex min-w-0 max-w-full flex-wrap items-baseline gap-x-1 gap-y-0.5 text-xs text-gray-600">
+                {label && <span className="max-w-full shrink-0 text-gray-400 [overflow-wrap:anywhere]">{label}:</span>}
+                <span className="min-w-0 max-w-full shrink-0 [overflow-wrap:anywhere]">
+                  {renderFieldValue(field, value, locale)}
+                </span>
               </div>
             );
           })}
