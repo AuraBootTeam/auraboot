@@ -32,13 +32,12 @@ public class DomainCommandAuthorization {
         finally { if (previous == null) CURRENT.remove(); else CURRENT.set(previous); }
     }
     public boolean isDomain(String code) {
-        return !DomainPermissionPolicy.models(snapshots.resolvePermissionDefinition(MetaContext.getCurrentTenantId(), code)).isEmpty();
+        return snapshots.resolveDomainPermissionDefinition(MetaContext.getCurrentTenantId(), code) != null;
     }
 
     /** Null leaves non-domain products on their existing authorization path. */
     public Boolean authorize(String code) {
-        var permission = snapshots.resolvePermissionDefinition(MetaContext.getCurrentTenantId(), code);
-        if (DomainPermissionPolicy.models(permission).isEmpty()) return null;
+        if (!isDomain(code)) return null;
         if (MetaContext.getCurrentTenantId() == null || MetaContext.getCurrentUserId() == null || MetaContext.getCurrentMemberId() == null)
             throw denied();
         var rows = grants(code);

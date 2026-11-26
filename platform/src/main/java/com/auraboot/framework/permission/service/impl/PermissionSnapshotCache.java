@@ -2,6 +2,7 @@ package com.auraboot.framework.permission.service.impl;
 
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
+import com.auraboot.framework.permission.service.DomainPermissionPolicy;
 import com.auraboot.framework.permission.service.SnapshotTransactionMemo;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.entity.UserRole;
@@ -358,12 +359,19 @@ public class PermissionSnapshotCache {
         return new PermissionCatalog(Collections.unmodifiableMap(definitionsByCode), Collections.unmodifiableMap(codesById));
     }
 
+    /** Domain probes can use the domain catalog's confirmed misses without a general permission lookup. */
+    public Permission resolveDomainPermissionDefinition(Long tenantId, String code) {
+        if (tenantId == null || code == null || code.isBlank()) return null;
+        var definition = getDomainPermissionCatalog(tenantId).definitionsByNormalizedCode().get(normalizePermissionCode(code));
+        return DomainPermissionPolicy.models(definition).isEmpty() ? null : definition;
+    }
+
     public List<String> domainPermissionAlternatives(Long tenantId, String code) {
-        var required = resolvePermissionDefinition(tenantId, code);
-        if (com.auraboot.framework.permission.service.DomainPermissionPolicy.models(required).isEmpty()) return List.of(code);
+        var required = resolveDomainPermissionDefinition(tenantId, code);
+        if (required == null) return List.of(code);
         var levels = List.of("read", "write", "manage");
         return getDomainPermissionCatalog(tenantId).definitionsByNormalizedCode().values().stream()
-                .filter(permission -> !com.auraboot.framework.permission.service.DomainPermissionPolicy.models(permission).isEmpty()
+                .filter(permission -> !DomainPermissionPolicy.models(permission).isEmpty()
                     && java.util.Objects.equals(required.getResourceCode(), permission.getResourceCode())
                     && levels.indexOf(permission.getAction()) >= levels.indexOf(required.getAction()))
                 .map(Permission::getCode).distinct().sorted().toList();

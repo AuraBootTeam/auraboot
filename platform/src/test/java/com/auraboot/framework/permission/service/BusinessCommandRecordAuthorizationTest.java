@@ -114,6 +114,7 @@ class BusinessCommandRecordAuthorizationTest {
         definition.setResourceCode("domain"); definition.setAction("write");
         definition.setExtension(Map.of("domainModels", Map.of(MODEL, List.of("read", "create", "update"))));
         when(snapshots.resolvePermissionDefinition(100L, CODE)).thenReturn(definition);
+        when(snapshots.resolveDomainPermissionDefinition(100L, CODE)).thenReturn(definition);
         var domains = new DomainCommandAuthorization(snapshots, bindings);
         org.springframework.test.util.ReflectionTestUtils.setField(authorization, "domains", domains);
         grants(grant(11, 101, CODE)); guards(CODE, new PermissionPolicyService.ConditionGuard(11L, null));
@@ -761,7 +762,7 @@ class BusinessCommandRecordAuthorizationTest {
             String code = "bom.cap." + levels.get(index);
             var definition = permission(code); definition.setResourceCode("bom"); definition.setAction(levels.get(index));
             definition.setExtension(Map.of("domainModels", Map.of("bom_task", List.of("read", "update"))));
-            when(snapshots.resolvePermissionDefinition(100L, code)).thenReturn(definition);
+            when(snapshots.resolveDomainPermissionDefinition(100L, code)).thenReturn(definition);
             when(snapshots.domainPermissionAlternatives(100L, code))
                     .thenReturn(levels.subList(index, levels.size()).stream().map(level -> "bom.cap." + level).toList());
             when(bindings.findBusinessGrants(100L, 1L, 5L, code)).thenReturn(List.of());

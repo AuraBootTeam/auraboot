@@ -637,6 +637,21 @@ class PermissionSnapshotCacheTest {
     }
 
     @Test
+    void aDomainProbeDoesNotFallBackToAPointLookupForOrdinaryPermissions() {
+        var ordinary = permission(910L, "crm.customer_pool.pick");
+        when(permissionMapper.findByTenantIdAndCode(100L, ordinary.getCode())).thenReturn(ordinary);
+        cache.withFreshReads(() -> {
+            assertThat(cache.resolveDomainPermissionDefinition(100L, "CRM.CUSTOMER_POOL.PICK")).isNull();
+            assertThat(cache.resolveDomainPermissionDefinition(100L, "unregistered")).isNull();
+            verify(permissionMapper, never()).findByTenantIdAndCode(any(), any());
+            assertThat(cache.resolvePermissionDefinition(100L, ordinary.getCode())).isSameAs(ordinary);
+            return null;
+        });
+        verify(permissionMapper).findResolvableDomainDefinitions(100L);
+        verify(permissionMapper).findByTenantIdAndCode(100L, ordinary.getCode());
+    }
+
+    @Test
     void preloadsAliasesAndMissesOnlyForTheCurrentFreshRead() {
         var alias = permission(905L, "model.test.read");
         when(permissionMapper.findResolvableDefinitionsByCodes(100L, List.of("model.test.read", "test:read")))

@@ -296,7 +296,7 @@ class CommandExecutionTransactionTest {
         permission.setResourceType("operation");
         permission.setAction("write");
         permission.setExtension(java.util.Map.of("domainModels", java.util.Map.of("bom_task", java.util.List.of("read", "update"))));
-        when(snapshots.resolvePermissionDefinition(100L, "bom.cap.write")).thenReturn(permission);
+        when(snapshots.resolveDomainPermissionDefinition(100L, "bom.cap.write")).thenReturn(permission);
         var grant = new com.auraboot.framework.rbac.mapper.RolePermissionMapper.BusinessGrantRow();
         grant.setId(10L);
         grant.setGrantType("grant");
