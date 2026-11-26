@@ -35,6 +35,6 @@ export const fieldFocusStyles = 'focus-visible:outline-none focus-visible:shadow
 export const fieldErrorFocusStyles = 'focus-visible:shadow-focus';
 
 export const fieldControlBase =
-  'w-full rounded-control border shadow-card transition-colors duration-200';
+  'w-full rounded-control border shadow-card transition-colors duration-200 aria-invalid:border-status-red dark:aria-invalid:border-status-red';
 export const fieldContainerBase = 'relative w-full';
 export const fieldBaseStyles = fieldControlBase;

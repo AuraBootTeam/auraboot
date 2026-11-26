@@ -1146,9 +1146,15 @@ describe('ControlledFieldRenderer', () => {
       // Mirror a real smart control: its own validationRules run over the same value
       // produces the same message the runtime form context already reported, and it
       // renders that through its own FieldBase.
-      ComponentLoader: () => (
+      ComponentLoader: ({ props }: {
+        props: Pick<React.InputHTMLAttributes<HTMLInputElement>, 'aria-invalid' | 'aria-describedby'>;
+      }) => (
         <FieldBase error="Required">
-          <input data-testid="inner-control" />
+          <input
+            data-testid="inner-control"
+            aria-invalid={props['aria-invalid']}
+            aria-describedby={props['aria-describedby']}
+          />
         </FieldBase>
       ),
     }));
@@ -1168,6 +1174,9 @@ describe('ControlledFieldRenderer', () => {
     await waitFor(() => {
       expect(screen.getByTestId('inner-control')).toBeInTheDocument();
     });
+    const control = screen.getByTestId('inner-control');
+    expect(control).toHaveAttribute('aria-invalid', 'true');
+    expect(control).toHaveAccessibleDescription('Required');
     expect(screen.getAllByText('Required')).toHaveLength(1);
 
     // With no wrapper error the control still shows its own validation feedback (e.g.
@@ -1180,6 +1189,8 @@ describe('ControlledFieldRenderer', () => {
         context={{ locale: 'zh-CN', t: (key: string) => key } as any}
       />,
     );
+    expect(screen.getByTestId('inner-control')).not.toHaveAttribute('aria-invalid');
+    expect(screen.getByTestId('inner-control')).not.toHaveAttribute('aria-describedby');
     expect(screen.getAllByText('Required')).toHaveLength(1);
   });
 

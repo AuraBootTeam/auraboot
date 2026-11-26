@@ -17,7 +17,7 @@
  * ```
  */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { FieldConfig, DataSourceConfig } from '~/framework/meta/schemas/types';
 import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { evaluateCondition } from '~/framework/meta/runtime/expression/evaluator';
@@ -100,6 +100,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   error,
 }) => {
   const t = context.t || ((key: string) => key);
+  const errorId = useId();
 
   // 条件渲染 - 检查 visibleWhen
   const visible = useMemo(() => {
@@ -470,6 +471,10 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
     // label is rendered by ControlledFieldRenderer wrapper, not passed to component
     // to ensure consistent vertical label-above-input layout across all components
     'aria-label': resolvedLabel,
+    ...(error && {
+      'aria-invalid': true,
+      'aria-describedby': [restDslProps['aria-describedby'], errorId].filter(Boolean).join(' '),
+    }),
     value: adaptedValue,
     onChange: adaptedOnChange,
     disabled: isDisabled,
@@ -613,7 +618,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
               <FieldErrorOwnedByWrapperContext.Provider value={Boolean(error)}>
                 <ComponentLoader componentName={componentName} props={componentProps} />
               </FieldErrorOwnedByWrapperContext.Provider>
-              <FieldError message={error} />
+              <FieldError id={errorId} message={error} />
             </>
           )}
           <FieldHelp message={resolvedHelpText} />
