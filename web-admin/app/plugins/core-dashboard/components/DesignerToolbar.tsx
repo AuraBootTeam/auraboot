@@ -16,6 +16,7 @@ import { Clock, Maximize2 } from 'lucide-react';
 import { DashboardDocumentActions } from './DashboardDocumentActions';
 
 interface DashboardToolbarProps {
+  displayTitle: string;
   onSave?: () => void;
   onPublish?: () => void;
   onUnpublish?: () => void;
@@ -29,6 +30,7 @@ interface DashboardToolbarProps {
 }
 
 export const DesignerToolbar: React.FC<DashboardToolbarProps> = ({
+  displayTitle,
   onSave,
   onPublish,
   onUnpublish,
@@ -67,7 +69,7 @@ export const DesignerToolbar: React.FC<DashboardToolbarProps> = ({
     <SharedDesignerToolbar
       testId="designer-toolbar"
       title={t('dashboard.designer.title')}
-      subtitle={dashboard?.title || t('dashboard.designer.defaultTitle')}
+      subtitle={displayTitle}
       status={statusText}
       isDirty={isDirty}
       isSaving={isSaving}
@@ -128,12 +130,12 @@ export const DesignerToolbar: React.FC<DashboardToolbarProps> = ({
         <>
           <ExportPdfButton
             targetRef={canvasRef}
-            fileName={dashboard?.title || 'dashboard'}
+            fileName={displayTitle}
             orientation="landscape"
           />
           <DashboardExportExcel
             widgets={dashboard?.widgets || []}
-            fileName={dashboard?.title || 'dashboard'}
+            fileName={displayTitle}
           />
         </>
       )}

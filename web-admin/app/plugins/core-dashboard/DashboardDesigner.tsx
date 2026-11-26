@@ -86,7 +86,12 @@ const AuthorizedDashboardDesigner: React.FC<DashboardDesignerProps> = ({
   const { showSuccessToast, showErrorToast, showWarningToast, showInfoToast } = useToast();
   const { t, locale } = useI18n();
 
-  const effectiveTitle = initialTitle || t('dashboard.designer.defaultTitle');
+  const defaultTitle = t('dashboard.designer.defaultTitle');
+  const effectiveTitle = initialTitle || defaultTitle;
+  const storedTitle = dashboard?.title ?? '';
+  const titleKey = storedTitle.startsWith('$i18n:') ? storedTitle.slice(6) : '';
+  const localizedTitle = titleKey ? t(titleKey) : storedTitle;
+  const displayTitle = localizedTitle && localizedTitle !== titleKey ? localizedTitle : defaultTitle;
 
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastSaveTimeRef = useRef<number>(0);
@@ -142,12 +147,12 @@ const AuthorizedDashboardDesigner: React.FC<DashboardDesignerProps> = ({
   // Update inputs when dashboard loads
   useEffect(() => {
     if (dashboard) {
-      setTitleInput(dashboard.title || '');
+      setTitleInput(displayTitle);
       setDescriptionInput(dashboard.description || '');
       setScopeInput(dashboard.scope || 'personal');
       setTeamIdInput(dashboard.teamId || '');
     }
-  }, [dashboard]);
+  }, [dashboard, displayTitle]);
 
   useEffect(() => {
     let mounted = true;
@@ -354,6 +359,7 @@ const AuthorizedDashboardDesigner: React.FC<DashboardDesignerProps> = ({
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-gray-50">
       {/* Toolbar */}
       <DesignerToolbar
+        displayTitle={displayTitle}
         onSave={handleSave}
         onPublish={handlePublish}
         onUnpublish={handleUnpublish}
@@ -402,7 +408,7 @@ const AuthorizedDashboardDesigner: React.FC<DashboardDesignerProps> = ({
           aria-label="Dashboard Settings"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
-              setTitleInput(dashboard?.title || '');
+              setTitleInput(displayTitle);
               setDescriptionInput(dashboard?.description || '');
               setScopeInput(dashboard?.scope || 'personal');
               setTeamIdInput(dashboard?.teamId || '');
@@ -411,7 +417,7 @@ const AuthorizedDashboardDesigner: React.FC<DashboardDesignerProps> = ({
           }}
           onKeyDown={(e) => {
             if (e.key === 'Escape') {
-              setTitleInput(dashboard?.title || '');
+              setTitleInput(displayTitle);
               setDescriptionInput(dashboard?.description || '');
               setScopeInput(dashboard?.scope || 'personal');
               setTeamIdInput(dashboard?.teamId || '');
@@ -427,10 +433,11 @@ const AuthorizedDashboardDesigner: React.FC<DashboardDesignerProps> = ({
             </div>
             <div className="space-y-4 p-6">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label htmlFor="dashboard-settings-title" className="mb-1 block text-sm font-medium text-gray-700">
                   {t('common.title')} <span className="text-red-500">*</span>
                 </label>
                 <input
+                  id="dashboard-settings-title"
                   type="text"
                   value={titleInput}
                   onChange={(e) => setTitleInput(e.target.value)}
@@ -504,7 +511,7 @@ const AuthorizedDashboardDesigner: React.FC<DashboardDesignerProps> = ({
               <button
                 onClick={() => {
                   // Reset to original values
-                  setTitleInput(dashboard?.title || '');
+                  setTitleInput(displayTitle);
                   setDescriptionInput(dashboard?.description || '');
                   setScopeInput(dashboard?.scope || 'personal');
                   setTeamIdInput(dashboard?.teamId || '');
@@ -525,7 +532,7 @@ const AuthorizedDashboardDesigner: React.FC<DashboardDesignerProps> = ({
                     return;
                   }
                   updateDashboardMeta({
-                    title: titleInput.trim(),
+                    title: titleInput.trim() === displayTitle && storedTitle ? storedTitle : titleInput.trim(),
                     description: descriptionInput.trim(),
                     scope: scopeInput,
                     teamId: scopeInput === 'team' ? teamIdInput.trim() : undefined,

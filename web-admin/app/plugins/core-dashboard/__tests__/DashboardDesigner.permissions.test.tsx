@@ -1,15 +1,20 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardDesigner } from '../DashboardDesigner';
 
 const mocks = vi.hoisted(() => ({
   hasPermission: vi.fn(), load: vi.fn(), create: vi.fn(), save: vi.fn(), reset: vi.fn(),
+  updateMeta: vi.fn(), dashboard: { pid: 'dashboard-1', title: 'Dashboard', scope: 'personal' },
 }));
 vi.mock('~/contexts/AuthContext', () => ({
   usePermissions: () => ({ hasPermission: mocks.hasPermission }),
 }));
 vi.mock('~/contexts/I18nContext', () => ({
-  useI18n: () => ({ locale: 'zh-CN', t: (key: string, _params: unknown, fallback?: string) => fallback ?? key }),
+  useI18n: () => ({
+    locale: 'zh-CN',
+    t: (key: string, _params: unknown, fallback?: string) =>
+      key === 'page.crm_dashboard.title' ? 'CRM 仪表盘' : fallback ?? key,
+  }),
 }));
 vi.mock('~/contexts/ToastContext', () => ({
   useToast: () => ({ showSuccessToast: vi.fn(), showErrorToast: vi.fn(), showWarningToast: vi.fn(), showInfoToast: vi.fn() }),
@@ -23,16 +28,26 @@ vi.mock('~/shared/versioning', () => ({
 vi.mock('../widgets/widgetRegistry', () => ({ widgetRegistry: {} }));
 vi.mock('../utils/createWidgetDraft', () => ({ createWidgetDraft: vi.fn() }));
 vi.mock('../components', () => ({
-  DesignerToolbar: ({ onSave }: { onSave: () => void }) => <button onClick={onSave}>Save dashboard</button>,
+  DesignerToolbar: ({ displayTitle, onSettings, onSave }: {
+    displayTitle: string;
+    onSettings: () => void;
+    onSave: () => void;
+  }) => (
+    <>
+      <h1>{displayTitle}</h1>
+      <button onClick={onSettings}>Dashboard settings</button>
+      <button onClick={onSave}>Save dashboard</button>
+    </>
+  ),
   WidgetPalette: () => <div>Palette content</div>, DesignerCanvas: () => null,
   WidgetPropertyPanel: () => null, BigScreenMode: () => null,
 }));
 vi.mock('../store/useDashboardStore', () => ({
   useDashboardStore: () => ({
-    dashboard: { pid: 'dashboard-1', title: 'Dashboard', scope: 'personal' },
+    dashboard: mocks.dashboard,
     isDirty: true, isLoading: false, isSaving: false,
     loadDashboard: mocks.load, createDashboard: mocks.create, saveDashboard: mocks.save,
-    reset: mocks.reset, validate: () => ({ valid: true, errors: [] }),
+    reset: mocks.reset, updateDashboardMeta: mocks.updateMeta, validate: () => ({ valid: true, errors: [] }),
   }),
 }));
 
@@ -40,6 +55,7 @@ describe('DashboardDesigner write permission boundary', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    mocks.dashboard.title = 'Dashboard';
     mocks.hasPermission.mockImplementation(code => code === 'dashboard.update');
     mocks.save.mockResolvedValue(undefined);
   });
@@ -75,6 +91,26 @@ describe('DashboardDesigner write permission boundary', () => {
     expect(screen.getByRole('button', { name: 'Save dashboard' })).toBeVisible();
     await act(async () => { await vi.advanceTimersByTimeAsync(31_000); });
     expect(mocks.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('displays the translated title and preserves its key until the title is renamed', () => {
+    const storedTitle = '$i18n:page.crm_dashboard.title';
+    mocks.dashboard.title = storedTitle;
+    render(<DashboardDesigner dashboardId="dashboard-1" />);
+    expect(screen.getByRole('heading', { name: 'CRM 仪表盘' })).toBeVisible();
+
+    const settings = screen.getByRole('button', { name: 'Dashboard settings' });
+    fireEvent.click(settings);
+    expect(screen.getByRole('textbox', { name: /common.title/ })).toHaveValue('CRM 仪表盘');
+    fireEvent.click(screen.getByRole('button', { name: 'common.save' }));
+    expect(mocks.updateMeta).toHaveBeenLastCalledWith(expect.objectContaining({ title: storedTitle }));
+
+    fireEvent.click(settings);
+    fireEvent.change(screen.getByRole('textbox', { name: /common.title/ }), {
+      target: { value: '销售仪表盘' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'common.save' }));
+    expect(mocks.updateMeta).toHaveBeenLastCalledWith(expect.objectContaining({ title: '销售仪表盘' }));
   });
 
   it('unmounts editor state and cancels pending auto-save when write access is revoked', async () => {
