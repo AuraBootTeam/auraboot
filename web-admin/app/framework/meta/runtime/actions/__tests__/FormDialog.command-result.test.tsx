@@ -761,8 +761,13 @@ describe('all native command prompt consumers acknowledge the same UI protocol',
       async (_url: string, options: { params: { targetRecordPid: string } }) =>
         options.params.targetRecordPid === 'A'
           ? { code: '0', data: {} }
-          : { code: '35000', httpStatus: 400, success: false, message: 'Bad parameter',
-              context: 'Plugin handler execution failed: Resolve the open association first' },
+          : {
+              code: '35000',
+              httpStatus: 400,
+              success: false,
+              message: 'Bad parameter',
+              context: 'Plugin handler execution failed: Resolve the open association first',
+            },
     );
     render(
       <Root>
@@ -772,13 +777,19 @@ describe('all native command prompt consumers acknowledge the same UI protocol',
     fireEvent.click(screen.getByRole('button', { name: 'Open action' }));
     await fill();
     fireEvent.click(screen.getByTestId('form-dialog-submit'));
-    await waitFor(() => expect(onResult).toHaveBeenCalledWith(expect.objectContaining({
-      successCount: 1,
-      failures: [expect.objectContaining({
-        recordPid: 'B',
-        reason: 'Resolve the open association first',
-      })],
-    })));
+    await waitFor(() =>
+      expect(onResult).toHaveBeenCalledWith(
+        expect.objectContaining({
+          successCount: 1,
+          failures: [
+            expect.objectContaining({
+              recordPid: 'B',
+              reason: 'Resolve the open association first',
+            }),
+          ],
+        }),
+      ),
+    );
     expect(refresh).toHaveBeenCalledOnce();
   });
   it('acknowledges an actual workbench poll terminal before the terminal read can fail', async () => {
