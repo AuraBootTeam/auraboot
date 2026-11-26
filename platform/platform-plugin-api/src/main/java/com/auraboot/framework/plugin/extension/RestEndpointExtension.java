@@ -44,4 +44,6 @@ public interface RestEndpointExtension extends ExtensionPoint {
     default int getPriority() {
         return 0;
     }
+    /** Metadata for a public GET that serves a published document. */
+    default RestPublication publicationRead(RestRoute route) { return null; }
 }

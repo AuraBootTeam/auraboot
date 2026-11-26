@@ -12,6 +12,10 @@ import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.plugin.extension.AuthPolicy;
+import com.auraboot.framework.plugin.extension.DataAccessor;
+import com.auraboot.framework.plugin.extension.IdentityDirectoryAccessor;
+import com.auraboot.framework.plugin.extension.PluginRequestContext;
+import com.auraboot.framework.plugin.extension.RestPublicationPublisher;
 import com.auraboot.framework.plugin.pf4j.RestEndpointRegistry;
 import com.auraboot.framework.saas.config.service.SystemModeService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,7 +29,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 import java.util.Optional;
+import java.time.ZoneId;
 
 /**
  * Single platform-owned dispatcher for plugin-contributed REST endpoints, mounted at
@@ -43,7 +49,7 @@ import java.util.Optional;
 @Slf4j
 @RestController
 @RequestMapping("/api/ext")
-@RequiredArgsConstructor
+@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
 public class PluginRestDispatcher {
 
     /** Per-IP requests/minute budget for PUBLIC plugin endpoints (mandatory abuse guard). */
@@ -56,6 +62,13 @@ public class PluginRestDispatcher {
     private final RestEndpointPipeline pipeline;
     private final ApiRateLimiter rateLimiter;
     private final SystemModeService systemModeService;
+    private final RestPublicationStore publications;
+
+    PluginRestDispatcher(RestEndpointRegistry registry, UserPermissionService userPermissionService,
+                         PluginRequestContextFactory contextFactory, RestEndpointPipeline pipeline,
+                         ApiRateLimiter rateLimiter, SystemModeService systemModeService) {
+        this(registry, userPermissionService, contextFactory, pipeline, rateLimiter, systemModeService, null);
+    }
 
     @AuthenticatedAccess("Dispatch delegates authorization to the registered route policy and permission guard")
     @RequestMapping("/{namespace}/**")
@@ -92,7 +105,7 @@ public class PluginRestDispatcher {
                 || !userPermissionService.hasPermission(userId, permission)) {
             throw new AccessDeniedException("Missing permission for plugin route: " + permission);
         }
-        runAndFlush(m, httpReq, httpRes, false);
+        runAndFlush(m, httpReq, httpRes, false, null);
     }
 
     /**
@@ -111,10 +124,23 @@ public class PluginRestDispatcher {
             writeError(httpRes, SC_TOO_MANY_REQUESTS, "Too many requests");
             return;
         }
-        Long defaultTenant = systemModeService.getDefaultTenantId();
-        MetaContext.setContext(defaultTenant, 0L, "public", "public");
+        RestPublicationStore.Published publication = null;
+        var declaration = m.extension().publicationRead(m.route());
+        if (declaration != null) {
+            if (publications == null || !"GET".equals(m.route().method()) || !m.route().readOnlyTx()) {
+                throw new AccessDeniedException("Invalid public publication route");
+            }
+            publication = publications.find(namespace, declaration.kind(), m.pathVars().get(declaration.pathVariable()))
+                    .orElse(null);
+            if (publication == null) {
+                writeError(httpRes, HttpServletResponse.SC_NOT_FOUND, "Publication unavailable");
+                return;
+            }
+        }
+        Long tenant = publication == null ? systemModeService.getDefaultTenantId() : publication.tenantId();
+        MetaContext.setContext(tenant, 0L, "public", "public");
         try {
-            runAndFlush(m, httpReq, httpRes, true);
+            runAndFlush(m, httpReq, httpRes, true, publication);
         } finally {
             MetaContext.clear();
         }
@@ -129,12 +155,18 @@ public class PluginRestDispatcher {
     private void runAndFlush(RestEndpointRegistry.Match m,
                              HttpServletRequest httpReq,
                              HttpServletResponse httpRes,
-                             boolean isPublic) throws IOException {
+                             boolean isPublic, RestPublicationStore.Published publication) throws IOException {
         ServletPluginHttpRequest req = new ServletPluginHttpRequest(httpReq, m.pathVars());
         try {
             var models=m.extension().tenantProjectionReadModels(m.route());
             if(models==null)throw new AccessDeniedException("Invalid route projection declaration");
             var context=models.isEmpty()?contextFactory.current(isPublic):contextFactory.current(isPublic,m.route(),models);
+            if (publication != null) {
+                context = new PublicationContext(context, null, publication.document());
+            } else if (!isPublic && publications != null && !m.route().readOnlyTx()) {
+                context = new PublicationContext(context,
+                        publications.publisher(m.extension().namespace(), context.tenantId(), context.userId()), Map.of());
+            }
             BufferingPluginHttpResponse buffered = pipeline.execute(m, req, context);
             buffered.flushTo(httpRes);
         } catch (ValidationException e) {
@@ -160,6 +192,25 @@ public class PluginRestDispatcher {
             }
             log.error("Plugin REST endpoint {} {} failed", httpReq.getMethod(), httpReq.getRequestURI(), e);
             writeError(httpRes, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Internal error");
+        }
+    }
+
+    private record PublicationContext(PluginRequestContext delegate, RestPublicationPublisher publisher,
+                                      Map<String, Object> publishedDocument) implements PluginRequestContext {
+        @Override public Long tenantId() { return delegate.tenantId(); }
+        @Override public Long userId() { return delegate.userId(); }
+        @Override public ZoneId zoneId() { return delegate.zoneId(); }
+        @Override public String generateId() { return delegate.generateId(); }
+        @Override public boolean isPublic() { return delegate.isPublic(); }
+        @Override public DataAccessor dataAccessor() {
+            if (isPublic()) throw new AccessDeniedException("Published documents do not grant business data access");
+            return delegate.dataAccessor();
+        }
+        @Override public IdentityDirectoryAccessor.UserIdentity findActiveTenantUser(String userPid) {
+            return delegate.findActiveTenantUser(userPid);
+        }
+        @Override public RestPublicationPublisher publicationPublisher() {
+            return publisher == null ? PluginRequestContext.super.publicationPublisher() : publisher;
         }
     }
 

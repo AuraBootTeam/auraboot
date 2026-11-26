@@ -218,6 +218,44 @@ class PluginRestDispatcherTest {
     }
 
     @Test
+    void publicationReadBindsThePublishedTenantWithNoBusinessDataAccess() throws Exception {
+        var store = mock(RestPublicationStore.class);
+        var published = new PluginRestDispatcher(registry, perms, ctxFactory, pipeline, rateLimiter, systemModeService, store);
+        var ext = mock(RestEndpointExtension.class);
+        var route = new RestRoute("GET", "/public/forms/{pid}/sdk.js", null, AuthPolicy.PUBLIC, false, true, null);
+        when(ext.publicationRead(route)).thenReturn(new com.auraboot.framework.plugin.extension.RestPublication("form", "pid"));
+        when(registry.match("probe", "GET", "/public/forms/F1/sdk.js"))
+                .thenReturn(Optional.of(new RestEndpointRegistry.Match(ext, route, Map.of("pid", "F1"))));
+        when(rateLimiter.isAllowed(anyString(), org.mockito.ArgumentMatchers.anyInt())).thenReturn(true);
+        when(store.find("probe", "form", "F1"))
+                .thenReturn(Optional.of(new RestPublicationStore.Published(31L, Map.of("label", "Public"))));
+        var context = mock(PluginRequestContext.class);
+        when(context.tenantId()).thenReturn(31L);
+        when(context.isPublic()).thenReturn(true);
+        when(ctxFactory.current(true)).thenReturn(context);
+        when(pipeline.execute(any(), any(), any())).thenAnswer(call -> {
+            PluginRequestContext current = call.getArgument(2);
+            assertThat(MetaContext.getCurrentTenantId()).isEqualTo(31L);
+            assertThat(current.publishedDocument()).containsEntry("label", "Public");
+            assertThatThrownBy(current::dataAccessor).isInstanceOf(AccessDeniedException.class);
+            assertThatThrownBy(current::publicationPublisher).isInstanceOf(UnsupportedOperationException.class);
+            return okBuffer();
+        });
+        var req = new MockHttpServletRequest("GET", "/api/ext/probe/public/forms/F1/sdk.js");
+        var response = new MockHttpServletResponse();
+        published.dispatch("probe", req, response);
+        assertThat(response.getStatus()).isEqualTo(200);
+        verify(systemModeService, never()).getDefaultTenantId();
+        assertThat(MetaContext.exists()).isFalse();
+
+        when(store.find("probe", "form", "F1")).thenReturn(Optional.empty());
+        var withdrawn = new MockHttpServletResponse();
+        published.dispatch("probe", req, withdrawn);
+        assertThat(withdrawn.getStatus()).isEqualTo(404);
+        verify(pipeline).execute(any(), any(), any());
+    }
+
+    @Test
     void unmatchedRoute_returns404() throws Exception {
         MockHttpServletRequest req = new MockHttpServletRequest("GET", "/api/ext/probe/nope");
         MockHttpServletResponse res = new MockHttpServletResponse();

@@ -1,6 +1,7 @@
 package com.auraboot.framework.plugin.extension;
 
 import java.time.ZoneId;
+import java.util.Map;
 
 /**
  * Per-request context the host injects into a {@link RestEndpointExtension} handler.
@@ -33,4 +34,11 @@ public interface PluginRequestContext {
 
     /** Resolve display identity only within this authenticated request's active tenant membership. */
     default IdentityDirectoryAccessor.UserIdentity findActiveTenantUser(String userPid) { return null; }
+    /** Scoped to the registered namespace and tenant of the authenticated write. */
+    default RestPublicationPublisher publicationPublisher() {
+        throw new UnsupportedOperationException("REST publishing is unavailable");
+    }
+
+    /** Document resolved for this public GET, independent of business data access. */
+    default Map<String, Object> publishedDocument() { return Map.of(); }
 }
