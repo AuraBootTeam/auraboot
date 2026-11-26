@@ -234,7 +234,7 @@ public class InstalledIntegrationService {
             String durable = "ext:" + principal.installationPid() + ":" + source + ":" + external;
             Resolved resolved = resolve(principal, source, external, durable);
             verifyEnvelope(resolved, envelope);
-            var original = receipts.find(principal.tenantId(), principal.installationPid(), source, external);
+            var original = receipts.findSnapshot(principal.tenantId(), principal.installationPid(), source, external);
             if (original == null || !Set.of("accepted", "completed").contains(original.state())
                     || !validRequestPid(original.requestPid()))
                 throw new ExternalEventIngressService.IdempotencyConflictException();
@@ -332,7 +332,7 @@ public class InstalledIntegrationService {
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public Map<String,Object> result(MachinePrincipal principal, String source, String eventId) {
         return inTenant(principal.tenantId(),principal.installationPid(), () -> {
-            var r = receipts.find(principal.tenantId(),principal.installationPid(),source,eventId);
+            var r = receipts.findSnapshot(principal.tenantId(),principal.installationPid(),source,eventId);
             if (r == null) throw denied();
             Resolved resolved = resolve(principal,source,eventId,r.durableEventId());
             if (!r.bindingSha256().equals(resolved.bindingHash()) || !commandMatches(resolved,r)

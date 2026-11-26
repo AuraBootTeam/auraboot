@@ -214,3 +214,18 @@ assert the physical connection's isolation, join the declared command transactio
 a private fixture table, and then retain the original authority denial. The outer rollback
 removes that fixture write. These tests establish the transaction boundary; native ingress
 accept/process/result journeys separately establish successful machine behavior.
+
+Result polling and accepted replay verification read an installed receipt through a non-locking
+snapshot query. They observe receipt state and immutable binding fingerprints; neither owns the
+consumer's transition. A receipt changed after the REPEATABLE READ snapshot can legitimately
+remain at its prior state for that poll. A later poll opens a new snapshot and observes completion.
+Using `FOR UPDATE` for this observation can raise PostgreSQL serialization failure when a
+consumer commits after the snapshot, making an ordinary result GET fail instead of returning a
+coherent prior state. Consumption, acceptance takeover checks, synchronous replay checks and
+explicit receipt recovery retain their existing locking reads and conditional write guards.
+
+The concurrent receipt integration case uses the real production MyBatis snapshot query against
+a private PostgreSQL table. A second physical connection commits completion after the result
+proxy establishes its snapshot. The poll reads the prior accepted state without locking, and a
+subsequent transaction reads completed. Binding denial remains an explicit seam after that read;
+this case proves concurrent observation, not a successful installed machine response.

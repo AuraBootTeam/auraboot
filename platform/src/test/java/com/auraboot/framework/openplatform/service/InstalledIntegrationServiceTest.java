@@ -47,6 +47,11 @@ class InstalledIntegrationServiceTest {
     InstalledIntegrationService service;
     final Map<String,CommandDefinition> metadata = new HashMap<>();
 
+    private void stubReceipt(InstalledIntegrationReceiptMapper.Receipt receipt) {
+        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(receipt);
+        when(receipts.findSnapshot(42L,"inst",source,"evt-1")).thenReturn(receipt);
+    }
+
     @BeforeEach void setup() throws Exception {
         service = new InstalledIntegrationService(registry,handlers,plugins,installations,scopes,commands,owners,receipts,executor,users,members,json,new OpenPlatformSecretCodec());
         when(registry.registration(source)).thenReturn(Optional.of(Map.entry(registration,"sha256:"+"a".repeat(64))));
@@ -283,7 +288,7 @@ class InstalledIntegrationServiceTest {
         // Authorization-shape check only; durable replay is qualified against real HTTP/PostgreSQL.
         service.accept(principal,source,event());var original=acceptedReceipt();
         when(receipts.claim(any())).thenReturn(0);
-        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(receiptWith(original,
+        stubReceipt(receiptWith(original,
                 "completed","request-pid",original.bindingSha256(),original.commandSha256()));
         appendUnrelatedInstallation();
         clearInvocations(executor);
@@ -295,15 +300,15 @@ class InstalledIntegrationServiceTest {
         // Authorization and call-shape only; persistence is qualified by installed HTTP/PostgreSQL.
         service.accept(principal,source,event());var original=acceptedReceipt();
         clearInvocations(receipts,executor);
-        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(original);
+        stubReceipt(original);
         assertEquals(new InstalledIntegrationService.Acceptance("request-pid",true),service.verifyAcceptedReplay(principal,source,event()));
         assertThrows(ExternalEventIngressService.IdempotencyConflictException.class,
                 ()->service.verifyAcceptedReplay(principal,source,event(Map.of("title","Changed"))));
-        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(receiptWith(original,"accepting",null,original.bindingSha256(),original.commandSha256()));
+        stubReceipt(receiptWith(original,"accepting",null,original.bindingSha256(),original.commandSha256()));
         assertThrows(ExternalEventIngressService.IdempotencyConflictException.class,()->service.verifyAcceptedReplay(principal,source,event()));
-        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(receiptWith(original,"completed","request-pid","different-binding",original.commandSha256()));
+        stubReceipt(receiptWith(original,"completed","request-pid","different-binding",original.commandSha256()));
         assertThrows(SecurityException.class,()->service.verifyAcceptedReplay(principal,source,event()));
-        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(null);
+        stubReceipt(null);
         assertThrows(ExternalEventIngressService.IdempotencyConflictException.class,()->service.verifyAcceptedReplay(principal,source,event()));
         verify(receipts,never()).claim(any());
         verify(receipts,never()).accepted(anyLong(),anyString(),anyString(),anyString(),anyString());
@@ -317,7 +322,7 @@ class InstalledIntegrationServiceTest {
         String legacyHash=service.commandHash(registration,originalConfigs);
         service.accept(principal,source,event());var original=acceptedReceipt();
         when(receipts.claim(any())).thenReturn(0);
-        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(receiptWith(original,
+        stubReceipt(receiptWith(original,
                 "completed","request-pid",original.bindingSha256(),legacyHash));
         appendUnrelatedInstallation();
         clearInvocations(executor);
@@ -365,24 +370,24 @@ class InstalledIntegrationServiceTest {
         when(registry.completedReceiptRegistrations(source)).thenReturn(Set.of(registration));
         when(receipts.claim(any())).thenReturn(0);
         var completed=receiptWith(old,"completed","request-pid",old.bindingSha256(),old.commandSha256());
-        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(completed);clearInvocations(executor);
+        stubReceipt(completed);clearInvocations(executor);
         assertTrue(service.accept(principal,source,event()).duplicate());service.consume(event());verifyNoInteractions(executor);
         when(executor.execute(eq(result),any())).thenReturn(CommandExecuteResult.builder().phaseReached("completed")
                 .data(Map.of("recordPid","request-pid","state","completed")).build());
         assertEquals("request-pid",service.result(principal,source,"evt-1").get("recordPid"));
         clearInvocations(executor);
-        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(old);
+        stubReceipt(old);
         assertThrows(SecurityException.class,()->service.accept(principal,source,event()));
         assertThrows(SecurityException.class,()->service.consume(event()));
         assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"));verifyNoInteractions(executor);
-        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(completed);
+        stubReceipt(completed);
         when(registry.completedReceiptRegistrations(source)).thenReturn(Set.of());
         assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"));
     }
     @Test void completedReceiptAllowsOnlyDeclaredReadAdditionOnProcess() throws Exception {
         service.accept(principal,source,event());var original=acceptedReceipt();
         var completed=receiptWith(original,"completed","request-pid",original.bindingSha256(),original.commandSha256());
-        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(completed);when(receipts.claim(any())).thenReturn(0);
+        stubReceipt(completed);when(receipts.claim(any())).thenReturn(0);
         addMachineReadGrant(process,"internal_address_history");
         when(registry.completedReceiptProcessReadAdditions(eq(registration),anyString())).thenReturn(Set.of("internal_address_history"));
         upgradeProvider();clearInvocations(executor,receipts);
@@ -404,7 +409,7 @@ class InstalledIntegrationServiceTest {
         metadata.get(process).setExecutionConfig(baseline.toString());
         service.accept(principal,source,event());var original=acceptedReceipt();
         var completed=receiptWith(original,"completed","request-pid",original.bindingSha256(),original.commandSha256());
-        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(completed);when(receipts.claim(any())).thenReturn(0);
+        stubReceipt(completed);when(receipts.claim(any())).thenReturn(0);
         appendReadFields();
         when(registry.completedReceiptProcessReadFieldAdditions(eq(registration),anyString()))
                 .thenReturn(Map.of("native_source",Set.of("closed","project","organization_snapshot")));
@@ -415,7 +420,7 @@ class InstalledIntegrationServiceTest {
         clearInvocations(executor);assertTrue(service.accept(principal,source,event()).duplicate());service.consume(event());verifyNoInteractions(executor);
         assertThrows(ExternalEventIngressService.IdempotencyConflictException.class,()->service.accept(principal,source,event(Map.of("title","changed"))));
         for(String state:List.of("accepting","accepted","failed")) {
-            when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(receiptWith(original,state,"request-pid",original.bindingSha256(),original.commandSha256()));
+            stubReceipt(receiptWith(original,state,"request-pid",original.bindingSha256(),original.commandSha256()));
             assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"),state);
             assertThrows(SecurityException.class,()->service.accept(principal,source,event()),state);
             assertThrows(SecurityException.class,()->service.consume(event()),state);
@@ -425,7 +430,7 @@ class InstalledIntegrationServiceTest {
 
     @Test void fieldReadPredecessorNeverAllowsOtherWritesReadsCommandsOrBindingChanges() throws Exception {
         addMachineReadGrant(process,"native_source");service.accept(principal,source,event());var original=acceptedReceipt();
-        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(receiptWith(original,"completed","request-pid",original.bindingSha256(),original.commandSha256()));
+        stubReceipt(receiptWith(original,"completed","request-pid",original.bindingSha256(),original.commandSha256()));
         when(receipts.claim(any())).thenReturn(0);
         var initial=new HashMap<String,String>();metadata.forEach((code,value)->initial.put(code,value.getExecutionConfig()));
         for(String fault:List.of("undeclared","missing-field","other-read","lost-original-read","write","accept","result","binding")) {
@@ -485,7 +490,7 @@ class InstalledIntegrationServiceTest {
         clearInvocations(executor);
         for(String state:List.of("accepting","accepted","failed","completed")) {
             var r=receiptWith(original,state,state.equals("completed")?"invalid pid":"request-pid",original.bindingSha256(),original.commandSha256());
-            when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(r);
+            stubReceipt(r);
             assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"),state);
             assertThrows(SecurityException.class,()->service.accept(principal,source,event()),state);
             assertThrows(SecurityException.class,()->service.consume(event()),state);
@@ -497,7 +502,7 @@ class InstalledIntegrationServiceTest {
         service.accept(principal,source,event());var original=acceptedReceipt();
         var completed=receiptWith(original,"completed","request-pid",original.bindingSha256(),original.commandSha256());
         var initial=new HashMap<String,String>();metadata.forEach((code,value)->initial.put(code,value.getExecutionConfig()));
-        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(completed);when(receipts.claim(any())).thenReturn(0);
+        stubReceipt(completed);when(receipts.claim(any())).thenReturn(0);
         for(String fault:List.of("result","accept","other-process-setting","write-on-added-model","unrelated-write","binding","undeclared")) {
             initial.forEach((code,value)->metadata.get(code).setExecutionConfig(value));addMachineReadGrant(process,"internal_address_history");
             when(registry.completedReceiptProcessReadAdditions(eq(registration),anyString())).thenReturn(
@@ -537,7 +542,7 @@ class InstalledIntegrationServiceTest {
     @Test void compatibleCompletedQueryStillRejectsAResultForAnotherRecord() throws Exception {
         service.accept(principal,source,event());var original=acceptedReceipt();addMachineReadGrant(process,"internal_address_history");
         when(registry.completedReceiptProcessReadAdditions(eq(registration),anyString())).thenReturn(Set.of("internal_address_history"));
-        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(receiptWith(original,"completed","request-pid",original.bindingSha256(),original.commandSha256()));
+        stubReceipt(receiptWith(original,"completed","request-pid",original.bindingSha256(),original.commandSha256()));
         when(executor.execute(eq(result),any())).thenReturn(CommandExecuteResult.builder().phaseReached("completed")
                 .data(Map.of("recordPid","foreign-pid","state","completed")).build());
         clearInvocations(executor);
@@ -548,7 +553,7 @@ class InstalledIntegrationServiceTest {
     @Test void completedReceiptSurvivesProviderUpgradeWithoutRepeatingBusinessCommands() {
         service.accept(principal,source,event());var r=acceptedReceipt();
         var completed=receiptWith(r,"completed","request-pid",r.bindingSha256(),r.commandSha256());
-        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(completed);when(receipts.claim(any())).thenReturn(0);
+        stubReceipt(completed);when(receipts.claim(any())).thenReturn(0);
         upgradeProvider();clearInvocations(executor,receipts);
         assertEquals(new InstalledIntegrationService.Acceptance("request-pid",true),service.accept(principal,source,event()));
         service.consume(event());verifyNoInteractions(executor);
@@ -567,7 +572,7 @@ class InstalledIntegrationServiceTest {
         when(receipts.claim(any())).thenReturn(0);
         for(String state:List.of("accepting","accepted","failed","completed")) {
             var invalid=receiptWith(r,state,state.equals("completed")?"invalid pid":"request-pid",r.bindingSha256(),r.commandSha256());
-            when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(invalid);
+            stubReceipt(invalid);
             assertThrows(SecurityException.class,()->service.accept(principal,source,event()),state);
             assertThrows(SecurityException.class,()->service.consume(event()),state);
             assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"),state);
@@ -579,12 +584,12 @@ class InstalledIntegrationServiceTest {
         when(receipts.claim(any())).thenReturn(0);
         for(var changed:List.of(receiptWith(r,"completed","request-pid","changed",r.commandSha256()),
                 receiptWith(r,"completed","request-pid",r.bindingSha256(),"changed"))) {
-            when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(changed);
+            stubReceipt(changed);
             assertThrows(SecurityException.class,()->service.accept(principal,source,event()));
             assertThrows(SecurityException.class,()->service.consume(event()));
             assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"));
         }
-        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(receiptWith(r,"completed","request-pid",r.bindingSha256(),r.commandSha256()));
+        stubReceipt(receiptWith(r,"completed","request-pid",r.bindingSha256(),r.commandSha256()));
         assertThrows(SecurityException.class,()->service.consume(event(Map.of("title","forged"))));
         var foreign=new MachinePrincipal(43L,"token","app",principal.scopes(),"app","inst","test","token");
         assertThrows(SecurityException.class,()->service.result(foreign,source,"evt-1"));
@@ -592,7 +597,7 @@ class InstalledIntegrationServiceTest {
     }
     @Test void currentResultQueryMustReturnExactlyTheOriginalReceiptRecord() {
         service.accept(principal,source,event());var r=acceptedReceipt();
-        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(r);
+        stubReceipt(r);
         for(Map<String,Object> data:List.<Map<String,Object>>of(Map.of("recordPid","foreign-pid"),Map.of("state","completed"))) {
             when(executor.execute(eq(result),any())).thenReturn(CommandExecuteResult.builder().phaseReached("completed").data(data).build());
             assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"));
@@ -629,7 +634,7 @@ class InstalledIntegrationServiceTest {
     }
     @Test void permanentIntentReplayDoesNotRunAcceptOrProcessAgain() {
         service.accept(principal,source,event());var r=acceptedReceipt();clearInvocations(executor);
-        when(receipts.claim(any())).thenReturn(0);when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(r);
+        when(receipts.claim(any())).thenReturn(0);stubReceipt(r);
         assertTrue(service.accept(principal,source,event()).duplicate());verifyNoInteractions(executor);
         var original=event();var headers=new HashMap<>(original.headers());headers.put("requestId","new-http-trace");
         var retried=new IntegrationEventEnvelope(original.schemaVersion(),original.eventId(),original.eventType(),original.source(),
@@ -638,7 +643,7 @@ class InstalledIntegrationServiceTest {
         assertThrows(ExternalEventIngressService.IdempotencyConflictException.class,()->service.accept(principal,source,event(Map.of("title","different"))));
     }
     @Test void reliableConsumerRequiresOriginalProvenanceThenExecutesFixedProcess() {
-        service.accept(principal,source,event());var r=acceptedReceipt();when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(r);
+        service.accept(principal,source,event());var r=acceptedReceipt();stubReceipt(r);
         when(executor.execute(eq(process),any())).thenReturn(CommandExecuteResult.builder().phaseReached("completed").data(Map.of("state","completed")).build());
         service.consume(event());var request=ArgumentCaptor.forClass(CommandExecuteRequest.class);verify(executor).execute(eq(process),request.capture());
         assertEquals("request-pid",request.getValue().getTargetRecordPid());assertEquals(Map.of("requestPid","request-pid"),request.getValue().getPayload());
@@ -646,7 +651,7 @@ class InstalledIntegrationServiceTest {
     }
     @Test void processReceivesOriginalVerifiedEnvelopeButResultHasNoInventedEvent() {
         service.accept(principal,source,event());var receipt=acceptedReceipt();
-        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(receipt);
+        stubReceipt(receipt);
         when(executor.execute(eq(process),any())).thenAnswer(call->{
             var settings=new HashMap<String,Object>();InstalledIntegrationExecution.install(process,42L,settings);
             var facts=(InstalledIntegrationEvent)settings.get(InstalledIntegrationEvent.SETTINGS_KEY);
@@ -664,7 +669,7 @@ class InstalledIntegrationServiceTest {
     }
 
     @Test void failedAttemptIsVisibleWhilePendingOrProcessingAndClearsAfterDelivery() {
-        service.accept(principal,source,event());var r=acceptedReceipt();when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(r);
+        service.accept(principal,source,event());var r=acceptedReceipt();stubReceipt(r);
         when(executor.execute(eq(result),any())).thenReturn(CommandExecuteResult.builder().phaseReached("completed")
                 .data(Map.of("recordPid","request-pid","state","accepted")).build());
         when(receipts.delivery(42L,r.durableEventId())).thenReturn(
@@ -683,7 +688,7 @@ class InstalledIntegrationServiceTest {
     }
 
     @Test void firstAttemptAndUnavailableDeliveryDoNotInventAnExecutionFailure() {
-        service.accept(principal,source,event());var r=acceptedReceipt();when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(r);
+        service.accept(principal,source,event());var r=acceptedReceipt();stubReceipt(r);
         when(executor.execute(eq(result),any())).thenReturn(CommandExecuteResult.builder().phaseReached("completed")
                 .data(Map.of("recordPid","request-pid","state","accepted")).build());
         when(receipts.delivery(42L,r.durableEventId())).thenReturn(
@@ -696,7 +701,7 @@ class InstalledIntegrationServiceTest {
     }
 
     @Test void unknownDeliveryStatesStillRejectEvenWithAnEarlierFailedAttempt() {
-        service.accept(principal,source,event());var r=acceptedReceipt();when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(r);
+        service.accept(principal,source,event());var r=acceptedReceipt();stubReceipt(r);
         when(executor.execute(eq(result),any())).thenReturn(CommandExecuteResult.builder().phaseReached("completed")
                 .data(Map.of("recordPid","request-pid","state","accepted")).build());
         when(receipts.delivery(42L,r.durableEventId())).thenReturn(new InstalledIntegrationReceiptMapper.Delivery("forged",true));
@@ -704,7 +709,7 @@ class InstalledIntegrationServiceTest {
     }
 
     @Test void hostOwnedFailureCodeCannotLeakStaleBusinessReaderDetailsAfterSuccess() {
-        service.accept(principal,source,event());var r=acceptedReceipt();when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(r);
+        service.accept(principal,source,event());var r=acceptedReceipt();stubReceipt(r);
         when(executor.execute(eq(result),any())).thenReturn(CommandExecuteResult.builder().phaseReached("completed")
                 .data(Map.of("recordPid","request-pid","state","completed","deliveryFailureCode","stale internal error text")).build());
         when(receipts.delivery(42L,r.durableEventId())).thenReturn(new InstalledIntegrationReceiptMapper.Delivery("delivered",true));
@@ -713,7 +718,7 @@ class InstalledIntegrationServiceTest {
     }
 
     @Test void ownerScopedResultAlwaysExecutesReadAndNeverCachesInitialAcceptedState() {
-        service.accept(principal,source,event());var r=acceptedReceipt();when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(r);
+        service.accept(principal,source,event());var r=acceptedReceipt();stubReceipt(r);
         when(executor.execute(eq(result),any())).thenReturn(
             CommandExecuteResult.builder().phaseReached("completed").data(Map.of("recordPid","request-pid","state","accepted")).build(),
             CommandExecuteResult.builder().phaseReached("completed").data(Map.of("recordPid","request-pid","state","completed","taskPid","task")).build());
@@ -731,7 +736,7 @@ class InstalledIntegrationServiceTest {
 
     @Test void bindingRevisionDriftAndMissingReceiptCannotBeConsumed() {
         assertThrows(SecurityException.class,()->service.consume(event()));service.accept(principal,source,event());var r=acceptedReceipt();
-        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(r);
+        stubReceipt(r);
         metadata.get(process).setExecutionConfig(metadata.get(process).getExecutionConfig().replace("\"revision\":1","\"revision\":2"));
         assertThrows(SecurityException.class,()->service.consume(event()));verify(executor,never()).execute(eq(process),any());
     }
@@ -841,7 +846,7 @@ class InstalledIntegrationServiceTest {
     @Test void scopedSecretReadAdditionKeepsOnlyTerminalHistoricalReceiptsCompatible() throws Exception {
         service.accept(principal,source,event());var original=acceptedReceipt();
         var completed=receiptWith(original,"completed","request-pid",original.bindingSha256(),original.commandSha256());
-        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(completed);when(receipts.claim(any())).thenReturn(0);
+        stubReceipt(completed);when(receipts.claim(any())).thenReturn(0);
         var processConfig=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(metadata.get(process).getExecutionConfig());
         var params=(com.fasterxml.jackson.databind.node.ObjectNode)processConfig.get("handlerParams");
         params.put("tenantSecretRead",true);params.putArray("tenantSecretFields").add("appSecret").add("password");params.putArray("tenantSecretServiceTypes").add("integration");
@@ -852,7 +857,7 @@ class InstalledIntegrationServiceTest {
         assertEquals("request-pid",service.result(principal,source,"evt-1").get("recordPid"));clearInvocations(executor);
         assertTrue(service.accept(principal,source,event()).duplicate());service.consume(event());verifyNoInteractions(executor);
         for(String state:List.of("accepted","failed","accepting")) {
-            when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(receiptWith(original,state,"request-pid",original.bindingSha256(),original.commandSha256()));
+            stubReceipt(receiptWith(original,state,"request-pid",original.bindingSha256(),original.commandSha256()));
             assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"),state);
             assertThrows(SecurityException.class,()->service.consume(event()),state);
         }
@@ -864,7 +869,7 @@ class InstalledIntegrationServiceTest {
         metadata.get(process).setExecutionConfig(root.toString());
         service.accept(principal,source,event());var original=acceptedReceipt();
         var completed=receiptWith(original,"completed","request-pid",original.bindingSha256(),original.commandSha256());
-        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(completed);when(receipts.claim(any())).thenReturn(0);
+        stubReceipt(completed);when(receipts.claim(any())).thenReturn(0);
         ((com.fasterxml.jackson.databind.node.ObjectNode)params.at("/installedMachineData/native_receipt")).putArray("create").add("quantity").add("source_ref");
         params.put("tenantSecretRead",true);params.putArray("tenantSecretFields").add("password");params.putArray("tenantSecretServiceTypes").add("integration");
         params.putArray("receiptReadContracts").addObject().put("connectionPid","own-connection");
@@ -877,11 +882,11 @@ class InstalledIntegrationServiceTest {
         assertEquals("request-pid",service.result(principal,source,"evt-1").get("recordPid"));clearInvocations(executor);
         assertTrue(service.accept(principal,source,event()).duplicate());service.consume(event());verifyNoInteractions(executor);
         for(String state:List.of("accepted","accepting","failed")) {
-            when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(receiptWith(original,state,"request-pid",original.bindingSha256(),original.commandSha256()));
+            stubReceipt(receiptWith(original,state,"request-pid",original.bindingSha256(),original.commandSha256()));
             assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"),state);
             assertThrows(SecurityException.class,()->service.consume(event()),state);
         }
-        when(receipts.find(42L,"inst",source,"evt-1")).thenReturn(completed);
+        stubReceipt(completed);
         params.put("undeclared",true);metadata.get(process).setExecutionConfig(root.toString());
         assertThrows(SecurityException.class,()->service.result(principal,source,"evt-1"));
     }

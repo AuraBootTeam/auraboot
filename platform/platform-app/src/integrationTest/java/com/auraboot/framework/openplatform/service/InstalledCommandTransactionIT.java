@@ -103,7 +103,7 @@ class InstalledCommandTransactionIT {
 
     @Test void resultOpensThePhysicalSnapshotBeforeDispatchAndKeepsMissingReceiptDenialAtomic() {
         var receipts = mock(InstalledIntegrationReceiptMapper.class);
-        when(receipts.find(1L, "installation", "source", "event")).thenAnswer(invocation -> {
+        when(receipts.findSnapshot(1L, "installation", "source", "event")).thenAnswer(invocation -> {
             assertEquals(1L, MetaContext.getCurrentTenantId());
             verifyPhysicalSnapshotAndJoinCommand();
             return null;
@@ -119,6 +119,63 @@ class InstalledCommandTransactionIT {
         assertThrows(SecurityException.class, () -> proxy.result(principal(), "source", "event"));
         assertEquals(1, callbacks.get());
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM " + schema + ".probe", Integer.class));
+    }
+
+    @Test void resultSnapshotSurvivesConcurrentConsumerCompletionWithoutLockingItsReceipt() throws Exception {
+        jdbc.execute("CREATE TABLE " + schema + ".ab_installed_integration_receipt ("
+                + "tenant_id bigint NOT NULL,installation_pid text NOT NULL,source_code text NOT NULL,"
+                + "external_event_id text NOT NULL,durable_event_id text NOT NULL,envelope_sha256 text NOT NULL,"
+                + "binding_sha256 text NOT NULL,command_sha256 text NOT NULL,provider_sha256 text NOT NULL,"
+                + "request_pid text,state text NOT NULL,updated_at timestamptz NOT NULL DEFAULT now(),"
+                + "PRIMARY KEY(tenant_id,installation_pid,source_code,external_event_id))");
+        jdbc.update("INSERT INTO " + schema + ".ab_installed_integration_receipt VALUES "
+                + "(1,'installation','source','event','durable','envelope','binding','command','provider',"
+                + "'request','accepted',now())");
+        var properties = new java.util.Properties();
+        properties.setProperty("currentSchema", schema);
+        source.setConnectionProperties(properties);
+        var configuration = new com.baomidou.mybatisplus.core.MybatisConfiguration();
+        configuration.setEnvironment(new org.apache.ibatis.mapping.Environment("receipt-snapshot-it",
+                new org.mybatis.spring.transaction.SpringManagedTransactionFactory(), source));
+        configuration.setMapUnderscoreToCamelCase(true);
+        configuration.addMapper(InstalledIntegrationReceiptMapper.class);
+        var factory = new com.baomidou.mybatisplus.core.MybatisSqlSessionFactoryBuilder().build(configuration);
+        var mapper = new org.mybatis.spring.SqlSessionTemplate(factory).getMapper(InstalledIntegrationReceiptMapper.class);
+        var reads = mock(InstalledIntegrationReceiptMapper.class);
+        var writer = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try {
+            when(reads.findSnapshot(1L, "installation", "source", "event")).thenAnswer(invocation -> {
+                assertEquals("repeatable read", jdbc.queryForObject("SHOW transaction_isolation", String.class));
+                assertEquals("accepted", jdbc.queryForObject("SELECT state FROM " + schema
+                        + ".ab_installed_integration_receipt WHERE external_event_id='event'", String.class));
+                // Commit on a different physical connection after the result transaction's snapshot.
+                assertEquals(1, writer.submit(() -> new JdbcTemplate(source).update("UPDATE " + schema
+                        + ".ab_installed_integration_receipt SET state='completed' WHERE external_event_id='event'"))
+                        .get(5, java.util.concurrent.TimeUnit.SECONDS));
+                var observed = mapper.findSnapshot(1L, "installation", "source", "event");
+                assertEquals("accepted", observed.state());
+                callbacks.incrementAndGet();
+                return observed;
+            });
+            var service = new InstalledIntegrationService(mock(InstalledIntegrationRegistry.class),
+                    mock(ExtensionRegistry.class), mock(AuraPluginManager.class), mock(ApplicationInstallationMapper.class),
+                    mock(ApplicationScopeGrantMapper.class), mock(com.auraboot.framework.meta.mapper.CommandDefinitionMapper.class),
+                    mock(PluginRecordMapper.class), reads, mock(CommandExecutor.class),
+                    mock(com.auraboot.framework.user.service.UserService.class),
+                    mock(com.auraboot.framework.tenant.service.TenantMemberService.class), new ObjectMapper(),
+                    mock(OpenPlatformSecretCodec.class));
+            var proxy = proxied(service, InstalledIntegrationService.class);
+            // Authorization remains denied by the explicit absent-binding seam after the real receipt read.
+            assertThrows(SecurityException.class, () -> proxy.result(principal(), "source", "event"));
+            assertEquals(1, callbacks.get());
+            verify(reads, never()).find(anyLong(), anyString(), anyString(), anyString());
+            assertEquals("completed", jdbc.queryForObject("SELECT state FROM " + schema
+                    + ".ab_installed_integration_receipt WHERE external_event_id='event'", String.class));
+            assertEquals("completed", mapper.findSnapshot(1L, "installation", "source", "event").state());
+        } finally {
+            writer.shutdownNow();
+            assertTrue(writer.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS));
+        }
     }
 
     @Test void synchronousBusinessActionOpensTheSameSnapshotWithoutBypassingItsAuthorityFailure() {

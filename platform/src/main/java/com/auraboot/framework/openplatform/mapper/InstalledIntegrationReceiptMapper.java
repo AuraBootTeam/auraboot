@@ -30,6 +30,17 @@ public interface InstalledIntegrationReceiptMapper {
     Receipt find(@Param("tenant") long tenant, @Param("installation") String installation,
                  @Param("source") String source, @Param("event") String event);
 
+    /** Coherent observation without taking the consumer's receipt write lock. */
+    @Select("""
+        SELECT tenant_id,installation_pid,source_code,external_event_id,durable_event_id,envelope_sha256,
+               binding_sha256,command_sha256,provider_sha256,request_pid,state
+        FROM ab_installed_integration_receipt
+        WHERE tenant_id=#{tenant} AND installation_pid=#{installation} AND source_code=#{source}
+          AND external_event_id=#{event}
+        """)
+    Receipt findSnapshot(@Param("tenant") long tenant, @Param("installation") String installation,
+                 @Param("source") String source, @Param("event") String event);
+
     record Delivery(String status, boolean failedAttempt) {}
 
     @Select("""
