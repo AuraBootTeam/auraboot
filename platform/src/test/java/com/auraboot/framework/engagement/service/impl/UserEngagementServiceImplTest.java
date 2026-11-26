@@ -6,6 +6,7 @@ import com.auraboot.framework.engagement.mapper.UserEngagementMapper;
 import com.auraboot.framework.exception.BusinessException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -26,6 +27,12 @@ class UserEngagementServiceImplTest {
 
     @Mock private UserEngagementMapper engagementMapper;
     @InjectMocks private UserEngagementServiceImpl service;
+
+    @BeforeEach
+    void storedInsertResult() {
+        lenient().when(engagementMapper.insertOrRefresh(any(UserEngagement.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+    }
 
     private UserEngagement entity(Long id) {
         UserEngagement e = new UserEngagement();
@@ -81,7 +88,7 @@ class UserEngagementServiceImplTest {
 
         service.upsert(1L, 2L, dto);
 
-        verify(engagementMapper).insert(argThat((UserEngagement e) -> e.getUserId() == 1L
+        verify(engagementMapper).insertOrRefresh(argThat((UserEngagement e) -> e.getUserId() == 1L
                 && e.getTenantId() == 2L
                 && e.getSortOrder() == 0));
         verify(engagementMapper, never()).updateById(any(UserEngagement.class));
@@ -100,7 +107,7 @@ class UserEngagementServiceImplTest {
 
         service.upsert(1L, 2L, dto);
 
-        verify(engagementMapper).insert(argThat((UserEngagement e) -> e.getSortOrder() == 5));
+        verify(engagementMapper).insertOrRefresh(argThat((UserEngagement e) -> e.getSortOrder() == 5));
     }
 
     @Test
@@ -115,8 +122,30 @@ class UserEngagementServiceImplTest {
 
         service.upsert(1L, 2L, dto);
         verify(engagementMapper).updateById(existing);
-        verify(engagementMapper, never()).insert(any(UserEngagement.class));
+        verify(engagementMapper, never()).insertOrRefresh(any(UserEngagement.class));
         assertEquals("New Label", existing.getTargetLabel());
+    }
+
+    @Test
+    void concurrentFirstVisitReturnsTheDatabaseIdentityAndOrder() {
+        when(engagementMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        UserEngagement stored = entity(123L);
+        stored.setSortOrder(6);
+        stored.setCreatedAt(OffsetDateTime.parse("2026-11-20T00:00:00Z"));
+        when(engagementMapper.insertOrRefresh(any(UserEngagement.class))).thenReturn(stored);
+        UserEngagementDTO input = new UserEngagementDTO();
+        input.setTargetType("page");
+        input.setTargetId("p1");
+        input.setEngagementType("favorite");
+        input.setSortOrder(99);
+
+        UserEngagementDTO result = service.upsert(1L, 2L, input);
+
+        assertEquals(123L, result.getId());
+        assertEquals(6, result.getSortOrder());
+        assertEquals(stored.getCreatedAt(), result.getCreatedAt());
+        verify(engagementMapper).insertOrRefresh(argThat(e -> e.getId() != null
+                && e.getUserId() == 1L && e.getTenantId() == 2L && e.getSortOrder() == 99));
     }
 
     @Test
@@ -145,8 +174,8 @@ class UserEngagementServiceImplTest {
             UserEngagement entity = invocation.getArgument(0);
             entity.setId(999L);
             inserted.set(entity);
-            return 1;
-        }).when(engagementMapper).insert(any(UserEngagement.class));
+            return entity;
+        }).when(engagementMapper).insertOrRefresh(any(UserEngagement.class));
 
         OffsetDateTime base = OffsetDateTime.now().minusDays(30);
         List<UserEngagement> existing = new ArrayList<>();
@@ -183,8 +212,8 @@ class UserEngagementServiceImplTest {
             UserEngagement entity = invocation.getArgument(0);
             entity.setId(999L);
             inserted.set(entity);
-            return 1;
-        }).when(engagementMapper).insert(any(UserEngagement.class));
+            return entity;
+        }).when(engagementMapper).insertOrRefresh(any(UserEngagement.class));
 
         List<UserEngagement> all = new ArrayList<>();
         IntStream.range(0, 20).forEach(i -> {
@@ -233,7 +262,7 @@ class UserEngagementServiceImplTest {
         dto.setEngagementType("favorite");
         dto.setSortOrder(7);
         service.upsert(1L, 2L, dto);
-        verify(engagementMapper).insert(argThat((UserEngagement e) -> e.getSortOrder() == 7));
+        verify(engagementMapper).insertOrRefresh(argThat((UserEngagement e) -> e.getSortOrder() == 7));
         verify(engagementMapper, times(1)).selectOne(any(LambdaQueryWrapper.class));
     }
 
