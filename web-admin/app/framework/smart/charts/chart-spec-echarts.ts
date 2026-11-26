@@ -67,11 +67,6 @@ function titleText(spec: ChartSpec): string | undefined {
   return typeof spec.title === 'string' ? spec.title : Object.values(spec.title)[0];
 }
 
-/**
- * BAR branch — byte-equivalent to SmartBarChart's legacy `buildBarOptionLegacy`
- * BASE option (sans the `chartOptions` prop-merge, which stays a call-site merge).
- * Must match legacy EXACTLY; covered by the B2d equivalence test.
- */
 function makeNumberFormatter(locale: string, format?: ChartNumberFormat) {
   const currency = format?.format === 'currency' && /^[A-Z]{3}$/.test(format.currency)
     ? format.currency
@@ -81,6 +76,10 @@ function makeNumberFormatter(locale: string, format?: ChartNumberFormat) {
     : { maximumFractionDigits: 2 });
 }
 
+/**
+ * The base option stays equivalent to the legacy builder for unformatted measures.
+ * Opt-in formats affect presentation without replacing the series values.
+ */
 function barOption(spec: ChartSpec, rows: Record<string, unknown>[], locale: string): EChartsOption {
   const title = titleText(spec);
   const orientation = spec.visual?.orientation ?? 'vertical';

@@ -420,12 +420,15 @@ export const SmartBarChart: React.FC<SmartBarChartProps> = ({
     const generatedAxis = ticksOption[valueAxisKey];
     const overrideAxis = chartOptions[valueAxisKey];
     if (metricFormats && generatedAxis && !Array.isArray(generatedAxis) &&
+        generatedAxis.type === 'value' &&
         typeof generatedAxis.axisLabel?.formatter === 'function' &&
-        overrideAxis && !Array.isArray(overrideAxis) &&
-        (overrideAxis.type === 'value' || overrideAxis.type === undefined)) {
-      merged[valueAxisKey] = {
-        ...overrideAxis,
-        axisLabel: { formatter: generatedAxis.axisLabel.formatter, ...overrideAxis.axisLabel },
+        overrideAxis && !Array.isArray(overrideAxis) && overrideAxis.type === 'value') {
+      return {
+        ...merged,
+        [valueAxisKey]: {
+          ...overrideAxis,
+          axisLabel: { formatter: generatedAxis.axisLabel.formatter, ...overrideAxis.axisLabel },
+        },
       };
     }
     return merged;
