@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
@@ -127,13 +128,13 @@ public class RecordCommentService {
     }
 
     /** Backward-compatible entry used by automation and event-policy actions. */
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public Map<String, Object> addComment(String modelCode, String recordPid, String content, String mentions) {
         return insertComment(modelCode, recordPid, content, parseLegacyMentions(mentions), mentions, null, false);
     }
 
     /** Interactive UI entry: supports replies, validated user mentions, and notifications. */
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public Map<String, Object> addInteractiveComment(String modelCode, String recordPid, String content,
                                                       List<String> mentionUserPids, String requestedParentPid) {
         return insertComment(modelCode, recordPid, content, mentionUserPids, null, requestedParentPid, true);
@@ -197,7 +198,7 @@ public class RecordCommentService {
         return editInteractiveComment(null, null, commentPid, content, mentionUserPids, true);
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public Map<String, Object> editInteractiveComment(String modelCode, String recordPid,
                                                        String commentPid, String content,
                                                        List<String> mentionUserPids) {
@@ -268,7 +269,7 @@ public class RecordCommentService {
         deleteComment(null, null, commentPid);
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public void deleteInteractiveComment(String modelCode, String recordPid, String commentPid) {
         assertRecordVisible(modelCode, recordPid);
         deleteComment(modelCode, recordPid, commentPid);

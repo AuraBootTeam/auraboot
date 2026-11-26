@@ -23,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
@@ -119,7 +120,7 @@ public class OrgEmployeeServiceImpl implements OrgEmployeeService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public OrgEmployeeDTO createWithUser(CreateEmployeeRequest request) {
         log.info("Creating employee with user: email={}", request.getEmail());
 
@@ -153,7 +154,7 @@ public class OrgEmployeeServiceImpl implements OrgEmployeeService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public EmployeeAccountProvisionResponse openAccount(String employeePid) {
         log.info("Opening account for employee: {}", employeePid);
 
@@ -225,7 +226,7 @@ public class OrgEmployeeServiceImpl implements OrgEmployeeService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public OrgEmployeeDTO linkMember(LinkMemberRequest request) {
         log.info("Linking member {} to new employee", request.getMemberPid());
 
@@ -274,7 +275,7 @@ public class OrgEmployeeServiceImpl implements OrgEmployeeService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public OrgEmployeeDTO linkExistingMember(String employeePid, String memberPid) {
         Map<String, Object> employee = dynamicDataService.getById(MODEL_EMPLOYEE, employeePid);
         if (employee == null) {
@@ -321,7 +322,7 @@ public class OrgEmployeeServiceImpl implements OrgEmployeeService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public void unlinkMember(String employeePid) {
         log.info("Unlinking member from employee: {}", employeePid);
 
@@ -351,7 +352,7 @@ public class OrgEmployeeServiceImpl implements OrgEmployeeService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public void transfer(String employeePid, TransferRequest request) {
         log.info("Transferring employee {} to dept {}", employeePid, request.getNewDeptPid());
 
@@ -372,7 +373,7 @@ public class OrgEmployeeServiceImpl implements OrgEmployeeService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public void batchTransfer(List<String> employeePids, TransferRequest request) {
         log.info("Batch transferring {} employees to dept {}", employeePids.size(), request.getNewDeptPid());
         for (String pid : employeePids) {
