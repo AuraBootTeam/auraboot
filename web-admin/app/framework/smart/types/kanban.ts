@@ -122,6 +122,8 @@ export interface SmartKanbanProps {
   title?: string;
   /** Data source configuration */
   dataSource: KanbanDataSource;
+  /** Fit as many stage columns as possible without shrinking below readable card width. */
+  fitColumns?: boolean;
   /** Whether cards can be dragged between columns */
   draggable?: boolean;
   /** Whether to show card count in column headers */

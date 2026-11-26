@@ -123,3 +123,10 @@ describe('SmartKanban sensor swap based on __AURA_E2E_MODE__', () => {
     expect(screen.getByTestId('kanban-column-header')).toHaveAttribute('data-column-id', 'todo');
   });
 });
+
+it('makes a fitting list board horizontally reachable by keyboard when space is limited', () => {
+  render(<SmartKanban {...baseProps} fitColumns />);
+  const stages = screen.getByRole('region', { name: /看板阶段|Board stages/ });
+  expect(stages).toHaveAttribute('tabindex', '0');
+  expect(stages).toContainElement(screen.getByTestId('kanban-column-header'));
+});

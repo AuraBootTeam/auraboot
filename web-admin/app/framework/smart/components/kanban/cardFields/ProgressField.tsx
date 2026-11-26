@@ -20,7 +20,7 @@ export function ProgressField({ value, max = 100 }: ProgressFieldProps) {
   const safeMax = max && max > 0 ? max : 100;
   const pct = Math.min(100, Math.max(0, (numeric / safeMax) * 100));
   return (
-    <span data-field-type="progress" className="inline-flex items-center gap-1">
+    <span data-field-type="progress" className="inline-flex max-w-full items-center gap-1">
       <span className="inline-block h-1.5 w-12 overflow-hidden rounded bg-gray-200">
         <span
           data-field-type-bar="progress"
@@ -28,7 +28,7 @@ export function ProgressField({ value, max = 100 }: ProgressFieldProps) {
           style={{ width: `${pct}%` }}
         />
       </span>
-      <span className="text-xs">{Math.round(pct)}%</span>
+      <span className="shrink-0 text-xs">{Math.round(pct)}%</span>
     </span>
   );
 }

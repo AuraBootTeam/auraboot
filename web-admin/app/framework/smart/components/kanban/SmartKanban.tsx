@@ -64,6 +64,7 @@ import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 export const SmartKanban: React.FC<SmartKanbanProps> = ({
   title,
   dataSource,
+  fitColumns = false,
   draggable = true,
   showCount = true,
   showAggregations = false,
@@ -273,14 +274,17 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
           ? { backgroundColor: `${column.color}20`, color: column.color }
           : undefined;
       const titleClass = cn(
-        'truncate text-sm font-medium',
+        'min-w-0 [overflow-wrap:anywhere] text-sm font-medium',
         !column.terminal && !column.color && 'text-gray-700',
       );
 
       return (
         <div
           key={column.id}
-          className="flex max-h-full w-72 shrink-0 flex-col rounded-lg bg-gray-100"
+          className={cn(
+            'flex max-h-full flex-col rounded-lg bg-gray-100',
+            fitColumns ? 'min-w-[10.5rem] max-w-72 flex-[1_0_10.5rem]' : 'w-72 shrink-0',
+          )}
         >
           {/* Column header */}
           <div
@@ -290,20 +294,20 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
             data-column-id={column.id}
             data-column-terminal={column.terminal ?? ''}
           >
-            <div className="flex items-center justify-between">
+            <div className={cn('flex items-center justify-between', fitColumns && 'flex-wrap gap-1')}>
               <span className={titleClass}>
                 {column.terminal === 'won' && <Check className="mr-1 inline h-4 w-4" />}
                 {column.terminal === 'lost' && <X className="mr-1 inline h-4 w-4" />}
                 {column.title}
               </span>
               {showCount && (
-                <div className="ml-2 flex items-center gap-1.5">
+                <div className="ml-2 flex shrink-0 flex-wrap items-center justify-end gap-1.5">
                   <span className="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-gray-200 px-1.5 text-xs font-medium text-gray-600">
                     {column.count}
                   </span>
                   {column.hasMore && (
                     <span
-                      className="text-[11px] whitespace-nowrap text-gray-500"
+                      className="whitespace-nowrap text-[11px] text-gray-500"
                       title={`${column.loadedCount ?? column.cards.length} / ${column.count}`}
                     >
                       {fallbackText('kanban.loadedCount', '已加载', 'Loaded')}{' '}
@@ -346,7 +350,7 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
         </div>
       );
     },
-    [displayDataSource, draggable, fallbackText, locale, onCardClick, showAggregations, showCount, t],
+    [displayDataSource, draggable, fallbackText, fitColumns, locale, onCardClick, showAggregations, showCount, t],
   );
 
   // All column IDs for droppable targets
@@ -424,7 +428,12 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
           onDragEnd={handleDragEnd}
         >
           <SortableContext items={columnIds} strategy={verticalListSortingStrategy}>
-            <div className="flex min-h-0 flex-1 gap-4 overflow-x-auto pb-2">
+            <div
+              className={cn('flex min-h-0 min-w-0 flex-1 overflow-x-auto pb-2', fitColumns ? 'gap-2' : 'gap-4')}
+              role={fitColumns ? 'region' : undefined}
+              aria-label={fitColumns ? fallbackText('kanban.columns', '看板阶段', 'Board stages') : undefined}
+              tabIndex={fitColumns ? 0 : undefined}
+            >
               {enrichedColumns.map(renderColumn)}
             </div>
           </SortableContext>
@@ -497,7 +506,7 @@ const KanbanColumnDropZone: React.FC<KanbanColumnDropZoneProps> = ({
   return (
     <div
       ref={setNodeRef}
-      className={cn('flex-1 space-y-2 overflow-y-auto p-2', isOver && 'bg-blue-50/50')}
+      className={cn('min-h-0 min-w-0 flex-1 space-y-2 overflow-y-auto p-2', isOver && 'bg-blue-50/50')}
       data-testid="kanban-column-body"
       data-column-id={columnId}
     >

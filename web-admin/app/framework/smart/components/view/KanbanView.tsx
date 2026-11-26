@@ -67,7 +67,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
         field: cf.field,
         label: cf.label,
         dictCode: cf.dictCode,
-        type: cf.type as 'text' | 'number' | 'date' | 'tag' | 'avatar' | undefined,
+        type: cf.type as NonNullable<KanbanDataSource['cardFields']>[number]['type'],
       })),
       aggregations: viewConfig.kanbanAggregations?.map((agg) => ({
         field: agg.field,
@@ -107,6 +107,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   return (
     <SmartKanban
       dataSource={dataSource}
+      fitColumns
       draggable={viewConfig?.draggable ?? true}
       showCount={viewConfig?.showCount ?? true}
       showAggregations={viewConfig?.showAggregations ?? false}

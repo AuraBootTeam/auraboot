@@ -178,13 +178,13 @@ export function KanbanCardItem({
       )}
 
       {/* Title */}
-      <div className="truncate text-sm font-medium" title={String(title ?? '')}>
+      <div className={cn('text-sm font-medium [overflow-wrap:anywhere]', terminal && 'pr-2')} title={String(title ?? '')}>
         {String(title ?? '')}
       </div>
 
       {/* Description */}
       {description !== undefined && description !== null && (
-        <div className="mt-1 line-clamp-2 text-xs text-gray-500">{String(description)}</div>
+        <div className="mt-1 line-clamp-2 text-xs text-gray-500 [overflow-wrap:anywhere]">{String(description)}</div>
       )}
 
       {/* Custom fields */}
@@ -204,9 +204,9 @@ export function KanbanCardItem({
             if (!isNewFieldType && (value === undefined || value === null)) return null;
 
             return (
-              <div key={field.field} className="flex items-center gap-1 text-xs text-gray-600">
-                {label && <span className="shrink-0 whitespace-nowrap text-gray-400">{label}:</span>}
-                <span>{renderFieldValue(field, value, locale)}</span>
+              <div key={field.field} className="flex min-w-0 max-w-full items-start gap-1 text-xs text-gray-600">
+                {label && <span className="max-w-[45%] shrink-0 text-gray-400 [overflow-wrap:anywhere]">{label}:</span>}
+                <span className="min-w-0 [overflow-wrap:anywhere]">{renderFieldValue(field, value, locale)}</span>
               </div>
             );
           })}
