@@ -90,6 +90,7 @@ class CommandRecordActionScopeAccessorFactoryTest {
         verify(permissions,never()).canOperate(anyLong(),anyString(),eq("update"),any());
         verify(scopes,never()).evaluate(anyLong(),anyString(),eq("read"),any());
         verify(transactions,times(2)).getTransaction(argThat(t -> t.isReadOnly()
+                && t.getIsolationLevel()==TransactionDefinition.ISOLATION_REPEATABLE_READ
                 && t.getPropagationBehavior()==TransactionDefinition.PROPAGATION_REQUIRES_NEW));
     }
     @Test void exactActionSharingIsRecheckedOnEveryCallAndDoesNotBecomeReadAuthority() {
