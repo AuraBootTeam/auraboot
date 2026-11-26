@@ -53,7 +53,7 @@ class RestPublicationCommandExecutorTest {
             return CommandExecuteResult.builder()
                     .data(Map.of("recordPid", "LEAD1", "internal", "not returned")).build();
         });
-        assertThat(executor.execute(grant, declared, Map.of("company", "Example"))).isEqualTo("LEAD1");
+        assertThat(executor.execute(grant, declared, Map.of("company", "Example"))).containsExactlyEntriesOf(Map.of("recordPid", "LEAD1"));
         assertThat(MetaContext.getCurrentUserId()).isZero();
     }
 

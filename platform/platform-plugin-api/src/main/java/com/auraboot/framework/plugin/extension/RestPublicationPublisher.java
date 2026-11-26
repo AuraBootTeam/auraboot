@@ -19,5 +19,11 @@ public interface RestPublicationPublisher {
         throw new UnsupportedOperationException("Publication commands are unavailable");
     }
 
+    /** Publish an integration command protected by a server-held digest of its API key. */
+    default void publishKeyedCommand(String kind, String id, String key, String commandCode,
+                                     Map<String, Object> input) {
+        throw new UnsupportedOperationException("Keyed publication commands are unavailable");
+    }
+
     void withdraw(String kind, String id);
 }

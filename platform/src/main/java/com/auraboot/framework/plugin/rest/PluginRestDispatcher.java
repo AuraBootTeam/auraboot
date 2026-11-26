@@ -155,27 +155,28 @@ public class PluginRestDispatcher {
         }
     }
 
-    private record PublishedInvocation(Map<String, Object> input, Function<Map<String, Object>, String> execute) {}
+    private record PublishedInvocation(Map<String, Object> input, Function<Map<String, Object>, Map<String, Object>> execute) {}
 
     private void dispatchPublishedCommand(String namespace, RestEndpointRegistry.Match m,
                                           HttpServletRequest request, HttpServletResponse response,
                                           RestPublicationCommand command) throws IOException {
         if (publications == null || publicationCommands == null || !"POST".equals(m.route().method())
                 || m.route().readOnlyTx() || m.route().idempotent()
-                || !command.publication().equals(m.extension().publicationCors(m.route()))) {
+                || (command.keyHeader() == null && !command.publication().equals(m.extension().publicationCors(m.route())))) {
             throw new AccessDeniedException("Invalid publication command route");
         }
         var declaration = command.publication();
         String id = m.pathVars().get(declaration.pathVariable());
-        String origin = request.getHeader("Origin");
-        var grant = publications.commandGrant(namespace, declaration.kind(), id, origin).orElse(null);
+        boolean keyed = command.keyHeader() != null;
+        String proof = request.getHeader(keyed ? command.keyHeader() : "Origin");
+        var grant = publications.commandGrant(namespace, declaration.kind(), id, proof, keyed).orElse(null);
         if (grant == null || !command.code().equals(grant.command())) {
             writeError(response, HttpServletResponse.SC_NOT_FOUND, "Publication unavailable");
             return;
         }
         var executed = new AtomicBoolean();
         var invocation = new PublishedInvocation(grant.input(), payload -> {
-            var current = publications.commandGrant(namespace, declaration.kind(), id, origin).orElse(null);
+            var current = publications.commandGrant(namespace, declaration.kind(), id, proof, keyed).orElse(null);
             if (!executed.compareAndSet(false, true) || !grant.equals(current)) {
                 throw new AccessDeniedException("Publication command unavailable");
             }
@@ -258,8 +259,8 @@ public class PluginRestDispatcher {
         @Override public Map<String, Object> publishedCommandInput() {
             return invocation == null ? Map.of() : invocation.input();
         }
-        @Override public String executePublishedCommand(Map<String, Object> payload) {
-            if (invocation == null) return PluginRequestContext.super.executePublishedCommand(payload);
+        @Override public Map<String, Object> executePublishedCommandResult(Map<String, Object> payload) {
+            if (invocation == null) return PluginRequestContext.super.executePublishedCommandResult(payload);
             return invocation.execute().apply(payload);
         }
         @Override public RestPublicationPublisher publicationPublisher() {

@@ -15775,9 +15775,11 @@ CREATE TABLE public.ab_plugin_rest_publication (
     actor_pid character varying(128),
     command_code character varying(128),
     command_input jsonb DEFAULT '{}'::jsonb NOT NULL,
+    key_digest bytea,
     CONSTRAINT ck_plugin_rest_publication_command CHECK (((actor_pid IS NULL) = (command_code IS NULL))),
     CONSTRAINT ck_plugin_rest_publication_command_input CHECK ((jsonb_typeof(command_input) = 'object'::text)),
     CONSTRAINT ck_plugin_rest_publication_document CHECK ((jsonb_typeof(document) = 'object'::text)),
+    CONSTRAINT ck_plugin_rest_publication_key CHECK (((key_digest IS NULL) OR ((octet_length(key_digest) = 32) AND (command_code IS NOT NULL) AND (allowed_origins = '[]'::jsonb) AND (parent_kind IS NULL)))),
     CONSTRAINT ck_plugin_rest_publication_origins CHECK ((jsonb_typeof(allowed_origins) = 'array'::text)),
     CONSTRAINT ck_plugin_rest_publication_parent CHECK (((parent_kind IS NULL) = (parent_id IS NULL)))
 );

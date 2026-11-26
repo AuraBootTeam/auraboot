@@ -15,5 +15,5 @@
 # bumps the count (#2550 landed V20261119003000 under a 20261123090000 floor).
 # scripts/db/check-migration-order-vs-base.sh closes that gap on pull requests:
 # a migration added below the base branch's highest version is rejected.
-version=20261126180000
-count=182
+version=20261126190000
+count=183

@@ -46,6 +46,14 @@ public interface PluginRequestContext {
 
     /** Execute the publication's fixed create command once and return only the new record PID. */
     default String executePublishedCommand(Map<String, Object> payload) {
+        Object pid = executePublishedCommandResult(payload).get("recordPid");
+        if (!(pid instanceof String value) || value.isBlank()) {
+            throw new IllegalStateException("Publication command returned no record PID");
+        }
+        return value;
+    }
+
+    default Map<String, Object> executePublishedCommandResult(Map<String, Object> payload) {
         throw new UnsupportedOperationException("Publication command is unavailable");
     }
 }

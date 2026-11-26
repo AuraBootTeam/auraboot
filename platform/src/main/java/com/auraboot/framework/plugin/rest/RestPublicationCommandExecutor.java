@@ -10,6 +10,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -26,7 +27,7 @@ class RestPublicationCommandExecutor {
         this.commands = commands;
     }
 
-    String execute(RestPublicationStore.CommandGrant grant, RestPublicationCommand declared, Map<String, Object> payload) {
+    Map<String, Object> execute(RestPublicationStore.CommandGrant grant, RestPublicationCommand declared, Map<String, Object> payload) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()
                 || TransactionSynchronizationManager.isCurrentTransactionReadOnly()
                 || !Long.valueOf(grant.tenantId()).equals(MetaContext.getCurrentTenantId())
@@ -36,7 +37,7 @@ class RestPublicationCommandExecutor {
         }
         var member = identities.findEnabledTenantMembership(grant.tenantId(), grant.actorPid());
         if (member == null || member.memberId() == null) throw new AccessDeniedException("Publisher is unavailable");
-        var resultPid = new AtomicReference<String>();
+        var output = new AtomicReference<Map<String, Object>>();
         MetaContext.runWithSnapshot(null, () -> {
             var actor = member.user();
             MetaContext.setContext(grant.tenantId(), actor.id(), actor.pid(), actor.username());
@@ -48,12 +49,17 @@ class RestPublicationCommandExecutor {
             request.setOperationType("CREATE");
             request.setPayload(payload);
             var result = commands.execute(declared.code(), request);
-            Object pid = result == null || result.getData() == null ? null : result.getData().get("recordPid");
-            if (!(pid instanceof String value) || value.isBlank()) {
-                throw new IllegalStateException("Publication command returned no record PID");
+            if (result == null || result.getData() == null) {
+                throw new IllegalStateException("Publication command returned no result");
             }
-            resultPid.set(value);
+            var projected = new HashMap<String, Object>();
+            for (String field : declared.resultFields()) {
+                Object value = result.getData().get(field);
+                if (value instanceof String text && !text.isBlank()) projected.put(field, text);
+            }
+            if (projected.isEmpty()) throw new IllegalStateException("Publication command returned no public result");
+            output.set(Map.copyOf(projected));
         });
-        return resultPid.get();
+        return output.get();
     }
 }
