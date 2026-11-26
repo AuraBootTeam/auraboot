@@ -29,7 +29,10 @@ import { usePermission } from '~/contexts/AuthContext';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import { useDataSourceManagerOptional } from '~/framework/meta/contexts/DataSourceContext';
 import { ReferenceCreateDialog } from '~/framework/meta/runtime/reference-create/ReferenceCreateDialog';
-import { hasMissingFieldDependency } from '~/framework/meta/rendering/fieldDependencies';
+import {
+  hasMissingFieldDependency,
+  resolveDependentReferenceTarget,
+} from '~/framework/meta/rendering/fieldDependencies';
 
 export interface ControlledFieldRendererProps {
   field: FieldConfig;
@@ -113,7 +116,10 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   // 计算条件属性
   const disableExpr = field.disableWhen || (field as any).disabledWhen;
   const enableExpr = field.enableWhen;
-  const dependencyMissing = hasMissingFieldDependency(field, context);
+  const hasDependentReference = field.props?.referenceTargetByValue != null;
+  const dependentTarget = resolveDependentReferenceTarget(field, context);
+  const dependencyMissing = hasMissingFieldDependency(field, context)
+    || (hasDependentReference && !dependentTarget);
   const isDisabled = disableExpr
     ? dependencyMissing || evaluateCondition(disableExpr, context)
     : enableExpr
@@ -339,9 +345,10 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   }, [componentLower, expectsJsonObjectValue, isMemberPickerMultiple, usesCsvMemberValue, onChange]);
 
   const fieldKind = String((field as any).dataType || field.type || '').toLowerCase();
-  const refTarget = {
+  const refTarget: Record<string, any> = {
     ...(((field as any).props?.refTarget || {}) as Record<string, any>),
     ...(((field as any).refTarget || {}) as Record<string, any>),
+    ...dependentTarget,
   };
   const refTargetModel =
     refTarget?.targetModel ||
@@ -501,6 +508,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   // spread (React reports it as an invalid attribute on every quote form).
   delete componentProps.immutableWhen;
   delete componentProps.allowedWriterCommands;
+  delete componentProps.referenceTargetByValue;
 
   // 如果有 dictCode 且没有 dataSource，自动生成字典数据源配置（不适用于 tree 组件）
   if (field.dictCode && !isTreeComponent && !field.dataSource) {
@@ -514,7 +522,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
       autoFetch: true,
     };
     componentProps.dataSource = dictDataSource;
-  } else if (!dependencyMissing && fieldKind === 'reference' && !field.dataSource) {
+  } else if (!dependencyMissing && (fieldKind === 'reference' || dependentTarget) && !field.dataSource) {
     const targetModelCode = refTargetModel;
     const labelField = refDisplayField;
     if (targetModelCode) {
@@ -626,7 +634,11 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
                   copy of it — otherwise the same message renders twice (form-context error
                   here + the control's identical validationRules run inside its FieldBase). */}
               <FieldErrorOwnedByWrapperContext.Provider value={Boolean(error)}>
-                <ComponentLoader componentName={componentName} props={componentProps} />
+                <ComponentLoader
+                  key={hasDependentReference ? dependentTarget?.targetModel : undefined}
+                  componentName={componentName}
+                  props={componentProps}
+                />
               </FieldErrorOwnedByWrapperContext.Provider>
               <FieldError id={errorId} message={error} />
             </>

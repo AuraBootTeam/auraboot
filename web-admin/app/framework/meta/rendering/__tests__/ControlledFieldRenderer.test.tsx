@@ -481,6 +481,57 @@ describe('ControlledFieldRenderer', () => {
     expect(props?.dataSource).toBeUndefined();
   });
 
+  it('uses only the selected kind to look up records for a dependent reference', async () => {
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: ({ props }: { props: Record<string, unknown> }) => {
+        capturedPropsSpy(props);
+        return null;
+      },
+    }));
+    const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+    const field = {
+      field: 'record_id',
+      component: 'SmartSelect',
+      type: 'string',
+      props: {
+        referenceTargetByValue: {
+          dependency: 'kind',
+          targets: {
+            account: { targetModel: 'accounts', displayField: 'account_name' },
+            contact: { targetModel: 'contacts', displayField: 'contact_name' },
+          },
+        },
+      },
+    };
+    const onChange = vi.fn();
+    const viewFor = (kind?: string) => (
+      <ControlledFieldRenderer
+        field={field}
+        value={undefined}
+        onChange={onChange}
+        context={{ locale: 'en', t: (key: string) => key, form: { kind } } as any}
+      />
+    );
+    const view = render(viewFor());
+    const props = () => capturedPropsSpy.mock.lastCall![0];
+    expect(props().disabled).toBe(true);
+    expect(props().dataSource).toBeUndefined();
+    expect(props().referenceTargetByValue).toBeUndefined();
+    view.rerender(viewFor('account'));
+    expect(props().disabled).toBe(false);
+    expect(props().dataSource).toMatchObject({
+      endpoint: '/api/dynamic/accounts/list', labelField: 'account_name', valueField: 'pid',
+    });
+    view.rerender(viewFor('contact'));
+    expect(props().dataSource).toMatchObject({
+      endpoint: '/api/dynamic/contacts/list', labelField: 'contact_name', valueField: 'pid',
+    });
+    view.rerender(viewFor('constructor'));
+    expect(props().disabled).toBe(true);
+    expect(props().dataSource).toBeUndefined();
+  });
+
   it('keeps dependent select data sources active after the parent has a value', async () => {
     vi.resetModules();
     vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({

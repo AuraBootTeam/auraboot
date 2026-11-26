@@ -39,3 +39,15 @@ export function hasMissingFieldDependency(field: FieldConfig, context: Expressio
   if (dependencies.length === 0) return false;
   return dependencies.some((dependency) => isBlank(getDependencyValue(context, dependency)));
 }
+
+export function resolveDependentReferenceTarget(field: FieldConfig, context: ExpressionContext) {
+  const config = field.props?.referenceTargetByValue as {
+    dependency: string;
+    targets: Record<string, { targetModel: string; displayField: string }>;
+  } | undefined;
+  if (typeof config?.dependency !== 'string' || !config.targets) return undefined;
+  const selected = getDependencyValue(context, config.dependency);
+  return typeof selected === 'string' && Object.hasOwn(config.targets, selected)
+    ? config.targets[selected]
+    : undefined;
+}
