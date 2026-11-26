@@ -140,7 +140,7 @@ test.describe('SavedView — KANBAN View', () => {
 
     // Check for kanban board (SmartKanban wraps columns in a flex container)
     // or unconfigured message from KanbanView
-    const kanbanBoard = page.locator('.flex.gap-4.overflow-x-auto');
+    const kanbanBoard = page.getByTestId('kanban-board');
     const unconfiguredMsg = page.getByText('看板视图未配置');
     await expect(kanbanBoard.or(unconfiguredMsg).first()).toBeVisible({ timeout: 8000 });
   });
@@ -150,7 +150,7 @@ test.describe('SavedView — KANBAN View', () => {
     await gotoAndSelectKanbanView(page);
 
     // Wait for kanban content
-    const kanbanBoard = page.locator('.flex.gap-4.overflow-x-auto');
+    const kanbanBoard = page.getByTestId('kanban-board');
     const unconfiguredMsg = page.getByText('看板视图未配置');
     await expect(kanbanBoard.or(unconfiguredMsg).first()).toBeVisible({ timeout: 8000 });
     // Look for draggable cards (KanbanCardItem uses role="button" with cursor-grab class)
@@ -165,7 +165,7 @@ test.describe('SavedView — KANBAN View', () => {
     await gotoAndSelectKanbanView(page);
 
     // Wait for kanban content
-    const kanbanBoard = page.locator('.flex.gap-4.overflow-x-auto');
+    const kanbanBoard = page.getByTestId('kanban-board');
     const unconfiguredMsg = page.getByText('看板视图未配置');
     await expect(kanbanBoard.or(unconfiguredMsg).first()).toBeVisible({ timeout: 8000 });
     // If cards exist, clicking one should open detail/modal (KanbanCardItem has role="button")
@@ -187,7 +187,7 @@ test.describe('SavedView — KANBAN View', () => {
     await gotoAndSelectKanbanView(page);
 
     // Wait for kanban content
-    const kanbanBoard = page.locator('.flex.gap-4.overflow-x-auto');
+    const kanbanBoard = page.getByTestId('kanban-board');
     const unconfiguredMsg = page.getByText('看板视图未配置');
     await expect(kanbanBoard.or(unconfiguredMsg).first()).toBeVisible({ timeout: 8000 });
     // Check for column structure (SmartKanban columns use bg-gray-100 rounded-lg)

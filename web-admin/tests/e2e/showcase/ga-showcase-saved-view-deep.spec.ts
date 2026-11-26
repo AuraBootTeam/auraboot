@@ -266,7 +266,7 @@ test.describe('GA showcase SavedView deep persistence', () => {
     await expect(page).toHaveURL(new RegExp(`(?:\\?|&)view=${pid}(?:&|$)`), { timeout: 10_000 });
 
     const notConfigured = page.getByText('看板视图未配置');
-    const kanbanBoard = page.locator('.flex.gap-4.overflow-x-auto').first();
+    const kanbanBoard = page.getByTestId('kanban-board').first();
     await expect
       .poll(
         async () => {
