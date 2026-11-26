@@ -85,8 +85,9 @@ export function useFormFields({
           clearFieldError(changedField);
         }
         setFormData((prev) => ({ ...prev, ...patch }));
-      }),
+      }, locale?.startsWith('zh')),
     [
+      locale,
       formData,
       pageContext,
       fieldErrors,

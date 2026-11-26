@@ -70,6 +70,7 @@ export function FormPageContent(props: PageContentProps) {
     setFieldErrors,
     summaryErrors,
     setSummaryErrors,
+    formElementRef,
     dirtyFieldsRef,
     clearFormDraftRef,
     searchParams,
@@ -151,6 +152,7 @@ export function FormPageContent(props: PageContentProps) {
   });
   const { validateFormBeforeSubmit, notifyValidationFailure } = useFormValidation({
     schema,
+    formElementRef,
     recordPid,
     initialFormData,
     formData,
@@ -241,6 +243,7 @@ export function FormPageContent(props: PageContentProps) {
   });
   return renderFormPageView({
     schema,
+    formElementRef,
     urlCommandCode,
     mainRecordLoaded,
     schemaFieldNames,

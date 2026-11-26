@@ -186,6 +186,9 @@ export interface DatePickerProps extends FormFieldProps {
   picker?: 'date' | 'week' | 'month' | 'quarter' | 'year';
   range?: boolean;
   dateType?: 'date' | 'datetime-local' | 'time' | 'month' | 'week';
+  localizedInput?: boolean;
+  readOnly?: boolean;
+  error?: string;
   clearable?: boolean;
   minDate?: string | number;
   maxDate?: string | number;

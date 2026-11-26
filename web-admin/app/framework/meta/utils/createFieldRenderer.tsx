@@ -37,6 +37,7 @@ export function createFieldRenderer(
   context: ExpressionContext,
   fieldErrors: Record<string, string> = {},
   onFieldChange?: (fieldCode: string, newValue: unknown) => void,
+  localizedDateInput = false,
 ) {
   return (field: FieldConfig) => (
     <ControlledFieldRenderer
@@ -53,6 +54,7 @@ export function createFieldRenderer(
       }}
       context={context}
       error={fieldErrors[field.field]}
+      localizedDateInput={localizedDateInput}
     />
   );
 }

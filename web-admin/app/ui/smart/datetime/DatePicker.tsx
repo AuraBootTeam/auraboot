@@ -10,6 +10,7 @@ import { useSmartFieldContract } from '~/plugins/core-designer/components/studio
 import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';
 import { useSmartText } from '~/utils/i18n';
 import { FieldBase } from '~/ui/ui/field-base';
+import { LocalizedDateInput } from './LocalizedDateInput';
 import { FieldControl } from '~/ui/ui/field-control';
 import { FieldActionGroup } from '~/ui/ui/field-action-group';
 import { FieldActionButton } from '~/ui/ui/field-action-button';
@@ -36,6 +37,9 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
       size = 'medium',
       variant = 'default',
       dateType = 'date',
+      localizedInput,
+      readOnly,
+      error: propError,
       placeholder: propPlaceholder,
       clearable = false,
       inline = true,
@@ -103,9 +107,9 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
       actionData?.error?.data?.name === name ? actionData?.error?.data?.desc : undefined;
 
     // 综合错误信息
-    const error = field.error || actionError;
+    const error = field.error || propError || actionError;
     const finalVariant = error ? 'error' : variant;
-    const meta = useSmartFieldMeta({ field, externalError: actionError });
+    const meta = useSmartFieldMeta({ field, externalError: propError || actionError });
     const errorText = meta.meta.error ? st(meta.meta.error) : undefined;
 
     // 获取今天的日期字符串
@@ -155,6 +159,35 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
       return null;
     }
 
+    const inputProps = {
+      id: name,
+      name,
+      'data-testid': `date-picker-input-${name}`,
+      'aria-required': requiredValue,
+      value: field.value || '',
+      placeholder: placeholderText,
+      disabled: disabledValue,
+      readOnly,
+      min: minDate,
+      max: maxDate,
+      step,
+      onBlur: field.onBlur,
+      className: clsx(
+        baseStyles,
+        fieldSizeStyles[size],
+        fieldInputHeightStyles[size],
+        variantStyles[finalVariant],
+        fieldFocusStyles,
+        meta.showError && fieldErrorFocusStyles,
+        {
+          'pr-20': (clearable && field.value) || showToday,
+          'pr-10': clearable && field.value && !showToday,
+          'w-full': true,
+        },
+        className,
+      ),
+      ...restProps,
+    };
     const inputElement = (
       <FieldControl
         inline={inline}
@@ -192,44 +225,28 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
           </FieldActionGroup>
         }
       >
-        <input
-          ref={ref}
-          type={dateType}
-          id={name}
-          name={name}
-          data-testid={`date-picker-input-${name}`}
-          value={field.value || ''}
-          placeholder={placeholderText}
-          disabled={disabledValue}
-          min={minDate}
-          max={maxDate}
-          step={step}
-          onChange={handleInputChange}
-          onBlur={field.onBlur}
-          onClick={(e) => {
-            // Open the native date picker when clicking anywhere on the input
-            try {
-              (e.target as HTMLInputElement).showPicker?.();
-            } catch (error) {
-              // showPicker() may throw in some browsers; ignore
- console.warn('[DatePicker] previously-silent catch', error);            }
-          }}
-          className={clsx(
-            baseStyles,
-            fieldSizeStyles[size],
-            fieldInputHeightStyles[size],
-            variantStyles[finalVariant],
-            fieldFocusStyles,
-            meta.showError && fieldErrorFocusStyles,
-            {
-              'pr-20': (clearable && field.value) || showToday, // 为按钮留出空间
-              'pr-10': clearable && field.value && !showToday,
-              'w-full': true,
-            },
-            className,
-          )}
-          {...restProps}
-        />
+        {localizedInput && (dateType === 'date' || dateType === 'datetime-local') ? (
+          <LocalizedDateInput
+            {...inputProps}
+            inputRef={ref}
+            pickerType={dateType}
+            onValueChange={field.setValue}
+          />
+        ) : (
+          <input
+            {...inputProps}
+            ref={ref}
+            type={dateType}
+            onChange={handleInputChange}
+            onClick={(event) => {
+              try {
+                event.currentTarget.showPicker?.();
+              } catch {
+                // Native pickers may be blocked outside user activation.
+              }
+            }}
+          />
+        )}
       </FieldControl>
     );
 

@@ -46,6 +46,7 @@ export function useFormPageState({ props }: UseFormPageStateArgs) {
   const [initialFormData, setInitialFormData] = useState<Record<string, any> | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [summaryErrors, setSummaryErrors] = useState<string[]>([]);
+  const formElementRef = useRef<HTMLFormElement>(null);
   const dirtyFieldsRef = useRef<Set<string>>(new Set());
   // T10: holds the latest draft-clear fn so submit handlers (defined before the
   // draft hook) can clear the persisted local draft on success.
@@ -84,6 +85,7 @@ export function useFormPageState({ props }: UseFormPageStateArgs) {
     setFieldErrors,
     summaryErrors,
     setSummaryErrors,
+    formElementRef,
     dirtyFieldsRef,
     clearFormDraftRef,
     searchParams,

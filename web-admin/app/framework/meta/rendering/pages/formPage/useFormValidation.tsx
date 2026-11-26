@@ -21,7 +21,7 @@ import type { useFormMetadata } from './useFormMetadata';
 
 type UseFormValidationArgs = Pick<
   ReturnType<typeof useFormPageState>,
-  'schema' | 'recordPid' | 'initialFormData' | 'formData' | 'showErrorToast'
+  'schema' | 'recordPid' | 'initialFormData' | 'formData' | 'formElementRef' | 'showErrorToast'
 > &
   Pick<
     ReturnType<typeof useFormPageRuntime>,
@@ -31,6 +31,7 @@ type UseFormValidationArgs = Pick<
 
 export function useFormValidation({
   schema,
+  formElementRef,
   recordPid,
   initialFormData,
   formData,
@@ -47,6 +48,12 @@ export function useFormValidation({
       return { fieldErrors: {}, summaryErrors: [] };
     }
     const nextFieldErrors: Record<string, string> = {};
+    const temporalFields = formElementRef.current?.querySelectorAll<HTMLInputElement>('input[data-temporal-error]');
+    for (const input of temporalFields ?? []) {
+      if (input.dataset.temporalError && input.name && input.getClientRects().length > 0) {
+        nextFieldErrors[input.name] = input.dataset.temporalError;
+      }
+    }
     const nextSummaryErrors: string[] = [];
     const submissionData = recordPid ? { ...(initialFormData || {}), ...formData } : formData;
     const blocks = schema.blocks;
@@ -67,6 +74,7 @@ export function useFormValidation({
           continue;
         }
 
+        if (nextFieldErrors[rawField.field]) continue;
         const value = submissionData[rawField.field];
         const reviewError = getBomUploadReviewError(
           value,
@@ -219,6 +227,7 @@ export function useFormValidation({
 
     return { fieldErrors: nextFieldErrors, summaryErrors: nextSummaryErrors };
   }, [
+    formElementRef,
     schema,
     pageContext,
     modelFields,

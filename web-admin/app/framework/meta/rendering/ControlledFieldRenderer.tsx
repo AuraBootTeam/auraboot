@@ -37,6 +37,7 @@ export interface ControlledFieldRendererProps {
   onChange: (value: any) => void;
   context: ExpressionContext;
   error?: string;
+  localizedDateInput?: boolean;
 }
 
 const SYSTEM_MODEL_ENDPOINTS: Record<
@@ -98,6 +99,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   onChange,
   context,
   error,
+  localizedDateInput,
 }) => {
   const t = context.t || ((key: string) => key);
   const errorId = useId();
@@ -464,6 +466,8 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
       ? { dateType: 'datetime-local' }
       : {}),
     ...restDslProps,
+    ...((componentLower === 'smartdatepicker' || componentLower === 'smartdatetimepicker') &&
+      localizedDateInput ? { localizedInput: true } : {}),
     ...(resolvedPlaceholder ? { placeholder: resolvedPlaceholder } : {}),
     // Controlled identity, state, and governance resolved by this wrapper are authoritative and
     // must never be shadowed by metadata extension keys.

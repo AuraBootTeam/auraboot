@@ -45,6 +45,7 @@ type RenderFormPageViewArgs = Pick<
   | 'onSubmitOverride'
   | 'urlCommandCode'
   | 'summaryErrors'
+  | 'formElementRef'
   | 'fieldErrors'
   | 'fieldPermissions'
   | 'recordPid'
@@ -112,6 +113,7 @@ export function renderFormPageView({
   runtime,
   aiFields,
   customBlockRuntime,
+  formElementRef,
   fieldErrors,
   fieldPermissions,
   modelFields,
@@ -320,6 +322,7 @@ export function renderFormPageView({
 
                 {/* Form Content - Using ComponentLoader Pattern */}
                 <form
+                  ref={formElementRef}
                   className="space-y-4"
                   data-testid="dynamic-form"
                   onSubmit={(e) => e.preventDefault()}
