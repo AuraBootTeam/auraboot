@@ -4,6 +4,8 @@ import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { resolveIcon, hasIcon } from '~/utils/icon-resolver';
 import {
+  dataSourceErrorMessage,
+  dataSourceErrorStatus,
   executeSimpleWorkbenchAction,
   readDataSourceRecord,
   readDataSourceState,
@@ -149,17 +151,13 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
   const evaluator = runtime.getEvaluator();
 
   if (dataSourceState?.error) {
-    const message =
-      dataSourceState.error instanceof Error
-        ? dataSourceState.error.message
-        : String(dataSourceState.error);
     return (
       <div
         role="alert"
         data-testid="metric-strip-error"
         className="rounded-control bg-status-red-bg text-status-red border-status-red border p-3 text-sm"
       >
-        {message || 'Failed to load metrics'}
+        {dataSourceErrorMessage(dataSourceErrorStatus(dataSourceState.error), locale)}
       </div>
     );
   }

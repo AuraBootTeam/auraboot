@@ -39,6 +39,12 @@ export const ROOT_ERROR_TEXTS = {
     'ja-JP': '接続が一時的に利用できません。復旧後に自動更新します。',
     'ko-KR': '백그라운드 연결을 사용할 수 없습니다. 연결되면 자동으로 업데이트됩니다.',
   },
+  dataSourceUnavailable: {
+    'zh-CN': '暂时无法加载数据，请稍后重试。',
+    'en-US': 'Could not load data. Please try again later.',
+    'ja-JP': 'データを読み込めません。しばらくしてから再試行してください。',
+    'ko-KR': '데이터를 불러올 수 없습니다. 잠시 후 다시 시도해 주세요.',
+  },
   oops: {
     'zh-CN': '出错了！',
     'en-US': 'Oops!',

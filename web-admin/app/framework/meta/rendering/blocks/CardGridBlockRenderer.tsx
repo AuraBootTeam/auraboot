@@ -45,8 +45,9 @@ import { Dialog, DialogContent, DialogTitle } from '~/ui/ui/dialog';
 import { ToolbarBlockRenderer } from './ToolbarBlockRenderer';
 import { FieldRenderer } from '~/framework/meta/rendering/FieldRenderer';
 import { GridLayoutRenderer } from '~/framework/meta/rendering/layout/GridLayoutRenderer';
-import { resolveErrorLocale, rootT } from '~/error/root-error-view';
 import {
+  dataSourceErrorMessage,
+  dataSourceErrorStatus,
   readDataSourceState,
   useDataSourceSubscription,
   useRuntimeStateSubscription,
@@ -263,21 +264,14 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
 
   // ── Error state ────────────────────────────────────────────────────────────
   if (dataSourceState?.error || parentState?.error) {
-    const sourceError = (dataSourceState?.error || parentState?.error) as Error & {status?:unknown;statusCode?:unknown;code?:unknown};
-    const status = Number(sourceError.status ?? sourceError.statusCode ?? sourceError.code);
-    const message =
-      status === 403
-        ? rootT('forbidden', resolveErrorLocale(locale))
-        : sourceError instanceof Error
-        ? sourceError.message
-        : String(sourceError);
+    const status = dataSourceErrorStatus(dataSourceState?.error || parentState?.error);
     return (
       <div
         role="alert"
         data-testid="card-grid-error"
         className="rounded-control bg-status-red-bg text-status-red border border-status-red p-3 text-sm"
       >
-        {message || t('common.loadError')}
+        {dataSourceErrorMessage(status, locale)}
       </div>
     );
   }

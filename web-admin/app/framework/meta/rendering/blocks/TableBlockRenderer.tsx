@@ -28,6 +28,8 @@ import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
 import { useAuth } from '~/contexts/AuthContext';
 import {
+  dataSourceErrorMessage,
+  dataSourceErrorStatus,
   executeSimpleWorkbenchAction,
   readDataSourceRows,
   readDataSourceState,
@@ -407,10 +409,8 @@ const TableBlockBodyRenderer: React.FC<TableBlockRendererProps> = ({ block, runt
     ) : (
       statePagination
     );
-  const dataSourceError = dataSourceState?.error as any;
-  const errorStatus = Number(
-    dataSourceError?.status ?? dataSourceError?.statusCode ?? dataSourceError?.response?.status,
-  );
+  const dataSourceError = dataSourceState?.error;
+  const errorStatus = dataSourceErrorStatus(dataSourceError);
   const accessDenied = errorStatus === 401 || errorStatus === 403;
   const hasStaleRows = Boolean(dataSourceError) && !accessDenied && rawData.length > 0;
   const stateConfig = ((block as any).states || {}) as Record<string, any>;
@@ -1468,6 +1468,7 @@ const TableBlockBodyRenderer: React.FC<TableBlockRendererProps> = ({ block, runt
   }
 
   if (dataSourceError && (accessDenied || rawData.length === 0)) {
+    const description = stateConfig[errorStateKey]?.description || stateConfig.error?.description;
     return (
       <div
         data-testid={`table-error-state-${errorStateKey}`}
@@ -1477,18 +1478,12 @@ const TableBlockBodyRenderer: React.FC<TableBlockRendererProps> = ({ block, runt
         <div className="text-text font-semibold">
           {stateTitle(
             errorStateKey,
-            stateTitle('error', errorStatus ? `Request failed (${errorStatus})` : 'Request failed'),
+            stateTitle('error', dataSourceErrorMessage(errorStatus, locale)),
           )}
         </div>
-        <div className="text-text-2 mt-1 text-sm">
-          {stateConfig[errorStateKey]?.description || stateConfig.error?.description
-            ? getLocalizedText(
-                stateConfig[errorStateKey]?.description ?? stateConfig.error.description,
-                locale,
-                t,
-              )
-            : String(dataSourceError?.message || '')}
-        </div>
+        {description && (
+          <div className="text-text-2 mt-1 text-sm">{getLocalizedText(description, locale, t)}</div>
+        )}
         {dataSourceId && (
           <button
             type="button"

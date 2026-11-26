@@ -168,9 +168,9 @@ describe('Table command pagination HTTP boundary', () => {
       });
       denied = true;
       fireEvent.click(screen.getByRole('button', { name: '2', exact: true }));
-      expect(await screen.findByTestId('table-error-state-403')).toHaveTextContent(
-        'Parent READ denied',
-      );
+      const accessError = await screen.findByTestId('table-error-state-403');
+      expect(accessError).toHaveTextContent('You do not have permission to view this page.');
+      expect(accessError).not.toHaveTextContent('Parent READ denied');
       expect(screen.queryByText('parent-B row 1')).not.toBeInTheDocument();
       expect(calls).toHaveLength(6);
       expect(calls.every((call) => call.url === '/api/meta/commands/execute/example:history')).toBe(

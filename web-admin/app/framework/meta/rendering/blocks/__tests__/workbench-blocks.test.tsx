@@ -266,7 +266,8 @@ describe('MetricStripBlockRenderer', () => {
 
     render(<MetricStripBlockRenderer block={block} runtime={runtime} />);
 
-    expect(screen.getByRole('alert')).toHaveTextContent('metrics failed');
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not load data. Please try again later.');
+    expect(screen.getByRole('alert')).not.toHaveTextContent('metrics failed');
   });
 
   it('renders multiple metrics from one data source and writes state on click', () => {

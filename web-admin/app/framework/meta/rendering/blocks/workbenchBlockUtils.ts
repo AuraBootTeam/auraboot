@@ -23,6 +23,23 @@ import {
 } from '~/framework/meta/utils/promptUpload';
 import { fetchResult } from '~/shared/services/http-client';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
+import { resolveErrorLocale, rootT } from '~/error/root-error-view';
+
+export function dataSourceErrorStatus(error: unknown): number {
+  if (!error || typeof error !== 'object') return NaN;
+  const source = error as {
+    status?: unknown;
+    statusCode?: unknown;
+    response?: { status?: unknown };
+    code?: unknown;
+  };
+  const status = Number(source.status ?? source.statusCode ?? source.response?.status ?? source.code);
+  return Number.isInteger(status) && status >= 400 && status <= 599 ? status : NaN;
+}
+
+export function dataSourceErrorMessage(status: number, locale: string): string {
+  return rootT(status === 403 ? 'forbidden' : 'dataSourceUnavailable', resolveErrorLocale(locale));
+}
 
 export function formatTemporalValue(
   value: unknown,
