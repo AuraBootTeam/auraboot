@@ -8,7 +8,7 @@ import { chartDataErrorLabel } from '../../utils/chartDataErrorLabel';
 
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useChartData } from '~/framework/smart/hooks/useChartData';
-import { useDimensionLabels } from '~/framework/smart/hooks/useDimensionLabels';
+import { useDimensionLabels, useDimensionTones } from '~/framework/smart/hooks/useDimensionLabels';
 import type {
   ChartDataSource,
   DrillDownConfig,
@@ -22,6 +22,7 @@ import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-rende
 import type { LocalizedText } from '~/framework/meta/schemas/types';
 import { cn } from '~/utils/cn';
 import { enrichDrillDownFilters } from '~/framework/smart/utils/drillDownFilters';
+import { StatusDot, resolveStatusTone } from '~/framework/meta/runtime/renderers/statusTone';
 
 /**
  * Per-column override delivered via `widget.config.table.columns`. Lets the
@@ -37,7 +38,13 @@ export interface SmartTableChartColumn {
   width?: number;
   /** Reserved for future use (cell renderer hint). */
   renderType?: string;
-  /** Reserved for future use (dict-driven tag rendering). */
+  /**
+   * Dictionary the column's values come from. It names the dictionary for a column that has no
+   * field behind it (named-query and API tables), and it wins over the model's own field binding.
+   * It is also the opt-in for status rendering: a value of such a column whose dictionary item
+   * declares `extension.color` is shown as 色点 + 文字, exactly as in a list page. A column without
+   * `dictCode` is plain text whatever its dictionary declares.
+   */
   dictCode?: string;
   /** Optional per-column align: 'left' | 'right' | 'center'. */
   align?: 'left' | 'right' | 'center';
@@ -333,14 +340,22 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
     return keys.map((k) => ({ field: k, label: k }));
   }, [data, tableColumns, locale]);
 
-  // Dict labels for the columns. The table renders stored values verbatim, so a
-  // stage column showed `proposal` and an activity type `call`. The model-list branch
-  // never builds a QueryMeta, hence resolving straight from the column fields.
+  // Dict labels and colours for the columns. The model-list branch never builds a QueryMeta, hence
+  // resolving straight from the column fields. A column's own `dictCode` is added as an explicit
+  // mapping: for a named-query or API table it is the only way to say which dictionary a column
+  // means, and the hook lets an explicit mapping win over the model's field binding.
   const columnFields = useMemo(() => columns.map((c) => c.field), [columns]);
-  const cellLabels = useDimensionLabels(
-    useModelBranch && modelCode ? { type: 'aggregate', modelCode } : dataSource,
-    columnFields,
-  );
+  const dictSource = useMemo<ChartDataSource | undefined>(() => {
+    const base: ChartDataSource | undefined =
+      useModelBranch && modelCode ? { type: 'aggregate', modelCode } : dataSource;
+    const declared = Object.fromEntries(
+      (tableColumns ?? []).filter((col) => col.dictCode).map((col) => [col.field, col.dictCode as string]),
+    );
+    if (!base || Object.keys(declared).length === 0) return base;
+    return { ...base, dimensionDicts: { ...(base.dimensionDicts ?? {}), ...declared } };
+  }, [useModelBranch, modelCode, dataSource, tableColumns]);
+  const cellLabels = useDimensionLabels(dictSource, columnFields);
+  const cellTones = useDimensionTones(dictSource, columnFields);
 
   const sortedRows = useMemo(() => {
     if (!data?.rows) return [];
@@ -527,7 +542,7 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
                     )}
                   >
                     <span title={formatCell(cellLabels, col, row[col.field], locale)}>
-                      {formatCell(cellLabels, col, row[col.field], locale)}
+                      {renderCell(cellLabels, cellTones, col, row[col.field], locale)}
                     </span>
                   </td>
                 ))}
@@ -594,6 +609,26 @@ function formatCell(
   if (configuredLabel) return getLocalizedText(configuredLabel, locale);
   const label = value == null ? undefined : labels[column.field]?.[String(value)];
   return label ?? formatCellValue(value, column, locale);
+}
+
+/**
+ * The body of one cell. In a column that names its dictionary, a value whose dictionary item declares
+ * a colour is a status and is drawn as 色点 + 文字 with the same dot component list and detail pages
+ * use. Everything else — other values, and every column without `dictCode` — is text.
+ */
+function renderCell(
+  labels: Record<string, Record<string, string>>,
+  tones: Record<string, Record<string, string>>,
+  column: SmartTableChartColumn,
+  value: unknown,
+  locale: string,
+): React.ReactNode {
+  const text = formatCell(labels, column, value, locale);
+  // Opt-in per column: only a column that names its dictionary is drawn as a status. A table that
+  // does not declare `dictCode` stays exactly as it was, in every product, until it asks for this.
+  const color = column.dictCode && value != null ? tones[column.field]?.[String(value)] : undefined;
+  if (!color) return text;
+  return <StatusDot tone={resolveStatusTone(color)} label={text} />;
 }
 
 function formatCellValue(value: unknown, column: SmartTableChartColumn, locale: string): string {

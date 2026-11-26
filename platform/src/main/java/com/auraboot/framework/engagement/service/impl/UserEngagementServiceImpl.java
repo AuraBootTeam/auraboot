@@ -183,6 +183,7 @@ public class UserEngagementServiceImpl implements UserEngagementService {
         dto.setEngagementType(entity.getEngagementType());
         dto.setSortOrder(entity.getSortOrder());
         dto.setCreatedAt(entity.getCreatedAt());
+        dto.setUpdatedAt(entity.getUpdatedAt());
         dto.setTargetContext(entity.getTargetContext());
 
         return dto;

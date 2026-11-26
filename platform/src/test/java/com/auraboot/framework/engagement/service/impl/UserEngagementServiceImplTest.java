@@ -54,6 +54,23 @@ class UserEngagementServiceImplTest {
     }
 
     @Test
+    void list_tellsTheLatestVisitFromTheFirst() {
+        // A revisited page keeps its first visit on createdAt; the "recently visited" list on the
+        // home page orders and stamps by the latest one, so the DTO carries both.
+        UserEngagement revisited = entity(11L);
+        OffsetDateTime first = OffsetDateTime.parse("2026-11-20T08:00:00Z");
+        OffsetDateTime latest = OffsetDateTime.parse("2026-11-26T00:30:00Z");
+        revisited.setCreatedAt(first);
+        revisited.setUpdatedAt(latest);
+        when(engagementMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(revisited));
+
+        List<UserEngagementDTO> result = service.list(1L, 2L, "recent_view", "page");
+
+        assertEquals(first, result.get(0).getCreatedAt());
+        assertEquals(latest, result.get(0).getUpdatedAt());
+    }
+
+    @Test
     void upsert_createsNewWhenAbsent() {
         when(engagementMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
         UserEngagementDTO dto = new UserEngagementDTO();

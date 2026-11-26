@@ -2751,6 +2751,26 @@
     "en-US": "Show less"
   },
   {
+    "key": "workbench.recent.subpage.new",
+    "zh-CN": "新建",
+    "en-US": "New"
+  },
+  {
+    "key": "workbench.recent.subpage.edit",
+    "zh-CN": "编辑",
+    "en-US": "Edit"
+  },
+  {
+    "key": "workbench.recent.subpage.view",
+    "zh-CN": "详情",
+    "en-US": "Details"
+  },
+  {
+    "key": "detail.section.empty",
+    "zh-CN": "这一段还没有内容。",
+    "en-US": "Nothing has been recorded in this section yet."
+  },
+  {
     "key": "workbench.recent.empty",
     "zh-CN": "暂无访问记录",
     "en-US": "No recent visits"
