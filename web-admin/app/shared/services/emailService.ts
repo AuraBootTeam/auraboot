@@ -367,11 +367,11 @@ export async function getMessageLinks(messageId: number): Promise<RecordLink[]> 
  * Get tracking stats (opens/clicks) for an outbound message.
  */
 export async function getTrackingStats(messageId: number): Promise<TrackingStats> {
-  const result = await fetchResult<TrackingStats>(`${BASE}/messages/${messageId}/tracking`, {
+  const result = await fetchResult<{ openCount: number; clickCount: number }>(`${BASE}/messages/${messageId}/tracking`, {
     method: 'get',
   });
   if (ResultHelper.isSuccess(result) && result.data) {
-    return result.data;
+    return { opens: result.data.openCount, clicks: result.data.clickCount };
   }
   return { opens: 0, clicks: 0 };
 }

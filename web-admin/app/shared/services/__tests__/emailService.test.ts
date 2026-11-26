@@ -342,7 +342,7 @@ describe('emailService', () => {
 
   describe('getTrackingStats', () => {
     it('GETs /api/email/messages/:id/tracking and returns stats', async () => {
-      fetchResultMock.mockResolvedValue(ok({ opens: 3, clicks: 1 }));
+      fetchResultMock.mockResolvedValue(ok({ openCount: 3, clickCount: 1 }));
 
       const result = await getTrackingStats(10);
 
