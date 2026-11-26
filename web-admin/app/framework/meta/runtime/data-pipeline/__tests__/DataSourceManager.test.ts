@@ -17,6 +17,32 @@ vi.mock('~/shared/services/http-client', () => ({
 const mockedFetchResult = vi.mocked(fetchResult);
 
 describe('DataSourceManager', () => {
+  it('keeps two same-name references distinguishable by their business numbers', async () => {
+    const manager = new DataSourceManager(createExpressionContext());
+    manager.register('campaigns', {
+      type: 'api',
+      endpoint: '/api/dynamic/campaign/list',
+      adaptor: 'optionList',
+      valueField: 'pid',
+      labelField: 'name',
+      labelSuffixField: 'code',
+      autoFetch: false,
+    });
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '0',
+      data: { records: [
+        { pid: 'first', name: 'Launch', code: 'CAM-1' },
+        { pid: 'second', name: 'Launch', code: 'CAM-2' },
+        { pid: 'third', name: 'Legacy' },
+      ] },
+    } as any);
+    expect(await manager.fetch('campaigns')).toEqual([
+      { value: 'first', label: 'Launch (CAM-1)' },
+      { value: 'second', label: 'Launch (CAM-2)' },
+      { value: 'third', label: 'Legacy' },
+    ]);
+  });
+
   it.each([{ records: [] }, { records: [{ mediaPid: 'media-1', altText: 'Front view' }] }])(
     'preserves raw page rows and metadata instead of projecting option labels: %j',
     async ({ records }) => {

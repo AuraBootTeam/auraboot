@@ -14,6 +14,7 @@ export interface StructuredArrayColumn {
 export interface StructuredArraySchema {
   columns?: StructuredArrayColumn[];
   item?: StructuredArrayColumn;
+  addLabel?: LocalizedText;
 }
 
 export function readStructuredArray(value: unknown): unknown[] | null {

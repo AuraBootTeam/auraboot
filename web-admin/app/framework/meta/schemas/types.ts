@@ -285,6 +285,8 @@ export interface DataSourceConfig {
   selectableField?: string;
   valueField?: string; // Default: 'value'
   labelField?: string; // Default: 'name'
+  /** Optional business identifier shown alongside an option label. */
+  labelSuffixField?: string;
   data?: any[]; // For static type only
   dependOn?: string[];
   // NamedQuery-specific fields (when type = 'namedQuery')

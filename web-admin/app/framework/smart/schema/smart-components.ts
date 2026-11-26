@@ -39,6 +39,7 @@ export interface DataSourceConfig {
   adaptor?: string;
   valueField?: string;
   labelField?: string;
+  labelSuffixField?: string;
   data?: any[];
   transform?: string; // 兼容旧版
   cache?: boolean;

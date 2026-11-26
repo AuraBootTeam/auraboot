@@ -949,14 +949,16 @@ export class DataSourceManager {
           pageSize: page.size,
         };
       }
-      case 'optionList':
-        // 转换为 { value, label } 格式
-        if (Array.isArray(data)) {
-          return data.map((item) => ({
+      case 'optionList': {
+        const toOption = (item: Record<string, any>) => {
+          const label = config.labelField ? item[config.labelField] : item.label;
+          const suffix = config.labelSuffixField && item[config.labelSuffixField];
+          return {
             value: config.valueField ? item[config.valueField] : item.value,
-            label: config.labelField ? item[config.labelField] : item.label,
-          }));
-        }
+            label: typeof suffix === 'string' && suffix.trim() ? `${label ?? ''} (${suffix})` : label,
+          };
+        };
+        if (Array.isArray(data)) return data.map(toOption);
         if (data && typeof data === 'object') {
           const source = Array.isArray((data as any).data)
             ? (data as any).data
@@ -968,13 +970,11 @@ export class DataSourceManager {
                   ? (data as any).items
                   : [];
           if (source.length > 0) {
-            return source.map((item: any) => ({
-              value: config.valueField ? item[config.valueField] : item.value,
-              label: config.labelField ? item[config.labelField] : item.label,
-            }));
+            return source.map(toOption);
           }
         }
         break;
+      }
 
       case 'dictData':
         // 字典数据适配器

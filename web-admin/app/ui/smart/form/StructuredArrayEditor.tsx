@@ -1,7 +1,6 @@
 import { useSmartText } from '~/utils/i18n';
 import { Button } from '~/ui/ui/button';
-import type { FormFieldProps, SelectProps } from '~/framework/smart/schema/smart-components';
-import type { LocalizedText } from '~/framework/meta/schemas/types';
+import type { FormFieldProps } from '~/framework/smart/schema/smart-components';
 import Input from './Input';
 import Select from './Select';
 import {
@@ -18,7 +17,7 @@ interface Props extends FormFieldProps, StructuredArraySchema {
 }
 
 export default function StructuredArrayEditor({
-  name, value, onChange, disabled, readOnly, context, columns, item,
+  name, value, onChange, disabled, readOnly, context, columns, item, addLabel,
   'aria-label': label, 'aria-describedby': describedBy, 'aria-invalid': invalid,
 }: Props) {
   const st = useSmartText();
@@ -27,7 +26,7 @@ export default function StructuredArrayEditor({
   const fieldColumns = item ? [item] : columns ?? [];
 
   const text = (chinese: string, english: string) =>
-    st({ 'zh-CN': chinese, en: english } as LocalizedText);
+    st({ 'zh-CN': chinese, en: english });
 
   if (!rows) {
     return <p id={name} role="alert">{text('无法读取已保存的列表。', 'The saved list could not be loaded.')}</p>;
@@ -81,7 +80,7 @@ export default function StructuredArrayEditor({
               return (
                 <div key={column.key} className="min-w-0 flex-1">
                   {column.dataSource || options ? (
-                    <Select {...props} options={options} dataSource={column.dataSource as SelectProps['dataSource']} />
+                    <Select {...props} options={options} dataSource={column.dataSource} />
                   ) : <Input {...props} />}
                 </div>
               );
@@ -105,7 +104,7 @@ export default function StructuredArrayEditor({
       ))}
       {!locked && (
         <Button type="button" variant="outline" size="sm" onClick={add}>
-          {item ? text('添加一项', 'Add an item') : text('添加条件', 'Add a condition')}
+          {addLabel ? st(addLabel) : text('添加一项', 'Add an item')}
         </Button>
       )}
     </div>
