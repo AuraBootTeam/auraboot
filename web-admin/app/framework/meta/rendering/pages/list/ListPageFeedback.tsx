@@ -134,8 +134,8 @@ export function renderListPageFeedback(
         >
           <span>
             {hasPendingPersonalViewConfig
-              ? translateCommon('common.saved_view_personal_draft', '当前个人视图有本地变更')
-              : translateCommon('common.saved_view_shared_draft', '共享视图有本地变更')}
+              ? translateCommon('common.saved_view_personal_draft', '个人视图的调整尚未保存')
+              : translateCommon('common.saved_view_shared_draft', '当前调整尚未保存')}
             {pendingViewSummary.length > 0 && (
               <span className="ml-1 text-amber-700">{pendingViewSummary.join(', ')}</span>
             )}
@@ -160,8 +160,8 @@ export function renderListPageFeedback(
                         ? 'common.saved_view_locked_preset_reason'
                         : 'common.saved_view_save_shared_disabled_reason',
                       isCurrentViewLockedPreset
-                        ? '插件预置视图不能直接保存，请先复制为个人视图。'
-                        : '你可以调整当前视图，但暂不能保存给团队或全员。',
+                        ? '选择「另存为新视图」即可保留这次调整。'
+                        : '你可以另存为个人视图，保留这次调整。',
                     )
             }
             data-testid={
@@ -185,8 +185,8 @@ export function renderListPageFeedback(
                   ? 'common.saved_view_locked_preset_reason'
                   : 'common.saved_view_save_shared_disabled_reason',
                 isCurrentViewLockedPreset
-                  ? '插件预置视图不能直接保存，请先复制为个人视图。'
-                  : '你可以调整当前视图，但暂不能保存给团队或全员。',
+                  ? '选择「另存为新视图」即可保留这次调整。'
+                  : '你可以另存为个人视图，保留这次调整。',
               )}
             </span>
           )}

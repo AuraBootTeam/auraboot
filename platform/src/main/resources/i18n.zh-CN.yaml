@@ -129,7 +129,7 @@ common:
   saved_view_locked_preset: 预置
   saved_view_capability_blocked: 需要配置
   saved_view_panel_subtitle: 管理当前列表的个人视图
-  saved_view_personal_draft: 当前个人视图有本地变更
+  saved_view_personal_draft: "个人视图的调整尚未保存"
   saved_view_save_current: 保存到当前视图
   saved_view_save_as_personal: 另存为新视图
   saved_view_current_saved: 当前视图已保存
@@ -222,10 +222,10 @@ common:
   saved_view_issue_records: 异常记录
   saved_view_first_n: "前 {count} 条"
   saved_view_data_limit_summary: "当前显示 {fetchedCount}/{totalCount} 条记录。"
-  saved_view_shared_draft: 共享视图已产生本地改动
+  saved_view_shared_draft: "当前调整尚未保存"
   saved_view_save_shared: 保存到共享视图
-  saved_view_save_shared_disabled_reason: 你可以调整当前视图，但暂不能保存给团队或全员
-  saved_view_locked_preset_reason: 插件预置视图不能直接保存，请先复制为我的视图
+  saved_view_save_shared_disabled_reason: "你可以另存为个人视图，保留这次调整。"
+  saved_view_locked_preset_reason: "选择「另存为新视图」即可保留这次调整。"
   saved_view_save_shared_confirm_title: 保存到共享视图？
   saved_view_save_shared_confirm_content: 这会更新 {target} 可见的共享视图。变更：{changes}。
   saved_view_shared_changes: 视图配置
