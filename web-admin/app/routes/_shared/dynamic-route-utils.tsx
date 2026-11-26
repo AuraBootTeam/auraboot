@@ -6,6 +6,7 @@
 import React from 'react';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
+import { WorkspaceCell, type WorkspaceCellPresentation } from '~/framework/meta/runtime/renderers/WorkspaceCells';
 import { MemberPicker } from '~/ui/smart/picker/MemberPicker';
 import { ReadonlyFileReference } from '~/ui/smart/display/ReadonlyFileReference';
 import { attachmentDownloadUrl } from '~/ui/smart/display/FileAttachmentField';
@@ -175,6 +176,7 @@ export function resolveLocalMenuRedirect(
 
 interface FieldConfig {
   field: string;
+  presentation?: WorkspaceCellPresentation;
   label?: string | LocalizedText;
   component?: string;
   dataType?: string;
@@ -487,6 +489,18 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
   const renderField = () => {
     // Read-only display
     if (readOnly) {
+      if (field.presentation?.kind === 'currency') {
+        return (
+          <div className="py-1">
+            <WorkspaceCell
+              value={value}
+              record={{}}
+              column={{ field: field.field, presentation: field.presentation }}
+              locale={locale}
+            />
+          </div>
+        );
+      }
       const referenceModel = getReferenceModel(field);
       const isUserSelect =
         componentType === 'userselect' ||

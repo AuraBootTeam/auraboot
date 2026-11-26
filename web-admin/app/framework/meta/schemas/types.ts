@@ -330,6 +330,8 @@ export interface FlowStep {
 // Field 配置（用于表单）
 export interface FieldConfig {
   field: string;
+  /** Presentation override for read-only currency amounts. */
+  presentation?: WorkspaceCellPresentation;
   /** Read-only inspector path and presentation; values stay in the parent record. */
   path?: string;
   valueType?: string;

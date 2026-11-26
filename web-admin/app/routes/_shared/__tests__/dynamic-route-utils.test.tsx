@@ -59,6 +59,20 @@ describe('resolveLocalMenuRedirect', () => {
 });
 
 describe('DynamicField', () => {
+  it('uses the configured currency in read-only fields with a decimal value', () => {
+    const field = {
+      field: 'budget',
+      component: 'number',
+      dataType: 'decimal',
+      presentation: { kind: 'currency' as const, currencyCode: 'CNY', precision: 2 },
+    };
+    const view = render(<DynamicField field={field} value="85000" onChange={vi.fn()} readOnly />);
+    expect(screen.getByText(/^[¥￥]85,000\.00$/)).toBeVisible();
+
+    view.rerender(<DynamicField field={field} value={null} onChange={vi.fn()} readOnly />);
+    expect(screen.getByText('—')).toBeVisible();
+  });
+
   it('uses a safe same-page download for controlled file attachments', () => {
     render(<DynamicField field={{ field: 'files', component: 'fileattachment' } as any}
       value={JSON.stringify([{ name: 'Policy.txt', url: '/api/announcements/versions/v1/attachments/f1', size: 12 },
