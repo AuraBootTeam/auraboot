@@ -24,6 +24,12 @@ public interface DynamicDataService {
      */
     PaginationResult<Map<String, Object>> list(String modelCode, DynamicQueryRequest request);
 
+    /** List through the same authorization and masking gates without reference label expansion. */
+    default PaginationResult<Map<String, Object>> listForProcessing(String modelCode, DynamicQueryRequest request) {
+        return list(modelCode, request);
+    }
+
+
     /**
      * List data by executing a NamedQuery directly (for pages with dataSource.type = "namedQuery").
      * Converts DynamicQueryRequest conditions to NamedQuery format and delegates to NamedQueryService.

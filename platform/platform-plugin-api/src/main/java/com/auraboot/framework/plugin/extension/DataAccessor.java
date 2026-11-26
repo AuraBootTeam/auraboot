@@ -74,6 +74,17 @@ public interface DataAccessor extends RecordReadAccessor {
      */
     List<Map<String, Object>> query(String modelCode, Map<String, Object> filters);
 
+    /** Query authorized, masked stored fields without expanding display-only reference labels. */
+    default List<Map<String, Object>> queryForProcessing(String modelCode, Map<String, Object> filters) {
+        return query(modelCode, filters);
+    }
+
+    /** Like queryIn, with a stored-field result intended for command processing. */
+    default List<Map<String, Object>> queryInForProcessing(String modelCode, String fieldName, Collection<?> values) {
+        return queryIn(modelCode, fieldName, values);
+    }
+
+
     /**
      * Read one database-backed page, including its authorized total count.
      * Filters, ordering and page boundaries must execute in the host query service;

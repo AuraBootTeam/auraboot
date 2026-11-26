@@ -13,7 +13,10 @@ import static org.mockito.Mockito.*;
 
 /** Listing preserves named-query delegation and stable physical pagination. */
 class DynamicDataListingSupportTest {
-    @BeforeEach void context() { MetaContext.setContext(42L,43L,"u-43","tester"); }
+    @BeforeEach void context() {
+        MetaContext.setContext(42L,43L,"u-43","tester");
+        MetaContext.setMemberId(44L);
+    }
     @AfterEach void clear() { MetaContext.clear(); }
     final NamedQueryService queries=mock(NamedQueryService.class);
     final MetaModelMapper models=mock(MetaModelMapper.class);
@@ -124,8 +127,10 @@ class DynamicDataListingSupportTest {
         var fields=new ArrayList<>(model.getFields());fields.add(FieldDefinition.builder().code("name").columnName("name").dataType("string").searchable(true).build());model.setFields(fields);
         var masks=mock(FieldMaskService.class);when(masks.applyMaskingForList(anyString(),anyList(),any()))
                 .thenAnswer(call->call.getArgument(1));
+        var display = mock(DynamicDataListingSupport.EnrichListRecordsOperation.class);
+        when(display.execute(anyString(), anyList())).thenAnswer(call -> call.getArgument(1));
         var listing=new DynamicDataListingSupport(builder,queries,new SecureSqlRewriter(),mapper,policies,
-                masks,mock(DataDomainService.class),models,mock(ExecutorRegistry.class),projection(),(m,r,a)->r,(m,r)->r,audit,m->model);
+                masks,mock(DataDomainService.class),models,mock(ExecutorRegistry.class),projection(),(m,r,a)->r,display,audit,m->model);
         var expected=new java.util.concurrent.atomic.AtomicReference<String>();
         when(policies.buildRowFilterForQuery(eq(42L),eq("fixture_bundle"),eq(43L),anyList(),anyString())).thenAnswer(call->{
             List<QueryCondition> conditions=call.getArgument(3);String pid=(String)conditions.get(0).getValue();
@@ -145,12 +150,15 @@ class DynamicDataListingSupportTest {
                 String pid=RequiredReadReferencesTest.id(n);
                 var condition=QueryCondition.builder().fieldName("pid").operator(QueryCondition.Operator.EQ).value(pid).build();
                 var page=listing.list("fixture_bundle",DynamicQueryRequest.builder().conditions(List.of(condition))
-                        .keyword(n==9?"first":"second").pageNum(1).pageSize(1).cursor(RequiredReadReferencesTest.id(1)).build());
+                        .keyword(n==9?"first":"second").pageNum(1).pageSize(1).cursor(RequiredReadReferencesTest.id(1)).build(),
+                        n == 9);
                 assertThat(page.getTotal()).isEqualTo(1L);assertThat(page.getRecords()).extracting(r->r.get("pid")).containsExactly(pid);
                 assertThat(page.getNextCursor()).isEqualTo(pid);
             }
         }
         verify(policies,times(2)).buildRowFilterForQuery(eq(42L),eq("fixture_bundle"),eq(43L),anyList(),anyString());
         verify(policies,never()).buildRowFilter(any(),anyString(),any());
+        verify(masks, times(2)).applyMaskingForList(eq("fixture_bundle"), anyList(), eq(43L));
+        verify(display).execute(eq("fixture_bundle"), anyList());
     }
 }

@@ -221,10 +221,20 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     @Override
     @Observed(name = "dynamic_data.list", contextualName = "dynamic-data-list")
     public PaginationResult<Map<String, Object>> list(String modelCode, DynamicQueryRequest request) {
+        return listInternal(modelCode, request, true);
+    }
+
+    @Override
+    public PaginationResult<Map<String, Object>> listForProcessing(String modelCode, DynamicQueryRequest request) {
+        return listInternal(modelCode, request, false);
+    }
+
+    private PaginationResult<Map<String, Object>> listInternal(
+            String modelCode, DynamicQueryRequest request, boolean enrichDisplay) {
         try (DynamicDataQueryScope __readScope = DynamicDataQueryScope.open()) {
             requireDomainAction(modelCode, "read");
             BusinessResourceDataScope.query(modelCode, request);
-            return dynamicDataListingSupport().list(modelCode,request);
+            return dynamicDataListingSupport().list(modelCode, request, enrichDisplay);
         }
     }
 

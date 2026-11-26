@@ -73,6 +73,15 @@ public class DynamicDataAccessorImpl implements DataAccessor {
 
     @Override
     public List<Map<String, Object>> query(String modelCode, Map<String, Object> filters) {
+        return query(modelCode, filters, true);
+    }
+
+    @Override
+    public List<Map<String, Object>> queryForProcessing(String modelCode, Map<String, Object> filters) {
+        return query(modelCode, filters, false);
+    }
+
+    private List<Map<String, Object>> query(String modelCode, Map<String, Object> filters, boolean enrichDisplay) {
         log.debug("Plugin DataAccessor: query({}, {})", modelCode, filters);
 
         List<QueryCondition> conditions = new ArrayList<>();
@@ -86,7 +95,7 @@ public class DynamicDataAccessorImpl implements DataAccessor {
             }
         }
 
-        return queryAll(modelCode, conditions);
+        return queryAll(modelCode, conditions, enrichDisplay);
     }
 
     @Override
@@ -125,6 +134,16 @@ public class DynamicDataAccessorImpl implements DataAccessor {
 
     @Override
     public List<Map<String, Object>> queryIn(String modelCode, String fieldName, Collection<?> values) {
+        return queryIn(modelCode, fieldName, values, true);
+    }
+
+    @Override
+    public List<Map<String, Object>> queryInForProcessing(String modelCode, String fieldName, Collection<?> values) {
+        return queryIn(modelCode, fieldName, values, false);
+    }
+
+    private List<Map<String, Object>> queryIn(
+            String modelCode, String fieldName, Collection<?> values, boolean enrichDisplay) {
         if (fieldName == null || fieldName.isBlank()) {
             throw new IllegalArgumentException("fieldName cannot be null or blank");
         }
@@ -139,10 +158,11 @@ public class DynamicDataAccessorImpl implements DataAccessor {
                         .fieldName(fieldName)
                         .operator(QueryCondition.Operator.IN)
                         .values(queryValues)
-                        .build()));
+                        .build()), enrichDisplay);
     }
 
-    private List<Map<String, Object>> queryAll(String modelCode, List<QueryCondition> conditions) {
+    private List<Map<String, Object>> queryAll(
+            String modelCode, List<QueryCondition> conditions, boolean enrichDisplay) {
         List<Map<String, Object>> records = new ArrayList<>();
         for (int pageNum = 1; ; pageNum++) {
             DynamicQueryRequest request = DynamicQueryRequest.builder()
@@ -151,7 +171,9 @@ public class DynamicDataAccessorImpl implements DataAccessor {
                     .conditions(conditions)
                     .build();
             PaginationResult<Map<String, Object>> result =
-                    withCommandAuthority(() -> dynamicDataService.list(modelCode, request));
+                    withCommandAuthority(() -> enrichDisplay
+                            ? dynamicDataService.list(modelCode, request)
+                            : dynamicDataService.listForProcessing(modelCode, request));
             List<Map<String, Object>> page = result == null || result.getRecords() == null
                     ? List.of() : result.getRecords();
             records.addAll(page);

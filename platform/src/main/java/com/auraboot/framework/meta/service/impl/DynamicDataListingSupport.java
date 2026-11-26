@@ -95,10 +95,15 @@ final class DynamicDataListingSupport extends BaseMetaService {
     private ModelDefinition getModelDefinition(String modelCode) { return getModelDefinitionOperation.execute(modelCode); }
 
     PaginationResult<Map<String, Object>> list(String modelCode, DynamicQueryRequest request){
-        return nativeReadFields.readWithinSnapshot(modelCode, () -> listInSnapshot(modelCode, request));
+        return list(modelCode, request, true);
     }
 
-    private PaginationResult<Map<String, Object>> listInSnapshot(String modelCode, DynamicQueryRequest request){
+    PaginationResult<Map<String, Object>> list(String modelCode, DynamicQueryRequest request, boolean enrichDisplay) {
+        return nativeReadFields.readWithinSnapshot(modelCode, () -> listInSnapshot(modelCode, request, enrichDisplay));
+    }
+
+    private PaginationResult<Map<String, Object>> listInSnapshot(
+            String modelCode, DynamicQueryRequest request, boolean enrichDisplay) {
         validateModelCode(modelCode);
         logOperation("list", modelCode, request);
 
@@ -307,7 +312,7 @@ final class DynamicDataListingSupport extends BaseMetaService {
         // `<field>_display` projections. Their permit boundary was already evaluated by the
         // command pipeline, so target-reference authorization/enrichment here is both redundant
         // and a large N+1 multiplier for multi-step commands.
-        if (!commandPermitInForce) {
+        if (enrichDisplay && !commandPermitInForce) {
             records = enrichListRecords(modelCode, records);
         }
 
