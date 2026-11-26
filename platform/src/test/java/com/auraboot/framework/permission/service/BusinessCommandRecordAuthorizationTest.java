@@ -552,6 +552,8 @@ class BusinessCommandRecordAuthorizationTest {
             });
             return null;
         });
+        verify(snapshots).resourcePermissionCodes(100L,MODEL,"read");
+        verify(snapshots).resolvePermissionDefinition(100L,CODE);
         verify(bindings,times(1)).findBusinessGrants(100L,1L,5L,CODE);
         verify(policies,times(1)).getConditionGuards(5L,CODE);
         verify(scopes,times(1)).resolveObjectBoundScopeForRole(5L,101L,MODEL,"read",MODEL);
@@ -559,6 +561,8 @@ class BusinessCommandRecordAuthorizationTest {
         when(scopes.resolveObjectBoundScopeForRole(5L,101L,MODEL,"read",MODEL)).thenReturn(DataScopeCondition.none());
         assertThat(authorization.resolveOrdinaryRead(5L,MODEL,record(1,"Shanghai")).result().granted()).isFalse();
         verify(scopes,times(2)).resolveObjectBoundScopeForRole(5L,101L,MODEL,"read",MODEL);
+        verify(snapshots,times(2)).resourcePermissionCodes(100L,MODEL,"read");
+        verify(snapshots,times(2)).resolvePermissionDefinition(100L,CODE);
     }
 
     @Test void projectionCannotReuseConfigurationAfterActorOrPhysicalSnapshotChange() {

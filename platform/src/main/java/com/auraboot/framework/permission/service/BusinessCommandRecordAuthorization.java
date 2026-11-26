@@ -1,6 +1,7 @@
 package com.auraboot.framework.permission.service;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.engine.evaluator.DataScopeEvaluator;
 import com.auraboot.framework.permission.engine.evaluator.PolicyEvaluator;
 import com.auraboot.framework.permission.engine.model.EvaluationStep;
@@ -17,6 +18,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.sql.Connection;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -87,6 +89,16 @@ public class BusinessCommandRecordAuthorization {
         T result=loader.get();current.verify();current.configuration.put(key,result);return result;
     }
 
+    private Permission permissionDefinition(Long tenant, String code) {
+        return readConfiguration(Arrays.asList("permission definition", tenant, code),
+                () -> snapshots.resolvePermissionDefinition(tenant, code));
+    }
+
+    private List<String> resourcePermissionCodes(Long tenant, String model, String action) {
+        return readConfiguration(Arrays.asList("permission codes", tenant, model, action),
+                () -> snapshots.resourcePermissionCodes(tenant, model, action));
+    }
+
     private List<RolePermissionMapper.BusinessGrantRow> grantRows(Long member,String code,boolean domain) {
         return readConfiguration(List.of("grants",member,code,domain),() -> domain && domains!=null ? domains.grants(code)
                 : bindings.findBusinessGrants(MetaContext.getCurrentTenantId(),MetaContext.getCurrentUserId(),member,code));
@@ -97,7 +109,7 @@ public class BusinessCommandRecordAuthorization {
     private PermissionPolicyService.ConditionGuard conditionGuard(Long member,RolePermissionMapper.BusinessGrantRow binding) {
         return readConfiguration(List.of("binding-guard",member,binding.getId(),binding.getPermissionCode()),() -> {
             if(Boolean.TRUE.equals(binding.getConditionLoaded())) {
-                var definition=snapshots.resolvePermissionDefinition(MetaContext.getCurrentTenantId(),binding.getPermissionCode());
+                var definition=permissionDefinition(MetaContext.getCurrentTenantId(),binding.getPermissionCode());
                 // An older/global duplicate definition cannot lend a newer definition's guard.
                 if(definition==null || binding.getPermissionId()==null || !Objects.equals(definition.getId(),binding.getPermissionId()))return null;
                 return policies.loadedConditionGuard(definition,binding.getId(),binding.getConditionAstJson(),binding.getConditionsJson());
@@ -144,14 +156,14 @@ public class BusinessCommandRecordAuthorization {
     public BusinessGrantDecision resolveForAction(Long member, List<String> codes, String model,
                                                   Map<String,Object> record, String action) {
         boolean domain = codes != null && codes.stream().anyMatch(code -> DomainPermissionPolicy.owns(
-                snapshots.resolvePermissionDefinition(MetaContext.getCurrentTenantId(), code), model));
+                permissionDefinition(MetaContext.getCurrentTenantId(), code), model));
         return resolveInternal(member, codes, model, record, domain ? action : null);
     }
 
     /** Resolve a complete generated model-read grant for an artifact reader, without an execution permit. */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public BusinessGrantDecision resolveModelRead(Long memberId, String model, Map<String,Object> record) {
-        return resolveInternal(memberId, snapshots.resourcePermissionCodes(MetaContext.getCurrentTenantId(), model, "read"), model, record, "read");
+        return resolveInternal(memberId, resourcePermissionCodes(MetaContext.getCurrentTenantId(), model, "read"), model, record, "read");
     }
 
     /** Null means this declared duty is not a write owner; an owning duty's refusal must not fall back. */
@@ -160,7 +172,7 @@ public class BusinessCommandRecordAuthorization {
                                                                Map<String,Object> record, String action) {
         if (code == null || code.isBlank()) throw new org.springframework.security.access.AccessDeniedException("Current command authority is unavailable");
         return snapshots.withFreshReads(() -> {
-            var permission = snapshots.resolvePermissionDefinition(MetaContext.getCurrentTenantId(), code);
+            var permission = permissionDefinition(MetaContext.getCurrentTenantId(), code);
             if (permission == null) throw new org.springframework.security.access.AccessDeniedException("Current command permission is unavailable");
             if (DomainPermissionPolicy.permits(permission, model, action))
                 return resolveInternal(member, List.of(code), model, record, action);
@@ -175,7 +187,7 @@ public class BusinessCommandRecordAuthorization {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public BusinessGrantDecision resolveOrdinaryRead(Long memberId, String model, Map<String,Object> record) {
         return resolveInternal(memberId,
-                snapshots.resourcePermissionCodes(MetaContext.getCurrentTenantId(), model, "read"),
+                resourcePermissionCodes(MetaContext.getCurrentTenantId(), model, "read"),
                 model, record, "read", true);
     }
 
@@ -204,7 +216,7 @@ public class BusinessCommandRecordAuthorization {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public BusinessGrantDecision resolveOrdinaryUpdate(Long memberId, String model, Map<String,Object> record) {
         return resolveInternal(memberId,
-                snapshots.resourcePermissionCodes(MetaContext.getCurrentTenantId(), model, "update"),
+                resourcePermissionCodes(MetaContext.getCurrentTenantId(), model, "update"),
                 model, record, "update", true);
     }
 
@@ -214,7 +226,7 @@ public class BusinessCommandRecordAuthorization {
         if (!MetaContext.exists() || record == null || MetaContext.getCurrentUserId() == null
                 || !Objects.equals(MetaContext.getCurrentUserId(), record.get("created_by")))
             return decision(denied("Native creation ownership is unavailable", List.of()), memberId, model, record, List.of());
-        var codes = new java.util.LinkedHashSet<>(snapshots.resourcePermissionCodes(MetaContext.getCurrentTenantId(), model, "create"));
+        var codes = new java.util.LinkedHashSet<>(resourcePermissionCodes(MetaContext.getCurrentTenantId(), model, "create"));
         String documentAuthority = com.auraboot.framework.meta.security.DocumentArtifactCommandScope.authorityFor(model, record, "create");
         if (documentAuthority != null) codes.add(documentAuthority);
         return resolveInternal(memberId, List.copyOf(codes), model, record, "create", true);
@@ -267,7 +279,7 @@ public class BusinessCommandRecordAuthorization {
             public Boolean get() {
                 if (nativeAction == null || "create".equals(nativeAction)) return false;
                 if (!ordinaryModelAction && codes.stream().noneMatch(code ->
-                        !DomainPermissionPolicy.models(snapshots.resolvePermissionDefinition(tenant,code)).isEmpty())) return false;
+                        !DomainPermissionPolicy.models(permissionDefinition(tenant,code)).isEmpty())) return false;
                 if (shared == null) {
                     var share=recordShares.evaluate(member,model,nativeAction,record);
                     if(share!=null)trace.add(share);
@@ -277,7 +289,7 @@ public class BusinessCommandRecordAuthorization {
             }
         };
         for (String code : new java.util.LinkedHashSet<>(codes)) {
-            var permission = snapshots.resolvePermissionDefinition(tenant, code);
+            var permission = permissionDefinition(tenant, code);
             boolean modelRead = "read".equals(nativeAction);
             boolean documentEffect = com.auraboot.framework.meta.security.DocumentArtifactCommandScope.permits(permission, model, record, nativeAction);
             boolean domain = DomainPermissionPolicy.owns(permission, model) || documentEffect;
@@ -383,7 +395,7 @@ public class BusinessCommandRecordAuthorization {
         // never listed them in permissions.json. They are constraints, never fallback authority.
         codes.addAll(com.auraboot.framework.permission.engine.evaluator.PermissionCodeCandidates.forResourceAction(model, action));
         for (String code : codes) {
-            var definition = snapshots.resolvePermissionDefinition(MetaContext.getCurrentTenantId(), code);
+            var definition = permissionDefinition(MetaContext.getCurrentTenantId(), code);
             if (definition == null && !declared.contains(code)) continue;
             if (definition == null || !model.equals(definition.getResourceCode())) return java.util.Optional.empty();
             String policyAction = definition.getAction();
