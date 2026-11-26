@@ -146,23 +146,13 @@ public class RecordShareServiceImpl implements RecordShareService {
             return false;
         }
 
-        if (StringUtils.hasText(normalizedMemberPid)) {
-            int directPidCount = recordShareMapper.countByRecordPidAndSubjectPid(
-                    tenantId, resourceCode, normalizedRecordPid, "member", normalizedMemberPid,
-                    normalizedAction, now);
-            if (directPidCount > 0) {
-                return true;
-            }
+        if (recordShareMapper.hasDirectMemberShareByRecordPid(
+                tenantId, resourceCode, normalizedRecordPid, memberId, normalizedMemberPid, normalizedAction, now)) {
+            return true;
         }
 
         if (memberId == null) {
             return false;
-        }
-
-        int directLegacyCount = recordShareMapper.countByRecordPidAndUser(
-                tenantId, resourceCode, normalizedRecordPid, memberId, normalizedAction, now);
-        if (directLegacyCount > 0) {
-            return true;
         }
 
         List<Long> roleIds = userRoleService.getRoleIdsByMemberIdAndTenantId(memberId, tenantId);

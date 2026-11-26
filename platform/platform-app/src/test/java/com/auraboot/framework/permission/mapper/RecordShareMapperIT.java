@@ -67,12 +67,14 @@ class RecordShareMapperIT {
                 TENANT_ID, RESOURCE, MEMBER_ID, MEMBER_PID, List.of(ROLE_ID), "update", now))
                 .containsExactlyInAnyOrder("rec-update", "rec-multi");
 
-        assertThat(mapper.countByRecordPidAndSubjectPid(
-                TENANT_ID, RESOURCE, "rec-read", "member", MEMBER_PID, "read", now))
-                .isOne();
-        assertThat(mapper.countByRecordPidAndSubjectPid(
-                TENANT_ID, RESOURCE, "rec-read", "member", MEMBER_PID, "update", now))
-                .isZero();
+        assertThat(mapper.hasDirectMemberShareByRecordPid(
+                TENANT_ID, RESOURCE, "rec-read", null, MEMBER_PID, "read", now)).isTrue();
+        assertThat(mapper.hasDirectMemberShareByRecordPid(
+                TENANT_ID, RESOURCE, "rec-read", null, MEMBER_PID, "update", now)).isFalse();
+        assertThat(mapper.hasDirectMemberShareByRecordPid(
+                TENANT_ID, RESOURCE, "rec-read", MEMBER_ID, "unmatched-pid", "read", now)).isTrue();
+        assertThat(mapper.hasDirectMemberShareByRecordPid(
+                TENANT_ID, RESOURCE, "rec-read", MEMBER_ID + 1, "unmatched-pid", "read", now)).isFalse();
         assertThat(mapper.countByRecordAndUser(
                 TENANT_ID, RESOURCE, 101L, MEMBER_ID, "read", now))
                 .isOne();
@@ -129,9 +131,8 @@ class RecordShareMapperIT {
         mapper.upsertByPublicPids(expired);
 
         assertThat(mapper.findByRecordPid(TENANT_ID, RESOURCE, "rec-renew", now)).isEmpty();
-        assertThat(mapper.countByRecordPidAndSubjectPid(
-                TENANT_ID, RESOURCE, "rec-renew", "member", MEMBER_PID, "read", now))
-                .isZero();
+        assertThat(mapper.hasDirectMemberShareByRecordPid(
+                TENANT_ID, RESOURCE, "rec-renew", null, MEMBER_PID, "read", now)).isFalse();
         RecordShare persistedExpired = mapper.findByRecordPidForManagement(
                         TENANT_ID, RESOURCE, "rec-renew", now)
                 .getFirst();
@@ -144,9 +145,8 @@ class RecordShareMapperIT {
                 "read,update",
                 renewedUntil))
                 .isOne();
-        assertThat(mapper.countByRecordPidAndSubjectPid(
-                TENANT_ID, RESOURCE, "rec-renew", "member", MEMBER_PID, "update", now))
-                .isOne();
+        assertThat(mapper.hasDirectMemberShareByRecordPid(
+                TENANT_ID, RESOURCE, "rec-renew", null, MEMBER_PID, "update", now)).isTrue();
         assertThat(mapper.findByRecordPidForManagement(TENANT_ID, RESOURCE, "rec-renew", now))
                 .singleElement()
                 .satisfies(share -> {

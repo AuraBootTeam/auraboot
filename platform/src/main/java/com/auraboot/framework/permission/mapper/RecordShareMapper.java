@@ -206,50 +206,27 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
             @Param("action") String action,
             @Param("now") Instant now);
 
-    /**
-     * Check if a public record PID is shared with a subject PID.
-     */
+    /** Check both direct member identifiers against the same record and action. */
     @Select("""
-        SELECT COUNT(*) FROM ab_record_share
-        WHERE tenant_id = #{tenantId}
-          AND resource_code = #{resourceCode}
-          AND record_pid = #{recordPid}
-          AND subject_type = #{subjectType}
-          AND subject_pid = #{subjectPid}
-          AND LOWER(#{action}) = ANY (
-            string_to_array(LOWER(REPLACE(permission_mask, ' ', '')), ',')
-          )
-          AND (expires_at IS NULL OR expires_at > #{now})
+        SELECT EXISTS (
+          SELECT 1 FROM ab_record_share
+          WHERE tenant_id = #{tenantId}
+            AND resource_code = #{resourceCode}
+            AND record_pid = #{recordPid}
+            AND subject_type = 'member'
+            AND (subject_pid = #{memberPid} OR subject_id = #{memberId})
+            AND LOWER(#{action}) = ANY (
+              string_to_array(LOWER(REPLACE(permission_mask, ' ', '')), ',')
+            )
+            AND (expires_at IS NULL OR expires_at > #{now})
+        )
         """)
-    int countByRecordPidAndSubjectPid(
+    boolean hasDirectMemberShareByRecordPid(
             @Param("tenantId") Long tenantId,
             @Param("resourceCode") String resourceCode,
             @Param("recordPid") String recordPid,
-            @Param("subjectType") String subjectType,
-            @Param("subjectPid") String subjectPid,
-            @Param("action") String action,
-            @Param("now") Instant now);
-
-    /**
-     * Check if a public record PID is shared with a legacy member ID.
-     */
-    @Select("""
-        SELECT COUNT(*) FROM ab_record_share
-        WHERE tenant_id = #{tenantId}
-          AND resource_code = #{resourceCode}
-          AND record_pid = #{recordPid}
-          AND subject_type = 'member'
-          AND subject_id = #{userId}
-          AND LOWER(#{action}) = ANY (
-            string_to_array(LOWER(REPLACE(permission_mask, ' ', '')), ',')
-          )
-          AND (expires_at IS NULL OR expires_at > #{now})
-        """)
-    int countByRecordPidAndUser(
-            @Param("tenantId") Long tenantId,
-            @Param("resourceCode") String resourceCode,
-            @Param("recordPid") String recordPid,
-            @Param("userId") Long userId,
+            @Param("memberId") Long memberId,
+            @Param("memberPid") String memberPid,
             @Param("action") String action,
             @Param("now") Instant now);
 

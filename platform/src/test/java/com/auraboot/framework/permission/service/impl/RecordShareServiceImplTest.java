@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
@@ -158,9 +159,9 @@ class RecordShareServiceImplTest {
 
     @Test
     void isSharedByPidReturnsTrueWhenDirectSubjectPidShareExists() {
-        when(recordShareMapper.countByRecordPidAndSubjectPid(
-                eq(100L), eq("model.user"), eq("rec_10"), eq("member"), eq("mem_5"), eq("read"), any()))
-                .thenReturn(1);
+        when(recordShareMapper.hasDirectMemberShareByRecordPid(
+                eq(100L), eq("model.user"), eq("rec_10"), eq(5L), eq("mem_5"), eq("read"), any()))
+                .thenReturn(true);
 
         boolean result = service.isSharedByPid(100L, "model.user", "rec_10", 5L, "mem_5", "read");
 
@@ -176,8 +177,7 @@ class RecordShareServiceImplTest {
         assertThat(service.isSharedByPid(100L, "model.user", " rec_10 ", 5L, "mem_5", "READ")).isFalse();
 
         verify(recordShareMapper).hasActiveSharesByRecordPid(eq(100L), eq("model.user"), eq("rec_10"), any());
-        verify(recordShareMapper, never()).countByRecordPidAndSubjectPid(any(), any(), any(), any(), any(), any(), any());
-        verify(recordShareMapper, never()).countByRecordPidAndUser(any(), any(), any(), any(), any(), any());
+        verify(recordShareMapper, never()).hasDirectMemberShareByRecordPid(any(), any(), any(), any(), any(), any(), any());
         verify(recordShareMapper, never()).countByRecordPidAndRoles(any(), any(), any(), any(), any(), any());
         verifyNoInteractions(userRoleService);
     }
@@ -186,9 +186,9 @@ class RecordShareServiceImplTest {
     void aFreshGrantIsObservedImmediatelyBecauseTheGrantEvictsThePresenceMemo() {
         when(recordShareMapper.hasActiveSharesByRecordPid(eq(100L), eq("model.user"), eq("rec_10"), any()))
                 .thenReturn(false, true);
-        lenient().when(recordShareMapper.countByRecordPidAndSubjectPid(
-                eq(100L), eq("model.user"), eq("rec_10"), eq("member"), eq("mem_5"), eq("read"), any()))
-                .thenReturn(1);
+        lenient().when(recordShareMapper.hasDirectMemberShareByRecordPid(
+                eq(100L), eq("model.user"), eq("rec_10"), eq(5L), eq("mem_5"), eq("read"), any()))
+                .thenReturn(true);
 
         assertThat(service.isSharedByPid(100L, "model.user", "rec_10", 5L, "mem_5", "read")).isFalse();
         // The grant path itself (shareRecordByPid) evicts the presence memo, so the very
@@ -196,23 +196,23 @@ class RecordShareServiceImplTest {
         service.shareRecordByPid(100L, "model.user", "rec_10", "member", 5L, "mem_5", "read", null);
         assertThat(service.isSharedByPid(100L, "model.user", "rec_10", 5L, "mem_5", "read")).isTrue();
         verify(recordShareMapper, times(2)).hasActiveSharesByRecordPid(eq(100L), eq("model.user"), eq("rec_10"), any());
-        verify(recordShareMapper).countByRecordPidAndSubjectPid(
-                eq(100L), eq("model.user"), eq("rec_10"), eq("member"), eq("mem_5"), eq("read"), any());
+        verify(recordShareMapper).hasDirectMemberShareByRecordPid(
+                eq(100L), eq("model.user"), eq("rec_10"), eq(5L), eq("mem_5"), eq("read"), any());
         verifyNoInteractions(userRoleService);
     }
 
     @Test
     void pidOnlySubjectRetainsItsOriginalDirectGrantAndTheSameExpiryInstant() {
-        when(recordShareMapper.countByRecordPidAndSubjectPid(
-                eq(100L), eq("model.user"), eq("rec_10"), eq("member"), eq("mem_5"), eq("read"), any()))
-                .thenReturn(1);
+        when(recordShareMapper.hasDirectMemberShareByRecordPid(
+                eq(100L), eq("model.user"), eq("rec_10"), isNull(), eq("mem_5"), eq("read"), any()))
+                .thenReturn(true);
 
         assertThat(service.isSharedByPid(100L, "model.user", "rec_10", null, " mem_5 ", "READ")).isTrue();
 
         ArgumentCaptor<Instant> now = ArgumentCaptor.forClass(Instant.class);
         verify(recordShareMapper).hasActiveSharesByRecordPid(eq(100L), eq("model.user"), eq("rec_10"), now.capture());
-        verify(recordShareMapper).countByRecordPidAndSubjectPid(
-                100L, "model.user", "rec_10", "member", "mem_5", "read", now.getValue());
+        verify(recordShareMapper).hasDirectMemberShareByRecordPid(
+                100L, "model.user", "rec_10", null, "mem_5", "read", now.getValue());
         verifyNoInteractions(userRoleService);
     }
 
@@ -228,18 +228,16 @@ class RecordShareServiceImplTest {
 
         assertThat(service.isSharedByPid(100L, "model.user", "rec_10", 5L, "mem_5", "update")).isFalse();
 
-        verify(recordShareMapper).countByRecordPidAndSubjectPid(
-                eq(100L), eq("model.user"), eq("rec_10"), eq("member"), eq("mem_5"), eq("update"), any());
-        verify(recordShareMapper).countByRecordPidAndUser(
-                eq(100L), eq("model.user"), eq("rec_10"), eq(5L), eq("update"), any());
+        verify(recordShareMapper).hasDirectMemberShareByRecordPid(
+                eq(100L), eq("model.user"), eq("rec_10"), eq(5L), eq("mem_5"), eq("update"), any());
         verify(recordShareMapper).countByRecordPidAndRoles(
                 eq(100L), eq("model.user"), eq("rec_10"), eq(List.of(7L)), eq("update"), any());
     }
 
     @Test
     void legacyMemberAndCanonicalRoleGrantsRetainTheirIndependentChecks() {
-        when(recordShareMapper.countByRecordPidAndUser(
-                eq(100L), eq("model.user"), eq("rec_10"), eq(5L), eq("read"), any())).thenReturn(1, 0);
+        when(recordShareMapper.hasDirectMemberShareByRecordPid(
+                eq(100L), eq("model.user"), eq("rec_10"), eq(5L), isNull(), eq("read"), any())).thenReturn(true, false);
         when(userRoleService.getRoleIdsByMemberIdAndTenantId(5L, 100L)).thenReturn(List.of(7L));
         when(recordShareMapper.countByRecordPidAndRoles(
                 eq(100L), eq("model.user"), eq("rec_10"), eq(List.of(7L)), eq("read"), any())).thenReturn(1);
@@ -254,9 +252,9 @@ class RecordShareServiceImplTest {
 
     @Test
     void aGrantRevokedAfterAnEarlierPositiveCheckIsNotCached() {
-        when(recordShareMapper.countByRecordPidAndSubjectPid(
-                eq(100L), eq("model.user"), eq("rec_10"), eq("member"), eq("mem_5"), eq("read"), any()))
-                .thenReturn(1, 0);
+        when(recordShareMapper.hasDirectMemberShareByRecordPid(
+                eq(100L), eq("model.user"), eq("rec_10"), eq(5L), eq("mem_5"), eq("read"), any()))
+                .thenReturn(true, false);
         when(userRoleService.getRoleIdsByMemberIdAndTenantId(5L, 100L)).thenReturn(List.of());
 
         assertThat(service.isSharedByPid(100L, "model.user", "rec_10", 5L, "mem_5", "read")).isTrue();
@@ -278,8 +276,8 @@ class RecordShareServiceImplTest {
     @Test
     void originalSubjectQueryFailureStillPropagatesAfterPositiveExistence() {
         IllegalStateException unavailable = new IllegalStateException("subject store unavailable");
-        when(recordShareMapper.countByRecordPidAndSubjectPid(
-                eq(100L), eq("model.user"), eq("rec_10"), eq("member"), eq("mem_5"), eq("read"), any()))
+        when(recordShareMapper.hasDirectMemberShareByRecordPid(
+                eq(100L), eq("model.user"), eq("rec_10"), eq(5L), eq("mem_5"), eq("read"), any()))
                 .thenThrow(unavailable);
         assertThatThrownBy(() -> service.isSharedByPid(100L, "model.user", "rec_10", 5L, "mem_5", "read"))
                 .isSameAs(unavailable);
