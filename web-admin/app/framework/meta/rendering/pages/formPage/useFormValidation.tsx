@@ -14,6 +14,7 @@ import type { FormValidationResult } from './formPageTypes';
 import { resolveValidationToastMessage, pushUniqueMessage } from './formValidationValues';
 import { getBomUploadReviewError } from './formPayload';
 import { getJsonFormValueError } from './formRecordValues';
+import { invalidStructuredArrayRow } from '~/ui/smart/form/structuredArrayValue';
 import { mergeFieldValidationRules } from './formFieldMetadata';
 import type { useFormPageState } from './useFormPageState';
 import type { useFormPageRuntime } from './useFormPageRuntime';
@@ -94,6 +95,16 @@ export function useFormValidation({
         if (jsonValueError) {
           nextFieldErrors[rawField.field] = jsonValueError;
           continue;
+        }
+        if (rawField.component === 'SmartStructuredArrayEditor') {
+          const incompleteRow = invalidStructuredArrayRow(value, rawField.props ?? {});
+          if (incompleteRow !== null) {
+            const row = incompleteRow + 1;
+            nextFieldErrors[rawField.field] = locale.startsWith('zh')
+              ? `请完成第 ${row} 行。`
+              : `Complete row ${row}.`;
+            continue;
+          }
         }
         for (const rule of rules) {
           if (!rule?.type) continue;

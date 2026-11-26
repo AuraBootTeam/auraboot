@@ -24,7 +24,13 @@ vi.mock('~/contexts/I18nContext', () => ({
 }));
 vi.mock('~/contexts/TimezoneContext', () => ({ useTimezone: () => ({ timezone: 'UTC' }) }));
 const t = (key: string, _args?: unknown, fallback?: string) => fallback ?? key;
-type RecordRow = { pid: string; title: string; status: string; row_version: number };
+type RecordRow = {
+  pid: string;
+  title: string;
+  status: string;
+  row_version: number;
+  contact_name?: string;
+};
 const row = (pid = 'A'): RecordRow => ({
   pid,
   title: `Case ${pid}`,

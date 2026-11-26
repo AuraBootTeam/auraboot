@@ -16,6 +16,7 @@ import Select from '~/ui/smart/form/Select';
 import Switch from '~/ui/smart/form/Switch';
 import Textarea from '~/ui/smart/form/Textarea';
 import JsonEditor from '~/ui/smart/form/JsonEditor';
+import StructuredArrayEditor from '~/ui/smart/form/StructuredArrayEditor';
 import TimezoneSelect from '~/ui/TimezoneSelect';
 
 // LRU-style component cache with max size
@@ -50,6 +51,8 @@ const EAGER_CORE_COMPONENTS: Record<string, ComponentType<any>> = {
   JsonEditor,
   SmartJsonEditor: JsonEditor,
   smartjsoneditor: JsonEditor,
+  SmartStructuredArrayEditor: StructuredArrayEditor,
+  smartstructuredarrayeditor: StructuredArrayEditor,
   select: Select,
   smartselect: Select,
   Select,
