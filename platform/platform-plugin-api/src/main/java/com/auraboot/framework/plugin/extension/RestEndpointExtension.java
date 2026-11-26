@@ -48,4 +48,6 @@ public interface RestEndpointExtension extends ExtensionPoint {
     default RestPublication publicationRead(RestRoute route) { return null; }
     /** Published origin policy for an opt-in, credential-free public POST. */
     default RestPublication publicationCors(RestRoute route) { return null; }
+    /** Fixed native command a public POST may run after its publication is authorized. */
+    default RestPublicationCommand publicationCommand(RestRoute route) { return null; }
 }

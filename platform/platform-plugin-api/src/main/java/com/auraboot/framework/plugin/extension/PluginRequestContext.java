@@ -41,4 +41,11 @@ public interface PluginRequestContext {
 
     /** Document resolved for this public GET, independent of business data access. */
     default Map<String, Object> publishedDocument() { return Map.of(); }
+    /** Private configuration for this explicitly authorized publication command. */
+    default Map<String, Object> publishedCommandInput() { return Map.of(); }
+
+    /** Execute the publication's fixed create command once and return only the new record PID. */
+    default String executePublishedCommand(Map<String, Object> payload) {
+        throw new UnsupportedOperationException("Publication command is unavailable");
+    }
 }

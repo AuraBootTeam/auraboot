@@ -37,12 +37,33 @@ public class RestPublicationStore {
     }
 
     boolean allowsOrigin(String namespace, String kind, String id, String origin) {
-        if (!validKey(namespace, kind, id) || origin == null || origin.length() > 512
-                || !origin.matches("https?://[^/\\s?#@*]+")) return false;
+        if (!validKey(namespace, kind, id) || !validOrigin(origin)) return false;
         return Boolean.TRUE.equals(jdbc.queryForObject(
                 "SELECT EXISTS (SELECT 1 " + VISIBLE_PUBLICATION
                         + " AND jsonb_exists(p.allowed_origins, ?))",
                 Boolean.class, namespace, kind, id, origin));
+    }
+
+    record CommandGrant(long tenantId, String actorPid, String command, Map<String, Object> input) {}
+
+    Optional<CommandGrant> commandGrant(String namespace, String kind, String id, String origin) {
+        if (!validKey(namespace, kind, id) || !validOrigin(origin)) return Optional.empty();
+        return jdbc.query("""
+                SELECT p.tenant_id, p.actor_pid, p.command_code, p.command_input::text,
+                    (SELECT parent.document::text FROM ab_plugin_rest_publication parent
+                     WHERE parent.namespace = p.namespace AND parent.kind = p.parent_kind
+                     AND parent.public_id = p.parent_id AND parent.tenant_id = p.tenant_id)
+                """ + VISIBLE_PUBLICATION + """
+                AND p.command_code IS NOT NULL AND p.actor_pid IS NOT NULL
+                AND jsonb_exists(p.allowed_origins, ?)
+                """, (rs, index) -> new CommandGrant(rs.getLong(1), rs.getString(2), rs.getString(3),
+                Map.of("form", parseDocument(rs.getString(4)),
+                        "parent", parseDocument(rs.getString(5)))),
+                namespace, kind, id, origin).stream().findFirst();
+    }
+
+    private static boolean validOrigin(String origin) {
+        return origin != null && origin.length() <= 512 && origin.matches("https?://[^/\\s?#@*]+");
     }
 
     private static final String VISIBLE_PUBLICATION = """
@@ -66,6 +87,24 @@ public class RestPublicationStore {
             @Override
             public void publishWithOrigins(String kind, String id, String parentKind, String parentId,
                                            Map<String, Object> document, List<String> origins) {
+                save(kind, id, parentKind, parentId, document, origins, null, null, Map.of());
+            }
+
+            @Override
+            public void publishWithCommand(String kind, String id, String parentKind, String parentId,
+                                           Map<String, Object> document, List<String> origins,
+                                           String commandCode, Map<String, Object> input) {
+                String actor = MetaContext.getCurrentUserPid();
+                if (actor == null || actor.isBlank() || commandCode == null
+                        || !commandCode.matches("[a-z][a-z0-9_]*:[a-z][a-z0-9_]*")) {
+                    throw new AccessDeniedException("A publisher and fixed command are required");
+                }
+                save(kind, id, parentKind, parentId, document, origins, actor, commandCode, input);
+            }
+
+            private void save(String kind, String id, String parentKind, String parentId,
+                              Map<String, Object> document, List<String> origins, String actor,
+                              String command, Map<String, Object> input) {
                 requireWrite(namespace, kind, id, tenantId, userId);
                 if (origins == null) throw new IllegalArgumentException("Publication origins are required");
                 if ((parentKind != null || parentId != null) && !validKey(namespace, parentKind, parentId)) {
@@ -73,13 +112,14 @@ public class RestPublicationStore {
                 }
                 int rows = jdbc.update("""
                         INSERT INTO ab_plugin_rest_publication
-                        (namespace, kind, public_id, tenant_id, parent_kind, parent_id, document, allowed_origins)
-                        VALUES (?, ?, ?, ?, ?, ?, CAST(? AS jsonb), CAST(? AS jsonb))
+                        (namespace, kind, public_id, tenant_id, parent_kind, parent_id, document, allowed_origins, actor_pid, command_code, command_input)
+                        VALUES (?, ?, ?, ?, ?, ?, CAST(? AS jsonb), CAST(? AS jsonb), ?, ?, CAST(? AS jsonb))
                         ON CONFLICT (namespace, kind, public_id) DO UPDATE
                         SET parent_kind = EXCLUDED.parent_kind, parent_id = EXCLUDED.parent_id,
-                            document = EXCLUDED.document, allowed_origins = EXCLUDED.allowed_origins
+                            document = EXCLUDED.document, allowed_origins = EXCLUDED.allowed_origins,
+                            actor_pid = EXCLUDED.actor_pid, command_code = EXCLUDED.command_code, command_input = EXCLUDED.command_input
                         WHERE ab_plugin_rest_publication.tenant_id = EXCLUDED.tenant_id
-                        """, namespace, kind, id, tenantId, parentKind, parentId, serialize(document), serialize(origins));
+                        """, namespace, kind, id, tenantId, parentKind, parentId, serialize(document), serialize(origins), actor, command, serialize(input));
                 if (rows != 1) throw new AccessDeniedException("Publication belongs to a different tenant");
             }
 
@@ -124,6 +164,7 @@ public class RestPublicationStore {
     }
 
     private Map<String, Object> parseDocument(String value) {
+        if (value == null) return Map.of();
         try {
             return json.readValue(value, DOCUMENT);
         } catch (JsonProcessingException error) {

@@ -88,7 +88,8 @@ public class RestEndpointPipeline {
         final String[] phase = {"init"};
         final TransactionTemplate tx = new TransactionTemplate(txManager);
         tx.setReadOnly(route.readOnlyTx() && !scopedIdempotency);
-        if (!scopedIdempotency && (tx.isReadOnly() || route.authPolicy() == AuthPolicy.AUTHENTICATED)) {
+        if (!scopedIdempotency && (tx.isReadOnly() || route.authPolicy() == AuthPolicy.AUTHENTICATED
+                || ext.publicationCommand(route) != null)) {
             // Physical rows and their current field grants must share one MVCC view for reads and writes.
             // Leave the idempotency claim transaction on its existing isolation for concurrent replay.
             tx.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);

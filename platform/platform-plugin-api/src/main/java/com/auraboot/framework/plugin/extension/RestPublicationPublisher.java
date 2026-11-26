@@ -12,5 +12,12 @@ public interface RestPublicationPublisher {
         throw new UnsupportedOperationException("Publication origins are unavailable");
     }
 
+    /** Bind a fixed command to the authenticated publisher and the private configuration. */
+    default void publishWithCommand(String kind, String id, String parentKind, String parentId,
+                                    Map<String, Object> document, List<String> origins,
+                                    String commandCode, Map<String, Object> input) {
+        throw new UnsupportedOperationException("Publication commands are unavailable");
+    }
+
     void withdraw(String kind, String id);
 }

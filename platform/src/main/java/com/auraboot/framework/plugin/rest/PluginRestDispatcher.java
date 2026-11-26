@@ -16,6 +16,7 @@ import com.auraboot.framework.plugin.extension.DataAccessor;
 import com.auraboot.framework.plugin.extension.IdentityDirectoryAccessor;
 import com.auraboot.framework.plugin.extension.PluginRequestContext;
 import com.auraboot.framework.plugin.extension.RestPublicationPublisher;
+import com.auraboot.framework.plugin.extension.RestPublicationCommand;
 import com.auraboot.framework.plugin.pf4j.RestEndpointRegistry;
 import com.auraboot.framework.saas.config.service.SystemModeService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,6 +33,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Optional;
 import java.time.ZoneId;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 
 /**
  * Single platform-owned dispatcher for plugin-contributed REST endpoints, mounted at
@@ -63,11 +66,12 @@ public class PluginRestDispatcher {
     private final ApiRateLimiter rateLimiter;
     private final SystemModeService systemModeService;
     private final RestPublicationStore publications;
+    private final RestPublicationCommandExecutor publicationCommands;
 
     PluginRestDispatcher(RestEndpointRegistry registry, UserPermissionService userPermissionService,
                          PluginRequestContextFactory contextFactory, RestEndpointPipeline pipeline,
                          ApiRateLimiter rateLimiter, SystemModeService systemModeService) {
-        this(registry, userPermissionService, contextFactory, pipeline, rateLimiter, systemModeService, null);
+        this(registry, userPermissionService, contextFactory, pipeline, rateLimiter, systemModeService, null, null);
     }
 
     @AuthenticatedAccess("Dispatch delegates authorization to the registered route policy and permission guard")
@@ -105,7 +109,7 @@ public class PluginRestDispatcher {
                 || !userPermissionService.hasPermission(userId, permission)) {
             throw new AccessDeniedException("Missing permission for plugin route: " + permission);
         }
-        runAndFlush(m, httpReq, httpRes, false, null);
+        runAndFlush(m, httpReq, httpRes, false, null, null);
     }
 
     /**
@@ -124,6 +128,11 @@ public class PluginRestDispatcher {
             writeError(httpRes, SC_TOO_MANY_REQUESTS, "Too many requests");
             return;
         }
+        var command = m.extension().publicationCommand(m.route());
+        if (command != null) {
+            dispatchPublishedCommand(namespace, m, httpReq, httpRes, command);
+            return;
+        }
         RestPublicationStore.Published publication = null;
         var declaration = m.extension().publicationRead(m.route());
         if (declaration != null) {
@@ -140,7 +149,41 @@ public class PluginRestDispatcher {
         Long tenant = publication == null ? systemModeService.getDefaultTenantId() : publication.tenantId();
         MetaContext.setContext(tenant, 0L, "public", "public");
         try {
-            runAndFlush(m, httpReq, httpRes, true, publication);
+            runAndFlush(m, httpReq, httpRes, true, publication, null);
+        } finally {
+            MetaContext.clear();
+        }
+    }
+
+    private record PublishedInvocation(Map<String, Object> input, Function<Map<String, Object>, String> execute) {}
+
+    private void dispatchPublishedCommand(String namespace, RestEndpointRegistry.Match m,
+                                          HttpServletRequest request, HttpServletResponse response,
+                                          RestPublicationCommand command) throws IOException {
+        if (publications == null || publicationCommands == null || !"POST".equals(m.route().method())
+                || m.route().readOnlyTx() || m.route().idempotent()
+                || !command.publication().equals(m.extension().publicationCors(m.route()))) {
+            throw new AccessDeniedException("Invalid publication command route");
+        }
+        var declaration = command.publication();
+        String id = m.pathVars().get(declaration.pathVariable());
+        String origin = request.getHeader("Origin");
+        var grant = publications.commandGrant(namespace, declaration.kind(), id, origin).orElse(null);
+        if (grant == null || !command.code().equals(grant.command())) {
+            writeError(response, HttpServletResponse.SC_NOT_FOUND, "Publication unavailable");
+            return;
+        }
+        var executed = new AtomicBoolean();
+        var invocation = new PublishedInvocation(grant.input(), payload -> {
+            var current = publications.commandGrant(namespace, declaration.kind(), id, origin).orElse(null);
+            if (!executed.compareAndSet(false, true) || !grant.equals(current)) {
+                throw new AccessDeniedException("Publication command unavailable");
+            }
+            return publicationCommands.execute(current, command, payload);
+        });
+        MetaContext.setContext(grant.tenantId(), 0L, "public", "public");
+        try {
+            runAndFlush(m, request, response, true, null, invocation);
         } finally {
             MetaContext.clear();
         }
@@ -155,17 +198,20 @@ public class PluginRestDispatcher {
     private void runAndFlush(RestEndpointRegistry.Match m,
                              HttpServletRequest httpReq,
                              HttpServletResponse httpRes,
-                             boolean isPublic, RestPublicationStore.Published publication) throws IOException {
+                             boolean isPublic, RestPublicationStore.Published publication,
+                             PublishedInvocation invocation) throws IOException {
         ServletPluginHttpRequest req = new ServletPluginHttpRequest(httpReq, m.pathVars());
         try {
             var models=m.extension().tenantProjectionReadModels(m.route());
             if(models==null)throw new AccessDeniedException("Invalid route projection declaration");
             var context=models.isEmpty()?contextFactory.current(isPublic):contextFactory.current(isPublic,m.route(),models);
-            if (publication != null) {
-                context = new PublicationContext(context, null, publication.document());
+            if (invocation != null) {
+                context = new PublicationContext(context, null, Map.of(), invocation);
+            } else if (publication != null) {
+                context = new PublicationContext(context, null, publication.document(), null);
             } else if (!isPublic && publications != null && !m.route().readOnlyTx()) {
                 context = new PublicationContext(context,
-                        publications.publisher(m.extension().namespace(), context.tenantId(), context.userId()), Map.of());
+                        publications.publisher(m.extension().namespace(), context.tenantId(), context.userId()), Map.of(), null);
             }
             BufferingPluginHttpResponse buffered = pipeline.execute(m, req, context);
             buffered.flushTo(httpRes);
@@ -196,7 +242,7 @@ public class PluginRestDispatcher {
     }
 
     private record PublicationContext(PluginRequestContext delegate, RestPublicationPublisher publisher,
-                                      Map<String, Object> publishedDocument) implements PluginRequestContext {
+                                      Map<String, Object> publishedDocument, PublishedInvocation invocation) implements PluginRequestContext {
         @Override public Long tenantId() { return delegate.tenantId(); }
         @Override public Long userId() { return delegate.userId(); }
         @Override public ZoneId zoneId() { return delegate.zoneId(); }
@@ -208,6 +254,13 @@ public class PluginRestDispatcher {
         }
         @Override public IdentityDirectoryAccessor.UserIdentity findActiveTenantUser(String userPid) {
             return delegate.findActiveTenantUser(userPid);
+        }
+        @Override public Map<String, Object> publishedCommandInput() {
+            return invocation == null ? Map.of() : invocation.input();
+        }
+        @Override public String executePublishedCommand(Map<String, Object> payload) {
+            if (invocation == null) return PluginRequestContext.super.executePublishedCommand(payload);
+            return invocation.execute().apply(payload);
         }
         @Override public RestPublicationPublisher publicationPublisher() {
             return publisher == null ? PluginRequestContext.super.publicationPublisher() : publisher;

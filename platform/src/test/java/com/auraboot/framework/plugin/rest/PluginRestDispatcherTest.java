@@ -220,7 +220,7 @@ class PluginRestDispatcherTest {
     @Test
     void publicationReadBindsThePublishedTenantWithNoBusinessDataAccess() throws Exception {
         var store = mock(RestPublicationStore.class);
-        var published = new PluginRestDispatcher(registry, perms, ctxFactory, pipeline, rateLimiter, systemModeService, store);
+        var published = new PluginRestDispatcher(registry, perms, ctxFactory, pipeline, rateLimiter, systemModeService, store, null);
         var ext = mock(RestEndpointExtension.class);
         var route = new RestRoute("GET", "/public/forms/{pid}/sdk.js", null, AuthPolicy.PUBLIC, false, true, null);
         when(ext.publicationRead(route)).thenReturn(new com.auraboot.framework.plugin.extension.RestPublication("form", "pid"));
