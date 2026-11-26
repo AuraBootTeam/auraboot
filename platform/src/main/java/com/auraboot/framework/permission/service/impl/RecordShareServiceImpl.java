@@ -146,14 +146,10 @@ public class RecordShareServiceImpl implements RecordShareService {
             return false;
         }
 
-        if (recordShareMapper.hasDirectMemberShareByRecordPid(
-                tenantId, resourceCode, normalizedRecordPid, memberId, normalizedMemberPid, normalizedAction, now)) {
-            return true;
-        }
-
-        if (memberId == null) {
-            return false;
-        }
+        var candidates = recordShareMapper.findShareCandidatesByRecordPid(
+                tenantId, resourceCode, normalizedRecordPid, memberId, normalizedMemberPid, normalizedAction, now);
+        if (candidates.directMember()) return true;
+        if (memberId == null || !candidates.roleCandidate()) return false;
 
         List<Long> roleIds = userRoleService.getRoleIdsByMemberIdAndTenantId(memberId, tenantId);
         if (roleIds == null || roleIds.isEmpty()) {

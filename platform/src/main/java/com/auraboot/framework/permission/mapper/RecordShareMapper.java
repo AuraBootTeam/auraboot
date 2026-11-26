@@ -215,22 +215,28 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
             @Param("action") String action,
             @Param("now") Instant now);
 
-    /** Check both direct member identifiers against the same record and action. */
+    /** Resolve a direct grant and whether a role check is needed, in the same action snapshot. */
     @Select("""
-        SELECT EXISTS (
-          SELECT 1 FROM ab_record_share
-          WHERE tenant_id = #{tenantId}
-            AND resource_code = #{resourceCode}
-            AND record_pid = #{recordPid}
-            AND subject_type = 'member'
-            AND (subject_pid = #{memberPid} OR subject_id = #{memberId})
-            AND LOWER(#{action}) = ANY (
+        SELECT COALESCE(BOOL_OR(subject_type = 'member'), FALSE) AS direct_member,
+               COALESCE(BOOL_OR(subject_type = 'role'), FALSE) AS role_candidate
+        FROM ab_record_share
+        WHERE tenant_id = #{tenantId}
+          AND resource_code = #{resourceCode}
+          AND record_pid = #{recordPid}
+          AND (
+              (subject_type = 'member' AND (subject_pid = #{memberPid} OR subject_id = #{memberId}))
+              OR (subject_type = 'role' AND subject_id IS NOT NULL)
+          )
+          AND LOWER(#{action}) = ANY (
               string_to_array(LOWER(REPLACE(permission_mask, ' ', '')), ',')
-            )
-            AND (expires_at IS NULL OR expires_at > #{now})
-        )
+          )
+          AND (expires_at IS NULL OR expires_at > #{now})
         """)
-    boolean hasDirectMemberShareByRecordPid(
+    @ConstructorArgs({
+        @Arg(column = "direct_member", javaType = boolean.class),
+        @Arg(column = "role_candidate", javaType = boolean.class)
+    })
+    ShareCandidates findShareCandidatesByRecordPid(
             @Param("tenantId") Long tenantId,
             @Param("resourceCode") String resourceCode,
             @Param("recordPid") String recordPid,
@@ -238,6 +244,8 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
             @Param("memberPid") String memberPid,
             @Param("action") String action,
             @Param("now") Instant now);
+
+    record ShareCandidates(boolean directMember, boolean roleCandidate) {}
 
     /**
      * Check if a specific record is shared with any of the given roles.
