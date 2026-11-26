@@ -4,7 +4,9 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.service.AsyncTaskExecutor.ProgressCallback;
 import com.auraboot.framework.meta.service.AsyncTaskResult;
 import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.plugin.extension.BusinessResourceAuthorization.ReadIsolation;
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
+import com.auraboot.framework.plugin.pf4j.CommandHandlerTransactionGuard;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -20,8 +22,13 @@ import org.mockito.quality.Strictness;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /** Delivery installs a fresh boundary decision; serialized permits cannot authorize a job. */
@@ -131,6 +138,49 @@ class CommandHandlerAsyncTaskExecutorAuthorityTest {
         assertThat(executor.execute(inputWithPermit("old.allow", "ALL", 7L), noopCallback()).isSuccess()).isFalse();
         assertThat(authoritySeenByHandler).hasNullValue();
         assertThat(MetaContext.hasCommandAuthority()).isFalse();
+    }
+
+    @Test
+    void ownerOptInRequiresGuardBeforeRunningTheFreshlyAuthorizedDelivery() throws Exception {
+        var executor = injectedExecutor();
+        var handler = mock(CommandHandlerExtension.class);
+        var guard = mock(CommandHandlerTransactionGuard.class);
+        var authorization = mock(DeferredCommandAuthorization.class);
+        var command = "qo_quote_common:batch_source_prices";
+        when(extensionRegistry.getCommandHandler(command)).thenReturn(Optional.of(handler));
+        when(handler.commandReadIsolation()).thenReturn(ReadIsolation.REPEATABLE_READ);
+        when(handler.supportsTransactionalDeferredExecution(command)).thenReturn(true);
+        when(handler.execute(any())).thenReturn(Map.of("ok", true));
+        when(authorization.authorizeAndExecute(any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenAnswer(call -> {
+                    Function<DeferredCommandAuthorization.Decision, Object> operation = call.getArgument(7);
+                    return operation.apply(new DeferredCommandAuthorization.Decision(
+                            "current.duty", "TARGET", 11L, Map.of(), Map.of()));
+                });
+        org.springframework.test.util.ReflectionTestUtils.setField(executor, "handlerTransactions", guard);
+        org.springframework.test.util.ReflectionTestUtils.setField(executor, "deferredAuthorization", authorization);
+
+        assertThat(executor.execute(input("old.allow"), noopCallback()).isSuccess()).isTrue();
+        var sequence = inOrder(guard, handler);
+        sequence.verify(guard).require(ReadIsolation.REPEATABLE_READ);
+        sequence.verify(handler).execute(any());
+    }
+
+    @Test
+    void ownerWithoutOptInDoesNotAuthorizeOrInvokeDeferredHandler() throws Exception {
+        var executor = injectedExecutor();
+        var handler = mock(CommandHandlerExtension.class);
+        var authorization = mock(DeferredCommandAuthorization.class);
+        var guard = mock(CommandHandlerTransactionGuard.class);
+        var command = "qo_quote_common:batch_source_prices";
+        when(extensionRegistry.getCommandHandler(command)).thenReturn(Optional.of(handler));
+        when(handler.commandReadIsolation()).thenReturn(ReadIsolation.REPEATABLE_READ);
+        org.springframework.test.util.ReflectionTestUtils.setField(executor, "handlerTransactions", guard);
+        org.springframework.test.util.ReflectionTestUtils.setField(executor, "deferredAuthorization", authorization);
+
+        assertThat(executor.execute(input("old.allow"), noopCallback()).isSuccess()).isFalse();
+        verifyNoInteractions(guard, authorization);
+        org.mockito.Mockito.verify(handler, org.mockito.Mockito.never()).execute(any());
     }
 
     private CommandHandlerAsyncTaskExecutor executorWithRecordingHandler() {

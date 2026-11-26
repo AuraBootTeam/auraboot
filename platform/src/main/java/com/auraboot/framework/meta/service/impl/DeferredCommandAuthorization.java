@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 
 /** Fresh human delivery authorization. Persisted task input is intent, never an executable grant. */
 @Component
@@ -30,6 +31,14 @@ public class DeferredCommandAuthorization {
 
     public Decision authorize(String commandCode, String handlerCode, String modelCode, String recordPid,
                               Map<String,Object> payload, String requestId, Long expectedVersion) {
+        return authorizeAndExecute(commandCode, handlerCode, modelCode, recordPid, payload,
+                requestId, expectedVersion, Function.identity());
+    }
+
+    /** Claim verification and current target authorization precede any work in the same command transaction. */
+    <T> T authorizeAndExecute(String commandCode, String handlerCode, String modelCode, String recordPid,
+                             Map<String,Object> payload, String requestId, Long expectedVersion,
+                             Function<Decision,T> operation) {
         var claim = AsyncTaskExecutionContext.require();
         Long tenant = MetaContext.getCurrentTenantId(), user = MetaContext.getCurrentUserId();
         if (commandCode == null || commandCode.isBlank() || handlerCode == null || handlerCode.isBlank()
@@ -65,8 +74,9 @@ public class DeferredCommandAuthorization {
             Object raw = context.getExecConfig().get("handlerParams");
             @SuppressWarnings("unchecked") var params = raw instanceof Map<?,?> values
                     ? (Map<String,Object>) values : Map.<String,Object>of();
-            return new Decision(context.getAuthorizationVerdict().permissionCode(),
+            var decision = new Decision(context.getAuthorizationVerdict().permissionCode(),
                     plan.scope() == null ? null : plan.scope().name(), plan.expectedVersion(), context.getPayload(), params);
+            return operation.apply(decision);
         });
     }
 }

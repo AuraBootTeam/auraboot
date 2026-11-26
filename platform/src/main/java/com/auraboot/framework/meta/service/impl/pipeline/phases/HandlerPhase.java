@@ -691,8 +691,12 @@ public class HandlerPhase implements CommandPhase {
         for (var transactionOwner : transactionOwners) {
             var isolation = transactionOwner.commandReadIsolation();
             if (isolation == null) continue;
-            if (handlerTransactions == null || isAsyncHandler(asyncHandlerParams))
+            boolean asyncOwnerUnsupported = isAsyncHandler(asyncHandlerParams)
+                    && (transactionOwner != handler || !secondaryHandlers.isEmpty() || asyncTaskService == null
+                        || !handler.supportsTransactionalDeferredExecution(commandCode));
+            if (handlerTransactions == null || asyncOwnerUnsupported) {
                 throw new AccessDeniedException("Command owner requires a verified synchronous transaction");
+            }
             handlerTransactions.require(isolation);
         }
         validateBusinessResources(pipelineContext,handler,secondaryHandlers);

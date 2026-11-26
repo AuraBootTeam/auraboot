@@ -33,6 +33,9 @@ public interface CommandHandlerExtension extends ExtensionPoint {
     /** Server-owned transaction requirement; metadata and callers cannot relax it. */
     default BusinessResourceAuthorization.ReadIsolation commandReadIsolation() { return null; }
 
+    /** Allows this command to reauthorize and run atomically in its declared transaction on a claimed worker. */
+    default boolean supportsTransactionalDeferredExecution(String commandCode) { return false; }
+
 
 
 

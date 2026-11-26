@@ -18,6 +18,7 @@ import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.auraboot.framework.plugin.pf4j.FileAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.IndependentTransactionAccessorImpl;
 import com.auraboot.framework.plugin.pf4j.AsyncTaskAccessorImpl;
+import com.auraboot.framework.plugin.pf4j.CommandHandlerTransactionGuard;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.transaction.PlatformTransactionManager;
 import com.auraboot.framework.plugin.pf4j.TenantProjectionAccessorImpl;
@@ -33,6 +34,7 @@ import org.springframework.stereotype.Component;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * Async executor that runs a plugin {@link CommandHandlerExtension} off the
@@ -95,6 +97,8 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
     private RecordShareAccessor recordShareAccessor;
     @Autowired(required = false)
     private PlatformTransactionManager platformTransactionManager;
+    @Autowired
+    private CommandHandlerTransactionGuard handlerTransactions;
     @Autowired(required = false)
     private ObjectProvider<AsyncTaskServiceImpl> asyncTaskServiceProvider;
     @Autowired(required = false)
@@ -193,120 +197,132 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
             }
             if (deferredAuthorization == null) throw new org.springframework.security.access.AccessDeniedException(
                     "Deferred command authorization is unavailable");
-            var delivery = deferredAuthorization.authorize(commandCode, handlerCode, modelCode, recordPid,
-                    payload, clientRequestId, commandExpectedVersion);
-
-            com.auraboot.framework.plugin.pf4j.CommandHandlerCapabilityGuard.requireAvailable(
-                    handler, handlerCode, aiProviderAccessorFactory != null, knowledgeBaseAccessor != null);
-            String namespace = handlerCode.contains(":") ? handlerCode.split(":")[0] : null;
-            Map<String, Object> pluginSettings = new HashMap<>(delivery.handlerParams());
-            pluginSettings.put("__commandCode", commandCode != null ? commandCode : handlerCode);
-            pluginSettings.put("__handlerCode", handlerCode);
-            if (userId != null) {
-                pluginSettings.put("__currentUser", userId.toString());
+            var isolation = handler.commandReadIsolation();
+            if (isolation != null && (!handler.supportsTransactionalDeferredExecution(commandCode)
+                    || handlerTransactions == null)) {
+                return AsyncTaskResult.nonRetryableFailure("Command owner requires a verified deferred transaction");
             }
-            if (currentUserPid != null && !currentUserPid.isBlank()) {
-                pluginSettings.put(CommandHandlerExtension.CURRENT_USER_PID_KEY,
-                        currentUserPid.trim());
-            }
-            if (clientRequestId != null && !clientRequestId.isBlank()) {
-                pluginSettings.put(CommandHandlerExtension.CLIENT_REQUEST_ID_KEY,
-                        clientRequestId.trim());
-            }
-            if (delivery.expectedVersion() != null) {
-                pluginSettings.put(CommandHandlerExtension.EXPECTED_VERSION_KEY,
-                        delivery.expectedVersion());
-            }
-            com.auraboot.framework.plugin.pf4j.TenantSecretAccessorImpl.install(
-                    pluginSettings, tenantId, cloudConfigService, objectMapper);
-            pluginSettings.put("__dataAccessor", new DynamicDataAccessorImpl(dynamicDataService));
-            if (commandExecutor != null) {
-                // Q03-04: async-dispatched handlers must get the same nested
-                // command dispatch bridge as pipeline HandlerPhase, or chains
-                // like parse_gerber → compute_process_fee silently fall back to
-                // unaudited direct calls on the production async path.
-                pluginSettings.put(CommandHandlerExtension.COMMAND_DISPATCHER_ACCESSOR_KEY,
-                        new com.auraboot.framework.plugin.pf4j.CommandDispatcherAccessorImpl(commandExecutor));
-            }
-            if (Boolean.TRUE.equals(pluginSettings.get(TenantProjectionAccessor.OPT_IN_HANDLER_PARAM))) {
-                pluginSettings.put(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY,
-                        new TenantProjectionAccessorImpl(tenantId,
-                                new BackgroundDataAccessorImpl(dynamicDataService)));
-            }
-            // A command launched by an async handler may itself enqueue a follow-up
-            // command (for example, attachment upload -> Gerber parse). Resolve the
-            // task service lazily to avoid a bean cycle with its executor registry.
-            AsyncTaskServiceImpl asyncTaskService = asyncTaskServiceProvider == null
-                    ? null : asyncTaskServiceProvider.getIfAvailable();
-            if (asyncTaskService != null) {
-                pluginSettings.put(CommandHandlerExtension.ASYNC_TASK_ACCESSOR_KEY,
-                        new AsyncTaskAccessorImpl(asyncTaskService, objectMapper, tenantId, userId));
-            }
-            if (platformTransactionManager != null) {
-                pluginSettings.put(CommandHandlerExtension.INDEPENDENT_TRANSACTION_ACCESSOR_KEY,
-                        new IndependentTransactionAccessorImpl(platformTransactionManager, dynamicDataService));
-            } else if (inputParams.path("resumeOnRestart").asBoolean(false)) {
+            if (inputParams.path("resumeOnRestart").asBoolean(false)
+                    && (isolation != null || platformTransactionManager == null)) {
                 return AsyncTaskResult.nonRetryableFailure("Resumable command requires checkpoint transactions");
             }
-            final ProgressCallback cb = callback;
-            pluginSettings.put("__progressReporter",
-                    (java.util.function.BiConsumer<Integer, String>)
-                            (pct, msg) -> cb.report(pct == null ? 0 : pct, msg));
-            if (biTemporalService != null) {
-                pluginSettings.put("__biTemporalAccessor",
-                        new BiTemporalAccessorImpl(biTemporalService, objectMapper));
-            }
-            if (aiProviderAccessorFactory != null) {
-                pluginSettings.put(CommandHandlerExtension.AI_PROVIDER_ACCESSOR_KEY,
-                        aiProviderAccessorFactory.create(tenantId));
-            }
-            if (fileService != null && storageProvider != null) {
-                pluginSettings.put(CommandHandlerExtension.FILE_ACCESSOR_KEY,
-                        new FileAccessorImpl(fileService, storageProvider, userId));
-            }
-            if (recordShareAccessor != null) {
-                pluginSettings.put(RecordShareAccessor.SETTINGS_KEY, recordShareAccessor);
-            }
-
-            CommandHandlerExtension.CommandContext pluginContext =
-                    CommandHandlerExtension.CommandContext.builder()
-                            .tenantId(tenantId)
-                            .namespace(namespace)
-                            .commandType(handlerCode)
-                            .modelCode(modelCode)
-                            .recordId(recordPid)
-                            .payload(delivery.payload())
-                            .settings(pluginSettings)
-                            .dryRun(false)
-                            .build();
-
-            // Only a current delivery decision can install execution authority. The task's
-            // commandAuthority/commandPermitScope and handlerParams are historical intent.
-            String commandAuthority = delivery.authority();
-            java.util.function.Supplier<Object> invocation = () -> {
-                try {
-                    return handler.execute(pluginContext);
-                } catch (Exception ex) {
-                    throw new CommandHandlerInvocationException(ex);
+            Function<DeferredCommandAuthorization.Decision, Object> runHandler = delivery -> {
+                if (isolation != null) handlerTransactions.require(isolation);
+                com.auraboot.framework.plugin.pf4j.CommandHandlerCapabilityGuard.requireAvailable(
+                        handler, handlerCode, aiProviderAccessorFactory != null, knowledgeBaseAccessor != null);
+                String namespace = handlerCode.contains(":") ? handlerCode.split(":")[0] : null;
+                Map<String, Object> pluginSettings = new HashMap<>(delivery.handlerParams());
+                pluginSettings.put("__commandCode", commandCode != null ? commandCode : handlerCode);
+                pluginSettings.put("__handlerCode", handlerCode);
+                if (userId != null) {
+                    pluginSettings.put("__currentUser", userId.toString());
                 }
+                if (currentUserPid != null && !currentUserPid.isBlank()) {
+                    pluginSettings.put(CommandHandlerExtension.CURRENT_USER_PID_KEY,
+                            currentUserPid.trim());
+                }
+                if (clientRequestId != null && !clientRequestId.isBlank()) {
+                    pluginSettings.put(CommandHandlerExtension.CLIENT_REQUEST_ID_KEY,
+                            clientRequestId.trim());
+                }
+                if (delivery.expectedVersion() != null) {
+                    pluginSettings.put(CommandHandlerExtension.EXPECTED_VERSION_KEY,
+                            delivery.expectedVersion());
+                }
+                com.auraboot.framework.plugin.pf4j.TenantSecretAccessorImpl.install(
+                        pluginSettings, tenantId, cloudConfigService, objectMapper);
+                pluginSettings.put("__dataAccessor", new DynamicDataAccessorImpl(dynamicDataService));
+                if (commandExecutor != null) {
+                    // Q03-04: async-dispatched handlers must get the same nested
+                    // command dispatch bridge as pipeline HandlerPhase, or chains
+                    // like parse_gerber → compute_process_fee silently fall back to
+                    // unaudited direct calls on the production async path.
+                    pluginSettings.put(CommandHandlerExtension.COMMAND_DISPATCHER_ACCESSOR_KEY,
+                            new com.auraboot.framework.plugin.pf4j.CommandDispatcherAccessorImpl(commandExecutor));
+                }
+                if (Boolean.TRUE.equals(pluginSettings.get(TenantProjectionAccessor.OPT_IN_HANDLER_PARAM))) {
+                    pluginSettings.put(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY,
+                            new TenantProjectionAccessorImpl(tenantId,
+                                    new BackgroundDataAccessorImpl(dynamicDataService)));
+                }
+                // A command launched by an async handler may itself enqueue a follow-up
+                // command (for example, attachment upload -> Gerber parse). Resolve the
+                // task service lazily to avoid a bean cycle with its executor registry.
+                AsyncTaskServiceImpl asyncTaskService = asyncTaskServiceProvider == null
+                        ? null : asyncTaskServiceProvider.getIfAvailable();
+                if (asyncTaskService != null) {
+                    pluginSettings.put(CommandHandlerExtension.ASYNC_TASK_ACCESSOR_KEY,
+                            new AsyncTaskAccessorImpl(asyncTaskService, objectMapper, tenantId, userId));
+                }
+                if (isolation == null && platformTransactionManager != null) {
+                    pluginSettings.put(CommandHandlerExtension.INDEPENDENT_TRANSACTION_ACCESSOR_KEY,
+                            new IndependentTransactionAccessorImpl(platformTransactionManager, dynamicDataService));
+                }
+                final ProgressCallback cb = callback;
+                pluginSettings.put("__progressReporter",
+                        (java.util.function.BiConsumer<Integer, String>)
+                                (pct, msg) -> cb.report(pct == null ? 0 : pct, msg));
+                if (biTemporalService != null) {
+                    pluginSettings.put("__biTemporalAccessor",
+                            new BiTemporalAccessorImpl(biTemporalService, objectMapper));
+                }
+                if (aiProviderAccessorFactory != null) {
+                    pluginSettings.put(CommandHandlerExtension.AI_PROVIDER_ACCESSOR_KEY,
+                            aiProviderAccessorFactory.create(tenantId));
+                }
+                if (fileService != null && storageProvider != null) {
+                    pluginSettings.put(CommandHandlerExtension.FILE_ACCESSOR_KEY,
+                            new FileAccessorImpl(fileService, storageProvider, userId));
+                }
+                if (recordShareAccessor != null) {
+                    pluginSettings.put(RecordShareAccessor.SETTINGS_KEY, recordShareAccessor);
+                }
+
+                CommandHandlerExtension.CommandContext pluginContext =
+                        CommandHandlerExtension.CommandContext.builder()
+                                .tenantId(tenantId)
+                                .namespace(namespace)
+                                .commandType(handlerCode)
+                                .modelCode(modelCode)
+                                .recordId(recordPid)
+                                .payload(delivery.payload())
+                                .settings(pluginSettings)
+                                .dryRun(false)
+                                .build();
+
+                // Only a current delivery decision can install execution authority. The task's
+                // commandAuthority/commandPermitScope and handlerParams are historical intent.
+                String commandAuthority = delivery.authority();
+                java.util.function.Supplier<Object> invocation = () -> {
+                    try {
+                        return handler.execute(pluginContext);
+                    } catch (Exception ex) {
+                        throw new CommandHandlerInvocationException(ex);
+                    }
+                };
+                if (commandAuthority != null) {
+                    java.util.function.Supplier<Object> delegate = invocation;
+                    invocation = () -> MetaContext.runWithCommandAuthority(commandAuthority, delegate);
+                }
+                String commandPermitScope = delivery.scope();
+                java.util.function.Supplier<Object> permittedInvocation = invocation;
+                java.util.function.Supplier<Object> commandScopedInvocation = commandCode == null
+                        ? permittedInvocation
+                        : () -> MetaContext.runWithAuthorizedCommandCode(commandCode, permittedInvocation);
+                return commandPermitScope == null
+                        ? permittedInvocation.get()
+                        : MetaContext.runWithCommandPermitPlan(
+                                commandPermitScope,
+                                delivery.expectedVersion(),
+                                modelCode,
+                                recordPid,
+                                commandScopedInvocation);
             };
-            if (commandAuthority != null) {
-                java.util.function.Supplier<Object> delegate = invocation;
-                invocation = () -> MetaContext.runWithCommandAuthority(commandAuthority, delegate);
-            }
-            String commandPermitScope = delivery.scope();
-            java.util.function.Supplier<Object> permittedInvocation = invocation;
-            java.util.function.Supplier<Object> commandScopedInvocation = commandCode == null
-                    ? permittedInvocation
-                    : () -> MetaContext.runWithAuthorizedCommandCode(commandCode, permittedInvocation);
-            Object result = commandPermitScope == null
-                    ? permittedInvocation.get()
-                    : MetaContext.runWithCommandPermitPlan(
-                            commandPermitScope,
-                            delivery.expectedVersion(),
-                            modelCode,
-                            recordPid,
-                            commandScopedInvocation);
+            Object result = isolation == null
+                    ? runHandler.apply(deferredAuthorization.authorize(commandCode, handlerCode, modelCode, recordPid,
+                        payload, clientRequestId, commandExpectedVersion))
+                    : deferredAuthorization.authorizeAndExecute(commandCode, handlerCode, modelCode, recordPid,
+                        payload, clientRequestId, commandExpectedVersion, runHandler);
             callback.report(100, "Completed");
 
             JsonNode data = result == null
