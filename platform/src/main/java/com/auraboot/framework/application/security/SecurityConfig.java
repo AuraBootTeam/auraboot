@@ -2,6 +2,8 @@ package com.auraboot.framework.application.security;
 
 import com.auraboot.framework.application.web.filter.JwtAuthenticationFilter;
 import com.auraboot.framework.application.web.filter.TestUserSpoofFilter;
+import com.auraboot.framework.plugin.rest.RestPublicationCorsSource;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -49,6 +51,9 @@ public class SecurityConfig {
     /** CORS rules for public machine-authenticated endpoints owned by other modules. */
     @Autowired(required = false)
     private List<PublicCorsContributor> publicCorsContributors;
+
+    @Autowired(required = false)
+    private ObjectProvider<RestPublicationCorsSource> publicationCors;
 
     /**
      * Test-only filter that allows E2E specs to override MetaContext user id
@@ -214,6 +219,10 @@ public class SecurityConfig {
         }
 
         source.registerCorsConfiguration("/api/**", configuration);
-        return source;
+        return request -> {
+            var publications = publicationCors == null ? null : publicationCors.getIfAvailable();
+            var cors = publications == null ? null : publications.getCorsConfiguration(request);
+            return cors == null ? source.getCorsConfiguration(request) : cors;
+        };
     }
 }

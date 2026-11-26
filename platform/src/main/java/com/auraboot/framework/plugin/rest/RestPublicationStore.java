@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -30,36 +31,55 @@ public class RestPublicationStore {
 
     Optional<Published> find(String namespace, String kind, String id) {
         if (!validKey(namespace, kind, id)) return Optional.empty();
-        return jdbc.query("""
-                SELECT p.tenant_id, p.document::text
-                FROM ab_plugin_rest_publication p
-                WHERE p.namespace = ? AND p.kind = ? AND p.public_id = ?
-                AND (p.parent_kind IS NULL OR EXISTS (
-                    SELECT 1 FROM ab_plugin_rest_publication parent
-                    WHERE parent.namespace = p.namespace AND parent.kind = p.parent_kind
-                    AND parent.public_id = p.parent_id AND parent.tenant_id = p.tenant_id
-                    AND parent.parent_kind IS NULL
-                ))
-                """, (rs, index) -> new Published(rs.getLong(1), parseDocument(rs.getString(2))),
+        return jdbc.query("SELECT p.tenant_id, p.document::text " + VISIBLE_PUBLICATION,
+                (rs, index) -> new Published(rs.getLong(1), parseDocument(rs.getString(2))),
                 namespace, kind, id).stream().findFirst();
     }
+
+    boolean allowsOrigin(String namespace, String kind, String id, String origin) {
+        if (!validKey(namespace, kind, id) || origin == null || origin.length() > 512
+                || !origin.matches("https?://[^/\\s?#@*]+")) return false;
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT EXISTS (SELECT 1 " + VISIBLE_PUBLICATION
+                        + " AND jsonb_exists(p.allowed_origins, ?))",
+                Boolean.class, namespace, kind, id, origin));
+    }
+
+    private static final String VISIBLE_PUBLICATION = """
+            FROM ab_plugin_rest_publication p
+            WHERE p.namespace = ? AND p.kind = ? AND p.public_id = ?
+            AND (p.parent_kind IS NULL OR EXISTS (
+                SELECT 1 FROM ab_plugin_rest_publication parent
+                WHERE parent.namespace = p.namespace AND parent.kind = p.parent_kind
+                AND parent.public_id = p.parent_id AND parent.tenant_id = p.tenant_id
+                AND parent.parent_kind IS NULL
+            ))
+            """;
 
     RestPublicationPublisher publisher(String namespace, long tenantId, long userId) {
         return new RestPublicationPublisher() {
             @Override
             public void publish(String kind, String id, String parentKind, String parentId, Map<String, Object> document) {
+                publishWithOrigins(kind, id, parentKind, parentId, document, List.of());
+            }
+
+            @Override
+            public void publishWithOrigins(String kind, String id, String parentKind, String parentId,
+                                           Map<String, Object> document, List<String> origins) {
                 requireWrite(namespace, kind, id, tenantId, userId);
+                if (origins == null) throw new IllegalArgumentException("Publication origins are required");
                 if ((parentKind != null || parentId != null) && !validKey(namespace, parentKind, parentId)) {
                     throw new IllegalArgumentException("Invalid publication parent");
                 }
                 int rows = jdbc.update("""
                         INSERT INTO ab_plugin_rest_publication
-                        (namespace, kind, public_id, tenant_id, parent_kind, parent_id, document)
-                        VALUES (?, ?, ?, ?, ?, ?, CAST(? AS jsonb))
+                        (namespace, kind, public_id, tenant_id, parent_kind, parent_id, document, allowed_origins)
+                        VALUES (?, ?, ?, ?, ?, ?, CAST(? AS jsonb), CAST(? AS jsonb))
                         ON CONFLICT (namespace, kind, public_id) DO UPDATE
-                        SET parent_kind = EXCLUDED.parent_kind, parent_id = EXCLUDED.parent_id, document = EXCLUDED.document
+                        SET parent_kind = EXCLUDED.parent_kind, parent_id = EXCLUDED.parent_id,
+                            document = EXCLUDED.document, allowed_origins = EXCLUDED.allowed_origins
                         WHERE ab_plugin_rest_publication.tenant_id = EXCLUDED.tenant_id
-                        """, namespace, kind, id, tenantId, parentKind, parentId, serializeDocument(document));
+                        """, namespace, kind, id, tenantId, parentKind, parentId, serialize(document), serialize(origins));
                 if (rows != 1) throw new AccessDeniedException("Publication belongs to a different tenant");
             }
 
@@ -90,7 +110,7 @@ public class RestPublicationStore {
                 && id != null && id.matches("[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}");
     }
 
-    private String serializeDocument(Map<String, Object> document) {
+    private String serialize(Object document) {
         if (document == null) throw new IllegalArgumentException("Publication document required");
         try {
             String serialized = json.writeValueAsString(document);

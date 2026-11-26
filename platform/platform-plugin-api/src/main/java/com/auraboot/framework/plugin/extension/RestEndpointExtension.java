@@ -46,4 +46,6 @@ public interface RestEndpointExtension extends ExtensionPoint {
     }
     /** Metadata for a public GET that serves a published document. */
     default RestPublication publicationRead(RestRoute route) { return null; }
+    /** Published origin policy for an opt-in, credential-free public POST. */
+    default RestPublication publicationCors(RestRoute route) { return null; }
 }
