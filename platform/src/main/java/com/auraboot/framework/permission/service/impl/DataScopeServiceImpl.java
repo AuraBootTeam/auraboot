@@ -12,6 +12,7 @@ import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.permission.mapper.RoleDataScopeMapper;
 import com.auraboot.framework.permission.service.DataScopeService;
+import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
@@ -52,7 +53,7 @@ public class DataScopeServiceImpl implements DataScopeService {
 
 
     private final RoleDataScopeMapper roleDataScopeMapper;
-    private final com.auraboot.framework.rbac.mapper.RoleMapper roleMapper;
+    private final RoleMapper roleMapper;
     private final UserRoleMapper userRoleMapper;
     private final TenantMemberMapper tenantMemberMapper;
     private final ApplicationEventPublisher eventPublisher;
@@ -124,24 +125,22 @@ public class DataScopeServiceImpl implements DataScopeService {
             return DataScopeCondition.none();
         }
         Long tenant = MetaContext.getCurrentTenantId();
-        var role = roleMapper.findEffectiveGrantOwner(tenant, MetaContext.getCurrentUserId(), memberId, roleId);
-        if (role == null) return DataScopeCondition.none();
-        var roleScopes = roleDataScopeMapper.findByTenantAndRole(tenant, roleId);
+        var roleScopes = roleMapper.findEffectiveGrantScopes(tenant, MetaContext.getCurrentUserId(), memberId, roleId);
+        if (roleScopes.isEmpty()) return DataScopeCondition.none();
         var entries = roleScopes.stream()
-                .filter(entry -> permissionResource.equals(entry.getResourceCode()) && action.equals(entry.getActionCode()))
+                .filter(entry -> permissionResource.equals(entry.resourceCode()) && action.equals(entry.actionCode()))
                 .toList();
         // An explicit action restriction always wins, including NONE or malformed metadata.
         // The fallback is local to the exact grant owner; another role cannot lend its scope.
         if (entries.isEmpty() && inheritObjectScope) {
-            entries = roleScopes.stream().filter(entry -> recordModel.equals(entry.getResourceCode())
-                    && "read".equals(entry.getActionCode())).toList();
+            entries = roleScopes.stream().filter(entry -> recordModel.equals(entry.resourceCode())
+                    && "read".equals(entry.actionCode())).toList();
         }
         // Never silently discard a custom restriction that this scope resolver cannot interpret.
-        if (entries.size() > 1 || entries.stream().anyMatch(entry -> entry.getScopeConfig() != null
-                && !(entry.getScopeConfig() instanceof Map<?, ?> config && config.isEmpty()))) {
+        if (entries.size() > 1 || entries.stream().anyMatch(RoleMapper.GrantScopeRow::customConfig)) {
             return DataScopeCondition.none();
         }
-        String type = entries.isEmpty() ? role.getDefaultDataScopeType() : entries.getFirst().getScopeType();
+        String type = entries.isEmpty() ? roleScopes.getFirst().defaultScopeType() : entries.getFirst().scopeType();
         if (type == null) return ordinaryRead && entries.isEmpty()
                 ? DataScopeCondition.notConfigured() : DataScopeCondition.none();
         try {

@@ -2,6 +2,8 @@ package com.auraboot.framework.rbac.mapper;
 
 import com.auraboot.framework.rbac.entity.Role;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import org.apache.ibatis.annotations.Arg;
+import org.apache.ibatis.annotations.ConstructorArgs;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -69,24 +71,40 @@ public interface RoleMapper extends BaseMapper<Role> {
     List<String> findEffectiveActorRoleCodes(@Param("tenantId") Long tenantId, @Param("userId") Long userId,
             @Param("memberId") Long memberId);
 
-    /** Current human grant owner; all tenant, membership and temporal joins are explicit. */
+    /** Return the effective grant owner and its tenant-local overrides in one snapshot. */
     @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
     @Select("""
-        SELECT r.* FROM ab_role r
-        JOIN ab_user_role ur ON ur.role_id=r.id
-        JOIN ab_tenant_member m ON m.id=ur.member_id AND m.tenant_id=ur.tenant_id
-        JOIN ab_user u ON u.id=m.user_id
-        WHERE ur.tenant_id=#{tenantId} AND ur.member_id=#{memberId} AND m.user_id=#{userId}
-          AND r.id=#{roleId} AND (r.tenant_id=#{tenantId} OR r.tenant_id IS NULL)
-          AND r.status='active' AND r.deleted_flag=FALSE
-          AND ur.status='active' AND ur.deleted_flag=FALSE
-          AND (ur.effective_date IS NULL OR ur.effective_date<=CURRENT_DATE)
-          AND (ur.expiry_date IS NULL OR ur.expiry_date>=CURRENT_DATE)
-          AND m.status='active' AND m.deleted_flag=FALSE AND u.is_enabled=TRUE AND u.deleted_flag=FALSE
-        LIMIT 1
+        WITH effective_role AS (
+            SELECT r.id, r.default_data_scope_type FROM ab_role r
+            JOIN ab_user_role ur ON ur.role_id=r.id
+            JOIN ab_tenant_member m ON m.id=ur.member_id AND m.tenant_id=ur.tenant_id
+            JOIN ab_user u ON u.id=m.user_id
+            WHERE ur.tenant_id=#{tenantId} AND ur.member_id=#{memberId} AND m.user_id=#{userId}
+              AND r.id=#{roleId} AND (r.tenant_id=#{tenantId} OR r.tenant_id IS NULL)
+              AND r.status='active' AND r.deleted_flag=FALSE
+              AND ur.status='active' AND ur.deleted_flag=FALSE
+              AND (ur.effective_date IS NULL OR ur.effective_date<=CURRENT_DATE)
+              AND (ur.expiry_date IS NULL OR ur.expiry_date>=CURRENT_DATE)
+              AND m.status='active' AND m.deleted_flag=FALSE AND u.is_enabled=TRUE AND u.deleted_flag=FALSE
+            LIMIT 1
+        )
+        SELECT r.default_data_scope_type, s.resource_code, s.action_code, s.scope_type,
+               (s.scope_config IS NOT NULL AND s.scope_config NOT IN ('{}'::jsonb, 'null'::jsonb)) AS custom_config
+        FROM effective_role r
+        LEFT JOIN ab_role_data_scope s ON s.role_id=r.id AND s.tenant_id=#{tenantId}
         """)
-    Role findEffectiveGrantOwner(@Param("tenantId") Long tenantId, @Param("userId") Long userId,
+    @ConstructorArgs({
+        @Arg(column = "default_data_scope_type", javaType = String.class),
+        @Arg(column = "resource_code", javaType = String.class),
+        @Arg(column = "action_code", javaType = String.class),
+        @Arg(column = "scope_type", javaType = String.class),
+        @Arg(column = "custom_config", javaType = boolean.class)
+    })
+    List<GrantScopeRow> findEffectiveGrantScopes(@Param("tenantId") Long tenantId, @Param("userId") Long userId,
             @Param("memberId") Long memberId, @Param("roleId") Long roleId);
+
+    record GrantScopeRow(String defaultScopeType, String resourceCode, String actionCode, String scopeType,
+                         boolean customConfig) {}
 
     /**
      * 根据角色编码查询角色

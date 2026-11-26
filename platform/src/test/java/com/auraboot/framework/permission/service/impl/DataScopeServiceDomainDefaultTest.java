@@ -7,7 +7,6 @@ import com.auraboot.framework.permission.entity.RoleDataScope;
 import com.auraboot.framework.permission.mapper.RoleDataScopeMapper;
 import com.auraboot.framework.permission.service.DomainCommandAuthorization;
 import com.auraboot.framework.permission.service.RoleAuthorizationWriteLock;
-import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
@@ -35,7 +34,6 @@ class DataScopeServiceDomainDefaultTest {
             mock(org.springframework.context.ApplicationEventPublisher.class), mock(DataScopeCacheEvictor.class));
     private static final String MODEL = "example_record";
     private static final String CODE = "bom.cap.read";
-    private Role reader;
 
     @BeforeEach void context() {
         MetaContext.setContext(100L, 1L, "actor", "actor"); MetaContext.setMemberId(5L);
@@ -44,16 +42,19 @@ class DataScopeServiceDomainDefaultTest {
         ReflectionTestUtils.setField(service, "metaModelService", mock(MetaModelService.class));
         when(memberships.findRoleIdsByMemberId(5L)).thenReturn(List.of(7L, 9L));
         when(scopeRows.findByRoleIdsAndResource(List.of(7L, 9L), MODEL, "read")).thenReturn(List.of());
-        when(scopeRows.findByTenantAndRole(100L, 7L)).thenReturn(List.of());
         var definition = new Permission(); definition.setCode(CODE); definition.setResourceCode("bom");
         definition.setResourceType("operation"); definition.setAction("read");
         definition.setExtension(Map.of("domainModels", Map.of(MODEL, List.of("read"))));
         when(definitions.resourcePermissionCodes(100L, MODEL, "read")).thenReturn(List.of(CODE));
         when(definitions.resolvePermissionDefinition(100L, CODE)).thenReturn(definition);
         when(grants.grants(CODE)).thenReturn(List.of(grant(7L)));
-        reader = new Role(); reader.setId(7L); reader.setDefaultDataScopeType("self");
-        when(roles.findEffectiveGrantOwner(100L, 1L, 5L, 7L)).thenReturn(reader);
+        stubRoleDefault(7L, "self");
     }
+    private void stubRoleDefault(long role, String defaultScope) {
+        when(roles.findEffectiveGrantScopes(100L, 1L, 5L, role))
+                .thenReturn(List.of(new RoleMapper.GrantScopeRow(defaultScope, null, null, null, false)));
+    }
+
     @AfterEach void clear() { MetaContext.clear(); }
     private RolePermissionMapper.BusinessGrantRow grant(long role) {
         var row = new RolePermissionMapper.BusinessGrantRow(); row.setRoleId(role);
@@ -64,13 +65,12 @@ class DataScopeServiceDomainDefaultTest {
         assertThat(scope.scopeType()).isEqualTo("self");
         assertThat(scope.ownerField()).isEqualTo("created_by");
         assertThat(scope.ownerValue()).isEqualTo(1L);
-        verify(roles, never()).findEffectiveGrantOwner(100L, 1L, 5L, 9L);
+        verify(roles, never()).findEffectiveGrantScopes(100L, 1L, 5L, 9L);
     }
     @Test void anUnrelatedRoleDefaultCannotSupplyAllAccess() {
-        var unrelated = new Role(); unrelated.setDefaultDataScopeType("all");
-        when(roles.findEffectiveGrantOwner(100L, 1L, 5L, 9L)).thenReturn(unrelated);
+        stubRoleDefault(9L, "all");
         assertThat(service.resolveScope(5L, MODEL, "read").scopeType()).isEqualTo("self");
-        verify(roles, never()).findEffectiveGrantOwner(100L, 1L, 5L, 9L);
+        verify(roles, never()).findEffectiveGrantScopes(100L, 1L, 5L, 9L);
     }
     @Test void noEffectiveFunctionalGrantOrExplicitDenyCannotManufactureAnAudience() {
         when(grants.grants(CODE)).thenReturn(List.of());
@@ -80,7 +80,7 @@ class DataScopeServiceDomainDefaultTest {
         assertThat(service.resolveScope(5L, MODEL, "read").scopeType()).isEqualTo("none");
     }
     @Test void legacyAbsenceRemainsUnconfiguredAndDoesNotWriteScopeRows() {
-        reader.setDefaultDataScopeType(null);
+        stubRoleDefault(7L, null);
         assertThat(service.resolveScope(5L, MODEL, "read").scopeType()).isEqualTo("not_configured");
         verify(scopeRows, never()).insert(any(RoleDataScope.class));
     }
@@ -102,9 +102,7 @@ class DataScopeServiceDomainDefaultTest {
         verifyNoInteractions(grants);
     }
     @Test void anEffectiveAllGrantKeepsTheExistingMaxMergeMeaning() {
-        var all = new Role(); all.setDefaultDataScopeType("all");
-        when(roles.findEffectiveGrantOwner(100L, 1L, 5L, 9L)).thenReturn(all);
-        when(scopeRows.findByTenantAndRole(100L, 9L)).thenReturn(List.of());
+        stubRoleDefault(9L, "all");
         when(grants.grants(CODE)).thenReturn(List.of(grant(7L), grant(9L)));
         assertThat(service.resolveScope(5L, MODEL, "read").scopeType()).isEqualTo("all");
     }

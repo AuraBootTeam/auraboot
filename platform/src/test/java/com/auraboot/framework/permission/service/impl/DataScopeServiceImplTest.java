@@ -12,6 +12,7 @@ import com.auraboot.framework.permission.event.RolePermissionChangedEvent;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.permission.mapper.RoleDataScopeMapper;
+import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
@@ -450,15 +451,13 @@ class DataScopeServiceImplTest {
 
     @Test void ordinaryReadLegacyNullRequiresAQualifiedOwnerAndNoMalformedOverride() {
         MetaContext.setMemberId(5L);
-        var owner = new com.auraboot.framework.rbac.entity.Role();
-        when(roleMapper.findEffectiveGrantOwner(100L,1L,5L,7L)).thenReturn(owner);
-        when(roleDataScopeMapper.findByTenantAndRole(100L,7L)).thenReturn(List.of());
+        stubGrantScopes(null);
         assertThat(service.resolveOrdinaryReadScopeForRole(5L,7L,"quote").scopeType()).isEqualTo("not_configured");
         assertThat(service.resolveScopeForRole(5L,7L,"quote","read","quote").scopeType()).isEqualTo("none");
         var malformed = new RoleDataScope(); malformed.setResourceCode("quote"); malformed.setActionCode("read");
-        when(roleDataScopeMapper.findByTenantAndRole(100L,7L)).thenReturn(List.of(malformed));
+        stubGrantScopes(null, malformed);
         assertThat(service.resolveOrdinaryReadScopeForRole(5L,7L,"quote").scopeType()).isEqualTo("none");
-        when(roleMapper.findEffectiveGrantOwner(100L,1L,5L,7L)).thenReturn(null);
+        when(roleMapper.findEffectiveGrantScopes(100L, 1L, 5L, 7L)).thenReturn(List.of());
         assertThat(service.resolveOrdinaryReadScopeForRole(5L,7L,"quote").scopeType()).isEqualTo("none");
     }
 
@@ -670,10 +669,7 @@ class DataScopeServiceImplTest {
     @Test
     void businessGrantScopeNeverBorrowsAnUnrelatedRoleScope() {
         MetaContext.setMemberId(5L);
-        var role = new com.auraboot.framework.rbac.entity.Role(); role.setDefaultDataScopeType("self");
-        when(roleMapper.findEffectiveGrantOwner(100L, 1L, 5L, 7L)).thenReturn(role);
-        var unrelated = scope("other", "manage", "all");
-        when(roleDataScopeMapper.findByTenantAndRole(100L, 7L)).thenReturn(List.of(unrelated));
+        stubGrantScopes("self", scope("other", "manage", "all"));
         var result = service.resolveScopeForRole(5L, 7L, "inventory.receipt", "confirm", "receipt");
         assertThat(result.scopeType()).isEqualTo("self"); assertThat(result.ownerValue()).isEqualTo(1L);
         org.mockito.Mockito.verify(userRoleMapper, org.mockito.Mockito.never()).findRoleIdsByMemberId(any());
@@ -682,21 +678,17 @@ class DataScopeServiceImplTest {
     @Test
     void businessGrantExactOverrideWinsOverRoleDefault() {
         MetaContext.setMemberId(5L);
-        var role = new com.auraboot.framework.rbac.entity.Role(); role.setDefaultDataScopeType("all");
-        when(roleMapper.findEffectiveGrantOwner(100L, 1L, 5L, 7L)).thenReturn(role);
-        when(roleDataScopeMapper.findByTenantAndRole(100L, 7L)).thenReturn(List.of(scope("inventory.receipt", "confirm", "none")));
+        stubGrantScopes("all", scope("inventory.receipt", "confirm", "none"));
         assertThat(service.resolveScopeForRole(5L, 7L, "inventory.receipt", "confirm", "receipt").scopeType()).isEqualTo("none");
     }
 
     @Test
     void missingDefaultAndUnknownScopeConfigurationDenyBusinessTargets() {
         MetaContext.setMemberId(5L);
-        var role = new com.auraboot.framework.rbac.entity.Role();
-        when(roleMapper.findEffectiveGrantOwner(100L, 1L, 5L, 7L)).thenReturn(role);
-        when(roleDataScopeMapper.findByTenantAndRole(100L, 7L)).thenReturn(List.of());
+        stubGrantScopes(null);
         assertThat(service.resolveScopeForRole(5L, 7L, "inventory.receipt", "confirm", "receipt").scopeType()).isEqualTo("none");
         var entry = scope("inventory.receipt", "confirm", "all"); entry.setScopeConfig(Map.of("unrecognizedRestriction", "do not ignore"));
-        when(roleDataScopeMapper.findByTenantAndRole(100L, 7L)).thenReturn(List.of(entry));
+        stubGrantScopes(null, entry);
         assertThat(service.resolveScopeForRole(5L, 7L, "inventory.receipt", "confirm", "receipt").scopeType()).isEqualTo("none");
     }
 
@@ -710,9 +702,7 @@ class DataScopeServiceImplTest {
 
     @Test void objectBoundActionsUseTheGrantOwnersExistingReadScopeWithoutWritingConfiguration() {
         MetaContext.setMemberId(5L);
-        var role = new com.auraboot.framework.rbac.entity.Role(); role.setDefaultDataScopeType("all");
-        when(roleMapper.findEffectiveGrantOwner(100L,1L,5L,7L)).thenReturn(role);
-        when(roleDataScopeMapper.findByTenantAndRole(100L,7L)).thenReturn(List.of(scope("quote","read","self")));
+        stubGrantScopes("all", scope("quote", "read", "self"));
         var result = service.resolveObjectBoundScopeForRole(5L,7L,"quote","manage","quote");
         assertThat(result.scopeType()).isEqualTo("self"); assertThat(result.ownerValue()).isEqualTo(1L);
         verify(userRoleMapper, never()).findRoleIdsByMemberId(any());
@@ -720,10 +710,8 @@ class DataScopeServiceImplTest {
 
     @Test void objectBoundActionOverridesAndMalformedRestrictionsNeverFallBackToReadAll() {
         MetaContext.setMemberId(5L);
-        var role = new com.auraboot.framework.rbac.entity.Role();
-        when(roleMapper.findEffectiveGrantOwner(100L,1L,5L,7L)).thenReturn(role);
-        var denied = scope("quote","manage","none");
-        when(roleDataScopeMapper.findByTenantAndRole(100L,7L)).thenReturn(List.of(scope("quote","read","all"),denied));
+        var denied = scope("quote", "manage", "none");
+        stubGrantScopes(null, scope("quote", "read", "all"), denied);
         assertThat(service.resolveObjectBoundScopeForRole(5L,7L,"quote","manage","quote").scopeType()).isEqualTo("none");
         denied.setScopeType("all");denied.setScopeConfig(Map.of("unknownRestriction",true));
         assertThat(service.resolveObjectBoundScopeForRole(5L,7L,"quote","manage","quote").scopeType()).isEqualTo("none");
@@ -731,14 +719,25 @@ class DataScopeServiceImplTest {
 
     @Test void objectBoundLegacyNullRequiresTheExactActiveRoleAndPreservesReadNone() {
         MetaContext.setMemberId(5L);
-        when(roleMapper.findEffectiveGrantOwner(100L,1L,5L,7L)).thenReturn(new com.auraboot.framework.rbac.entity.Role());
-        when(roleDataScopeMapper.findByTenantAndRole(100L,7L)).thenReturn(List.of());
+        stubGrantScopes(null);
         assertThat(service.resolveObjectBoundScopeForRole(5L,7L,"quote","manage","quote").scopeType()).isEqualTo("not_configured");
         assertThat(service.resolveScopeForRole(5L,7L,"quote","manage","quote").scopeType()).isEqualTo("none");
-        when(roleDataScopeMapper.findByTenantAndRole(100L,7L)).thenReturn(List.of(scope("quote","read","none")));
+        stubGrantScopes(null, scope("quote", "read", "none"));
         assertThat(service.resolveObjectBoundScopeForRole(5L,7L,"quote","manage","quote").scopeType()).isEqualTo("none");
-        when(roleMapper.findEffectiveGrantOwner(100L,1L,5L,7L)).thenReturn(null);
+        when(roleMapper.findEffectiveGrantScopes(100L, 1L, 5L, 7L)).thenReturn(List.of());
         assertThat(service.resolveObjectBoundScopeForRole(5L,7L,"quote","manage","quote").scopeType()).isEqualTo("none");
+    }
+
+    private void stubGrantScopes(String defaultScope, RoleDataScope... overrides) {
+        when(roleMapper.findEffectiveGrantScopes(100L, 1L, 5L, 7L)).thenAnswer(invocation -> {
+            if (overrides.length == 0) {
+                return List.of(new RoleMapper.GrantScopeRow(defaultScope, null, null, null, false));
+            }
+            return java.util.Arrays.stream(overrides).map(entry -> new RoleMapper.GrantScopeRow(
+                    defaultScope, entry.getResourceCode(), entry.getActionCode(), entry.getScopeType(),
+                    entry.getScopeConfig() != null
+                            && !(entry.getScopeConfig() instanceof Map<?, ?> config && config.isEmpty()))).toList();
+        });
     }
 
     private static RoleDataScope scope(String resource, String action, String type) {

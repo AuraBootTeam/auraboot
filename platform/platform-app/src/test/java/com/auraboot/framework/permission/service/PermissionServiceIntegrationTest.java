@@ -11,6 +11,7 @@ import com.auraboot.framework.permission.dto.PermissionUpdateRequest;
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.rbac.entity.Role;
+import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.auraboot.framework.rbac.service.RoleService;
 import com.auraboot.framework.rbac.service.UserRoleService;
@@ -22,8 +23,10 @@ import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
+import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,6 +65,15 @@ class PermissionServiceIntegrationTest {
 
     @Autowired
     private RolePermissionMapper rolePermissionMapper;
+
+    @Autowired
+    private RoleMapper roleMapper;
+
+    @Autowired
+    private JdbcTemplate jdbc;
+
+    @Autowired
+    private SqlSessionTemplate sqlSession;
 
     @Autowired
     private UserService userService;
@@ -193,6 +205,44 @@ class PermissionServiceIntegrationTest {
     }
 
     // ==================== Tests ====================
+
+    @Test
+    @Order(0)
+    @Transactional
+    void effectiveGrantScopeReadsOnlyActiveMembershipAndItsOwnTenantConfiguration() {
+        long tenant = testTenant.getId();
+        long user = testUser.getId();
+        long member = testTenantMember.getId();
+        long role = testRole.getId();
+        jdbc.update("UPDATE ab_role SET default_data_scope_type = NULL WHERE id = ?", role);
+        assertThat(roleMapper.findEffectiveGrantScopes(tenant, user, member, role))
+                .containsExactly(new RoleMapper.GrantScopeRow(null, null, null, null, false));
+
+        insertGrantScope(tenant, role, "read", "self", "{}");
+        insertGrantScope(tenant, role, "update", "none", "{\"unsupported\":true}");
+        insertGrantScope(tenant, role, "create", "self", "null");
+        insertGrantScope(tenant + 1, role, "delete", "all", "{}");
+        sqlSession.clearCache();
+        assertThat(roleMapper.findEffectiveGrantScopes(tenant, user, member, role))
+                .containsExactlyInAnyOrder(
+                        new RoleMapper.GrantScopeRow(null, "test_model", "read", "self", false),
+                        new RoleMapper.GrantScopeRow(null, "test_model", "update", "none", true),
+                        new RoleMapper.GrantScopeRow(null, "test_model", "create", "self", false));
+        assertThat(roleMapper.findEffectiveGrantScopes(tenant + 1, user, member, role)).isEmpty();
+        assertThat(roleMapper.findEffectiveGrantScopes(tenant, user + 1, member, role)).isEmpty();
+
+        jdbc.update("UPDATE ab_user_role SET expiry_date = CURRENT_DATE - 1 WHERE tenant_id = ? AND member_id = ? AND role_id = ?",
+                tenant, member, role);
+        sqlSession.clearCache();
+        assertThat(roleMapper.findEffectiveGrantScopes(tenant, user, member, role)).isEmpty();
+    }
+
+    private void insertGrantScope(long tenant, long role, String action, String scope, String config) {
+        jdbc.update("""
+                INSERT INTO ab_role_data_scope (pid, tenant_id, role_id, resource_code, action_code, scope_type, scope_config)
+                VALUES (?, ?, ?, 'test_model', ?, ?, CAST(? AS jsonb))
+                """, UniqueIdGenerator.generate(), tenant, role, action, scope, config);
+    }
 
     @Test
     @Order(0)
