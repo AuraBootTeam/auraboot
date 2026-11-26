@@ -3,6 +3,7 @@ package com.auraboot.framework.plugin.rest;
 import com.auraboot.framework.meta.service.IdempotencyService;
 import com.auraboot.framework.meta.service.impl.CommandEffectExecutor;
 import com.auraboot.framework.meta.service.impl.DynamicDataQueryScope;
+import com.auraboot.framework.plugin.extension.AuthPolicy;
 import com.auraboot.framework.plugin.extension.PluginHttpRequest;
 import com.auraboot.framework.plugin.extension.PluginRequestContext;
 import com.auraboot.framework.plugin.extension.RestEndpointExtension;
@@ -87,9 +88,9 @@ public class RestEndpointPipeline {
         final String[] phase = {"init"};
         final TransactionTemplate tx = new TransactionTemplate(txManager);
         tx.setReadOnly(route.readOnlyTx() && !scopedIdempotency);
-        if (tx.isReadOnly()) {
-            // Physical rows and their current field grants must share one MVCC view.
-            // Keep writable/idempotency-claim transactions on their existing isolation.
+        if (!scopedIdempotency && (tx.isReadOnly() || route.authPolicy() == AuthPolicy.AUTHENTICATED)) {
+            // Physical rows and their current field grants must share one MVCC view for reads and writes.
+            // Leave the idempotency claim transaction on its existing isolation for concurrent replay.
             tx.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
         }
 

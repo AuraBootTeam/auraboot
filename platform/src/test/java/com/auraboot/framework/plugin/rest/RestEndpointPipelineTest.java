@@ -4,6 +4,7 @@ import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.meta.service.IdempotencyService;
 import com.auraboot.framework.meta.service.impl.CommandEffectExecutor;
 import com.auraboot.framework.meta.service.impl.DynamicDataQueryScope;
+import com.auraboot.framework.plugin.extension.AuthPolicy;
 import com.auraboot.framework.plugin.extension.PluginHttpRequest;
 import com.auraboot.framework.plugin.extension.PluginHttpResponse;
 import com.auraboot.framework.plugin.extension.PluginRequestContext;
@@ -180,6 +181,23 @@ class RestEndpointPipelineTest {
         ArgumentCaptor<TransactionDefinition> definition = ArgumentCaptor.forClass(TransactionDefinition.class);
         verify(manager).getTransaction(definition.capture());
         assertThat(definition.getValue().isReadOnly()).isTrue();
+        assertThat(definition.getValue().getIsolationLevel()).isEqualTo(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        assertThat(ext.ran).isTrue();
+    }
+
+    @Test
+    void authenticatedWriteRoutes_requestOneCoherentWritableSnapshot() {
+        PlatformTransactionManager manager = mock(PlatformTransactionManager.class);
+        when(manager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        RestEndpointPipeline subject = new RestEndpointPipeline(manager, idempotency, schemaValidator, effectExecutor);
+        RecordingExt ext = new RecordingExt();
+        RestRoute route = new RestRoute("POST", "/echo", "probe.echo.write", AuthPolicy.AUTHENTICATED, false, false, null);
+
+        subject.execute(match(route, ext), req("POST", null, null), ctx());
+
+        ArgumentCaptor<TransactionDefinition> definition = ArgumentCaptor.forClass(TransactionDefinition.class);
+        verify(manager).getTransaction(definition.capture());
+        assertThat(definition.getValue().isReadOnly()).isFalse();
         assertThat(definition.getValue().getIsolationLevel()).isEqualTo(TransactionDefinition.ISOLATION_REPEATABLE_READ);
         assertThat(ext.ran).isTrue();
     }
