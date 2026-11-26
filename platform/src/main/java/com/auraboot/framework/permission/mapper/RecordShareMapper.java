@@ -3,6 +3,8 @@ package com.auraboot.framework.permission.mapper;
 import com.auraboot.framework.permission.entity.RecordShare;
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import org.apache.ibatis.annotations.Arg;
+import org.apache.ibatis.annotations.ConstructorArgs;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -324,6 +326,58 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
             @Param("recordId") Long recordId,
             @Param("subjectType") String subjectType,
             @Param("subjectId") Long subjectId);
+
+    record SharedRecordKey(Long legacyId, String recordPid) {}
+
+    /**
+     * Read both key types in one statement. A public subject match alone never
+     * contributes the legacy ID even if the share row happens to contain one.
+     */
+    @Select("""
+        <script>
+        WITH eligible AS (
+          SELECT record_id, record_pid,
+                 ((subject_type = 'member' AND subject_id = #{userId})
+                  <if test="roleIds != null and roleIds.size() > 0">
+                  OR (subject_type = 'role' AND subject_id IN
+                    <foreach item='id' collection='roleIds' open='(' separator=',' close=')'>
+                      #{id}
+                    </foreach>
+                  )
+                  </if>
+                 ) AS legacy_subject,
+                 <choose>
+                   <when test="memberPid != null and memberPid != ''">
+                   (subject_type = 'member' AND subject_pid = #{memberPid})
+                   </when>
+                   <otherwise>FALSE</otherwise>
+                 </choose> AS public_subject
+          FROM ab_record_share
+          WHERE tenant_id = #{tenantId}
+            AND resource_code = #{resourceCode}
+            AND LOWER(#{action}) = ANY (
+              string_to_array(LOWER(REPLACE(permission_mask, ' ', '')), ',')
+            )
+            AND (expires_at IS NULL OR expires_at > #{now})
+        )
+        SELECT DISTINCT CASE WHEN legacy_subject THEN record_id END AS legacy_id, record_pid
+        FROM eligible
+        WHERE (legacy_subject AND (record_id IS NOT NULL OR record_pid IS NOT NULL))
+           OR (public_subject AND record_pid IS NOT NULL)
+        </script>
+        """)
+    @ConstructorArgs({
+        @Arg(column = "legacy_id", javaType = Long.class),
+        @Arg(column = "record_pid", javaType = String.class)
+    })
+    List<SharedRecordKey> findSharedRecordKeys(
+            @Param("tenantId") Long tenantId,
+            @Param("resourceCode") String resourceCode,
+            @Param("userId") Long userId,
+            @Param("memberPid") String memberPid,
+            @Param("roleIds") List<Long> roleIds,
+            @Param("action") String action,
+            @Param("now") Instant now);
 
     /**
      * Get all record IDs shared with a member (directly or via roles).

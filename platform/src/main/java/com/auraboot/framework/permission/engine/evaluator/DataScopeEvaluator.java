@@ -194,15 +194,10 @@ public class DataScopeEvaluator {
             return condition;
         }
 
+        var shares = recordShareService.getSharedRecords(
+                tenantId, resource, memberId, MetaContext.getCurrentUserPid(), action);
         return condition
-                .withSharedRecords(
-                        recordShareService.getSharedRecordIds(tenantId, resource, memberId, action),
-                        recordShareService.getSharedRecordPids(
-                                tenantId,
-                                resource,
-                                memberId,
-                                MetaContext.getCurrentUserPid(),
-                                action))
+                .withSharedRecords(shares.legacyIds(), shares.publicPids())
                 .withSharedRootReferences(rowSurfaceResolver.resolveSharedRootReferences(
                         tenantId, memberId, resource, action));
     }

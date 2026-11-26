@@ -176,6 +176,19 @@ public class RecordShareServiceImpl implements RecordShareService {
     }
 
     @Override
+    public SharedRecords getSharedRecords(Long tenantId, String resourceCode, Long memberId, String memberPid,
+                                          String action) {
+        List<Long> roles = userRoleService.getRoleIdsByMemberIdAndTenantId(memberId, tenantId);
+        var keys = recordShareMapper.findSharedRecordKeys(tenantId, resourceCode, memberId, normalizePid(memberPid),
+                roles != null ? roles : List.of(), normalizeAction(action), Instant.now());
+        return new SharedRecords(
+                keys.stream().map(RecordShareMapper.SharedRecordKey::legacyId).filter(java.util.Objects::nonNull)
+                        .distinct().toList(),
+                keys.stream().map(RecordShareMapper.SharedRecordKey::recordPid).filter(java.util.Objects::nonNull)
+                        .distinct().toList());
+    }
+
+    @Override
     public List<Long> getSharedRecordIds(Long tenantId, String resourceCode, Long memberId, String action) {
         List<Long> roleIds = userRoleService.getRoleIdsByMemberIdAndTenantId(memberId, tenantId);
         return recordShareMapper.findSharedRecordIds(

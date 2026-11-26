@@ -103,6 +103,12 @@ public interface RecordShareService {
             String memberPid,
             String action);
 
+    record SharedRecords(List<Long> legacyIds, List<String> publicPids) {}
+
+    /** Get both key types for a single actor, resource, action and instant. */
+    SharedRecords getSharedRecords(Long tenantId, String resourceCode, Long memberId, String memberPid,
+                                   String action);
+
     /**
      * Get all record IDs shared with a member (directly or via their roles).
      *

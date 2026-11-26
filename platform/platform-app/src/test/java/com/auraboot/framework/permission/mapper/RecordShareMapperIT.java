@@ -82,6 +82,27 @@ class RecordShareMapperIT {
     }
 
     @Test
+    void combinedKeysKeepLegacyAndPublicSubjectRulesIndependent() {
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+        Instant later = now.plus(1, ChronoUnit.HOURS);
+        insert(TENANT_ID, 301L, "legacy-pair", "member", MEMBER_ID, null, "read", later);
+        insert(TENANT_ID, 302L, "public-only", "member", MEMBER_ID + 1, MEMBER_PID, "read, update", later);
+        insert(TENANT_ID, 303L, "role-pair", "role", ROLE_ID, null, "read", later);
+        insert(TENANT_ID, 304L, "expired", "member", MEMBER_ID, MEMBER_PID, "read", now);
+        insert(OTHER_TENANT_ID, 305L, "cross-tenant", "member", MEMBER_ID, MEMBER_PID, "read", later);
+
+        assertThat(mapper.findSharedRecordKeys(TENANT_ID, RESOURCE, MEMBER_ID, MEMBER_PID,
+                List.of(ROLE_ID), "read", now)).containsExactlyInAnyOrder(
+                new RecordShareMapper.SharedRecordKey(301L, "legacy-pair"),
+                new RecordShareMapper.SharedRecordKey(null, "public-only"),
+                new RecordShareMapper.SharedRecordKey(303L, "role-pair"));
+        assertThat(mapper.findSharedRecordKeys(TENANT_ID, RESOURCE, MEMBER_ID, MEMBER_PID,
+                List.of(), "update", now)).containsExactly(new RecordShareMapper.SharedRecordKey(null, "public-only"));
+        assertThat(mapper.findSharedRecordKeys(TENANT_ID, RESOURCE, MEMBER_ID, null,
+                List.of(), "read", now)).containsExactly(new RecordShareMapper.SharedRecordKey(301L, "legacy-pair"));
+    }
+
+    @Test
     @DisplayName("public-PID collaborator upsert upgrades the existing relationship")
     void upsertByPublicPidsUpdatesPermissionWithoutDuplicatingShare() {
         RecordShare readOnly = publicShare("share-original", "rec-upsert", "read");

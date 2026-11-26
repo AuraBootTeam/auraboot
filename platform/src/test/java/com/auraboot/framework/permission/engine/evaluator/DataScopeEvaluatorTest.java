@@ -208,10 +208,8 @@ class DataScopeEvaluatorTest {
         DataScopeCondition self = new DataScopeCondition(
                 "self", "owner_id", 7L, null, List.of(), List.of());
         when(dataScopeService.resolveScope(1L, "M", "read")).thenReturn(self);
-        when(recordShareService.getSharedRecordIds(99L, "M", 1L, "read"))
-                .thenReturn(List.of(10L));
-        when(recordShareService.getSharedRecordPids(99L, "M", 1L, "user_pid_7", "read"))
-                .thenReturn(List.of("rec_11"));
+        when(recordShareService.getSharedRecords(99L, "M", 1L, "user_pid_7", "read"))
+                .thenReturn(new RecordShareService.SharedRecords(List.of(10L), List.of("rec_11")));
 
         DataScopeCondition condition = evaluator.getCondition(1L, "M", "read");
 
@@ -262,10 +260,8 @@ class DataScopeEvaluatorTest {
         DataScopeCondition self = new DataScopeCondition(
                 "self", "created_by", 7L, null, List.of(), List.of());
         when(dataScopeService.resolveScope(1L, "qo_quote_line_common", "read")).thenReturn(self);
-        when(recordShareService.getSharedRecordIds(99L, "qo_quote_line_common", 1L, "read"))
-                .thenReturn(List.of());
-        when(recordShareService.getSharedRecordPids(99L, "qo_quote_line_common", 1L, "user_pid_7", "read"))
-                .thenReturn(List.of());
+        when(recordShareService.getSharedRecords(99L, "qo_quote_line_common", 1L, "user_pid_7", "read"))
+                .thenReturn(new RecordShareService.SharedRecords(List.of(), List.of()));
         when(rowSurfaceResolver.resolveSharedRootReferences(99L, 1L, "qo_quote_line_common", "read"))
                 .thenReturn(List.of(new SharedRootReference("qo_ql_quote_id", List.of("root_1"))));
 
@@ -324,7 +320,7 @@ class DataScopeEvaluatorTest {
         when(dataScopeService.resolveScope(1L, "M", "view")).thenReturn(self);
         assertSame(self, evaluator.getCondition(1L, "M", "view"));
         verify(recordShareService, org.mockito.Mockito.never())
-                .getSharedRecordPids(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                .getSharedRecords(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.any());
     }
