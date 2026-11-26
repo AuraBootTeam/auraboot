@@ -1,23 +1,30 @@
 package com.auraboot.framework.email;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.email.mapper.EmailRecordLinkMapper;
 import com.auraboot.framework.email.model.EmailConstants;
 import com.auraboot.framework.email.model.EmailMessage;
 import com.auraboot.framework.email.model.EmailRecordLink;
 import com.auraboot.framework.email.service.EmailRecordLinkService;
+import com.auraboot.framework.meta.service.DynamicDataService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -28,12 +35,40 @@ import static org.mockito.Mockito.when;
 class EmailRecordLinkServiceUnitTest {
 
     @Mock private EmailRecordLinkMapper linkMapper;
+    @Mock private DynamicDataService dynamicDataService;
 
     private EmailRecordLinkService service;
 
     @BeforeEach
     void setUp() {
-        service = new EmailRecordLinkService(linkMapper);
+        service = new EmailRecordLinkService(linkMapper, dynamicDataService);
+    }
+
+    @AfterEach
+    void clearContext() {
+        MetaContext.clear();
+    }
+
+    @Test
+    void recordTimelineDelegatesWithCallerIdentityAndPaging() {
+        MetaContext.setContext(7L, 99L, "actor", "Sales");
+        when(dynamicDataService.getByIdForProcessing("customer_record", "record-1"))
+                .thenReturn(Map.of("pid", "record-1"));
+        when(linkMapper.findMessagesByRecord(7L, 99L, "customer_record", "record-1", 10, 5))
+                .thenReturn(List.of(new EmailMessage()));
+
+        assertThat(service.findMessagesByRecord("customer_record", "record-1", 10, 5)).hasSize(1);
+    }
+
+    @Test
+    void recordTimelineRejectsUnreadableRecordsBeforeReadingMail() {
+        MetaContext.setContext(7L, 99L, "actor", "Sales");
+        when(dynamicDataService.getByIdForProcessing("customer_record", "record-1"))
+                .thenThrow(new AccessDeniedException("Record read denied"));
+
+        assertThatThrownBy(() -> service.findMessagesByRecord("customer_record", "record-1", 0, 10))
+                .isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(linkMapper);
     }
 
     @Test

@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -66,6 +67,17 @@ class EmailMessageControllerPidContractTest {
                 "getByRecord", String.class, String.class, int.class, int.class);
         Parameter recordParam = method.getParameters()[1];
         assertThat(recordParam.getName()).isEqualTo("recordPid");
+    }
+
+    @Test
+    void timelinePassesOffsetBeforeLimit() {
+        when(emailRecordLinkService.findMessagesByRecord("crm_contact_common", "record-1", 20, 10))
+                .thenReturn(List.of(new EmailMessage()));
+
+        var result = newController().getByRecord("crm_contact_common", "record-1", 3, 10);
+
+        assertThat(result.getData()).containsEntry("pageNum", 3).containsEntry("pageSize", 10);
+        assertThat((List<?>) result.getData().get("records")).hasSize(1);
     }
 
     private final com.auraboot.framework.email.service.EmailMessageService emailMessageService =

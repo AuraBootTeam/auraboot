@@ -303,22 +303,22 @@ describe('emailService', () => {
 
   describe('getMessagesByRecord', () => {
     it('GETs /api/email/messages/by-record with modelCode + recordPid', async () => {
-      const msgs = [{ id: 1, subject: 'Hi' }];
-      fetchResultMock.mockResolvedValue(ok(msgs));
+      const msgs = [{ id: 1, subject: 'Hi', toAddresses: '["recipient@example.test"]' }];
+      fetchResultMock.mockResolvedValue(ok({ records: msgs, pageNum: 2, pageSize: 10 }));
 
-      const result = await getMessagesByRecord('order', 'order-pid-50');
+      const result = await getMessagesByRecord('order', 'order-pid-50', 2);
 
       expect(fetchResultMock).toHaveBeenCalledWith('/api/email/messages/by-record', {
         method: 'get',
-        params: { modelCode: 'order', recordPid: 'order-pid-50' },
+        params: { modelCode: 'order', recordPid: 'order-pid-50', pageNum: 2 },
       });
-      expect(result).toEqual(msgs);
+      expect(result).toEqual([{ ...msgs[0], toAddresses: ['recipient@example.test'] }]);
     });
 
-    it('returns empty array on failure', async () => {
+    it('rejects a failed response so the timeline can distinguish failure from empty', async () => {
       fetchResultMock.mockResolvedValue(fail());
 
-      expect(await getMessagesByRecord('order', 'order-pid-1')).toEqual([]);
+      await expect(getMessagesByRecord('order', 'order-pid-1')).rejects.toThrow('Could not load record emails');
     });
   });
 

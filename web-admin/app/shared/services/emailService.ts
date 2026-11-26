@@ -324,15 +324,30 @@ export async function unlinkRecord(messageId: number, linkId: number): Promise<v
 export async function getMessagesByRecord(
   modelCode: string,
   recordPid: string,
+  pageNum = 1,
 ): Promise<EmailMessage[]> {
-  const result = await fetchResult<EmailMessage[]>(`${BASE}/messages/by-record`, {
+  type RecordEmail = Omit<EmailMessage, 'toAddresses'> & { toAddresses?: string[] | string | null };
+  const result = await fetchResult<{ records: RecordEmail[] }>(`${BASE}/messages/by-record`, {
     method: 'get',
-    params: { modelCode, recordPid },
+    params: { modelCode, recordPid, pageNum },
   });
-  if (ResultHelper.isSuccess(result) && result.data) {
-    return result.data;
+  if (!ResultHelper.isSuccess(result) || !Array.isArray(result.data?.records)) {
+    throw new Error('Could not load record emails');
   }
-  return [];
+  return result.data.records.map((record) => {
+    let addresses: unknown = record.toAddresses;
+    if (typeof addresses === 'string') {
+      try {
+        addresses = JSON.parse(addresses);
+      } catch {
+        addresses = [];
+      }
+    }
+    const toAddresses = Array.isArray(addresses)
+      ? addresses.filter((address): address is string => typeof address === 'string')
+      : [];
+    return { ...record, toAddresses };
+  });
 }
 
 /**

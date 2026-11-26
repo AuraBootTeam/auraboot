@@ -1,12 +1,17 @@
 package com.auraboot.framework.email.service;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.email.mapper.EmailRecordLinkMapper;
 import com.auraboot.framework.email.model.EmailConstants;
 import com.auraboot.framework.email.model.EmailMessage;
 import com.auraboot.framework.email.model.EmailRecordLink;
+import com.auraboot.framework.meta.service.DynamicDataService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -26,6 +31,7 @@ import java.util.List;
 public class EmailRecordLinkService {
 
     private final EmailRecordLinkMapper emailRecordLinkMapper;
+    private final DynamicDataService dynamicDataService;
 
     // ──────────────────────────────────────────────────────────────────────────
     // Auto-link
@@ -119,9 +125,16 @@ public class EmailRecordLinkService {
         return link;
     }
 
-    /** Messages linked to a business record (moved from the controller for ArchUnit rule 2). */
-    public java.util.List<com.auraboot.framework.email.model.EmailMessage> findMessagesByRecord(
-            Long tenantId, String modelCode, String recordPid, int offset, int limit) {
-        return emailRecordLinkMapper.findMessagesByRecord(tenantId, modelCode, recordPid, offset, limit);
+    /** Mailbox and business record access must both hold for the current caller. */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public List<EmailMessage> findMessagesByRecord(
+            String modelCode, String recordPid, int offset, int limit) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+        if (tenantId == null || userId == null || userId <= 0
+                || dynamicDataService.getByIdForProcessing(modelCode, recordPid) == null) {
+            throw new AccessDeniedException("Record email is not accessible");
+        }
+        return emailRecordLinkMapper.findMessagesByRecord(tenantId, userId, modelCode, recordPid, offset, limit);
     }
 }

@@ -23,23 +23,19 @@ import {
 import { getMessagesByRecord, type EmailMessage } from '~/shared/services/emailService';
 import TrackingStats from './TrackingStats';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
+import { useI18n } from '~/contexts/I18nContext';
+import { useSmartText } from '~/utils/i18n';
+import type { BlockRendererProps } from '@auraboot/runtime-kernel';
 
 interface EmailTimelineProps {
   modelCode: string;
   recordPid: string;
 }
 
-function timeAgo(dateStr: string): string {
-  const now = Date.now();
-  const diff = now - new Date(dateStr).getTime();
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString();
+export function RecordEmailTimeline({ runtime }: BlockRendererProps) {
+  const { modelCode, recordPid } = runtime.getContext().$page ?? {};
+  if (typeof modelCode !== 'string' || typeof recordPid !== 'string' || !recordPid) return null;
+  return <EmailTimeline key={`${modelCode}:${recordPid}`} modelCode={modelCode} recordPid={recordPid} />;
 }
 
 interface EmailTimelineItemProps {
@@ -47,8 +43,11 @@ interface EmailTimelineItemProps {
 }
 
 function EmailTimelineItem({ message }: EmailTimelineItemProps) {
+  const st = useSmartText();
+  const { locale } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const isInbound = message.direction === 'inbound';
+  const sentAt = message.gmailDate ? new Date(message.gmailDate).toLocaleString(locale) : '';
 
   const snippet = message.bodyText
     ? message.bodyText.slice(0, 100) + (message.bodyText.length > 100 ? '…' : '')
@@ -62,7 +61,7 @@ function EmailTimelineItem({ message }: EmailTimelineItemProps) {
           className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${
             isInbound ? 'bg-gray-100 dark:bg-gray-700' : 'bg-blue-100 dark:bg-blue-900/30'
           }`}
-          title={isInbound ? 'Inbound' : 'Outbound'}
+          title={isInbound ? st({ 'zh-CN': '收件', en: 'Inbound' }) : st({ 'zh-CN': '发件', en: 'Outbound' })}
         >
           {isInbound ? (
             <EnvelopeIcon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
@@ -82,41 +81,31 @@ function EmailTimelineItem({ message }: EmailTimelineItemProps) {
                 ? message.fromName
                   ? `${message.fromName} <${message.fromAddress}>`
                   : message.fromAddress
-                : `To: ${message.toAddresses.join(', ')}`}
+                : `${st({ 'zh-CN': '收件人', en: 'To' })}: ${message.toAddresses?.join(', ') ?? ''}`}
             </p>
             <p className="mt-0.5 text-sm font-medium text-gray-900 dark:text-white">
-              {message.subject || '(No subject)'}
+              {message.subject || st({ 'zh-CN': '无主题', en: 'No subject' })}
             </p>
           </div>
-          <span className="flex-shrink-0 text-xs text-gray-400">{timeAgo(message.gmailDate)}</span>
+          <span className="flex-shrink-0 text-xs text-gray-400">{sentAt}</span>
         </div>
 
         {/* Snippet / Expand */}
-        {snippet && (
-          <button onClick={() => setExpanded((v) => !v)} className="mt-1 w-full text-start">
-            {!expanded ? (
-              <p className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                {snippet}
-                <ChevronDownIcon className="inline h-3 w-3 flex-shrink-0" />
-              </p>
-            ) : (
-              <div>
-                <div className="text-xs text-gray-700 dark:text-gray-300">
-                  {message.bodyHtml ? (
-                    <div
-                      className="prose prose-xs dark:prose-invert max-w-none"
-                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(message.bodyHtml) }}
-                    />
-                  ) : (
-                    <pre className="font-sans whitespace-pre-wrap">{message.bodyText}</pre>
-                  )}
-                </div>
-                <span className="mt-1 flex items-center gap-1 text-xs text-blue-500">
-                  Show less <ChevronUpIcon className="inline h-3 w-3" />
-                </span>
-              </div>
+        {(snippet || message.bodyHtml) && (
+          <>
+            {expanded && (
+              message.bodyText
+                ? <p className="text-text-2 whitespace-pre-wrap break-words text-sm">{message.bodyText}</p>
+                : <div className="prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(message.bodyHtml ?? '', { allowImages: false }) }} />
             )}
-          </button>
+            <button type="button" aria-expanded={expanded} onClick={() => setExpanded((v) => !v)}
+              className="text-accent mt-1 flex items-center gap-1 text-start text-sm">
+              {expanded
+                ? <>{st({ 'zh-CN': '收起正文', en: 'Hide message' })}<ChevronUpIcon className="h-3 w-3" /></>
+                : <>{snippet || st({ 'zh-CN': '展开正文', en: 'Show message' })}<ChevronDownIcon className="h-3 w-3 shrink-0" /></>}
+            </button>
+          </>
         )}
 
         {/* Tracking stats for outbound */}
@@ -131,20 +120,32 @@ function EmailTimelineItem({ message }: EmailTimelineItemProps) {
 }
 
 export default function EmailTimeline({ modelCode, recordPid }: EmailTimelineProps) {
+  const st = useSmartText();
   const [messages, setMessages] = useState<EmailMessage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
-    getMessagesByRecord(modelCode, recordPid)
-      .then(setMessages)
-      .catch(() => {
-        /* non-critical */
+    setError(false);
+    getMessagesByRecord(modelCode, recordPid, page)
+      .then((records) => {
+        if (cancelled) return;
+        setMessages((previous) => page === 1 ? records : [
+          ...previous, ...records.filter((record) => !previous.some((saved) => saved.id === record.id)),
+        ]);
+        setHasMore(records.length === 10);
       })
-      .finally(() => setLoading(false));
-  }, [modelCode, recordPid]);
+      .catch(() => { if (!cancelled) setError(true); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [modelCode, recordPid, page, attempt]);
 
-  if (loading) {
+  if (loading && !messages.length) {
     return (
       <div className="flex items-center justify-center py-6" data-testid="email-timeline-loading">
         <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
@@ -152,14 +153,14 @@ export default function EmailTimeline({ modelCode, recordPid }: EmailTimelinePro
     );
   }
 
-  if (messages.length === 0) {
+  if (!error && messages.length === 0) {
     return (
       <div
         className="flex flex-col items-center justify-center py-8 text-center"
         data-testid="email-timeline-empty"
       >
         <EnvelopeIcon className="mb-2 h-8 w-8 text-gray-300 dark:text-gray-600" />
-        <p className="text-sm text-gray-400 dark:text-gray-500">No emails linked</p>
+        <p className="text-text-2 text-sm">{st({ 'zh-CN': '暂无关联邮件', en: 'No linked emails' })}</p>
       </div>
     );
   }
@@ -169,6 +170,19 @@ export default function EmailTimeline({ modelCode, recordPid }: EmailTimelinePro
       {messages.map((message) => (
         <EmailTimelineItem key={message.id} message={message} />
       ))}
+      {error ? (
+        <div role="alert" className="text-text-2 text-sm" data-testid="email-timeline-error">
+          {st({ 'zh-CN': '无法加载关联邮件。', en: 'Unable to load linked emails.' })}
+          <button type="button" onClick={() => setAttempt((value) => value + 1)} className="text-accent ms-2">
+            {st({ 'zh-CN': '重试', en: 'Retry' })}
+          </button>
+        </div>
+      ) : hasMore && (
+        <button type="button" disabled={loading} onClick={() => setPage((value) => value + 1)}
+          className="text-accent text-sm">
+          {st({ 'zh-CN': '加载更多', en: 'Load more' })}
+        </button>
+      )}
     </div>
   );
 }

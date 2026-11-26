@@ -13,6 +13,7 @@ import com.auraboot.framework.integration.BaseIntegrationTest;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,6 +48,9 @@ class EmailRecordLinkServiceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private EmailAccountMapper emailAccountMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private final String runId = "erl-" + System.currentTimeMillis();
 
@@ -187,5 +191,41 @@ class EmailRecordLinkServiceIntegrationTest extends BaseIntegrationTest {
         assertThat(deleted).isNull();
 
         log.info("ERL-03 PASS: linkId={} deleted from database", linkId);
+    }
+
+    @Test
+    @Order(4)
+    void timelineMatchesRecordAndCurrentMailboxMembershipBeforePaging() {
+        String model = "customer_record";
+        String recordPid = "timeline-" + runId;
+        Long accountOwner = MetaContext.getCurrentUserId();
+        long otherUser = accountOwner + 1_000_000;
+        emailRecordLinkService.manualLink(testTenantId, testMessageId, "gmail-thread-" + runId, model, recordPid);
+
+        assertThat(emailRecordLinkMapper.findMessagesByRecord(testTenantId, accountOwner, model, recordPid, 0, 1))
+                .extracting(EmailMessage::getId).containsExactly(testMessageId);
+        assertThat(emailRecordLinkMapper.findMessagesByRecord(testTenantId, accountOwner, model, recordPid, 1, 1))
+                .isEmpty();
+        assertThat(emailRecordLinkMapper.findMessagesByRecord(testTenantId, otherUser, model, recordPid, 0, 1))
+                .isEmpty();
+        assertThat(emailRecordLinkMapper.findMessagesByRecord(testTenantId + 1, accountOwner, model, recordPid, 0, 1))
+                .isEmpty();
+        assertThat(emailRecordLinkMapper.findMessagesByRecord(testTenantId, accountOwner, model, recordPid + "-other", 0, 1))
+                .isEmpty();
+
+        jdbcTemplate.update("UPDATE ab_email_account SET account_type = 'shared' WHERE id = ?", testAccountId);
+        assertThat(emailRecordLinkMapper.findMessagesByRecord(testTenantId, otherUser, model, recordPid, 0, 1))
+                .isEmpty();
+        jdbcTemplate.update("INSERT INTO ab_email_account_member(account_id, user_id, role) VALUES (?, ?, 'member')",
+                testAccountId, otherUser);
+        try {
+            assertThat(emailRecordLinkMapper.findMessagesByRecord(testTenantId, otherUser, model, recordPid, 0, 1))
+                    .extracting(EmailMessage::getId).containsExactly(testMessageId);
+        } finally {
+            jdbcTemplate.update("DELETE FROM ab_email_account_member WHERE account_id = ? AND user_id = ?",
+                    testAccountId, otherUser);
+        }
+        assertThat(emailRecordLinkMapper.findMessagesByRecord(testTenantId, otherUser, model, recordPid, 0, 1))
+                .isEmpty();
     }
 }

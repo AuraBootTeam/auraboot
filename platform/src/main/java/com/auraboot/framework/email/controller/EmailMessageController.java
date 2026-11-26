@@ -254,13 +254,12 @@ public class EmailMessageController {
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "10") int pageSize) {
 
-        Long tenantId = MetaContext.getCurrentTenantId();
         pageNum = PaginationSafetyUtils.pageNumber(pageNum);
         pageSize = PaginationSafetyUtils.pageSize(pageSize, 100);
 
         int offset = PaginationSafetyUtils.offset(pageNum, pageSize, 100);
         List<EmailMessage> messages = emailRecordLinkService.findMessagesByRecord(
-                tenantId, modelCode, recordPid, pageSize, offset);
+                modelCode, recordPid, offset, pageSize);
 
         return ApiResponse.ok(Map.of(
                 "records", messages,

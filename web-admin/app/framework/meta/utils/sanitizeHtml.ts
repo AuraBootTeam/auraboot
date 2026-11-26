@@ -12,14 +12,14 @@ import DOMPurify from 'dompurify';
  * @param html - Raw HTML string to sanitize
  * @returns Sanitized HTML string safe for dangerouslySetInnerHTML
  */
-export function sanitizeHtml(html: string): string {
+export function sanitizeHtml(html: string, { allowImages = true } = {}): string {
   if (!html) return '';
   return DOMPurify.sanitize(html, {
     ALLOWED_TAGS: [
       'b', 'i', 'em', 'strong', 'u', 's', 'strike', 'del',
       'p', 'br', 'hr', 'div', 'span',
       'ul', 'ol', 'li',
-      'a', 'img',
+      'a', ...(allowImages ? ['img'] : []),
       'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
       'table', 'thead', 'tbody', 'tr', 'th', 'td',
       'pre', 'code', 'blockquote',
