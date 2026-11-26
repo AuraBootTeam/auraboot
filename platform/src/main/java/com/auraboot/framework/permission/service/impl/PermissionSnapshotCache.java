@@ -16,6 +16,7 @@ import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -138,6 +139,29 @@ public class PermissionSnapshotCache {
                     () -> permissionMapper.findByTenantIdAndCode(tenantId, normalized));
         }
         return getPermissionCatalog(tenantId).definitionsByNormalizedCode().get(normalized);
+    }
+
+    /** Batch uncached aliases within the current authorization read. Values never enter a shared cache. */
+    public void preloadFreshPermissionDefinitions(Long tenantId, Collection<String> codes) {
+        Map<FreshLookupKey, Object> values = freshReadValues.get();
+        if (values == null || tenantId == null || codes.size() < 2 || codes.size() > 128) return;
+        var domain = getDomainPermissionCatalog(tenantId).definitionsByNormalizedCode();
+        List<String> missing = codes.stream()
+                .filter(code -> code != null && !code.isBlank())
+                .map(this::normalizePermissionCode)
+                .distinct()
+                .filter(code -> !domain.containsKey(code) && !values.containsKey(permissionDefinitionLookup(tenantId, code)))
+                .toList();
+        if (missing.size() < 2) return;
+        var definitions = catalog(permissionMapper.findResolvableDefinitionsByCodes(tenantId, missing))
+                .definitionsByNormalizedCode();
+        for (String code : missing) {
+            values.put(permissionDefinitionLookup(tenantId, code), definitions.get(code));
+        }
+    }
+
+    private static FreshLookupKey permissionDefinitionLookup(Long tenantId, String normalizedCode) {
+        return new FreshLookupKey(PERMISSION_CATALOG_CACHE, new PermissionDefinitionKey(tenantId, normalizedCode));
     }
 
     public Set<String> resolvePermissionCodes(Long tenantId, Set<Long> permissionIds) {

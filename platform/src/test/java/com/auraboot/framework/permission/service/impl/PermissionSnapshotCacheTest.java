@@ -637,6 +637,28 @@ class PermissionSnapshotCacheTest {
     }
 
     @Test
+    void preloadsAliasesAndMissesOnlyForTheCurrentFreshRead() {
+        var alias = permission(905L, "model.test.read");
+        when(permissionMapper.findResolvableDefinitionsByCodes(100L, List.of("model.test.read", "test:read")))
+                .thenReturn(List.of(alias));
+        when(permissionMapper.findByTenantIdAndCode(100L, "test:read"))
+                .thenReturn(permission(906L, "test:read"));
+
+        cache.withFreshReads(() -> {
+            var aliases = List.of("MODEL.TEST.READ", "model.test.read", "test:read");
+            cache.preloadFreshPermissionDefinitions(100L, aliases);
+            cache.preloadFreshPermissionDefinitions(100L, aliases);
+            assertThat(cache.resolvePermissionId(100L, "Model.Test.Read")).isEqualTo(905L);
+            assertThat(cache.resolvePermissionId(100L, "test:read")).isNull();
+            return null;
+        });
+
+        assertThat(cache.withFreshReads(() -> cache.resolvePermissionId(100L, "test:read"))).isEqualTo(906L);
+        verify(permissionMapper).findResolvableDefinitionsByCodes(100L, List.of("model.test.read", "test:read"));
+        verify(permissionMapper, never()).findByTenantIdAndCode(100L, "model.test.read");
+    }
+
+    @Test
     void freshDomainOwnershipStillRejectsMalformedPublishedPolicies() {
         Permission invalid = permission(901L, "example.cap.read");
         invalid.setExtension(Map.of("domainModels", "invalid"));

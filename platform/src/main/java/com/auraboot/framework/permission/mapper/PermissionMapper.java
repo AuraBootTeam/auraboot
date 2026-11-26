@@ -34,7 +34,7 @@ public interface PermissionMapper extends BaseMapper<Permission> {
         FROM ab_permission
         WHERE tenant_id = #{tenantId}
           AND (deleted_flag = false OR deleted_flag IS NULL)
-        ORDER BY created_at DESC
+        ORDER BY created_at DESC, id DESC
         """)
     @ResultMap("mybatis-plus_Permission")
     List<Permission> findResolvableDefinitions(@Param("tenantId") Long tenantId);
@@ -52,7 +52,7 @@ public interface PermissionMapper extends BaseMapper<Permission> {
                     AND (d.deleted_flag = false OR d.deleted_flag IS NULL)
                     AND jsonb_exists(d.extension, 'domainModels')
               )
-            ORDER BY LOWER(p.code), p.created_at DESC
+            ORDER BY LOWER(p.code), p.created_at DESC, p.id DESC
         ) current_definitions
         WHERE jsonb_exists(extension, 'domainModels')
         ORDER BY created_at DESC
@@ -89,12 +89,30 @@ public interface PermissionMapper extends BaseMapper<Permission> {
         WHERE tenant_id = #{tenantId}
           AND LOWER(code) = LOWER(#{code})
           AND (deleted_flag = false OR deleted_flag IS NULL)
-        ORDER BY created_at DESC
+        ORDER BY created_at DESC, id DESC
         LIMIT 1
         """)
     @ResultMap("mybatis-plus_Permission")
     Permission findByTenantIdAndCode(@Param("tenantId") Long tenantId,
                                      @Param("code") String code);
+
+    /** Resolve a bounded set of aliases using the same tenant and version precedence as a point lookup. */
+    @Select("""
+        <script>
+        SELECT DISTINCT ON (LOWER(code)) *
+        FROM ab_permission
+        WHERE tenant_id = #{tenantId}
+          AND (deleted_flag = false OR deleted_flag IS NULL)
+          AND LOWER(code) IN
+          <foreach item="code" collection="codes" open="(" separator="," close=")">
+              #{code}
+          </foreach>
+        ORDER BY LOWER(code), created_at DESC, id DESC
+        </script>
+        """)
+    @ResultMap("mybatis-plus_Permission")
+    List<Permission> findResolvableDefinitionsByCodes(@Param("tenantId") Long tenantId,
+                                                       @Param("codes") List<String> codes);
 
     /**
      * Find permissions by resource type

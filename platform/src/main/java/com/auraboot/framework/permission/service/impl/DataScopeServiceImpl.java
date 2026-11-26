@@ -392,7 +392,7 @@ public class DataScopeServiceImpl implements DataScopeService {
      * Note: created_by stores userId, not memberId.
      */
     private DataScopeCondition buildSelfCondition(String resourceCode) {
-        String ownerField = getDataScopeOwnerField(resourceCode);
+        String ownerField = dataScopeField(getDataScopeConfig(resourceCode), "ownerField", DEFAULT_OWNER_FIELD);
         Object ownerValue = resolveOwnerValue(resourceCode, ownerField);
         if (ownerValue == null) {
             // String owner column but no userPid in context: deny rather than emit broken SQL
@@ -477,9 +477,10 @@ public class DataScopeServiceImpl implements DataScopeService {
             return strict ? DataScopeCondition.none() : buildSelfCondition(resourceCode);
         }
 
-        String ownerField = getDataScopeOwnerField(resourceCode);
-        String deptField = getDataScopeDeptField(resourceCode);
-        String deptOwnerField = getDataScopeDeptOwnerField(resourceCode);
+        var config = getDataScopeConfig(resourceCode);
+        String ownerField = dataScopeField(config, "ownerField", DEFAULT_OWNER_FIELD);
+        String deptField = dataScopeField(config, "departmentField", DEFAULT_DEPT_FIELD);
+        String deptOwnerField = optionalDataScopeField(config, "departmentOwnerField");
         String scopeTypeCode = includeSub ? DataScopeType.DEPT_AND_SUB.code() : DataScopeType.DEPT.code();
         return new DataScopeCondition(
                 scopeTypeCode,
@@ -507,7 +508,8 @@ public class DataScopeServiceImpl implements DataScopeService {
     }
 
     private DataScopeCondition buildTeamCondition(Long memberId, String resourceCode, boolean strict, boolean recordScope) {
-        String teamField = getDataScopeTeamField(resourceCode);
+        var config = getDataScopeConfig(resourceCode);
+        String teamField = optionalDataScopeField(config, "teamField");
         if (recordScope && teamField == null) {
             log.warn("TEAM data scope on {} has no extension.dataScope.teamField; denying", resourceCode);
             return DataScopeCondition.none();
@@ -523,7 +525,7 @@ public class DataScopeServiceImpl implements DataScopeService {
             log.warn("Member {} belongs to no team, team inputs unavailable", memberId);
             return strict ? DataScopeCondition.none() : buildSelfCondition(resourceCode);
         }
-        String ownerField = getDataScopeOwnerField(resourceCode);
+        String ownerField = dataScopeField(config, "ownerField", DEFAULT_OWNER_FIELD);
         return new DataScopeCondition(
                 DataScopeType.TEAM.code(),
                 ownerField,
@@ -544,96 +546,34 @@ public class DataScopeServiceImpl implements DataScopeService {
     /** Default department field when no dataScope config is present on the model */
     private static final String DEFAULT_DEPT_FIELD = "org_emp_dept_id";
 
-    /**
-     * Read the ownerField from model extension.dataScope config.
-     * Falls back to "created_by" if not configured.
-     *
-     * <p>Expected model extension format:
-     * <pre>
-     * {
-     *   "dataScope": {
-     *     "ownerField": "crm_account_owner_id",
-     *     "departmentField": "crm_account_dept_id"
-     *   }
-     * }
-     * </pre>
-     */
-    @SuppressWarnings("unchecked")
-    private String getDataScopeOwnerField(String resourceCode) {
-        Map<String, Object> dataScopeConfig = getDataScopeConfig(resourceCode);
-        if (dataScopeConfig == null) {
-            return DEFAULT_OWNER_FIELD;
-        }
-        Object ownerField = dataScopeConfig.get("ownerField");
-        return ownerField != null ? ownerField.toString() : DEFAULT_OWNER_FIELD;
+    private static String dataScopeField(Map<?, ?> config, String name, String defaultField) {
+        Object field = config.get(name);
+        return field == null ? defaultField : field.toString();
     }
 
-    /**
-     * Read the departmentField from model extension.dataScope config.
-     * Falls back to "org_emp_dept_id" if not configured.
-     */
-    @SuppressWarnings("unchecked")
-    private String getDataScopeDeptField(String resourceCode) {
-        Map<String, Object> dataScopeConfig = getDataScopeConfig(resourceCode);
-        if (dataScopeConfig == null) {
-            return DEFAULT_DEPT_FIELD;
-        }
-        Object deptField = dataScopeConfig.get("departmentField");
-        return deptField != null ? deptField.toString() : DEFAULT_DEPT_FIELD;
+    private static String optionalDataScopeField(Map<?, ?> config, String name) {
+        String field = dataScopeField(config, name, null);
+        return field == null || field.isBlank() ? null : field;
     }
 
-    /**
-     * Read the team field from model extension.dataScope config.
-     * Returns null when unset — TEAM scope is opt-in per model (no default column).
-     */
-    private String getDataScopeTeamField(String resourceCode) {
-        Map<String, Object> dataScopeConfig = getDataScopeConfig(resourceCode);
-        if (dataScopeConfig == null) {
-            return null;
-        }
-        Object field = dataScopeConfig.get("teamField");
-        return field != null && !field.toString().isBlank() ? field.toString() : null;
-    }
-
-    /**
-     * Read an owner field whose user PID should be resolved through org employee membership.
-     * This takes precedence over departmentField when configured.
-     */
-    private String getDataScopeDeptOwnerField(String resourceCode) {
-        Map<String, Object> dataScopeConfig = getDataScopeConfig(resourceCode);
-        if (dataScopeConfig == null) {
-            return null;
-        }
-        Object field = dataScopeConfig.get("departmentOwnerField");
-        return field != null && !field.toString().isBlank() ? field.toString() : null;
-    }
-
-    /**
-     * Get the dataScope config map from the model's extension.
-     * Returns null if model not found or dataScope not configured.
-     */
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> getDataScopeConfig(String resourceCode) {
+    private Map<?, ?> getDataScopeConfig(String resourceCode) {
         // CATCH: non-transactional helper, safe to handle — model lookup may fail for non-existent codes
         try {
             var modelOpt = metaModelService.getModelDefinition(resourceCode);
             if (modelOpt.isEmpty()) {
-                return null;
+                return Map.of();
             }
             // Preserve the fresh current-model policy source without presentation statistics.
             var extension = metaModelService.findExtensionByCode(resourceCode);
             if (extension == null) {
-                return null;
+                return Map.of();
             }
             Object dataScopeObj = extension.get("dataScope");
-            if (dataScopeObj instanceof Map) {
-                return (Map<String, Object>) dataScopeObj;
-            }
-            return null;
+            return dataScopeObj instanceof Map<?, ?> config ? config : Map.of();
         } catch (Exception e) {
             // codeql[java/log-injection] Resource codes are validated metadata identifiers and are logged as structured parameters only.
             log.debug("Could not load dataScope config for model {}: {}", resourceCode, e.getMessage());
-            return null;
+            return Map.of();
         }
     }
 }

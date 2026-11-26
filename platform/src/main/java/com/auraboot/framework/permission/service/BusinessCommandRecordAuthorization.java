@@ -272,6 +272,7 @@ public class BusinessCommandRecordAuthorization {
     private BusinessGrantDecision evaluateSnapshot(Long member, List<String> codes, String model, Map<String, Object> record,
                                                   String nativeAction, boolean ordinaryModelAction) {
         var tenant = MetaContext.getCurrentTenantId();
+        snapshots.preloadFreshPermissionDefinitions(tenant, codes);
         List<EvaluationStep> trace = new ArrayList<>();
         List<BusinessGrantDecision.Grant> matched = new ArrayList<>();
         java.util.function.Supplier<Boolean> sharedRecord = new java.util.function.Supplier<>() {
@@ -394,8 +395,10 @@ public class BusinessCommandRecordAuthorization {
         // Generated model bindings can carry existing field/row restrictions even when the plugin
         // never listed them in permissions.json. They are constraints, never fallback authority.
         codes.addAll(com.auraboot.framework.permission.engine.evaluator.PermissionCodeCandidates.forResourceAction(model, action));
+        Long tenant = MetaContext.getCurrentTenantId();
+        snapshots.preloadFreshPermissionDefinitions(tenant, codes);
         for (String code : codes) {
-            var definition = permissionDefinition(MetaContext.getCurrentTenantId(), code);
+            var definition = permissionDefinition(tenant, code);
             if (definition == null && !declared.contains(code)) continue;
             if (definition == null || !model.equals(definition.getResourceCode())) return java.util.Optional.empty();
             String policyAction = definition.getAction();

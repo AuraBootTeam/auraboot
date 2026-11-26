@@ -194,6 +194,19 @@ class PermissionServiceIntegrationTest {
 
     // ==================== Tests ====================
 
+    @Test
+    @Order(0)
+    void batchedPermissionCodesUseTheSamePrecedenceAndDeletionRulesAsPointQueries() {
+        var active = permissionService.create(buildCreateRequest("batch_active" + testSuffix));
+        var deleted = permissionService.create(buildCreateRequest("batch_deleted" + testSuffix));
+        permissionService.delete(deleted.getId());
+
+        assertThat(permissionMapper.findResolvableDefinitionsByCodes(
+                testTenant.getId(), List.of(active.getCode(), deleted.getCode(), "batch_missing" + testSuffix)))
+                .extracting(Permission::getId)
+                .containsExactly(permissionMapper.findByTenantIdAndCode(testTenant.getId(), active.getCode()).getId());
+    }
+
     /**
      * PS-01: create permission with valid request persists with correct fields.
      */
