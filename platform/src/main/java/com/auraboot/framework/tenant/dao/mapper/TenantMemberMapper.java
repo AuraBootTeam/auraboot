@@ -15,6 +15,39 @@ import java.util.List;
 @Mapper
 public interface TenantMemberMapper extends BaseMapper<TenantMember> {
 
+    /** Only owner identities for the actor's department filter. No employee record fields are returned. */
+    @Select("""
+            WITH RECURSIVE department_scope(pid) AS (
+                SELECT d.pid
+                FROM ab_tenant_member actor
+                JOIN mt_org_employee e ON e.tenant_id = actor.tenant_id
+                    AND e.org_emp_member_id = actor.pid AND e.deleted_flag = FALSE
+                JOIN mt_org_department d ON d.tenant_id = actor.tenant_id
+                    AND d.pid = e.org_emp_dept_id AND d.deleted_flag = FALSE
+                WHERE actor.tenant_id = #{tenantId} AND actor.id = #{memberId}
+                    AND actor.user_id = #{userId} AND actor.status = 'active'
+                    AND actor.deleted_flag = FALSE
+                UNION
+                SELECT child.pid
+                FROM mt_org_department child
+                JOIN department_scope parent ON child.org_dept_parent_id = parent.pid
+                WHERE child.tenant_id = #{tenantId} AND child.deleted_flag = FALSE
+                    AND #{includeSubDepartments}
+            )
+            SELECT DISTINCT u.pid
+            FROM department_scope d
+            JOIN mt_org_employee e ON e.tenant_id = #{tenantId}
+                AND e.org_emp_dept_id = d.pid AND e.deleted_flag = FALSE
+            JOIN ab_user u ON u.pid = e.org_emp_user_id AND u.deleted_flag = FALSE
+            JOIN ab_tenant_member member ON member.tenant_id = #{tenantId}
+                AND member.user_id = u.id AND member.status = 'active' AND member.deleted_flag = FALSE
+            ORDER BY u.pid
+            """)
+    List<String> findDepartmentOwnerPids(@Param("tenantId") Long tenantId,
+                                        @Param("memberId") Long memberId,
+                                        @Param("userId") Long userId,
+                                        @Param("includeSubDepartments") boolean includeSubDepartments);
+
     /**
      * 根据租户ID查询成员列表
      */

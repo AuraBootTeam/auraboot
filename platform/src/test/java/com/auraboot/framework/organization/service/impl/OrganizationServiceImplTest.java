@@ -11,6 +11,7 @@ import com.auraboot.framework.rbac.entity.UserRole;
 import com.auraboot.framework.rbac.service.RoleService;
 import com.auraboot.framework.rbac.service.UserRoleService;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
+import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
@@ -27,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,6 +39,7 @@ class OrganizationServiceImplTest {
     @Mock private RoleService roleService;
     @Mock private UserRoleService userRoleService;
     @Mock private TenantMemberService tenantMemberService;
+    @Mock private TenantMemberMapper tenantMemberMapper;
 
     @InjectMocks private OrganizationServiceImpl service;
 
@@ -156,50 +159,27 @@ class OrganizationServiceImplTest {
     }
 
     @Test
-    @DisplayName("getCurrentDepartmentUserPids resolves current member, descendants and every employee page")
+    @DisplayName("getCurrentDepartmentUserPids binds the current actor and never reads HR records")
     void getCurrentDepartmentUserPids() {
         MetaContext.setContext(9L, 7L, "current-user", "tester");
         MetaContext.setMemberId(5L);
-        TenantMember member = new TenantMember();
-        member.setPid("member-5");
-        when(tenantMemberService.getById(5L)).thenReturn(member);
+        when(tenantMemberMapper.findDepartmentOwnerPids(9L, 5L, 7L, true))
+                .thenReturn(List.of("current-user", "peer-user"));
+        when(tenantMemberMapper.findDepartmentOwnerPids(9L, 5L, 7L, false))
+                .thenReturn(List.of("current-user"));
 
-        Map<String, Object> current = emp("current-emp", "d1", null);
-        current.put("org_emp_member_id", "member-5");
-        current.put("org_emp_user_id", "current-user");
-        Map<String, Object> peer = emp("peer-emp", "d1-child", null);
-        peer.put("org_emp_user_id", "peer-user");
-
-        Map<String, Object> root = dept("d1", "root", null, null);
-        Map<String, Object> child = dept("d1-child", "child", "d1", null);
-        when(dynamicDataService.list(eq("org_department"), any(DynamicQueryRequest.class)))
-            .thenReturn(page(List.of(root, child)));
-        when(dynamicDataService.list(eq("org_employee"), any(DynamicQueryRequest.class)))
-            .thenAnswer(invocation -> {
-                DynamicQueryRequest request = invocation.getArgument(1);
-                if (request.getPageSize() == 1) {
-                    return page(List.of(current));
-                }
-                if (request.getConditions() == null) {
-                    return page(List.of()); // employee counts during department-tree build
-                }
-                assertEquals(List.of("d1", "d1-child"), request.getConditions().getFirst().getValues());
-                return page(List.of(current, peer));
-            });
-
-        assertEquals(List.of("current-user", "peer-user"),
-                service.getCurrentDepartmentUserPids(true));
+        assertEquals(List.of("current-user", "peer-user"), service.getCurrentDepartmentUserPids(true));
+        assertEquals(List.of("current-user"), service.getCurrentDepartmentUserPids(false));
+        verifyNoInteractions(dynamicDataService);
     }
 
     @Test
-    @DisplayName("getCurrentDepartmentUserPids fails closed without a linked member or department")
-    void getCurrentDepartmentUserPidsMissingLink() {
+    @DisplayName("getCurrentDepartmentUserPids fails closed without a member in context")
+    void getCurrentDepartmentUserPidsMissingMember() {
         assertTrue(service.getCurrentDepartmentUserPids(true).isEmpty());
-
         MetaContext.setContext(9L, 7L, "current-user", "tester");
-        MetaContext.setMemberId(5L);
-        when(tenantMemberService.getById(5L)).thenReturn(null);
         assertTrue(service.getCurrentDepartmentUserPids(true).isEmpty());
+        verifyNoInteractions(tenantMemberMapper, dynamicDataService);
     }
 
     @Test

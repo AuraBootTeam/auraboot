@@ -13,6 +13,7 @@ import com.auraboot.framework.rbac.entity.UserRole;
 import com.auraboot.framework.rbac.service.RoleService;
 import com.auraboot.framework.rbac.service.UserRoleService;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
+import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -66,6 +67,7 @@ public class OrganizationServiceImpl implements OrganizationService {
     private final RoleService roleService;
     private final UserRoleService userRoleService;
     private final TenantMemberService tenantMemberService;
+    private final TenantMemberMapper tenantMemberMapper;
 
     @Override
     public List<DepartmentTreeNode> getDepartmentTree(Long tenantId) {
@@ -153,44 +155,12 @@ public class OrganizationServiceImpl implements OrganizationService {
 
     @Override
     public List<String> getCurrentDepartmentUserPids(boolean includeSubDepartments) {
-        String currentDeptPid = getCurrentDepartmentPid();
-        if (currentDeptPid == null) {
+        if (!MetaContext.exists() || MetaContext.getCurrentTenantId() == null
+                || MetaContext.getCurrentMemberId() == null || MetaContext.getCurrentUserId() == null) {
             return List.of();
         }
-
-        List<String> deptPids = includeSubDepartments
-                ? getDeptAndSubPids(currentDeptPid)
-                : List.of(currentDeptPid);
-        if (deptPids.isEmpty()) {
-            return List.of();
-        }
-
-        LinkedHashSet<String> userPids = new LinkedHashSet<>();
-        int pageNum = 1;
-        int totalPages;
-        do {
-            DynamicQueryRequest request = DynamicQueryRequest.builder()
-                .pageNum(pageNum)
-                .pageSize(MAX_QUERY_PAGE_SIZE)
-                .conditions(List.of(
-                    QueryCondition.builder()
-                        .fieldName(EMP_DEPT_ID)
-                        .operator(QueryCondition.Operator.IN)
-                        .values(new ArrayList<>(deptPids))
-                        .build()
-                ))
-                .build();
-            PaginationResult<Map<String, Object>> result = dynamicDataService.list(MODEL_EMPLOYEE, request);
-            for (Map<String, Object> employee : Optional.ofNullable(result.getRecords()).orElse(List.of())) {
-                String userPid = asString(employee.get(EMP_USER_ID));
-                if (userPid != null && !userPid.isBlank()) {
-                    userPids.add(userPid);
-                }
-            }
-            totalPages = result.getTotalPages() != null ? result.getTotalPages() : 0;
-            pageNum++;
-        } while (pageNum <= totalPages);
-        return List.copyOf(userPids);
+        return tenantMemberMapper.findDepartmentOwnerPids(MetaContext.getCurrentTenantId(),
+                MetaContext.getCurrentMemberId(), MetaContext.getCurrentUserId(), includeSubDepartments);
     }
 
     @Override
