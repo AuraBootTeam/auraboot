@@ -109,12 +109,12 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
     return (
       <div className="px-4 py-8 text-center text-sm" data-testid="field-history-empty">
         <p className="text-text-2 font-medium">
-          {locale === 'zh-CN' ? '暂无变更记录' : 'No change history'}
+          {locale === 'zh-CN' ? '暂无字段变更记录' : 'No field changes recorded'}
         </p>
         <p className="text-text-3 mt-1">
           {locale === 'zh-CN'
-            ? '字段变更后，可在这里查看修改人、时间和前后值。'
-            : 'Field changes will show who made the change, when, and both values.'}
+            ? '这里显示已启用审计字段的修改人、时间和前后值。'
+            : 'Changes to audited fields show who made the change, when, and both values.'}
         </p>
       </div>
     );

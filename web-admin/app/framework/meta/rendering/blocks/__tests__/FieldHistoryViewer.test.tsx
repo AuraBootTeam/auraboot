@@ -47,7 +47,9 @@ describe('field history API contract and business feedback', () => {
   it('distinguishes a successful empty history from failure', async () => {
     request.mockResolvedValue({ code: '0', desc: 'OK', data: [] });
     render(<FieldHistoryViewer modelCode="inv_lot" recordPid={pid} locale="en-US" />);
-    expect(await screen.findByTestId('field-history-empty')).toHaveTextContent('No change history');
+    const empty = await screen.findByTestId('field-history-empty');
+    expect(empty).toHaveTextContent('No field changes recorded');
+    expect(empty).toHaveTextContent('Changes to audited fields');
     expect(screen.queryByTestId('field-history-error')).not.toBeInTheDocument();
   });
 });
