@@ -107,8 +107,15 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
   const visibleChanges = changes.filter(change => (!fields || fields.includes(change.fieldCode)) && (!compact || change.changeType.toLowerCase() === 'modified'));
   if (visibleChanges.length === 0) {
     return (
-      <div className="text-text-3 py-12 text-center text-sm" data-testid="field-history-empty">
-        {locale === 'zh-CN' ? '暂无变更记录' : 'No change history'}
+      <div className="px-4 py-8 text-center text-sm" data-testid="field-history-empty">
+        <p className="text-text-2 font-medium">
+          {locale === 'zh-CN' ? '暂无变更记录' : 'No change history'}
+        </p>
+        <p className="text-text-3 mt-1">
+          {locale === 'zh-CN'
+            ? '字段变更后，可在这里查看修改人、时间和前后值。'
+            : 'Field changes will show who made the change, when, and both values.'}
+        </p>
       </div>
     );
   }

@@ -284,21 +284,18 @@ export function renderDetailPageView({
     </svg>
   );
 
-  const nativeActions = effectiveHeaderToolbar?.buttons?.length ? (
-    <DetailActionButtons
-      buttons={effectiveHeaderToolbar.buttons}
-      modelCode={schema?.modelCode || tableName}
-      recordData={recordData}
-      hasPermission={hasPermission}
-      evaluateVisibleWhen={evaluateVisibleWhen}
-      actionLoading={actionLoading}
-      resolveButtonLabel={resolveButtonLabel}
-      handleAction={handleAction}
-      locale={locale}
-      t={t}
-      placement={presentation ? 'footer' : 'header'}
-    />
-  ) : null;
+  const detailActionProps = {
+    buttons: effectiveHeaderToolbar?.buttons ?? [],
+    modelCode: schema?.modelCode || tableName,
+    recordData,
+    hasPermission,
+    evaluateVisibleWhen,
+    actionLoading,
+    resolveButtonLabel,
+    handleAction,
+    locale,
+    t,
+  };
 
   const showShare = schema.extension?.showShare !== false && canManageRecordShares;
   const reportRecordPid = schema.extension?.showReport !== false ? recordData?.pid : undefined;
@@ -479,25 +476,16 @@ export function renderDetailPageView({
 
             {/* Header toolbar buttons */}
             <div
-              className={
-                hasUtilityMenu ? `${headerLayout.actions} sm:ml-auto` : headerLayout.actions
-              }
+              className={`relative ${headerLayout.actions} ${hasUtilityMenu ? 'sm:ml-auto' : ''}`}
               data-print="hide"
             >
               {keepShareVisible && shareAction}
-              {hasUtilityMenu ? (
-                <details className="relative">
-                  <summary className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover cursor-pointer list-none border px-3 py-1.5 text-sm font-medium">
-                    {getLocalizedText({ 'zh-CN': '更多操作', en: 'More actions' }, locale, t)}
-                  </summary>
-                  <div className="rounded-card border-border bg-panel absolute left-0 z-30 mt-2 flex w-max max-w-[min(20rem,75vw)] flex-wrap gap-2 border p-2 shadow-lg sm:right-0 sm:left-auto">
-                    {utilityActions}
-                  </div>
-                </details>
-              ) : (
-                utilityActions
-              )}
-              {!presentation && nativeActions}
+              {!hasUtilityMenu && utilityActions}
+              <DetailActionButtons
+                {...detailActionProps}
+                buttons={presentation ? [] : detailActionProps.buttons}
+                overflowUtilities={hasUtilityMenu ? utilityActions : undefined}
+              />
             </div>
           </div>
         </div>
@@ -1001,7 +989,7 @@ export function renderDetailPageView({
             >
               {closeLabel}
             </button>
-            {nativeActions}
+            <DetailActionButtons {...detailActionProps} placement="footer" />
           </div>,
           presentation.footerTarget,
         )}

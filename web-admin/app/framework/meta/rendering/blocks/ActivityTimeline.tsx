@@ -277,8 +277,15 @@ const LegacyActivityTimeline: React.FC<LegacyActivityTimelineProps> = ({
 
   if (activities.length === 0) {
     return (
-      <div className="text-text-3 py-12 text-center text-sm" data-testid="activity-timeline-empty">
-        {locale === 'zh-CN' ? '暂无活动记录' : 'No activities yet'}
+      <div className="px-4 py-8 text-center text-sm" data-testid="activity-timeline-empty">
+        <p className="text-text-2 font-medium">
+          {locale === 'zh-CN' ? '暂无活动记录' : 'No activities yet'}
+        </p>
+        <p className="text-text-3 mt-1">
+          {locale === 'zh-CN'
+            ? '与此记录关联的跟进和任务会按时间显示在这里。'
+            : 'Related interactions and tasks will appear here in chronological order.'}
+        </p>
       </div>
     );
   }

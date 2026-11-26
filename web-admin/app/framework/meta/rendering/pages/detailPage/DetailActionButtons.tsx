@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { isButtonDisabled } from '~/framework/meta/utils/buttonPermissions';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
@@ -7,7 +8,8 @@ import type { RecordData } from './detailPageTypes';
 
 export interface DetailActionButtonsProps {
   placement?: 'header' | 'footer';
-  buttons: ButtonConfig[];
+  overflowUtilities?: ReactNode;
+  buttons: Array<ButtonConfig & { overflow?: boolean }>;
   modelCode: string;
   recordData: RecordData;
   hasPermission: (permission: string) => boolean;
@@ -32,14 +34,21 @@ export function DetailActionButtons({
   locale,
   t,
   placement = 'header',
+  overflowUtilities,
 }: DetailActionButtonsProps) {
+  const visibleButtons = buttons.filter(
+    (button) =>
+      canRenderDetailToolbarButton(button, hasPermission) &&
+      evaluateVisibleWhen(button.visibleWhen),
+  );
+  const overflowButtons = visibleButtons.filter((button) => button.overflow);
+  const moreLabel = getLocalizedText({ 'zh-CN': '更多操作', en: 'More actions' }, locale, t);
+  const isFooter = placement === 'footer';
   return (
     <>
-      {buttons
-        .filter((button: ButtonConfig) => canRenderDetailToolbarButton(button, hasPermission))
-        .filter((button: ButtonConfig) => evaluateVisibleWhen(button.visibleWhen))
-        .filter((button: ButtonConfig) => !(button as any).overflow)
-        .map((button: ButtonConfig) => (
+      {visibleButtons
+        .filter((button) => !button.overflow)
+        .map((button) => (
           <button
             key={button.code}
             data-testid={`toolbar-btn-${button.code}`}
@@ -57,46 +66,43 @@ export function DetailActionButtons({
             {resolveButtonLabel(button)}
           </button>
         ))}
-      {buttons.some(
-        (button: ButtonConfig) =>
-          (button as any).overflow &&
-          canRenderDetailToolbarButton(button, hasPermission) &&
-          evaluateVisibleWhen(button.visibleWhen),
-      ) && (
-        <details className="relative" data-testid="detail-toolbar-more">
+      {(overflowButtons.length > 0 || overflowUtilities) && (
+        <details className={isFooter ? 'relative' : 'sm:relative'} data-testid="detail-toolbar-more">
           <summary
-            aria-label={getLocalizedText({ 'zh-CN': '更多操作', en: 'More actions' }, locale, t)}
-            className="text-text-2 hover:bg-hover rounded-control flex h-8 w-8 cursor-pointer list-none items-center justify-center text-xl"
+            aria-label={moreLabel}
+            className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover cursor-pointer list-none whitespace-nowrap border px-3 py-1.5 text-sm font-medium"
           >
-            ⋮
+            {moreLabel}
           </summary>
           <div
             data-testid="detail-toolbar-more-menu"
-            className={`border-border bg-panel rounded-card absolute right-0 z-40 max-h-[60vh] min-w-40 overflow-y-auto border p-1 shadow-lg ${placement === 'footer' ? 'bottom-full mb-2' : 'top-10'}`}
+            className={`border-border bg-panel rounded-card absolute right-0 z-40 max-w-[min(20rem,75vw)] min-w-40 border p-1 shadow-lg ${isFooter ? 'bottom-full mb-2' : 'top-10 max-sm:top-full max-sm:mt-2'}`}
           >
-            {buttons
-              .filter(
-                (button: ButtonConfig) =>
-                  (button as any).overflow &&
-                  canRenderDetailToolbarButton(button, hasPermission) &&
-                  evaluateVisibleWhen(button.visibleWhen),
-              )
-              .map((button: ButtonConfig) => (
-                <button
-                  key={button.code}
-                  type="button"
-                  data-testid={`toolbar-btn-${button.code}`}
-                  disabled={isButtonDisabled(button, evaluateVisibleWhen, actionLoading)}
-                  className={`hover:bg-hover block w-full rounded px-3 py-2 text-left text-xs ${button.danger ? 'text-status-red' : 'text-text-2'}`}
-                  onClick={(event) => {
-                    const menu = event.currentTarget.closest('details');
-                    if (menu) menu.open = false;
-                    void handleAction(button, recordData);
-                  }}
-                >
-                  {resolveButtonLabel(button)}
-                </button>
-              ))}
+            {overflowButtons.length > 0 && (
+              <div className="max-h-[50vh] overflow-y-auto">
+                {overflowButtons.map((button) => (
+                  <button
+                    key={button.code}
+                    type="button"
+                    data-testid={`toolbar-btn-${button.code}`}
+                    disabled={isButtonDisabled(button, evaluateVisibleWhen, actionLoading)}
+                    className={`hover:bg-hover block w-full rounded px-3 py-2 text-left text-xs ${button.danger ? 'text-status-red' : 'text-text-2'}`}
+                    onClick={(event) => {
+                      const menu = event.currentTarget.closest('details');
+                      if (menu) menu.open = false;
+                      void handleAction(button, recordData);
+                    }}
+                  >
+                    {resolveButtonLabel(button)}
+                  </button>
+                ))}
+              </div>
+            )}
+            {overflowUtilities && (
+              <div className={`flex w-max max-w-full flex-wrap gap-2 p-1 ${overflowButtons.length ? 'border-border mt-1 border-t pt-2' : ''}`}>
+                {overflowUtilities}
+              </div>
+            )}
           </div>
         </details>
       )}

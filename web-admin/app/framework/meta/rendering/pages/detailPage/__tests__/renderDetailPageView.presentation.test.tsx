@@ -87,6 +87,29 @@ describe('actual detail presentation body', () => {
     }
   });
 
+  it('uses one overflow for secondary business actions and utilities', () => {
+    const view = args(null);
+    view.schema = { ...view.schema, extension: { showReport: false } };
+    const secondary = { code: 'mark_lost', label: 'Mark lost', overflow: true };
+    const restricted = { code: 'restricted', label: 'Restricted', overflow: true, visibleWhen: 'hidden' };
+    view.effectiveHeaderToolbar = { buttons: [secondary, restricted] };
+    view.hasPermission = () => true;
+    view.evaluateVisibleWhen = (condition) => condition !== 'hidden';
+    view.resolveButtonLabel = (button) => String(button.label);
+    const handleAction = vi.fn().mockResolvedValue(undefined);
+    view.handleAction = handleAction;
+    render(<MemoryRouter>{renderDetailPageView(view)}</MemoryRouter>);
+    const overflow = screen.getByTestId('detail-toolbar-more');
+    expect(screen.getAllByText('More actions')).toHaveLength(1);
+    expect(overflow).toContainElement(screen.getByText('Print'));
+    expect(overflow).toContainElement(screen.getByText('Export PDF'));
+    expect(screen.queryByText('Restricted')).not.toBeInTheDocument();
+    overflow.setAttribute('open', '');
+    fireEvent.click(screen.getByText('Mark lost'));
+    expect(handleAction).toHaveBeenCalledWith(secondary, view.recordData);
+    expect(overflow).not.toHaveAttribute('open');
+  });
+
   it('keeps the normal detail heading and reads the same actual-height variable for its minimum height', () => {
     render(<MemoryRouter>{renderDetailPageView(args(null))}</MemoryRouter>);
     expect(screen.getByRole('heading', { name: 'Actual event subject' })).toBeInTheDocument();
