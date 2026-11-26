@@ -1,6 +1,7 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { evaluateCondition as evaluateExpressionCondition } from '~/framework/meta/runtime/expression/evaluator';
@@ -3523,6 +3524,32 @@ describe('RecordInspectorBlockRenderer', () => {
 });
 
 describe('EvidencePanelBlockRenderer', () => {
+  it('links the selected business name to its record using a configured internal route', () => {
+    const runtime = makeRuntime({
+      getContext: () => ({
+        locale: 'en-US',
+        t: (key: string) => key,
+        form: {},
+        global: {},
+        state: { selected: { pid: 'account-17', name: 'Maple Industries' } },
+      }),
+    });
+    const block: BlockConfig = {
+      id: 'account-context',
+      blockType: 'evidence-panel',
+      context: '${state.selected}',
+      sections: [
+        { key: 'name', field: 'name', label: 'Customer', linkTo: '/p/customer/view/${state.selected.pid}' },
+        { key: 'external', field: 'name', label: 'External text', linkTo: '//example.test' },
+      ],
+    };
+    render(<MemoryRouter><EvidencePanelBlockRenderer block={block} runtime={runtime} /></MemoryRouter>);
+    expect(screen.getByRole('link', { name: 'Maple Industries' })).toHaveAttribute(
+      'href', '/p/customer/view/account-17',
+    );
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+  });
+
   it('formats datetime evidence sections instead of exposing raw transport timestamps', () => {
     const enteredAt = '2026-08-20T05:13:40.519+00:00';
     const runtime = makeRuntime({

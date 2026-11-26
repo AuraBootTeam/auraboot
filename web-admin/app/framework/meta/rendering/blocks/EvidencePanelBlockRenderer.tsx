@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -380,6 +381,10 @@ export const EvidencePanelBlockRenderer: React.FC<EvidencePanelBlockRendererProp
             const rawValue = readPath(record, section.field);
             const parsedValue = parseJsonValue(rawValue);
             const value = formatValue(rawValue, section.format, section.valueMap, locale, t);
+            const destination = typeof section.linkTo === 'string'
+              ? resolveRuntimeValue(runtime, section.linkTo)
+              : undefined;
+            const internalLink = typeof destination === 'string' && /^\/(?![\\/])/.test(destination);
             const isJson = section.format === 'json' || value.includes('\n');
             const semanticItems = Array.isArray(section.items) ? section.items : [];
 
@@ -398,6 +403,10 @@ export const EvidencePanelBlockRenderer: React.FC<EvidencePanelBlockRendererProp
                   <pre className="rounded-control bg-subtle text-text-2 mt-1 max-h-48 overflow-auto p-3 text-xs">
                     {value}
                   </pre>
+                ) : internalLink && !isEmptyValue(rawValue) ? (
+                  <Link to={destination} className="text-accent mt-1 block text-sm break-words underline">
+                    {value}
+                  </Link>
                 ) : (
                   <div className="text-text mt-1 text-sm break-words">{value}</div>
                 )}
