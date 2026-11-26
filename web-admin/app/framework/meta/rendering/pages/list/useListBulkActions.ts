@@ -5,7 +5,6 @@ import {
 } from '~/framework/meta/runtime/actions/promptSubmissionFeedback';
 import { commandExecutionError } from '~/framework/meta/utils/commandExecutionError';
 import React, { useCallback } from 'react';
-import { resolveCommandErrorMessage } from '~/framework/meta/hooks/useActionHandler';
 import { promptInputForm } from '~/framework/meta/runtime/actions/ActionRegistry';
 import type { ButtonConfig, FieldConfig } from '~/framework/meta/schemas/types';
 import { resolveConfirmDialog } from '~/framework/meta/utils/i18nResolver';
@@ -159,19 +158,18 @@ export function useListBulkActions({
             },
             token: token || undefined,
           });
-          if (ResultHelper.isSuccess(result) && !commandBusinessRejectionError(result)) {
+          const rejection = ResultHelper.isSuccess(result)
+            ? commandBusinessRejectionError(result)
+            : commandExecutionError(result, command, t, locale);
+          if (!rejection) {
             successCount += 1;
             if (hasAsyncCommandReceipt(result.data)) acceptedReceipt ??= result.data;
           } else {
-            firstError ??=
-              commandBusinessRejectionError(result) ??
-              commandExecutionError(result, command, t, locale);
+            firstError ??= rejection;
             failures.push({
               recordPid: id,
               recordLabel: recordLabelById.get(id) || id,
-              reason:
-                commandBusinessRejectionError(result)?.message ??
-                resolveCommandErrorMessage(result, command, t),
+              reason: rejection.message,
             });
           }
         } catch (error) {
@@ -357,21 +355,19 @@ export function useListBulkActions({
             },
             token: token || undefined,
           });
-          if (ResultHelper.isSuccess(result) && !commandBusinessRejectionError(result)) {
+          const rejection = ResultHelper.isSuccess(result)
+            ? commandBusinessRejectionError(result)
+            : commandExecutionError(result, command, t, locale);
+          if (!rejection) {
             successCount = ids.length;
             if (hasAsyncCommandReceipt(result.data)) acceptedReceipt = result.data;
             submissionFeedback.completeResult(result);
           } else {
-            submissionFeedback.fail(
-              commandBusinessRejectionError(result) ??
-                commandExecutionError(result, command, t, locale),
-            );
+            submissionFeedback.fail(rejection);
             failures.push({
               recordPid: command,
               recordLabel: command,
-              reason:
-                commandBusinessRejectionError(result)?.message ??
-                resolveCommandErrorMessage(result, command, t),
+              reason: rejection.message,
             });
           }
         } else {

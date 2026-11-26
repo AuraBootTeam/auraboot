@@ -579,7 +579,15 @@ function Subtable({ refresh }: { refresh: () => Promise<void> }) {
     </button>
   );
 }
-function Bulk({ refresh, ids = ['A'] }: { refresh: () => Promise<void>; ids?: string[] }) {
+function Bulk({
+  refresh,
+  ids = ['A'],
+  onResult = vi.fn(),
+}: {
+  refresh: () => Promise<void>;
+  ids?: string[];
+  onResult?: Parameters<typeof useListBulkActions>[0]['setBulkActionResult'];
+}) {
   const actions = useListBulkActions({
     setImportOpen: vi.fn(),
     loadData: refresh,
@@ -595,7 +603,7 @@ function Bulk({ refresh, ids = ['A'] }: { refresh: () => Promise<void>; ids?: st
     token: undefined,
     t,
     showToast: vi.fn(),
-    setBulkActionResult: vi.fn(),
+    setBulkActionResult: onResult,
     canUseButton: () => true,
     setBulkFieldCommand: vi.fn(),
     modelCode: 'case',
@@ -745,6 +753,33 @@ describe('all native command prompt consumers acknowledge the same UI protocol',
     expect(io.fetch).toHaveBeenCalledTimes(2);
     expect(refresh).toHaveBeenCalledOnce();
     expect(screen.getByTestId('form-dialog-submit')).toBeDisabled();
+  });
+  it('shows a targeted bulk rejection reason from a normalized HTTP failure', async () => {
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    const onResult = vi.fn();
+    io.fetch.mockImplementation(
+      async (_url: string, options: { params: { targetRecordPid: string } }) =>
+        options.params.targetRecordPid === 'A'
+          ? { code: '0', data: {} }
+          : { code: '35000', httpStatus: 400, success: false, message: 'Bad parameter',
+              context: 'Plugin handler execution failed: Resolve the open association first' },
+    );
+    render(
+      <Root>
+        <Bulk refresh={refresh} ids={['A', 'B']} onResult={onResult} />
+      </Root>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Open action' }));
+    await fill();
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+    await waitFor(() => expect(onResult).toHaveBeenCalledWith(expect.objectContaining({
+      successCount: 1,
+      failures: [expect.objectContaining({
+        recordPid: 'B',
+        reason: 'Resolve the open association first',
+      })],
+    })));
+    expect(refresh).toHaveBeenCalledOnce();
   });
   it('acknowledges an actual workbench poll terminal before the terminal read can fail', async () => {
     const closedBeforeRead: boolean[] = [];
