@@ -79,6 +79,19 @@ public class BusinessCommandRecordAuthorization {
         finally { readProjection.remove(); }
     }
 
+    /** Batch only the definitions a host-approved read projection will need. */
+    public void preloadReadPermissionDefinitions(Set<String> models) {
+        var current = readProjection.get();
+        if (current == null) throw new org.springframework.security.access.AccessDeniedException("Read projection snapshot is unavailable");
+        current.verify();
+        var codes = new java.util.LinkedHashSet<String>();
+        for (String model : models) {
+            codes.addAll(resourcePermissionCodes(current.tenant, model, "read"));
+        }
+        snapshots.preloadFreshPermissionDefinitions(current.tenant, codes);
+        current.verify();
+    }
+
     /** Authorization authoring cannot invalidate configuration during a host projection. */
     public static boolean isReadProjectionSnapshotActive() { return readProjection.get()!=null; }
 

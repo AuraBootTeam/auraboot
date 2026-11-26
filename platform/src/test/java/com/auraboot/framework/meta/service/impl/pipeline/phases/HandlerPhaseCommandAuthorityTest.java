@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -155,7 +156,12 @@ class HandlerPhaseCommandAuthorityTest {
         verifyNoInteractions(authorization);
 
         when(handler.supportsPermissionConfigurationSnapshot(commandCode)).thenReturn(true);
-        assertThat(phase.withHandlerReadProjection(context, () -> "snapshot")).isEqualTo("snapshot");
+        var models = Set.of("claim_item", "claim_pool");
+        when(handler.permissionConfigurationReadModels(commandCode)).thenReturn(models);
+        assertThat(phase.withHandlerReadProjection(context, () -> {
+            verify(authorization).preloadReadPermissionDefinitions(models);
+            return "snapshot";
+        })).isEqualTo("snapshot");
         verify(authorization).withReadProjectionSnapshot(any());
 
         clearInvocations(authorization);

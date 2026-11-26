@@ -18,6 +18,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.sql.Connection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -564,6 +565,23 @@ class BusinessCommandRecordAuthorizationTest {
         verify(scopes,times(2)).resolveObjectBoundScopeForRole(5L,101L,MODEL,"read",MODEL);
         verify(snapshots,times(2)).resourcePermissionCodes(100L,MODEL,"read");
         verify(snapshots,times(2)).resolvePermissionDefinition(100L,CODE);
+    }
+
+    @Test void readsOnlyTheDeclaredModelsPermissionDefinitionsInsideTheVerifiedProjection() {
+        var models = Set.of("claim_item", "claim_pool");
+        when(snapshots.resourcePermissionCodes(100L, "claim_item", "read"))
+                .thenReturn(List.of("claim_item:read", "model.claim_item.read"));
+        when(snapshots.resourcePermissionCodes(100L, "claim_pool", "read"))
+                .thenReturn(List.of("claim_pool:read", "model.claim_pool.read"));
+        assertThatThrownBy(() -> authorization.preloadReadPermissionDefinitions(models))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        authorization.withReadProjectionSnapshot(() -> {
+            authorization.preloadReadPermissionDefinitions(models);
+            return null;
+        });
+        verify(snapshots).preloadFreshPermissionDefinitions(100L,
+                Set.of("claim_item:read", "model.claim_item.read", "claim_pool:read", "model.claim_pool.read"));
+        verifyNoInteractions(bindings, scopes, recordShares);
     }
 
     @Test void projectionCannotReuseConfigurationAfterActorOrPhysicalSnapshotChange() {

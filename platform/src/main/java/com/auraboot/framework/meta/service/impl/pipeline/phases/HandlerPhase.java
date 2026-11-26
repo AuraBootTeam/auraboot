@@ -197,26 +197,30 @@ public class HandlerPhase implements CommandPhase {
         boolean hasDocumentProjection = context.getBusinessTargetAuthorization() != null
                 && com.auraboot.framework.meta.security.DocumentArtifactContract.from(
                         context.getExecConfig(), context.getCommand().getModelCode()) != null;
-        if (hasDocumentProjection || supportsPermissionConfigurationSnapshot(context)) {
-            return documentAuthorization.withReadProjectionSnapshot(execution);
-        }
-        return execution.get();
+        if (hasDocumentProjection) return documentAuthorization.withReadProjectionSnapshot(execution);
+        var projectionHandler = permissionConfigurationSnapshotHandler(context);
+        if (projectionHandler.isEmpty()) return execution.get();
+        return documentAuthorization.withReadProjectionSnapshot(() -> {
+            var models = projectionHandler.get().permissionConfigurationReadModels(context.getCommandCode());
+            if (!models.isEmpty()) documentAuthorization.preloadReadPermissionDefinitions(models);
+            return execution.get();
+        });
     }
 
-    private boolean supportsPermissionConfigurationSnapshot(CommandPipelineContext context) {
+    private java.util.Optional<CommandHandlerExtension> permissionConfigurationSnapshotHandler(
+            CommandPipelineContext context) {
         if (extensionRegistry == null || MetaContext.getCurrentMemberId() == null
                 || AsyncTaskExecutionContext.isActive()
                 || context.getAuthorizationVerdict() == null || !context.getAuthorizationVerdict().isAuthorized()
                 || context.getPermitPlan() == null || !context.getPermitPlan().isPermitted()) {
-            return false;
+            return java.util.Optional.empty();
         }
         String commandCode = context.getCommandCode();
         String handlerCode = CommandExecutorUtils.resolvePluginHandlerCode(commandCode, context.getExecConfig());
         return extensionRegistry.getCommandHandler(handlerCode)
                 .filter(handler -> handler.commandReadIsolation() != null
                         && handler.supportsPermissionConfigurationSnapshot(commandCode)
-                        && extensionRegistry.getSecondaryCommandHandlers(handlerCode).isEmpty())
-                .isPresent();
+                        && extensionRegistry.getSecondaryCommandHandlers(handlerCode).isEmpty());
     }
 
     // ==================== Inlined delegate methods ====================

@@ -40,6 +40,9 @@ public interface CommandHandlerExtension extends ExtensionPoint {
      */
     default boolean supportsPermissionConfigurationSnapshot(String commandCode) { return false; }
 
+    /** Models whose read permission definitions an opted-in handler expects to use. */
+    default Set<String> permissionConfigurationReadModels(String commandCode) { return Set.of(); }
+
     /** Allows this command to reauthorize and run atomically in its declared transaction on a claimed worker. */
     default boolean supportsTransactionalDeferredExecution(String commandCode) { return false; }
 
