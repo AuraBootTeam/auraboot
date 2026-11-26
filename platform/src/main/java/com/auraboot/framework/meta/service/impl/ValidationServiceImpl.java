@@ -61,11 +61,12 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
         List<String> warnings = new ArrayList<>();
         List<String> validFields = new ArrayList<>();
 
+        Map<String, Optional<String>> referenceTables = new HashMap<>();
         // 验证每个字段
         if (modelDefinition.getFields() != null) {
             for (FieldDefinition field : modelDefinition.getFields()) {
                 FieldValidationResult fieldResult = validateField(field, data.get(field.getCode()), context,
-                        relationsVerified);
+                        relationsVerified, referenceTables);
                 
                 if (fieldResult.isValid()) {
                     validFields.add(field.getCode());
@@ -165,6 +166,7 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
 
     private void validateBatchBusinessReferences(ModelDefinition model, List<Map<String, Object>> rows) {
         if (model.getFields() == null) return;
+        Map<String, Optional<String>> referenceTables = new HashMap<>();
         for (FieldDefinition field : model.getFields()) {
             FieldDefinition.RefTarget target = field.getRefTarget();
             if (target == null || target.getTargetEntity() == null || target.getTargetEntity().isBlank()
@@ -176,17 +178,8 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
                 }
             }
             if (values.isEmpty()) continue;
-            String table = target.getTargetTable();
-            if (table == null || table.isBlank()) {
-                MetaModelDTO targetModel = metaModelService.findByCode(target.getTargetEntity());
-                if (targetModel == null || targetModel.getTableName() == null
-                        || targetModel.getTableName().isBlank()) {
-                    log.warn("Reference field '{}' points at model '{}' without a resolvable table; "
-                            + "skipping existence check", field.getCode(), target.getTargetEntity());
-                    continue;
-                }
-                table = targetModel.getTableName();
-            }
+            String table = referenceTable(field, referenceTables);
+            if (table == null) continue;
             boolean explicitIdentity = target.getValueField() != null && !target.getValueField().isBlank();
             String valueField = explicitIdentity
                     ? target.getValueField()
@@ -228,7 +221,7 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
 
     @Override
     public FieldValidationResult validateField(FieldDefinition fieldDefinition, Object value, ValidationContext context) {
-        return validateField(fieldDefinition, value, context, false);
+        return validateField(fieldDefinition, value, context, false, new HashMap<>());
     }
 
     @Override
@@ -244,11 +237,12 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
         } catch (IllegalArgumentException failure) {
             return FieldValidationResult.invalid(failure.getMessage());
         }
-        return validateField(field, nativeValue, context, false);
+        return validateField(field, nativeValue, context);
     }
 
     private FieldValidationResult validateField(FieldDefinition fieldDefinition, Object value,
-                                                ValidationContext context, boolean businessReferencesVerified) {
+                                                ValidationContext context, boolean businessReferencesVerified,
+                                                Map<String, Optional<String>> referenceTables) {
         if (fieldDefinition == null) {
             return FieldValidationResult.invalid("Field definition cannot be null");
         }
@@ -288,7 +282,7 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
         // this check a command accepts a dangling pid and persists a row that can
         // never be joined (P2 finding: sc_monthly_metric.sc_showcase_pid).
         if (!businessReferencesVerified) {
-            validateBusinessReference(fieldDefinition, value, errors);
+            validateBusinessReference(fieldDefinition, value, errors, referenceTables);
         }
 
         // 长度验证
@@ -349,7 +343,8 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
      * table. A missing referenced model degrades to a log warning (config-time
      * validation owns that failure), mirroring the relation validator.
      */
-    private void validateBusinessReference(FieldDefinition fieldDefinition, Object value, List<String> errors) {
+    private void validateBusinessReference(FieldDefinition fieldDefinition, Object value, List<String> errors,
+                                           Map<String, Optional<String>> referenceTables) {
         FieldDefinition.RefTarget refTarget = fieldDefinition.getRefTarget();
         if (refTarget == null) {
             return;
@@ -361,17 +356,8 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
         if (!(value instanceof String rawValue) || rawValue.isBlank()) {
             return;
         }
-        String targetTable = refTarget.getTargetTable();
-        if (targetTable == null || targetTable.isBlank()) {
-            MetaModelDTO targetModel = metaModelService.findByCode(targetEntity);
-            if (targetModel == null || targetModel.getTableName() == null
-                    || targetModel.getTableName().isBlank()) {
-                log.warn("Reference field '{}' points at model '{}' without a resolvable table; "
-                        + "skipping existence check", fieldDefinition.getCode(), targetEntity);
-                return;
-            }
-            targetTable = targetModel.getTableName();
-        }
+        String targetTable = referenceTable(fieldDefinition, referenceTables);
+        if (targetTable == null) return;
         boolean explicitIdentity = refTarget.getValueField() != null && !refTarget.getValueField().isBlank();
         String valueField = explicitIdentity
                 ? refTarget.getValueField()
@@ -401,6 +387,20 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
                         + "': " + targetTable + "." + valueField + " = " + candidate);
             }
         }
+    }
+
+    private String referenceTable(FieldDefinition field, Map<String, Optional<String>> referenceTables) {
+        var target = field.getRefTarget();
+        String explicitTable = target.getTargetTable();
+        if (explicitTable != null && !explicitTable.isBlank()) return explicitTable;
+        String table = referenceTables.computeIfAbsent(target.getTargetEntity(),
+                model -> Optional.ofNullable(metaModelService.findCurrentTableNameByCode(model))
+                        .filter(name -> !name.isBlank())).orElse(null);
+        if (table == null) {
+            log.warn("Reference field '{}' points at model '{}' without a resolvable table; skipping existence check",
+                    field.getCode(), target.getTargetEntity());
+        }
+        return table;
     }
 
     private String businessReferenceLookup(String valueField, String displayField, String candidate,

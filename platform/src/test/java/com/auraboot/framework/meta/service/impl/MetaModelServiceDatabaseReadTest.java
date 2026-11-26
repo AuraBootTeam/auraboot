@@ -17,6 +17,23 @@ import static org.mockito.Mockito.*;
 class MetaModelServiceDatabaseReadTest {
     @AfterEach void clear() { MetaContext.clear(); }
 
+    @Test void currentTableLookupRetainsLegacyTableNameResolution() {
+        var mapper = mock(MetaModelMapper.class);
+        var fieldBindings = mock(MetaModelFieldBindingMapper.class);
+        var service = new MetaModelServiceImpl(mapper, mock(MetaFieldMapper.class), mock(QueryBuilderService.class),
+                fieldBindings, mock(AutoPermissionAssignmentService.class), mock(MetaDefinitionCacheService.class),
+                mock(ApplicationEventPublisher.class), mock(ApplicationRuntimeDefinitionCatalog.class));
+        when(mapper.findCurrentTableRegistration("registered"))
+                .thenReturn(new MetaModelMapper.TableRegistration("registered", "  custom_table  "));
+        when(mapper.findCurrentTableRegistration("legacy"))
+                .thenReturn(new MetaModelMapper.TableRegistration("legacy", null));
+
+        assertThat(service.findCurrentTableNameByCode("registered")).isEqualTo("custom_table");
+        assertThat(service.findCurrentTableNameByCode("legacy")).isEqualTo("mt_legacy");
+        assertThat(service.findCurrentTableNameByCode("absent")).isNull();
+        verifyNoInteractions(fieldBindings);
+    }
+
     @Test void explicitDatabaseReadBypassesAValidButOlderRuntimeReleaseSnapshot() {
         MetaContext.setContext(1L,7L,null,"system");
         var mapper=mock(MetaModelMapper.class);

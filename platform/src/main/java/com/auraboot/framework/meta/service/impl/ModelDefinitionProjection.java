@@ -133,10 +133,12 @@ final class ModelDefinitionProjection extends BaseMetaService {
     }
 
     String resolveTableName(Model model){
-        if (model.getTableName() != null && !model.getTableName().trim().isEmpty()) {
-            return model.getTableName().trim();
-        }
-        return generateTableName(model.getCode());
+        return resolveTableName(model.getCode(), model.getTableName());
+    }
+
+    String resolveTableName(String modelCode, String registeredTable) {
+        if (registeredTable != null && !registeredTable.trim().isEmpty()) return registeredTable.trim();
+        return generateTableName(modelCode);
     }
 
     Map<String, Object> flattenExtension(Model model){

@@ -148,6 +148,15 @@ public interface MetaModelMapper extends BaseMapper<Model> {
     @Select("SELECT * FROM ab_meta_model WHERE code = #{code} AND is_current = TRUE AND deleted_flag = false")
     Model findCurrentByCode(@Param("code") String code);
 
+    @Select("SELECT code, table_name FROM ab_meta_model WHERE code = #{code} AND is_current = TRUE AND deleted_flag = false")
+    @ConstructorArgs({
+        @Arg(column = "code", javaType = String.class),
+        @Arg(column = "table_name", javaType = String.class)
+    })
+    TableRegistration findCurrentTableRegistration(@Param("code") String code);
+
+    record TableRegistration(String code, String tableName) {}
+
     /**
      * Explicit-tenant variant: the tenant condition is a bound parameter rather
      * than the tenant-line interceptor, so resolution stays deterministic on

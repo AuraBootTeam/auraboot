@@ -775,6 +775,14 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     }
 
     @Override
+    public String findCurrentTableNameByCode(String code) {
+        if (!StringUtils.hasText(code)) return null;
+        var registration = metaModelMapper.findCurrentTableRegistration(code);
+        return registration == null ? null
+                : modelDefinitionProjection().resolveTableName(registration.code(), registration.tableName());
+    }
+
+    @Override
     public Map<String, Object> findExtensionByCode(String code) {
         if (!StringUtils.hasText(code)) {
             return null;

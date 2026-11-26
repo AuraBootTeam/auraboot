@@ -175,15 +175,13 @@ class ValidationServiceBatchRelationsTest {
 
     @Test void resolvesRegisteredTargetTableOnceForTheWholeFieldBatch() {
         var models = mock(com.auraboot.framework.meta.service.MetaModelService.class);
-        when(models.findByCode("parent")).thenReturn(
-                com.auraboot.framework.meta.dto.MetaModelDTO.builder()
-                        .code("parent").tableName("mt_registered_parent").build());
+        when(models.findCurrentTableNameByCode("parent")).thenReturn("mt_registered_parent");
         when(mapper.selectByQuery(anyString(), anyMap())).thenReturn(List.of(Map.of("cnt0", 1L)));
         ModelDefinition refs = businessReferenceModel();
         refs.getFields().get(0).getRefTarget().setTargetTable(null);
         new ValidationServiceImpl(mapper, null, models).validateBatchAndThrow(refs,
                 List.of(Map.of("parent", "same"), Map.of("parent", "same")), ValidationContext.CREATE);
-        verify(models, times(1)).findByCode("parent");
+        verify(models, times(1)).findCurrentTableNameByCode("parent");
         verify(mapper, times(1)).selectByQuery(contains("FROM mt_registered_parent"), anyMap());
     }
 

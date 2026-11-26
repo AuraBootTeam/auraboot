@@ -2,7 +2,7 @@ package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.FieldDefinition;
-import com.auraboot.framework.meta.dto.MetaModelDTO;
+import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.dto.ValidationContext;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.MetaModelService;
@@ -93,13 +93,32 @@ class ValidationServiceReferenceValidationTest {
     }
 
     private void mockModelTable(String modelCode, String tableName) {
-        MetaModelDTO model = MetaModelDTO.builder().code(modelCode).tableName(tableName).build();
-        when(metaModelService.findByCode(modelCode)).thenReturn(model);
+        when(metaModelService.findCurrentTableNameByCode(modelCode)).thenReturn(tableName);
     }
 
     private void mockCount(long count) {
         when(dynamicDataMapper.selectByQuery(anyString(), any()))
                 .thenReturn(List.of(Map.of("cnt", count)));
+    }
+
+    @Test
+    void oneValidationResolvesAPhysicalTargetOnceWithoutReusingItAcrossOperations() {
+        var model = ModelDefinition.builder().code("order")
+                .fields(List.of(referenceField("first_contact", "contact"), referenceField("second_contact", "contact")))
+                .build();
+        var data = Map.<String, Object>of("first_contact", "one", "second_contact", "two");
+        when(metaModelService.findCurrentTableNameByCode("contact")).thenReturn("mt_contact_v1", "mt_contact_v2");
+        mockCount(1);
+
+        assertTrue(service.validateData(model, data, ValidationContext.UPDATE).isValid());
+        verify(metaModelService).findCurrentTableNameByCode("contact");
+        assertTrue(service.validateData(model, data, ValidationContext.UPDATE).isValid());
+
+        verify(metaModelService, org.mockito.Mockito.times(2)).findCurrentTableNameByCode("contact");
+        verify(dynamicDataMapper, org.mockito.Mockito.times(2)).selectByQuery(
+                org.mockito.Mockito.contains("FROM mt_contact_v1"), any());
+        verify(dynamicDataMapper, org.mockito.Mockito.times(2)).selectByQuery(
+                org.mockito.Mockito.contains("FROM mt_contact_v2"), any());
     }
 
     @Test
@@ -172,7 +191,7 @@ class ValidationServiceReferenceValidationTest {
         // sys_user handling asserts tenant membership through UserService; with no
         // membership mocked the handler reports the miss — the reference-existence
         // SQL path must stay out of it.
-        verify(metaModelService, never()).findByCode(anyString());
+        verify(metaModelService, never()).findCurrentTableNameByCode(anyString());
         verify(dynamicDataMapper, never()).selectByQuery(anyString(), any());
         assertFalse(result.getErrors().isEmpty());
     }
@@ -188,14 +207,14 @@ class ValidationServiceReferenceValidationTest {
         var result = service.validateField(field, "01MISSING", ValidationContext.CREATE);
 
         assertFalse(result.isValid());
-        verify(metaModelService, never()).findByCode(anyString());
+        verify(metaModelService, never()).findCurrentTableNameByCode(anyString());
         assertTrue(result.getErrors().get(0).contains("mt_legacy_ref.pid"));
     }
 
     @Test
     @DisplayName("degrades to a warning-free skip when the target model has no table")
     void skipsWhenModelUnresolvable() {
-        when(metaModelService.findByCode("ghost_model")).thenReturn(null);
+        when(metaModelService.findCurrentTableNameByCode("ghost_model")).thenReturn(null);
 
         var result = service.validateField(
                 referenceField("sc_ref", "ghost_model"),

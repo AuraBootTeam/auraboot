@@ -116,6 +116,8 @@ class MetaModelServiceVirtualIntegrationTest extends BaseIntegrationTest {
         ModelDefinition reloaded = metaModelService.getDefinitionByCode(code);
         assertThat(reloaded.getSourceType()).isEqualTo("physical");
         assertThat(reloaded.getCapabilities().isCreate()).isTrue();
+        assertThat(metaModelService.findCurrentTableNameByCode(code)).isEqualTo("mt_" + code);
+        assertThat(metaModelService.findCurrentTableNameByCode(code + "_missing")).isNull();
     }
 
     /**

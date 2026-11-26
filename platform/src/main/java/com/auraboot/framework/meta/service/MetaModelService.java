@@ -410,6 +410,12 @@ public interface MetaModelService {
      */
     MetaModelDTO findByCode(String code);
 
+    /** Resolve the current registered table for a model without loading its presentation metadata. */
+    default String findCurrentTableNameByCode(String code) {
+        var model = findByCode(code);
+        return model == null ? null : model.getTableName();
+    }
+
     /** Current model extensions without presentation-only field statistics. */
     default java.util.Map<String, Object> findExtensionByCode(String code) {
         var model = findByCode(code);
