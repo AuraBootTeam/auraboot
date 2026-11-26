@@ -39,6 +39,7 @@ public class GlobalSearchResult {
     public static class Group {
         private String modelCode;
         private String modelLabel;
+        private String titleField;
         private Long total;
         private List<Map<String, Object>> records;
     }

@@ -245,11 +245,12 @@ export function CommandPalette() {
               resp.data.groups as Array<{
                 modelCode: string;
                 modelLabel: string;
+                titleField?: string | null;
                 records?: unknown[];
               }>
             ).flatMap((group) =>
               (group.records ?? [])
-                .map((record) => toRecordHit(record, group.modelCode, group.modelLabel))
+                .map((record) => toRecordHit(record, group.modelCode, group.modelLabel, group.titleField))
                 .filter((hit: RecordHit | null): hit is RecordHit => hit !== null),
             );
             setRecordResults(hits.slice(0, 15));
@@ -1009,13 +1010,15 @@ export function toRecordHit(
   record: unknown,
   modelCode: string,
   modelName: string,
+  titleField?: string | null,
 ): RecordHit | null {
   if (!record || typeof record !== 'object') return null;
   const row = record as Record<string, unknown>;
   if (typeof row.pid !== 'string' || !row.pid.trim()) return null;
+  const title = titleField && Object.hasOwn(row, titleField) ? row[titleField] : null;
   return {
     pid: row.pid,
-    displayText: extractDisplayText(row),
+    displayText: typeof title === 'string' && title.trim() ? title : extractDisplayText(row),
     modelCode,
     modelName,
     path: `/p/${modelCode}/view/${encodeURIComponent(row.pid)}`,

@@ -104,9 +104,12 @@ public class GlobalSearchServiceImpl implements GlobalSearchService {
                 if (result.getRecords() == null || result.getRecords().isEmpty()) {
                     continue;
                 }
+                Object configuredTitleField = model.getExtension() == null
+                        ? null : model.getExtension().get("titleField");
                 groups.add(GlobalSearchResult.Group.builder()
                         .modelCode(model.getCode())
-                        .modelLabel(model.getDisplayName() != null ? model.getDisplayName() : model.getCode())
+                        .modelLabel(displayLabel(model))
+                        .titleField(configuredTitleField instanceof String code && !code.isBlank() ? code : null)
                         .total(result.getTotal())
                         .records(result.getRecords())
                         .build());

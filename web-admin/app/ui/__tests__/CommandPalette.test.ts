@@ -75,9 +75,10 @@ describe('CommandPalette public record identity', () => {
   it('builds record navigation from pid only', () => {
     expect(
       toRecordHit(
-        { pid: '01KPUBLIC', id: 9_007_199_254_740_993n, crm_acc_name: 'Acme' },
+        { pid: '01KPUBLIC', id: 9_007_199_254_740_993n, crm_acc_code: 'ACC-1', crm_acc_name: 'Acme' },
         'crm_account_common',
         'Accounts',
+        'crm_acc_name',
       ),
     ).toEqual({
       pid: '01KPUBLIC',

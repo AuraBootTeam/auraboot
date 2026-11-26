@@ -115,9 +115,10 @@ class GlobalSearchServiceImplTest {
 
     @Test
     void searchGroupsHitsPerModelAndKeepsRawRows() {
+        Model account = model("crm_account_common", null);
+        account.getExtension().setDynamicProperty("titleField", "crm_acc_name");
         when(metaModelMapper.findCurrentByTenant()).thenReturn(List.of(
-                model("crm_account_common", null),
-                model("crm_contact_common", null)));
+                account, model("crm_contact_common", null)));
         stubReadable("crm_account_common", true);
         stubReadable("crm_contact_common", true);
 
@@ -133,6 +134,7 @@ class GlobalSearchServiceImplTest {
         GlobalSearchResult.Group group = result.getGroups().get(0);
         assertEquals("crm_account_common", group.getModelCode());
         assertEquals("CRM_ACCOUNT_COMMON", group.getModelLabel());
+        assertEquals("crm_acc_name", group.getTitleField());
         assertEquals(7L, group.getTotal());
         assertEquals("01MTEST", group.getRecords().get(0).get("pid"));
         assertFalse(result.isTruncated());
