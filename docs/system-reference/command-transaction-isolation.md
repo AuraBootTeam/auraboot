@@ -192,3 +192,25 @@ that command's key while it waits rejects the invocation before opening a transa
 failures propagate after rollback, and guard ownership is cleared on every exit. No general write
 retry is introduced. Payload-dependent keys and caller-owned transactions retain their existing
 guarded-phase boundary; they do not gain a fresh transaction snapshot from waiting on a lock.
+
+## Installed integration and synchronous API coordinators
+
+The installed integration coordinator opens a writable REPEATABLE READ transaction for
+acceptance, accepted replay verification, reliable consumption, synchronous execution and
+result polling. The synchronous business API coordinator uses the same boundary before
+dispatching a command. The external ingress accept coordinator already owns this isolation.
+
+A result GET still dispatches an installed status command. Opening a default READ COMMITTED
+transaction first makes a handler's declared snapshot contract impossible to satisfy; the
+command correctly refuses that caller. The coordinator must establish the snapshot before
+reading its receipt or invoking the command. This does not suspend a caller transaction,
+bypass installation/binding authority, turn a missing receipt into a result, or weaken an
+explicit command isolation requirement. A caller that supplies an incompatible transaction
+continues to fail closed.
+
+The PostgreSQL boundary integration tests use the real Spring transaction interceptor and
+command transaction coordinator. Binding and policy collaborators are explicit seams: they
+assert the physical connection's isolation, join the declared command transaction, write only
+a private fixture table, and then retain the original authority denial. The outer rollback
+removes that fixture write. These tests establish the transaction boundary; native ingress
+accept/process/result journeys separately establish successful machine behavior.
