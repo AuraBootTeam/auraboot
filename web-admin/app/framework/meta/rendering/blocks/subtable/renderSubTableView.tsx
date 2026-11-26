@@ -274,6 +274,8 @@ export function renderSubTableView({
                       getDictLabel,
                       timezone,
                       formats,
+                      undefined,
+                      locale,
                     )}
                   </span>
                 )}
@@ -286,6 +288,8 @@ export function renderSubTableView({
                     getDictLabel,
                     timezone,
                     formats,
+                    undefined,
+                    locale,
                   )}
                 </span>
                 {configuredRowActions
@@ -468,6 +472,7 @@ export function renderSubTableView({
                                 timezone,
                                 formats,
                                 referenceDisplayValue,
+                                locale,
                               )}
                               isEditing={editable}
                               error={editErrors[col.field]}
@@ -507,6 +512,7 @@ export function renderSubTableView({
                             timezone,
                             formats,
                             referenceDisplayValue,
+                            locale,
                           )}
                         </td>
                       );
