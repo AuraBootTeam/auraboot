@@ -24,7 +24,7 @@ import { evaluateCondition } from '~/framework/meta/runtime/expression/evaluator
 import { ComponentLoader } from '~/framework/meta/rendering/components/ComponentLoader';
 import { FieldError, FieldHelp } from '~/ui/ui/field-meta';
 import { FieldErrorOwnedByWrapperContext } from '~/ui/ui/field-base';
-import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
+import { getLocalizedText, parseMemberPickerValue } from '~/routes/_shared/dynamic-route-utils';
 import { usePermission } from '~/contexts/AuthContext';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import { useDataSourceManagerOptional } from '~/framework/meta/contexts/DataSourceContext';
@@ -226,6 +226,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   //   for string fields, so we serialize as a JSON string ('["id1","id2"]').
   const isMemberPickerMultiple =
     componentLower === 'memberpicker' && Boolean(field.props?.multiple);
+  const usesCsvMemberValue = isMemberPickerMultiple && field.props?.multipleValueFormat === 'csv';
   const isUploadComponent = componentLower === 'upload' || componentLower === 'smartupload';
   const expectsJsonObjectValue =
     componentLower === 'daterange' ||
@@ -260,6 +261,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
       return undefined;
     }
     if (isMemberPickerMultiple) {
+      if (usesCsvMemberValue) return parseMemberPickerValue(value, true, 'csv');
       if (typeof value === 'string' && value.startsWith('[')) {
         try {
           const parsed = JSON.parse(value);
@@ -303,7 +305,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
       return componentLower === 'daterange' ? parsed ?? {} : parsed;
     }
     return value;
-  }, [componentLower, expectsJsonObjectValue, isMemberPickerMultiple, isUploadComponent, field.props?.multiple, value]);
+  }, [componentLower, expectsJsonObjectValue, isMemberPickerMultiple, usesCsvMemberValue, isUploadComponent, field.props?.multiple, value]);
 
   const adaptedOnChange = useMemo(() => {
     if (componentLower === 'cascadeselect') {
@@ -313,6 +315,10 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
     }
     if (isMemberPickerMultiple) {
       return (next: unknown) => {
+        if (usesCsvMemberValue) {
+          onChange(Array.isArray(next) ? next.join(',') : next ?? '');
+          return;
+        }
         if (Array.isArray(next)) {
           onChange(next.length > 0 ? JSON.stringify(next) : '');
           return;
@@ -330,7 +336,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
       };
     }
     return onChange;
-  }, [componentLower, expectsJsonObjectValue, isMemberPickerMultiple, onChange]);
+  }, [componentLower, expectsJsonObjectValue, isMemberPickerMultiple, usesCsvMemberValue, onChange]);
 
   const fieldKind = String((field as any).dataType || field.type || '').toLowerCase();
   const refTarget = {

@@ -22,7 +22,11 @@ import {
 // 重新导出供外部使用
 export { getLocalizedText, type LocalizedText, type TranslatableText, type TranslateFunction };
 
-function parseMemberPickerValue(value: unknown, multiple: boolean): string | string[] | undefined {
+export function parseMemberPickerValue(
+  value: unknown,
+  multiple: boolean,
+  valueFormat?: 'csv',
+): string | string[] | undefined {
   if (value == null || value === '') return undefined;
 
   if (Array.isArray(value)) {
@@ -33,6 +37,9 @@ function parseMemberPickerValue(value: unknown, multiple: boolean): string | str
   if (typeof value === 'string') {
     const trimmed = value.trim();
     if (!trimmed) return undefined;
+    if (multiple && valueFormat === 'csv') {
+      return trimmed.split(',').map((id) => id.trim()).filter(Boolean);
+    }
 
     if (trimmed.startsWith('[')) {
       try {
@@ -528,7 +535,11 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
       }
 
       if (componentType === 'memberpicker' || isUserSelect) {
-        const memberValue = parseMemberPickerValue(value, Boolean(field.props?.multiple));
+        const memberValue = parseMemberPickerValue(
+          value,
+          Boolean(field.props?.multiple),
+          field.props?.multipleValueFormat === 'csv' ? 'csv' : undefined,
+        );
         return (
           <MemberPicker
             value={memberValue}

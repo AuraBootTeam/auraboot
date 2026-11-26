@@ -9,6 +9,36 @@ describe('ControlledFieldRenderer', () => {
     capturedPropsSpy.mockClear();
   });
 
+  it('reopens ordered comma-separated member selections and saves them in the same format', async () => {
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: ({ props }: { props: Record<string, unknown> }) => {
+        capturedPropsSpy(props);
+        return null;
+      },
+    }));
+    const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+    const onChange = vi.fn();
+    render(
+      <ControlledFieldRenderer
+        field={{
+          field: 'rep_pool',
+          component: 'MemberPicker',
+          props: { multiple: true, multipleValueFormat: 'csv' },
+        }}
+        value=" owner-2, ,owner-1 "
+        onChange={onChange}
+        context={{ locale: 'en', t: (key: string) => key } as any}
+      />,
+    );
+    const picker = capturedPropsSpy.mock.lastCall![0];
+    expect(picker.value).toEqual(['owner-2', 'owner-1']);
+    picker.onChange(['owner-2', 'owner-3']);
+    expect(onChange).toHaveBeenLastCalledWith('owner-2,owner-3');
+    picker.onChange(undefined);
+    expect(onChange).toHaveBeenLastCalledWith('');
+  });
+
   it('places inline filter labels beside the control while keeping feedback with the control', async () => {
     vi.resetModules();
     vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
