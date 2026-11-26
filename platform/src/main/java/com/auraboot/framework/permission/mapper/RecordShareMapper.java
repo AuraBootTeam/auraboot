@@ -28,15 +28,28 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
      * changing a collaborator from read-only to read/write an atomic update instead
      * of accumulating contradictory grants.
      */
-    @Insert("""
+    @Insert(INSERT_PUBLIC_SHARE + PUBLIC_SHARE_ROW + UPDATE_PUBLIC_SHARE_ON_CONFLICT)
+    int upsertByPublicPids(@Param("share") RecordShare share);
+
+    @Insert("<script>" + INSERT_PUBLIC_SHARE
+            + "<foreach collection='shares' item='share' separator=','>" + PUBLIC_SHARE_ROW + "</foreach>"
+            + UPDATE_PUBLIC_SHARE_ON_CONFLICT + "</script>")
+    int upsertByPublicPidsBatch(@Param("shares") List<RecordShare> shares);
+
+    String INSERT_PUBLIC_SHARE = """
         INSERT INTO ab_record_share (
           pid, tenant_id, resource_code, record_pid, subject_type, subject_id,
           subject_pid, permission_mask, expires_at, created_at, created_by
-        ) VALUES (
+        ) VALUES
+        """;
+    String PUBLIC_SHARE_ROW = """
+        (
           #{share.pid}, #{share.tenantId}, #{share.resourceCode}, #{share.recordPid},
           #{share.subjectType}, #{share.subjectId}, #{share.subjectPid},
           #{share.permissionMask}, #{share.expiresAt}, #{share.createdAt}, #{share.createdBy}
         )
+        """;
+    String UPDATE_PUBLIC_SHARE_ON_CONFLICT = """
         ON CONFLICT (tenant_id, resource_code, record_pid, subject_type, subject_pid)
           WHERE record_pid IS NOT NULL AND subject_pid IS NOT NULL
         DO UPDATE SET
@@ -44,8 +57,7 @@ public interface RecordShareMapper extends BaseMapper<RecordShare> {
           expires_at = EXCLUDED.expires_at,
           created_at = EXCLUDED.created_at,
           created_by = EXCLUDED.created_by
-        """)
-    int upsertByPublicPids(@Param("share") RecordShare share);
+        """;
 
     @Select("""
         SELECT * FROM ab_record_share

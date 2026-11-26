@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -66,11 +67,25 @@ public class RecordShareAccessorImpl implements RecordShareAccessor {
                 audience.addAll(replacement.userPids());
             }
             var recipients = resolveRecipients(tenantId, List.copyOf(audience));
+            boolean distinctTargets = inputs.stream()
+                    .map(replacement -> List.of(replacement.resourceCode().trim(), replacement.recordPid().trim()))
+                    .distinct().count() == inputs.size();
+            List<RecordShareService.MemberShare> pending = new ArrayList<>();
             for (var replacement : inputs) {
                 var members = recipientMembers(replacement.userPids(), recipients);
-                replaceRecordShares(tenantId, replacement.resourceCode(), replacement.recordPid(),
-                        members, replacement.allowUpdate() ? "read,update" : "read");
+                String resource = replacement.resourceCode().trim();
+                String record = replacement.recordPid().trim();
+                String mask = replacement.allowUpdate() ? "read,update" : "read";
+                if (distinctTargets) {
+                    removeStaleMemberShares(tenantId, resource, record, members.keySet());
+                    members.forEach((pid, id) -> pending.add(
+                            new RecordShareService.MemberShare(resource, record, id, pid, mask)));
+                } else {
+                    // A later replacement of the same record must see the earlier writes.
+                    replaceRecordShares(tenantId, resource, record, members, mask);
+                }
             }
+            if (!pending.isEmpty()) recordShareService.shareMembersByPids(tenantId, pending);
             return null;
         });
     }
@@ -95,25 +110,24 @@ public class RecordShareAccessorImpl implements RecordShareAccessor {
 
     private void replaceRecordShares(long tenantId, String resourceCode, String recordPid,
                                      Map<String, Long> memberIdsByPid, String permissionMask) {
-        Set<String> desiredMemberPids = memberIdsByPid.keySet();
+        String resource = resourceCode.trim();
+        String record = recordPid.trim();
+        removeStaleMemberShares(tenantId, resource, record, memberIdsByPid.keySet());
+        memberIdsByPid.forEach((pid, id) -> recordShareService.shareRecordByPid(
+                tenantId, resource, record, "member", id, pid, permissionMask, null));
+    }
+
+    private void removeStaleMemberShares(long tenantId, String resourceCode, String recordPid,
+                                         Set<String> desiredMemberPids) {
         List<RecordShare> existing = recordShareService.listByRecordPidForManagement(
-                tenantId, resourceCode.trim(), recordPid.trim());
+                tenantId, resourceCode, recordPid);
         List<String> staleSharePids = existing.stream()
                 .filter(share -> "member".equalsIgnoreCase(share.getSubjectType())
                         && StringUtils.hasText(share.getSubjectPid())
                         && !desiredMemberPids.contains(share.getSubjectPid()))
                 .map(RecordShare::getPid)
                 .toList();
-        if (!staleSharePids.isEmpty()) {
-            // Batch removal: each removeByPid would re-select the share it
-            // already has in memory.
-            recordShareService.removeByPids(tenantId, staleSharePids);
-        }
-        for (String memberPid : desiredMemberPids) {
-            recordShareService.shareRecordByPid(
-                    tenantId, resourceCode.trim(), recordPid.trim(),
-                    "member", memberIdsByPid.get(memberPid), memberPid, permissionMask, null);
-        }
+        if (!staleSharePids.isEmpty()) recordShareService.removeByPids(tenantId, staleSharePids);
     }
 
     private List<String> normalizeUserPids(Collection<String> userPids) {

@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.permission.entity.RecordShare;
 import com.auraboot.framework.permission.mapper.RecordShareMapper;
+import com.auraboot.framework.permission.service.RecordShareService.MemberShare;
 import com.auraboot.framework.rbac.service.UserRoleService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -108,6 +109,29 @@ class RecordShareServiceImplTest {
         assertThat(share.getPid()).isNotBlank();
         assertThat(share.getCreatedAt()).isNotNull();
         assertThat(share.getCreatedBy()).isEqualTo(99L);
+    }
+
+    @Test
+    void sharesMembersUsingOneBatchWithTheOriginalActorAndPermissionMasks() {
+        service.shareMembersByPids(100L, List.of(
+                new MemberShare("model.customer", "record-1", 5L, "member-5", "read,update"),
+                new MemberShare("model.history", "record-2", 6L, "member-6", "read")));
+
+        var captor = ArgumentCaptor.<List<RecordShare>>captor();
+        verify(recordShareMapper).upsertByPublicPidsBatch(captor.capture());
+        verify(recordShareMapper, never()).upsertByPublicPids(any());
+        var rows = captor.getValue();
+        assertThat(rows).extracting(RecordShare::getResourceCode).containsExactly("model.customer", "model.history");
+        assertThat(rows).extracting(RecordShare::getRecordPid).containsExactly("record-1", "record-2");
+        assertThat(rows).extracting(RecordShare::getSubjectPid).containsExactly("member-5", "member-6");
+        assertThat(rows).extracting(RecordShare::getSubjectId).containsExactly(5L, 6L);
+        assertThat(rows).extracting(RecordShare::getPermissionMask).containsExactly("read,update", "read");
+        assertThat(rows).allSatisfy(row -> {
+            assertThat(row.getTenantId()).isEqualTo(100L);
+            assertThat(row.getCreatedBy()).isEqualTo(99L);
+            assertThat(row.getExpiresAt()).isNull();
+            assertThat(row.getSubjectType()).isEqualTo("member");
+        });
     }
 
     @Test

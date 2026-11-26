@@ -60,6 +60,42 @@ public class RecordShareServiceImpl implements RecordShareService {
     public void shareRecordByPid(Long tenantId, String resourceCode, String recordPid,
                                  String subjectType, Long subjectId, String subjectPid,
                                  String permissionMask, Instant expiresAt) {
+        var share = publicShare(tenantId, resourceCode, recordPid, subjectType, subjectId, subjectPid,
+                permissionMask, expiresAt);
+        recordShareMapper.upsertByPublicPids(share);
+        finishPublicShare(share);
+    }
+
+    @Override
+    @Transactional
+    public void shareMembersByPids(Long tenantId, List<MemberShare> shares) {
+        var rows = shares.stream().map(share -> {
+            if (!StringUtils.hasText(share.resourceCode()) || !StringUtils.hasText(share.memberPid())) {
+                throw new RootUnCheckedException(BadParam, "resourceCode and memberPid are required");
+            }
+            return publicShare(tenantId, share.resourceCode(), share.recordPid(),
+                    "member", share.memberId(), share.memberPid(), share.permissionMask(), null);
+        }).toList();
+        // Both PIDs are required by this batch path. A duplicate conflict key is
+        // applied in caller order, as with successive single-record upserts.
+        var distinct = rows.stream()
+                .map(share -> List.of(share.getResourceCode(), share.getRecordPid(), share.getSubjectPid()))
+                .distinct().count();
+        if (distinct != rows.size()) {
+            for (var share : rows) recordShareMapper.upsertByPublicPids(share);
+        } else {
+            for (int from = 0; from < rows.size(); from += 1000) {
+                var batch = rows.subList(from, Math.min(from + 1000, rows.size()));
+                if (batch.size() == 1) recordShareMapper.upsertByPublicPids(batch.getFirst());
+                else recordShareMapper.upsertByPublicPidsBatch(batch);
+            }
+        }
+        rows.forEach(this::finishPublicShare);
+    }
+
+    private RecordShare publicShare(Long tenantId, String resourceCode, String recordPid,
+                                    String subjectType, Long subjectId, String subjectPid,
+                                    String permissionMask, Instant expiresAt) {
         if (!StringUtils.hasText(recordPid)) {
             throw new RootUnCheckedException(BadParam, "recordPid is required");
         }
@@ -81,12 +117,15 @@ public class RecordShareServiceImpl implements RecordShareService {
         share.setCreatedAt(Instant.now());
         share.setCreatedBy(MetaContext.getCurrentUserId());
 
-        recordShareMapper.upsertByPublicPids(share);
-        sharePresenceCache.evictRecord(tenantId, resourceCode, recordPid.trim());
+        return share;
+    }
+
+    private void finishPublicShare(RecordShare share) {
+        sharePresenceCache.evictRecord(share.getTenantId(), share.getResourceCode(), share.getRecordPid());
         log.info("Shared record {}/{} with {}:{} (mask={}, expires={})",
-                resourceCode, recordPid, subjectType,
-                StringUtils.hasText(subjectPid) ? subjectPid : subjectId,
-                permissionMask, expiresAt);
+                share.getResourceCode(), share.getRecordPid(), share.getSubjectType(),
+                share.getSubjectPid() != null ? share.getSubjectPid() : share.getSubjectId(),
+                share.getPermissionMask(), share.getExpiresAt());
     }
 
     @Override

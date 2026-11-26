@@ -50,6 +50,12 @@ public interface RecordShareService {
                           String subjectType, Long subjectId, String subjectPid,
                           String permissionMask, Instant expiresAt);
 
+    record MemberShare(String resourceCode, String recordPid, Long memberId, String memberPid,
+                       String permissionMask) {}
+
+    /** Upsert permanent shares for members already resolved in this tenant. */
+    void shareMembersByPids(Long tenantId, List<MemberShare> shares);
+
     /**
      * Remove sharing of a record with a subject.
      *

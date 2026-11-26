@@ -98,17 +98,37 @@ class RecordShareAccessorImplTest {
 
         verify(tenantMemberMapper).findActiveRecipients(7L, List.of("owner", "manager"));
         verifyNoMoreInteractions(tenantMemberMapper);
-        verify(recordShareService).shareRecordByPid(7L, "account", "account-1",
-                "member", 1L, "member-a", "read,update", null);
-        verify(recordShareService).shareRecordByPid(7L, "pool_item", "item-1",
-                "member", 1L, "member-a", "read,update", null);
-        verify(recordShareService).shareRecordByPid(7L, "history", "history-1",
-                "member", 1L, "member-a", "read", null);
-        verify(recordShareService).shareRecordByPid(7L, "history", "history-1",
-                "member", 2L, "member-b", "read", null);
-        verify(recordShareService, times(4))
-                .shareRecordByPid(anyLong(), anyString(), anyString(), anyString(),
-                        anyLong(), anyString(), anyString(), isNull());
+        verify(recordShareService).shareMembersByPids(7L, List.of(
+                new RecordShareService.MemberShare("account", "account-1", 1L, "member-a", "read,update"),
+                new RecordShareService.MemberShare("pool_item", "item-1", 1L, "member-a", "read,update"),
+                new RecordShareService.MemberShare("history", "history-1", 1L, "member-a", "read"),
+                new RecordShareService.MemberShare("history", "history-1", 2L, "member-b", "read")));
+        verify(recordShareService, never()).shareRecordByPid(
+                anyLong(), anyString(), anyString(), anyString(), anyLong(), anyString(), anyString(), isNull());
+    }
+
+    @Test
+    void repeatedTargetAppliesEachReplacementInOrder() {
+        when(tenantMemberMapper.findActiveRecipients(7L, List.of("owner", "manager")))
+                .thenReturn(List.of(new TenantMemberMapper.ActiveMemberRecipient("owner", "member-a", 1L),
+                        new TenantMemberMapper.ActiveMemberRecipient("manager", "member-b", 2L)));
+        when(recordShareService.listByRecordPidForManagement(7L, "account", "account-1"))
+                .thenReturn(List.of(), List.of(share("share-a", "member-a")));
+        var accessor = new RecordShareAccessorImpl(recordShareService, tenantMemberMapper);
+
+        accessor.replaceSharesForRecords(7L, List.of(
+                new Replacement("account", "account-1", Set.of("owner"), true),
+                new Replacement("account", " account-1 ", Set.of("manager"), false)));
+
+        var ordered = inOrder(recordShareService);
+        ordered.verify(recordShareService).listByRecordPidForManagement(7L, "account", "account-1");
+        ordered.verify(recordShareService).shareRecordByPid(
+                7L, "account", "account-1", "member", 1L, "member-a", "read,update", null);
+        ordered.verify(recordShareService).listByRecordPidForManagement(7L, "account", "account-1");
+        ordered.verify(recordShareService).removeByPids(7L, List.of("share-a"));
+        ordered.verify(recordShareService).shareRecordByPid(
+                7L, "account", "account-1", "member", 2L, "member-b", "read", null);
+        ordered.verifyNoMoreInteractions();
     }
 
     @Test
