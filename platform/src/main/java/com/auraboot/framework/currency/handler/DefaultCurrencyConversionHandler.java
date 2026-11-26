@@ -1,5 +1,6 @@
 package com.auraboot.framework.currency.handler;
 
+import com.auraboot.framework.currency.service.CurrencyService;
 import com.auraboot.framework.currency.spi.CurrencyConversionSpi;
 import com.auraboot.framework.currency.spi.ExchangeRateResult;
 import com.auraboot.framework.meta.service.CommandHandler;
@@ -40,6 +41,7 @@ public class DefaultCurrencyConversionHandler implements CommandHandler {
     private final ObjectMapper objectMapper;
     private final ObjectProvider<CurrencyConversionSpi> currencyConversionSpiProvider;
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
+    private final ObjectProvider<CurrencyService> currencyServiceProvider;
 
     @Override
     public String getHandlerName() {
@@ -130,6 +132,17 @@ public class DefaultCurrencyConversionHandler implements CommandHandler {
         if (inverse != null && inverse.getRate() != null && inverse.getRate().compareTo(BigDecimal.ZERO) > 0) {
             BigDecimal rate = BigDecimal.ONE.divide(inverse.getRate(), 8, RoundingMode.HALF_UP);
             return new ExchangeRateResult(rate, inverse.getRateId(), true);
+        }
+
+        CurrencyService currencyService = currencyServiceProvider.getIfAvailable();
+        if (currencyService != null && tenantId != null) {
+            try {
+                var conversion = currencyService.convert(BigDecimal.ONE, fromCurrency, toCurrency,
+                        LocalDate.now(), tenantId);
+                return new ExchangeRateResult(conversion.getRateUsed(), null, false);
+            } catch (CurrencyService.MissingExchangeRateException e) {
+                log.debug("No platform exchange rate for {} -> {}: {}", fromCurrency, toCurrency, e.getMessage());
+            }
         }
 
         if (spi == null) {

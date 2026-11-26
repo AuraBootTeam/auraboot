@@ -88,14 +88,14 @@ public class CurrencyServiceImpl implements CurrencyService {
         // from -> pivot
         BigDecimal fromToPivotRate = findEffectiveRate(tenantId, fromCurrency, PIVOT_CURRENCY, date);
         if (fromToPivotRate == null) {
-            throw new RuntimeException("No exchange rate found for " + fromCurrency + " -> " + PIVOT_CURRENCY
+            throw new MissingExchangeRateException("No exchange rate found for " + fromCurrency + " -> " + PIVOT_CURRENCY
                     + " on or before " + date);
         }
 
         // pivot -> to
         BigDecimal pivotToTargetRate = findEffectiveRate(tenantId, PIVOT_CURRENCY, toCurrency, date);
         if (pivotToTargetRate == null) {
-            throw new RuntimeException("No exchange rate found for " + PIVOT_CURRENCY + " -> " + toCurrency
+            throw new MissingExchangeRateException("No exchange rate found for " + PIVOT_CURRENCY + " -> " + toCurrency
                     + " on or before " + date);
         }
 

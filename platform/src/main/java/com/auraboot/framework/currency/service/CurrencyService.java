@@ -13,6 +13,13 @@ import java.util.List;
  */
 public interface CurrencyService {
 
+    /** A valid currency pair has no applicable direct, inverse, or pivot rate. */
+    class MissingExchangeRateException extends RuntimeException {
+        public MissingExchangeRateException(String message) {
+            super(message);
+        }
+    }
+
     /**
      * Convert an amount from one currency to another using rates effective on a given date.
      * Supports triangulated conversion via a pivot currency (USD) if direct rate is unavailable.
