@@ -8,7 +8,7 @@ import * as http from 'http';
 import * as https from 'https';
 import dns from 'node:dns';
 import { createRequestHandler } from '@react-router/express';
-import { BffProxyService, shouldParseProxyBody } from '~/server/services/BffProxyService';
+import { BffProxyService, shouldParseProxyBody, usesPublicPluginCors } from '~/server/services/BffProxyService';
 import { bffFlowDesignerService } from '~/server/services/BffFlowDesignerService';
 
 import uploadRouter from '~/server/routes/upload';
@@ -148,6 +148,10 @@ const DEV_ALLOWED_ORIGIN_HEADERS = new Map<string, string>(
 
 // CORS middleware with externalized configuration
 app.use((req, res, next) => {
+  if (usesPublicPluginCors(req.originalUrl || req.url, req.method)) {
+    next();
+    return;
+  }
   const origin = req.headers.origin;
   const explicitAllowedOrigin = origin ? CREDENTIAL_ALLOWED_ORIGIN_HEADERS.get(origin) : undefined;
   const devAllowedOrigin =

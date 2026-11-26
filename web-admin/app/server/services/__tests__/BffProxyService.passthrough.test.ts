@@ -151,6 +151,29 @@ describe('BffProxyService — Origin as a security input', () => {
     expect(seen.origin).toBe('https://shop.example.com');
   });
 
+  it('forwards public plugin preflight headers and leaves other plugin routes unchanged', async () => {
+    const backend = await startBackend('application/json', '{"ok":true}');
+    const service = new BffProxyService({ target: `http://127.0.0.1:${backend.port}` });
+    try {
+      for (const [path, forwarded] of [
+        ['/api/ext/probe/public/forms/F1/submit', true],
+        ['/api/ext/probe/forms/F1/submit', false],
+      ] as const) {
+        const req = browserRequest(path, 'https://publisher.example.test');
+        req.method = 'OPTIONS';
+        req.headers['access-control-request-method'] = 'POST';
+        req.headers['access-control-request-headers'] = 'content-type';
+        await service.handleApiRequest(req, recordingResponse().res);
+        const seen = backend.lastHeaders();
+        expect(seen.origin).toBe(forwarded ? req.headers.origin : undefined);
+        expect(seen['access-control-request-method']).toBe(forwarded ? 'POST' : undefined);
+        expect(seen['access-control-request-headers']).toBe(forwarded ? 'content-type' : undefined);
+      }
+    } finally {
+      backend.close();
+    }
+  });
+
   it('does NOT forward Origin on ordinary admin paths', async () => {
     const backend = await startBackend('application/json', '{"ok":true}');
 

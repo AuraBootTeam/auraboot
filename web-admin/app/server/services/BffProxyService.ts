@@ -97,6 +97,12 @@ export function shouldForwardRequestBody(
   );
 }
 
+/** Public plugin writes and browser preflights use the backend's registered origin policy. */
+export function usesPublicPluginCors(path: string, method: string): boolean {
+  return (method === 'POST' || method === 'OPTIONS') &&
+    /^\/api\/ext\/[A-Za-z0-9_][A-Za-z0-9_.-]*\/public\//.test(path);
+}
+
 const BROWSER_ONLY_PROXY_HEADERS = new Set([
   'access-control-request-headers',
   'access-control-request-method',
@@ -623,7 +629,8 @@ export class BffProxyService {
     // refused. Forwarded exactly where it is load-bearing, and nowhere else.
     const path = req.originalUrl || req.url || '';
     const originIsSecurityInput =
-      path.startsWith('/api/public/') || path.startsWith('/api/collect/');
+      path.startsWith('/api/public/') || path.startsWith('/api/collect/') ||
+      usesPublicPluginCors(path, req.method);
 
     Object.entries(req.headers).forEach(([key, value]) => {
       const lowerKey = key.toLowerCase();
@@ -633,8 +640,9 @@ export class BffProxyService {
         return;
       }
 
-      if (lowerKey === 'origin' && originIsSecurityInput) {
-        if (typeof value === 'string') sanitized.origin = value;
+      if (originIsSecurityInput && (lowerKey === 'origin' || (req.method === 'OPTIONS' &&
+          (lowerKey === 'access-control-request-method' || lowerKey === 'access-control-request-headers')))) {
+        if (typeof value === 'string') sanitized[lowerKey] = value;
         return;
       }
 
