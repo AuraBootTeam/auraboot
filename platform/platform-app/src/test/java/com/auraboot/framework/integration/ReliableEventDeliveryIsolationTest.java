@@ -71,9 +71,9 @@ class ReliableEventDeliveryIsolationTest {
         }
     }
     @Test
-    void ordinaryConsumerKeepsExistingDefaultIsolation() {
+    void ordinaryConsumerOwnsCoherentRepeatableReadIsolation() {
         new ReliableEventDeliveryExecutor(mapper, metrics, manager).deliver(event, new Ordinary(), "lease");
-        assertThat(isolation).isEqualTo(TransactionDefinition.ISOLATION_DEFAULT);
+        assertThat(isolation).isEqualTo(TransactionDefinition.ISOLATION_REPEATABLE_READ);
         verify(manager).commit(any());
     }
     @Test
@@ -114,7 +114,7 @@ class ReliableEventDeliveryIsolationTest {
             default -> null;
         });
         new ReliableEventDeliveryExecutor(mapper, metrics, manager).deliver(event,(ReliableEventConsumerExtension) consumer, "lease");
-        assertThat(isolation).isEqualTo(TransactionDefinition.ISOLATION_DEFAULT);
+        assertThat(isolation).isEqualTo(TransactionDefinition.ISOLATION_REPEATABLE_READ);
     }
 
     @Test

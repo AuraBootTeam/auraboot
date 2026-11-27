@@ -327,9 +327,10 @@ for (const [sharedStatus, bootstrapStatus, expected] of [[0, 0, 0], [1, 0, 1], [
   test(`independent bootstrap preserves statuses ${sharedStatus}/${bootstrapStatus}`, t => {
     const artifacts = mkdtempSync(path.join(tmpdir(), 'oss-ci-status-contract-'));
     t.after(() => rmSync(artifacts, { recursive: true, force: true }));
-    const calls = source.slice(source.indexOf('run_backend_gradle aura_boot --continue cleanTest test'), source.indexOf('# Both task exit codes'));
+    const calls = source.slice(source.indexOf('if (( ${#FOCUSED_TEST_ARGUMENTS[@]} > 0 )); then'), source.indexOf('# Both task exit codes'));
     const result = spawnSync('bash', ['-c', `
       BOOTSTRAP_DATABASE=aura_boot_bootstrap_contract
+      FOCUSED_TEST_ARGUMENTS=()
       run_backend_gradle() {
         printf '%s\\n' "$*"
         if [[ "$*" == *bootstrapBillingAccountTest ]]; then return "$BOOTSTRAP_STATUS"; fi

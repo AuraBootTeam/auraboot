@@ -50,6 +50,15 @@ FLYWAY_IMAGE='flyway/flyway:12.8.1@sha256:b8a2d72926b98234c1fb8f45659fd23d8a001a
 
 mkdir -p "$ARTIFACTS"
 
+# Exact class selection is for root-cause validation only; no arguments keeps the
+# original complete nightly denominator. Admission precedes any infrastructure.
+selection_arguments="$(python3 -B "$SCRIPT_DIR/ci/backend_test_selection.py" plan \
+    "$PROJECT_ROOT/platform" "$ARTIFACTS/test-selection.json" "$@")" || exit 2
+FOCUSED_TEST_ARGUMENTS=()
+if [[ -n "$selection_arguments" ]]; then
+  while IFS= read -r argument; do FOCUSED_TEST_ARGUMENTS+=("$argument"); done <<< "$selection_arguments"
+fi
+
 if ! python3 -B "$SCRIPT_DIR/ci/test_migration_conventions.py" \
     > "$ARTIFACTS/migration-convention-contracts.log" 2>&1; then
   printf '[oss-backend-unit-ci] product-failure: migration convention contracts failed\n' >&2
@@ -327,7 +336,11 @@ GRADLE_OPTS="-Dmaven.repo.local=$ARTIFACTS/m2 ${GRADLE_OPTS:-}" \
 platform/gradlew --no-daemon -p platform "${RESOURCE_ARGUMENTS[@]}" "$@"
 }
 
-run_backend_gradle aura_boot --continue cleanTest test
+if (( ${#FOCUSED_TEST_ARGUMENTS[@]} > 0 )); then
+  run_backend_gradle aura_boot --continue --no-build-cache "${FOCUSED_TEST_ARGUMENTS[@]}"
+else
+  run_backend_gradle aura_boot --continue cleanTest test
+fi
 root_test_status=$?
 printf '%s\n' "$root_test_status" > "$ARTIFACTS/root-test-exit-code.txt"
 printf '%s\n' "$BOOTSTRAP_DATABASE" > "$ARTIFACTS/bootstrap-database.txt"
@@ -356,4 +369,9 @@ for build in "$PROJECT_ROOT/platform/build" "$PROJECT_ROOT"/platform/*/build; do
     fi
   done
 done
+if (( ${#FOCUSED_TEST_ARGUMENTS[@]} > 0 )); then
+  python3 -B "$SCRIPT_DIR/ci/backend_test_selection.py" reconcile \
+    "$ARTIFACTS/test-selection.json" "$ARTIFACTS/junit" \
+    || { [[ "$gradle_status" -ne 0 ]] || gradle_status=1; }
+fi
 exit "$gradle_status"

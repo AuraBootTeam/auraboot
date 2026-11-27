@@ -69,6 +69,16 @@ class DynamicDataServiceImplTypesIT {
     private MetaModelFieldBindingMapper fieldBindingMapper;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired private com.auraboot.framework.permission.service.UserPermissionService fixturePermissions;
+    private com.auraboot.framework.integration.NativePermissionFixture fixtureAuthority;
+
+    private void authorizeFixtureModel() {
+        if (fixtureAuthority == null) {
+            fixtureAuthority = new com.auraboot.framework.integration.NativePermissionFixture(jdbcTemplate, fixturePermissions);
+            fixtureAuthority.grantModel(modelCode, "read", "create", "update", "delete");
+        }
+    }
+
     @Autowired
     private UserService userService;
     @Autowired
@@ -102,10 +112,12 @@ class DynamicDataServiceImplTypesIT {
             }
             inited = true;
         }
+        authorizeFixtureModel();
     }
 
     @AfterAll
     void cleanup() {
+        if (fixtureAuthority != null) fixtureAuthority.close();
         try {
             try {
                 schemaManagementService.dropTableByModel(modelCode);
@@ -264,5 +276,6 @@ class DynamicDataServiceImplTypesIT {
             tenantMemberService.addMember(testUser.getId(), testTenant.getId(), "active");
         }
         MetaContext.setContext(testTenant.getId(), testUser.getId(), testUser.getPid(), testUser.getUserName());
+        MetaContext.setMemberId(tenantMemberService.findByTenantIdAndUserId(testTenant.getId(), testUser.getId()).getId());
     }
 }
