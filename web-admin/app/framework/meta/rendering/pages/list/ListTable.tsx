@@ -36,7 +36,7 @@ import {
 import { DraggableColumnHeader } from './DraggableColumnHeader';
 import { COMPACT_COLUMN_WIDTH, fitDefaultColumnWidths } from './responsiveColumnWidths';
 import { RowActionButtons } from './RowActionButtons';
-import { estimateActionColumnWidth, partitionRowActions } from './actionColumnWidth';
+import { desktopRowActions, estimateActionColumnWidth, partitionRowActions } from './actionColumnWidth';
 import { SummaryRow, hasAnyAggregate } from './SummaryRow';
 import { buildRowTree, flattenVisible, collectAllNodeIds } from './rowTree';
 import { InlineEditCell } from '~/framework/meta/rendering/components/InlineEditCell';
@@ -247,14 +247,18 @@ export const ListTable = React.memo(function ListTable({
   // Size the action column to the labels it actually renders. A hard-coded width
   // silently clipped longer labels ("统一设计器"), which wrapped and inflated every
   // row. DSL `width` still wins — it is the escape hatch, not the norm.
+  // A mobile-only button has a desktop twin under another code; rendering both lists the same
+  // command twice. The rendered set and the width estimate go through the same filter.
+  const actionButtons = useMemo(() => desktopRowActions(actionColumn?.buttons ?? []), [actionColumn]);
+
   const actionColumnWidth = useMemo(() => {
     if (!actionColumn) return 0;
     if (actionColumn.width) return getColumnWidth(actionColumn);
-    const { inline, overflow } = partitionRowActions(actionColumn.buttons ?? []);
+    const { inline, overflow } = partitionRowActions(actionButtons);
     return estimateActionColumnWidth(inline.map(resolveButtonLabel), {
       hasOverflow: overflow.length > 0,
     });
-  }, [actionColumn, getColumnWidth, resolveButtonLabel]);
+  }, [actionButtons, actionColumn, getColumnWidth, resolveButtonLabel]);
 
   const baseTableWidth = useMemo(() => {
     const selectionWidth = enableSelection ? SELECTION_COLUMN_WIDTH : 0;
@@ -887,7 +891,7 @@ export const ListTable = React.memo(function ListTable({
                             >
                               <div className="flex items-center">
                                 <RowActionButtons
-                                  buttons={actionColumn.buttons || []}
+                                  buttons={actionButtons}
                                   record={record}
                                   evaluateVisibleWhen={evaluateVisibleWhen}
                                   canUseButton={canUseButton}
@@ -1005,7 +1009,7 @@ export const ListTable = React.memo(function ListTable({
                           >
                             <div className="flex items-center">
                               <RowActionButtons
-                                buttons={actionColumn.buttons || []}
+                                buttons={actionButtons}
                                 record={record}
                                 evaluateVisibleWhen={evaluateVisibleWhen}
                                 canUseButton={canUseButton}
@@ -1124,7 +1128,7 @@ export const ListTable = React.memo(function ListTable({
                           >
                             <div className="flex items-center">
                               <RowActionButtons
-                                buttons={actionColumn.buttons || []}
+                                buttons={actionButtons}
                                 record={record}
                                 evaluateVisibleWhen={evaluateVisibleWhen}
                                 canUseButton={canUseButton}

@@ -197,7 +197,7 @@ public class InstalledIntegrationService {
         return registry.prepareBusinessRequest(source,input);
     }
 
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public Acceptance accept(MachinePrincipal principal, String source, IntegrationEventEnvelope envelope) {
         return inTenant(principal.tenantId(), principal.installationPid(), () -> {
             String external = envelope.headers().get("externalEventId");
@@ -227,14 +227,14 @@ public class InstalledIntegrationService {
     }
 
     /** Verifies an already accepted event without claiming a receipt or running a command. */
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public Acceptance verifyAcceptedReplay(MachinePrincipal principal, String source, IntegrationEventEnvelope envelope) {
         return inTenant(principal.tenantId(), principal.installationPid(), () -> {
             String external = envelope.headers().get("externalEventId");
             String durable = "ext:" + principal.installationPid() + ":" + source + ":" + external;
             Resolved resolved = resolve(principal, source, external, durable);
             verifyEnvelope(resolved, envelope);
-            var original = receipts.find(principal.tenantId(), principal.installationPid(), source, external);
+            var original = receipts.findSnapshot(principal.tenantId(), principal.installationPid(), source, external);
             if (original == null || !Set.of("accepted", "completed").contains(original.state())
                     || !validRequestPid(original.requestPid()))
                 throw new ExternalEventIngressService.IdempotencyConflictException();
@@ -243,7 +243,7 @@ public class InstalledIntegrationService {
         });
     }
 
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public void consume(IntegrationEventEnvelope persisted) {
         IntegrationEventEnvelope envelope = restoreOriginalTime(persisted);
         String installation = envelope.headers().get("installationPid");
@@ -268,7 +268,7 @@ public class InstalledIntegrationService {
     }
 
     /** Runs the installed business boundary in the caller transaction without enqueueing work. */
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public Map<String,Object> executeSynchronously(MachinePrincipal principal, String source,
             IntegrationEventEnvelope envelope) {
         return executeSynchronouslyWithReceipt(principal, source, envelope).data();
@@ -276,7 +276,7 @@ public class InstalledIntegrationService {
 
     public record SynchronousResult(Map<String,Object> data, boolean replay) { }
 
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public SynchronousResult executeSynchronouslyWithReceipt(MachinePrincipal principal, String source,
             IntegrationEventEnvelope envelope) {
         if (principal == null || envelope == null) throw denied();
@@ -329,10 +329,10 @@ public class InstalledIntegrationService {
         return payload;
     }
 
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public Map<String,Object> result(MachinePrincipal principal, String source, String eventId) {
         return inTenant(principal.tenantId(),principal.installationPid(), () -> {
-            var r = receipts.find(principal.tenantId(),principal.installationPid(),source,eventId);
+            var r = receipts.findSnapshot(principal.tenantId(),principal.installationPid(),source,eventId);
             if (r == null) throw denied();
             Resolved resolved = resolve(principal,source,eventId,r.durableEventId());
             if (!r.bindingSha256().equals(resolved.bindingHash()) || !commandMatches(resolved,r)

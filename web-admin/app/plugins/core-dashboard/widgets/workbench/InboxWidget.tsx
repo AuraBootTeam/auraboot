@@ -42,15 +42,18 @@ const FILTER_PILLS = [
   { key: 'alert', labelKey: 'workbench.inbox.alert' },
 ];
 
-function formatDue(item: InboxItem): string {
+/** `createdAt` of an inbox item as a relative day label, in the reader's language. */
+export function formatDue(item: InboxItem, locale?: string): string {
   const created = item.createdAt ? new Date(item.createdAt).getTime() : 0;
   if (!created) return '—';
+  const chinese = String(locale ?? '').toLowerCase().startsWith('zh');
   const diffMs = Date.now() - created;
   const days = Math.floor(diffMs / 86_400_000);
-  if (days <= 0) return 'Today';
-  if (days === 1) return '1d ago';
-  if (days < 7) return `${days}d ago`;
-  return `${Math.floor(days / 7)}w ago`;
+  if (days <= 0) return chinese ? '今天' : 'Today';
+  if (days === 1) return chinese ? '1 天前' : '1d ago';
+  if (days < 7) return chinese ? `${days} 天前` : `${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  return chinese ? `${weeks} 周前` : `${weeks}w ago`;
 }
 
 export function InboxWidget({
@@ -59,7 +62,7 @@ export function InboxWidget({
   itemTypes,
   className = '',
 }: InboxWidgetProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [items, setItems] = useState<InboxItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [, setTotal] = useState(0);
@@ -207,7 +210,7 @@ export function InboxWidget({
                   </td>
                   <td className="px-5 py-3 text-gray-500">
                     <div className="flex items-center justify-between gap-3">
-                      <span>{formatDue(item)}</span>
+                      <span>{formatDue(item, locale)}</span>
                       {isApproval && (
                         <button
                           type="button"

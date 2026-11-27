@@ -39,7 +39,7 @@ export interface KanbanCardItemProps {
  * dedicated cardFields components for currency / avatar / progress /
  * date-relative; keeps inline rendering for legacy text / number / date / tag.
  */
-function renderFieldValue(field: KanbanCardField, value: unknown): React.ReactNode {
+function renderFieldValue(field: KanbanCardField, value: unknown, locale?: string): React.ReactNode {
   switch (field.type) {
     case 'currency':
       return (
@@ -53,7 +53,9 @@ function renderFieldValue(field: KanbanCardField, value: unknown): React.ReactNo
     case 'progress':
       return <ProgressField value={value as number | string | null | undefined} max={field.max} />;
     case 'date-relative':
-      return <DateRelativeField value={value as string | Date | null | undefined} />;
+      return (
+        <DateRelativeField value={value as string | Date | null | undefined} locale={locale} />
+      );
     case 'date': {
       if (value === null || value === undefined) return '-';
       const date = value instanceof Date ? value : new Date(String(value));
@@ -204,7 +206,7 @@ export function KanbanCardItem({
             return (
               <div key={field.field} className="flex items-center gap-1 text-xs text-gray-600">
                 {label && <span className="shrink-0 whitespace-nowrap text-gray-400">{label}:</span>}
-                <span>{renderFieldValue(field, value)}</span>
+                <span>{renderFieldValue(field, value, locale)}</span>
               </div>
             );
           })}

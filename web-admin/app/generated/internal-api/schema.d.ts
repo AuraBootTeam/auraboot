@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 47713865d7b1d742f20404e061117c5945e44b1e40198a3d6e23266c6a0ae087
+ * Contract SHA-256: 04c697056b629380f72f6a0b698ede34f7d36a08cdda6277b18f571e594bf404
  */
 export interface paths {
     "/api/activities": {
@@ -42227,6 +42227,8 @@ export interface components {
             targetId?: string;
             targetLabel?: string;
             targetType?: string;
+            /** Format: date-time */
+            updatedAt?: string;
         };
         UserIdentity: {
             avatar?: string | null;

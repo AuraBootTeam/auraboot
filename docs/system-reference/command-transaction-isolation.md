@@ -2,7 +2,7 @@
 type: system-reference
 status: active
 created: 2026-10-23
-updated: 2026-10-27
+updated: 2026-11-26
 ---
 
 # Command transaction isolation
@@ -166,3 +166,66 @@ The original creation payload and locked current row must contain the same scala
 A targetless create command receives only the creation capability. Existing `appendAndRetainExistingToTarget` retains all original readable-target, lock, version, owner and rollback requirements. Legacy `linkExisting` remains an UPDATE path and refuses immutable children. This does not authorize non-owner historical copying or export rows created with a null file projection.
 
 The combined rich-source check executes 119 unit cases across seven suites and nineteen PostgreSQL/local-storage cases: seven new boundary checks and twelve existing parent append regressions. These are factory and transaction checks. Actual Registry commands, HTTP, browser, paired artifact admission and deployment require separate evidence. Original execution records and exact source digests remain in the team's private evidence store.
+
+
+## Fresh record-scope authorization checks
+
+The host's `RecordActionScopeAccessor` performs each human record-action decision in its own
+read-only `REQUIRES_NEW`, `REPEATABLE_READ` transaction. Native model reads and the complete
+permission decision share that snapshot. A later check opens a fresh snapshot; a prior decision
+is not a cached grant. The original writable command transaction is suspended and restored,
+including its physical connection and isolation. The scope bridge still expires with its
+original invocation, actor, thread and synchronization. It neither commits the caller's writes
+nor grants generic model CRUD.
+
+## Constant command concurrency keys
+
+For a command that owns its physical transaction, a constant server-authored `concurrencyKey`
+is acquired before that transaction begins and is held through commit or rollback. The executor
+recognizes the already-held guard and does not acquire it again around the guarded phases.
+This permits an immutable append to observe the previous holder's committed head under
+repeatable read without changing the parent record or replaying a failed handler.
+
+The lock resource name and configured timeout are unchanged: a constant key retains its existing
+global scope. Choose the key's scope deliberately. Metadata is reloaded after acquisition; changing
+that command's key while it waits rejects the invocation before opening a transaction. Handler
+failures propagate after rollback, and guard ownership is cleared on every exit. No general write
+retry is introduced. Payload-dependent keys and caller-owned transactions retain their existing
+guarded-phase boundary; they do not gain a fresh transaction snapshot from waiting on a lock.
+
+## Installed integration and synchronous API coordinators
+
+The installed integration coordinator opens a writable REPEATABLE READ transaction for
+acceptance, accepted replay verification, reliable consumption, synchronous execution and
+result polling. The synchronous business API coordinator uses the same boundary before
+dispatching a command. The external ingress accept coordinator already owns this isolation.
+
+A result GET still dispatches an installed status command. Opening a default READ COMMITTED
+transaction first makes a handler's declared snapshot contract impossible to satisfy; the
+command correctly refuses that caller. The coordinator must establish the snapshot before
+reading its receipt or invoking the command. This does not suspend a caller transaction,
+bypass installation/binding authority, turn a missing receipt into a result, or weaken an
+explicit command isolation requirement. A caller that supplies an incompatible transaction
+continues to fail closed.
+
+The PostgreSQL boundary integration tests use the real Spring transaction interceptor and
+command transaction coordinator. Binding and policy collaborators are explicit seams: they
+assert the physical connection's isolation, join the declared command transaction, write only
+a private fixture table, and then retain the original authority denial. The outer rollback
+removes that fixture write. These tests establish the transaction boundary; native ingress
+accept/process/result journeys separately establish successful machine behavior.
+
+Result polling and accepted replay verification read an installed receipt through a non-locking
+snapshot query. They observe receipt state and immutable binding fingerprints; neither owns the
+consumer's transition. A receipt changed after the REPEATABLE READ snapshot can legitimately
+remain at its prior state for that poll. A later poll opens a new snapshot and observes completion.
+Using `FOR UPDATE` for this observation can raise PostgreSQL serialization failure when a
+consumer commits after the snapshot, making an ordinary result GET fail instead of returning a
+coherent prior state. Consumption, acceptance takeover checks, synchronous replay checks and
+explicit receipt recovery retain their existing locking reads and conditional write guards.
+
+The concurrent receipt integration case uses the real production MyBatis snapshot query against
+a private PostgreSQL table. A second physical connection commits completion after the result
+proxy establishes its snapshot. The poll reads the prior accepted state without locking, and a
+subsequent transaction reads completed. Binding denial remains an explicit seam after that read;
+this case proves concurrent observation, not a successful installed machine response.

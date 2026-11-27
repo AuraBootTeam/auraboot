@@ -164,7 +164,8 @@ public class CommandExecutorImpl implements CommandExecutor {
                     () -> commandPipeline.executeGuardedPhases(ctx);
 
             CommandExecuteResult result;
-            if (ctx.getConcurrencyKey() != null) {
+            boolean guardHeld = executionTransaction.holdsConcurrencyGuard(commandCode, ctx.getConcurrencyKey());
+            if (ctx.getConcurrencyKey() != null && !guardHeld) {
                 result = concurrencyGuard.executeWithLock(ctx.getConcurrencyKey(), ctx.getLockTimeoutMs(), guardedPipeline);
             } else {
                 result = guardedPipeline.get();

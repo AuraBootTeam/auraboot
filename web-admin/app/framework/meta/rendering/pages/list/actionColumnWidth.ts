@@ -15,6 +15,17 @@ import type { ButtonConfig } from '~/framework/meta/schemas/types';
 export const MAX_INLINE_ACTIONS = 3;
 
 /**
+ * The row actions a desktop list renders. A button marked `mobileOnly` is written for the
+ * mobile card and has a desktop twin under another code: the CRM lead list carries a
+ * "move to pool" that asks for the target pool and a mobile-only one that opens a form. On
+ * the desktop list the mobile one still landed in the overflow menu, so the user saw the same
+ * command twice. TableBlockRenderer already drops these; this is the same rule for ListTable.
+ */
+export function desktopRowActions(buttons: ButtonConfig[]): ButtonConfig[] {
+  return buttons.filter((button) => !(button as { mobileOnly?: boolean }).mobileOnly);
+}
+
+/**
  * Split row actions into the ones rendered inline and the ones collapsed into
  * the "⋮" menu. Both the renderer and the column-width estimator go through
  * here, so a column can never be sized for a layout it does not render.

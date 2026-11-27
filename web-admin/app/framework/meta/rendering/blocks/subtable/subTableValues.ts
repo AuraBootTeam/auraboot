@@ -20,6 +20,7 @@ export function formatCellValue(
   timeZone?: string,
   formats?: Partial<DateTimeFormatPreferences>,
   referenceDisplayValue?: string,
+  locale?: string,
 ): string {
   if (value == null) return '-';
 
@@ -50,7 +51,10 @@ export function formatCellValue(
   }
 
   if (typeof value === 'boolean') {
-    return value ? 'Yes' : 'No';
+    // 是 / 否 for a Chinese reader: the cell of a sub-table read `Yes` and `No` on a Chinese
+    // stack (the CRM account detail lists its contacts with a 主要联系人 column).
+    const chinese = String(locale ?? '').toLowerCase().startsWith('zh');
+    return value ? (chinese ? '是' : 'Yes') : (chinese ? '否' : 'No');
   }
 
   if (typeof value === 'number') {
