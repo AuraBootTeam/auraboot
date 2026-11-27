@@ -50,6 +50,22 @@ FLYWAY_IMAGE='flyway/flyway:12.8.1@sha256:b8a2d72926b98234c1fb8f45659fd23d8a001a
 
 mkdir -p "$ARTIFACTS"
 
+if ! python3 -B "$SCRIPT_DIR/ci/test_migration_conventions.py" \
+    > "$ARTIFACTS/migration-convention-contracts.log" 2>&1; then
+  printf '[oss-backend-unit-ci] product-failure: migration convention contracts failed\n' >&2
+  exit 1
+fi
+# Static migration admission precedes image pulls and database mutation. Exact
+# infrastructure scope does not change business rules or the historical ratchet.
+if ! python3 "$SCRIPT_DIR/check-migration-conventions.py" \
+    "$PROJECT_ROOT/platform/src/main/resources/db/migration/core" \
+    --baseline-file "$SCRIPT_DIR/migration-conventions-baseline.txt" \
+    --infrastructure-policy "$SCRIPT_DIR/migration-conventions-infrastructure.json" \
+    > "$ARTIFACTS/migration-conventions.log" 2>&1; then
+  printf '[oss-backend-unit-ci] product-failure: new migration convention violations (see %s)\n' "$ARTIFACTS/migration-conventions.log" >&2
+  exit 1
+fi
+
 environment_invalid() {
   printf '[oss-backend-unit-ci] environment-invalid: %s\n' "$*" >&2
   exit 2
@@ -217,16 +233,7 @@ if ! run_flyway validate > "$ARTIFACTS/flyway-validate.log" 2>&1; then
   exit 1
 fi
 
-# Migration convention gate (P6 follow-up): the committed baseline holds the accepted
-# historical debt (1057 legacy violations); only NEW violations block the run. The
-# ratchet reports fixed entries so the baseline can shrink monotonically.
-if ! python3 "$SCRIPT_DIR/check-migration-conventions.py" \
-    "$PROJECT_ROOT/platform/src/main/resources/db/migration/core" \
-    --baseline-file "$SCRIPT_DIR/migration-conventions-baseline.txt" \
-    > "$ARTIFACTS/migration-conventions.log" 2>&1; then
-  printf '[oss-backend-unit-ci] product-failure: new migration convention violations (see %s)\n' "$ARTIFACTS/migration-conventions.log" >&2
-  exit 1
-fi
+
 
 # Ledger reconciliation (P6 follow-up): every migration file must be registered in the
 # freshly-applied ledger — catches naming drift and directory/ledger divergence early.
