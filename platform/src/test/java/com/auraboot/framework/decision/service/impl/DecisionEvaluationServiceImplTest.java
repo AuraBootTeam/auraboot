@@ -565,6 +565,13 @@ class DecisionEvaluationServiceImplTest {
             String snapshot = capturedTraceSnapshot();
             assertThat(snapshot).contains("RESOLVED").contains("level");
             assertThat(snapshot).doesNotContain("tenant_id");
+            var transaction = ArgumentCaptor.forClass(org.springframework.transaction.TransactionDefinition.class);
+            verify(transactionManager).getTransaction(transaction.capture());
+            assertThat(transaction.getValue().getIsolationLevel())
+                    .isEqualTo(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
+            assertThat(transaction.getValue().getPropagationBehavior())
+                    .isEqualTo(org.springframework.transaction.TransactionDefinition.PROPAGATION_NESTED);
+            assertThat(transaction.getValue().isReadOnly()).isTrue();
         }
 
         @Test

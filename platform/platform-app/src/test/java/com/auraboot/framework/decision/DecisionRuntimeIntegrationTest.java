@@ -60,6 +60,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>Extends {@link BaseIntegrationTest} so it inherits a committed test tenant + MetaContext and
  * a per-test transaction rolled back at the end (so created definitions/versions/logs clean up).
  */
+@org.springframework.transaction.annotation.Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
 class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
