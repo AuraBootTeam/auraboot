@@ -151,6 +151,7 @@ class DocGenerationServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     @Order(6)
     @DisplayName("GEN-06: Tenant-scoped models, bound fields, commands and counts overwrite prior tenant output")
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     void tenantMetadataIsExcludedAndEmptyOutputReplacesPriorContent() throws Exception {
         String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
         String modelCode = "doc_scope_" + suffix;

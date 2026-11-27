@@ -40,6 +40,7 @@ class BootstrapRepairServiceCoverageIT extends BaseIntegrationTest {
 
     @Test
     @DisplayName("every ordered step repairs its prerequisite and reaches a stable state")
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     void everyStepIdempotent() {
         // Run in production order so this test establishes its own prerequisites instead
         // of depending on seed rows left by another test or CI setup phase.

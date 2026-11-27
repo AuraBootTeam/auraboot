@@ -66,6 +66,10 @@ class DynamicDataAdvancedIntegrationTest extends BaseIntegrationTest {
     private boolean modelInitialized = false;
     private final List<String> createdRecordPids = Collections.synchronizedList(new ArrayList<>());
 
+    @Autowired private com.auraboot.framework.permission.service.UserPermissionService fixturePermissions;
+    private com.auraboot.framework.integration.NativePermissionFixture nativeAuthority;
+    @AfterAll void releaseOwnedAuthority() { if (nativeAuthority != null) nativeAuthority.close(); }
+
     @BeforeAll
     void setupSharedModel() {
         modelCode = "adv_test_" + System.currentTimeMillis();
@@ -83,6 +87,8 @@ class DynamicDataAdvancedIntegrationTest extends BaseIntegrationTest {
                 createModel();
                 createFields();
                 createPhysicalTable();
+                nativeAuthority = new com.auraboot.framework.integration.NativePermissionFixture(jdbcTemplate, fixturePermissions);
+                nativeAuthority.grantModel(modelCode, "create", "read", "update", "delete");
                 modelInitialized = true;
                 log.info("Model initialized: {}", modelCode);
             } catch (Exception e) {

@@ -181,8 +181,10 @@ public class CommandExecutionTransaction {
         // scope: the native field authorization decides it on the locked row and admits it only
         // from a coherent transaction. Checked after the secondaries, so a declared requirement
         // is neither contradicted nor relaxed. Update and aggregate effects write through the
-        // scoped SQL path and keep their own guards.
-        boolean effectDerived = isolation == null && declaresRecordCreation(config);
+        // scoped SQL path and keep their own guards. Cascades read child rows through the
+        // ordinary projection before deleting them, so they need the same coherent view.
+        boolean effectDerived = isolation == null && (declaresRecordCreation(config)
+                || config.get("cascadeDelete") instanceof java.util.List<?> cascades && !cascades.isEmpty());
         if (effectDerived) isolation = coherentMinimum(config);
         // The executor's own read for a query takes the native read projection, which answers a
         // record only from a coherent transaction. A query without a plugin handler has nothing

@@ -84,6 +84,10 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
 
     // ── Setup ────────────────────────────────────────────────────────────────
 
+    @Autowired private com.auraboot.framework.permission.service.UserPermissionService fixturePermissions;
+    private com.auraboot.framework.integration.NativePermissionFixture nativeAuthority;
+    @AfterAll void releaseOwnedAuthority() { if (nativeAuthority != null) nativeAuthority.close(); }
+
     @BeforeAll
     void initModelCode() {
         String suffix = Long.toString(System.currentTimeMillis(), 36);
@@ -102,6 +106,8 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
             createModel();
             createFields();
             createPhysicalTable();
+            nativeAuthority = new com.auraboot.framework.integration.NativePermissionFixture(jdbcTemplate, fixturePermissions);
+            nativeAuthority.grantModel(modelCode, "create", "read", "update", "delete");
             modelReady = true;
             log.info("[jsonb-it] model={} ready", modelCode);
         }

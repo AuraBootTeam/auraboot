@@ -53,6 +53,9 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles("integration-test")
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class CommandRecordActionScopeCapabilityIntegrationTest extends BaseIntegrationTest {
+    @Autowired private javax.sql.DataSource fixtureDataSource;
+    @Autowired private org.springframework.boot.data.redis.autoconfigure.DataRedisProperties fixtureRedis;
+    @Autowired private com.auraboot.framework.permission.service.UserPermissionService fixturePermissions;
     @Autowired private CommandRecordActionScopeAccessorFactory factory;
     @Autowired private CommandTargetScopePhase targetScope;
     @Autowired private DynamicDataService data;
@@ -69,10 +72,8 @@ class CommandRecordActionScopeCapabilityIntegrationTest extends BaseIntegrationT
     private String label;
     private String pid;
 
-    @BeforeEach void ownedFixture() {
-        assertEquals("maritime-parallel-core",System.getenv("AURA_RUNTIME_NAME"));
-        assertEquals("auraboot_26",System.getenv("POSTGRES_DB"));
-        assertEquals("auraboot_26",jdbc.queryForObject("select current_database()",String.class));
+    @BeforeEach void ownedFixture() throws Exception {
+        com.auraboot.framework.integration.DeclaredTestInfrastructure.assertSelected(fixtureDataSource, fixtureRedis);
         String suffix=Long.toUnsignedString(System.nanoTime()); model="cmd_scope_"+suffix; label="scope_label_"+suffix;
         var entity=new Model(); entity.setPid(UniqueIdGenerator.generate()); entity.setTenantId(getTestTenant().getId());
         entity.setCode(model); entity.setVersion(1); entity.setIsCurrent(true); entity.setStatus(Status.PUBLISHED.getCode());
@@ -89,7 +90,11 @@ class CommandRecordActionScopeCapabilityIntegrationTest extends BaseIntegrationT
         var created=schema.createTableByModel(model); assertTrue(created.isSuccess(),created.getErrorMessage());
         grantCommittedPermissionToTestRole(model+".read","model",model,"read","Read command scope fixture");
         setScope("read","all"); setScope("update","none"); setScope("delete","none");
-        var record=MetaContext.runWithCommandPermitScope("ALL",()->data.create(model,new HashMap<>(Map.of(label,"Before"))));
+        Map<String,Object> record;
+        try (var seed = new com.auraboot.framework.integration.NativePermissionFixture(jdbc, fixturePermissions)) {
+            seed.grantModel(model, "create");
+            record = data.create(model, new HashMap<>(Map.of(label, "Before")));
+        }
         pid=(String)record.get("pid"); assertNotNull(pid);
         var stored=MetaContext.runWithCommandPermitScope("ALL",()->data.getById(model,pid));
         assertEquals(getTestTenant().getId(),stored.get("tenant_id"));

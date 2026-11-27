@@ -13,6 +13,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 STACK_DIR="$PROJECT_ROOT/.aura-stack"
 
 SLUG=""
+ADMIN_SESSION_FILE=""
 PROFILE="core"
 EDITION="auto"
 BACKEND_URL="${BACKEND_URL:-}"
@@ -39,6 +40,7 @@ Options:
                                      auto       prefer enterprise root when it exists
                                      oss        only import from OSS plugin root
                                      enterprise prefer enterprise plugin root, then OSS root
+  --admin-session-file=<path>      Owned private business session bound to this backend and administrator.
   --backend-url=<url>              Backend base URL for host mode.
   --plugin-root=<path>             OSS plugin root. Host path in host mode; container
                                    path in --slug Docker mode.
@@ -71,6 +73,7 @@ for arg in "$@"; do
         --slug=*) SLUG="${arg#--slug=}" ;;
         --profile=*) PROFILE="${arg#--profile=}" ;;
         --edition=*) EDITION="${arg#--edition=}" ;;
+        --admin-session-file=*) ADMIN_SESSION_FILE="${arg#--admin-session-file=}" ;;
         --backend-url=*) BACKEND_URL="${arg#--backend-url=}" ;;
         --plugin-root=*) PLUGIN_ROOT="${arg#--plugin-root=}" ;;
         --enterprise-plugin-root=*) ENTERPRISE_PLUGIN_ROOT="${arg#--enterprise-plugin-root=}" ;;
@@ -334,6 +337,11 @@ if [ "$status" != "UP" ]; then
     exit 1
 fi
 
+if [ -n "$ADMIN_SESSION_FILE" ]; then
+    jwt="$(AURA_CORE_BASE_URL="$BACKEND_URL" ADMIN_EMAIL="$ADMIN_EMAIL" ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+        AURA_ADMIN_SESSION_FILE="$ADMIN_SESSION_FILE" python3 -B "$SCRIPT_DIR/application/core-admin-session.py")" \
+        || { echo "ERROR: runtime administrator session is unavailable" >&2; exit 1; }
+else
 login_resp="$(NO_PROXY=localhost curl -s -X POST "$BACKEND_URL/api/auth/login" \
     -H "Content-Type: application/json" \
     -d "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}")"
@@ -370,6 +378,8 @@ for item in json.load(sys.stdin).get('data',[]):
         echo "ERROR: tenant selection failed: $select_resp" >&2
         exit 1
     fi
+fi
+
 fi
 
 # Select optional profile resources using the authenticated verified assembly.

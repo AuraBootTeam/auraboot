@@ -19,7 +19,15 @@ class RoleDisplaySummaryIT extends BaseIntegrationTest {
 
     @Test void countsAssignedMembersEvenWhenTheirAssignmentWindowHasExpired() {
         var tenant = getTestTenant().getId();
-        var role = getTestRole().getId();
+        long role = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        String pid = com.auraboot.framework.common.util.UniqueIdGenerator.generate();
+        jdbc.update("INSERT INTO ab_role (id,pid,tenant_id,code,name,scope_type,status,deleted_flag) "
+                        + "VALUES (?,?,?,?,?,'tenant','active',FALSE)",
+                role,pid,tenant,"summary_"+pid.toLowerCase(),"Owned role summary fixture");
+        jdbc.update("INSERT INTO ab_user_role (id,pid,tenant_id,member_id,role_id,status,deleted_flag) "
+                        + "VALUES (?,?,?,?,?,'active',FALSE)",
+                com.baomidou.mybatisplus.core.toolkit.IdWorker.getId(),
+                com.auraboot.framework.common.util.UniqueIdGenerator.generate(),tenant,getTestTenantMember().getId(),role);
         assertThat(roles.displaySummaries(tenant, List.of(role))).singleElement()
                 .satisfies(summary -> assertThat(summary.getMemberCount()).isEqualTo(1L));
         jdbc.update("UPDATE ab_user_role SET expiry_date=CURRENT_DATE-1 WHERE tenant_id=? AND role_id=? AND member_id=?",

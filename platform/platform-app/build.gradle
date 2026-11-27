@@ -195,6 +195,9 @@ dependencies {
     testImplementation testFixtures(project(':'))
     testImplementation testFixtures(project(':platform-agent'))
     testImplementation project(':platform-plugin-api')
+    // The seed/reset ITs explicitly activate the test profile. Its controllers
+    // belong to the opt-in classifier, not Core's ordinary library or this app.
+    testRuntimeOnly files(rootProject.tasks.named('testApiJar'))
 }
 sourceSets {
     integrationTest {

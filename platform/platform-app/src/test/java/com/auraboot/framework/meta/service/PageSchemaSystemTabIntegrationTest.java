@@ -40,9 +40,10 @@ class PageSchemaSystemTabIntegrationTest extends BaseIntegrationTest {
         List<Map<String, Object>> systemTabs = tabs.stream()
                 .filter(t -> Boolean.TRUE.equals(t.get("system")))
                 .toList();
-        assertThat(systemTabs).hasSize(4);
+        assertThat(systemTabs).hasSize(3);
         assertThat(systemTabs.stream().map(t -> t.get("key")).toList())
-                .containsExactly("__comments__", "__activity__", "__approval_comments__", "__field_history__");
+                .containsExactly("__comments__", "__activity__", "__field_history__");
+        assertThat(systemTabs).noneMatch(tab -> "__approval_comments__".equals(tab.get("key")));
     }
 
     @Test

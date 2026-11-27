@@ -27,9 +27,14 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(classes=TestApplication.class)
 @ActiveProfiles("integration-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class CommandCreatedFileLinkIT {
+@org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+class CommandCreatedFileLinkIT extends com.auraboot.framework.integration.BaseIntegrationTest {
+    @Autowired private com.auraboot.framework.permission.service.UserPermissionService fixturePermissions;
+    private com.auraboot.framework.integration.NativePermissionFixture nativeAuthority;
+    @AfterAll void releaseOwnedAuthority() { if (nativeAuthority != null) nativeAuthority.close(); }
+
     static final String COMMAND="creation:file",FIELD="proof_file";
-    static final long TENANT=992720001L,USER=992720002L,MEMBER=992720003L;
+    Long TENANT,USER,MEMBER;
     static final Path STORAGE=directory();
     static Path directory(){try{return Files.createTempDirectory("aura-created-files-slot72-");}catch(java.io.IOException e){throw new IllegalStateException(e);}}
     @DynamicPropertySource static void properties(DynamicPropertyRegistry r){r.add("aura.storage.local.base-path",STORAGE::toString);}
@@ -38,6 +43,7 @@ class CommandCreatedFileLinkIT {
     @Autowired PlatformTransactionManager transactions;
     String rootModel,childModel,rootPid;String file;
     @BeforeAll void metadata() {
+        applyTestMetaContext();TENANT=getTestTenant().getId();USER=getTestUser().getId();MEMBER=getTestTenantMember().getId();
         actor();String suffix=UniqueIdGenerator.generate().toLowerCase();rootModel="cfroot_"+suffix;childModel="cfchild_"+suffix;
         models.saveDefinition(ModelDefinition.builder().code(rootModel).tableName("mt_"+rootModel).status("published").modelType("entity")
                 .fields(List.of(FieldDefinition.builder().code("name").columnName("name").dataType("string").build())).build());
@@ -47,6 +53,9 @@ class CommandCreatedFileLinkIT {
                 .fields(List.of(FieldDefinition.builder().code(FIELD).columnName(FIELD).dataType("file").maxLength(128)
                         .immutable(true).allowedWriterCommands(List.of(COMMAND)).build())).build());
         assertTrue(schema.createTableByModel(rootModel).isSuccess());assertTrue(schema.createTableByModel(childModel).isSuccess());
+        nativeAuthority = new com.auraboot.framework.integration.NativePermissionFixture(jdbc, fixturePermissions);
+        nativeAuthority.grantModel(rootModel, "create", "read", "update");
+        nativeAuthority.grantModel(childModel, "create", "read");
         rootPid=MetaContext.runWithCommandPermitScope("ALL",()->data.create(rootModel,Map.of("name","root"))).get("pid").toString();
     }
     @BeforeEach void upload() {
@@ -54,9 +63,11 @@ class CommandCreatedFileLinkIT {
         assertFalse(retained());
     }
     @AfterEach void clear(){MetaContext.clear();}
-    void actor(){MetaContext.setContext(TENANT,USER,"created-file-actor","actor");MetaContext.setMemberId(MEMBER);}
+    void actor(){applyTestMetaContext();}
     void command(boolean targeted,Consumer<FileAccessor> action) {
-        new TransactionTemplate(transactions).executeWithoutResult(status->{
+        var commandTransaction = new TransactionTemplate(transactions);
+        commandTransaction.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        commandTransaction.executeWithoutResult(status->{
             String model=targeted?rootModel:childModel,target=targeted?rootPid:null;
             var definition=new CommandDefinition();definition.setCode(COMMAND);definition.setModelCode(model);
             var request=new CommandExecuteRequest();request.setTargetRecordId(target);

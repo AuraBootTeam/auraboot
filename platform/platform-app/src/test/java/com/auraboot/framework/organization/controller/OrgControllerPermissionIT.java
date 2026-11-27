@@ -59,6 +59,13 @@ class OrgControllerPermissionIT extends BaseIntegrationTest {
     @Autowired private TenantService tenants;
     @Autowired private OrgEmployeeService employees;
 
+    private Map<String,Object> seedOrgRecord(String model, Map<String,Object> values) {
+        try (var authority = new com.auraboot.framework.integration.NativePermissionFixture(jdbc, permissions)) {
+            authority.grantModel(model, "create", "read");
+            return data.create(model, values);
+        }
+    }
+
     private MockMvc mvc;
     private String departmentPid;
     private Path plugin;
@@ -77,7 +84,7 @@ class OrgControllerPermissionIT extends BaseIntegrationTest {
         assertThat(imported.isSuccess()).as("organization import: %s", imported.getErrorMessage()).isTrue();
         assertThat(permissions.getUserPermissionCodes(getTestUser().getId()))
                 .doesNotContain("org.hr.manage", "org.team.manage");
-        departmentPid = data.create("org_department", Map.of(
+        departmentPid = seedOrgRecord("org_department", Map.of(
                 "org_dept_name", "Department permission fixture " + System.nanoTime(),
                 "org_dept_order", 5)).get("pid").toString();
 
@@ -105,9 +112,9 @@ class OrgControllerPermissionIT extends BaseIntegrationTest {
         applyTestMetaContext();
         assertThat(permissions.getUserPermissionCodes(getTestUser().getId()))
                 .contains("org.hr.manage").doesNotContain("org.team.manage");
-        var position = data.create("org_position", Map.of("org_pos_name", "Commander fixture",
+        var position = seedOrgRecord("org_position", Map.of("org_pos_name", "Commander fixture",
                 "org_pos_dept_id", departmentPid, "org_pos_level", "staff"));
-        String employee = data.create("org_employee", Map.of("org_emp_name", "Commander fixture",
+        String employee = seedOrgRecord("org_employee", Map.of("org_emp_name", "Commander fixture",
                 "org_emp_dept_id", departmentPid, "org_emp_position_id", position.get("pid")))
                 .get("pid").toString();
         String createdName = "Created with HR only " + System.nanoTime();
@@ -186,7 +193,7 @@ class OrgControllerPermissionIT extends BaseIntegrationTest {
                 .andExpect(success()).andExpect(jsonPath("$.code").value("0"));
         assertThat(employee(employeePid).get("org_emp_name")).isEqualTo("Updated HR employee");
         applyTestMetaContext();
-        String target = data.create("org_department", Map.of("org_dept_name", "Transfer target " + System.nanoTime()))
+        String target = seedOrgRecord("org_department", Map.of("org_dept_name", "Transfer target " + System.nanoTime()))
                 .get("pid").toString();
         String targetPosition = position(target);
         mvc.perform(body(put("/api/org/employees/{pid}/transfer", employeePid),
@@ -243,7 +250,7 @@ class OrgControllerPermissionIT extends BaseIntegrationTest {
         grantCapability("org.cap.hr");
         applyTestMetaContext();
         var foreign = foreignMember();
-        String employeePid = data.create("org_employee", Map.of(
+        String employeePid = seedOrgRecord("org_employee", Map.of(
                 "org_emp_name", "Unlinked foreign-boundary fixture " + System.nanoTime(),
                 "org_emp_dept_id", departmentPid, "org_emp_position_id", position(departmentPid))).get("pid").toString();
         var employeeBefore = employee(employeePid);
@@ -263,7 +270,7 @@ class OrgControllerPermissionIT extends BaseIntegrationTest {
         applyTestMetaContext();
         var account = users.signUp("org-existing-link-" + System.nanoTime() + "@example.test", "Test-password-2026!");
         var member = members.addMember(account.getId(), getTestTenant().getId(), "active");
-        String employeePid = data.create("org_employee", Map.of(
+        String employeePid = seedOrgRecord("org_employee", Map.of(
                 "org_emp_name", "Unlinked own-tenant fixture " + System.nanoTime(),
                 "org_emp_dept_id", departmentPid, "org_emp_position_id", position(departmentPid))).get("pid").toString();
 
@@ -305,7 +312,7 @@ class OrgControllerPermissionIT extends BaseIntegrationTest {
     private void assertEmployeeWritesDenied() throws Exception {
         applyTestMetaContext();
         String position = position(departmentPid);
-        String employeePid = data.create("org_employee", Map.of("org_emp_name", "Employee denial fixture",
+        String employeePid = seedOrgRecord("org_employee", Map.of("org_emp_name", "Employee denial fixture",
                 "org_emp_dept_id", departmentPid, "org_emp_position_id", position)).get("pid").toString();
         var user = users.signUp("org-link-deny-" + System.nanoTime() + "@example.test", "Test-password-2026!");
         var member = members.addMember(user.getId(), getTestTenant().getId(), "active");
@@ -336,7 +343,7 @@ class OrgControllerPermissionIT extends BaseIntegrationTest {
     }
 
     private String position(String departmentPid) {
-        return data.create("org_position", Map.of("org_pos_name", "Permission fixture position " + System.nanoTime(),
+        return seedOrgRecord("org_position", Map.of("org_pos_name", "Permission fixture position " + System.nanoTime(),
                 "org_pos_dept_id", departmentPid, "org_pos_level", "staff")).get("pid").toString();
     }
 

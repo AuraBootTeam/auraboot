@@ -35,12 +35,17 @@ class DefaultScopeTransactionIT extends BaseIntegrationTest {
     @Autowired private RolePermissionService grants;
     @Autowired private UserPermissionService permissions;
     @MockitoSpyBean private DataScopeService scopes;
+    private com.auraboot.framework.integration.TenantAdministrationFixture administrator;
     private Long roleId;
     private String rolePid;
     private String resource;
 
     @BeforeEach
     void fixture() {
+        administrator = com.auraboot.framework.integration.TenantAdministrationFixture.grant(
+                jdbc, getTestTenant().getId(), getTestTenantMember().getId());
+        grantCommittedPermissionToTestRole(com.auraboot.framework.permission.constants.MetaPermission.ROLE_MANAGE,
+                "API", "role", "update", "Role authoring fixture");
         rolePid = UniqueIdGenerator.generate();
         resource = "default_scope_tx_" + rolePid.toLowerCase();
         roleId = IdWorker.getId();
@@ -65,6 +70,7 @@ class DefaultScopeTransactionIT extends BaseIntegrationTest {
     @AfterEach
     void cleanup() {
         reset(scopes);
+        if (administrator != null) administrator.close();
         if (roleId != null) {
             jdbc.update("DELETE FROM ab_role_data_scope WHERE tenant_id=? AND role_id=?", getTestTenant().getId(), roleId);
             jdbc.update("DELETE FROM ab_role_permission WHERE tenant_id=? AND role_id=?", getTestTenant().getId(), roleId);

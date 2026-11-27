@@ -71,6 +71,7 @@ class PermissionMatrixPolicyControllerIT extends BaseIntegrationTest {
     void grantPolicyManageAccess() {
         grantTenantAdminRoleToTestUser();
         grantToTestRole(MetaPermission.PERMISSION_MANAGE);
+        grantToTestRole(MetaPermission.ROLE_MANAGE);
         userPermissionService.evictPermissionDefinitions(getTestTenant().getId());
         userPermissionService.evictRoleUsers(getTestTenant().getId(), getTestRole().getId());
     }

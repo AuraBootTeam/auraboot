@@ -69,7 +69,10 @@ class DynamicDataAnalyticsCoverageIT extends BaseIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired private com.auraboot.framework.permission.service.UserPermissionService fixturePermissions;
+    private com.auraboot.framework.integration.NativePermissionFixture nativeAuthority;
     private Long tenantId;
+    private final java.util.List<String> batchPids = new java.util.ArrayList<>();
     private String pid1;
     private String pid2;
     private String pid3;
@@ -83,6 +86,8 @@ class DynamicDataAnalyticsCoverageIT extends BaseIntegrationTest {
         createModel();
         createFields();
         createTable();
+        nativeAuthority = new com.auraboot.framework.integration.NativePermissionFixture(jdbcTemplate, fixturePermissions);
+        nativeAuthority.grantModel(MODEL, "create", "read", "update", "delete");
         pid1 = createRecord("A", 10, 100);
         pid2 = createRecord("B", 20, 200);
         pid3 = createRecord("C", 30, 300);
@@ -90,6 +95,12 @@ class DynamicDataAnalyticsCoverageIT extends BaseIntegrationTest {
         // needs the model read grant committed before the lookups.
         grantCommittedPermissionToTestRole(
                 "model." + MODEL + ".read", "model", MODEL, "read", "DD analytics read");
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void cleanupOwnedBatchRows() {
+        for (String pid : batchPids) jdbcTemplate.update("DELETE FROM mt_" + MODEL + " WHERE tenant_id=? AND pid=?", tenantId, pid);
+        batchPids.clear();
     }
 
     @AfterAll
@@ -100,6 +111,7 @@ class DynamicDataAnalyticsCoverageIT extends BaseIntegrationTest {
         } catch (Exception ignored) {
         }
         purgeFamily();
+        if (nativeAuthority != null) nativeAuthority.close();
         MetaContext.clear();
     }
 
@@ -139,18 +151,15 @@ class DynamicDataAnalyticsCoverageIT extends BaseIntegrationTest {
                 "SELECT ddan_counter FROM mt_" + MODEL + " WHERE ddan_name = 'A'", Integer.class);
         assertEquals(10, afterMismatch);
 
-        // match: single field. Record-level write ACLs may scope the CAS update to zero
-        // rows even for the owning user; the pipeline (validation, guards, scoped UPDATE
-        // with the compare predicate) executes end-to-end either way.
-        boolean updatedA = dynamicDataService.compareAndSet(MODEL, pidByName("A"), "ddan_counter", 10, 11);
-        if (updatedA) {
-            assertEquals(11, jdbcTemplate.queryForObject(
-                    "SELECT ddan_counter FROM mt_" + MODEL + " WHERE ddan_name = 'A'", Integer.class));
-        }
-
-        // match: multi-field overload (same record-ACL caveat)
-        assertDoesNotThrow(() -> dynamicDataService.compareAndSet(MODEL, pidByName("B"), "ddan_counter", 20,
+        assertTrue(dynamicDataService.compareAndSet(MODEL, pidByName("A"), "ddan_counter", 10, 11));
+        assertEquals(11, jdbcTemplate.queryForObject(
+                "SELECT ddan_counter FROM mt_" + MODEL + " WHERE ddan_name = 'A'", Integer.class));
+        assertTrue(dynamicDataService.compareAndSet(MODEL, pidByName("B"), "ddan_counter", 20,
                 Map.of("ddan_counter", 21, "ddan_cap", 250)));
+        assertEquals(21, jdbcTemplate.queryForObject(
+                "SELECT ddan_counter FROM mt_" + MODEL + " WHERE ddan_name = 'B'", Integer.class));
+        assertEquals(250, jdbcTemplate.queryForObject(
+                "SELECT ddan_cap FROM mt_" + MODEL + " WHERE ddan_name = 'B'", Integer.class));
 
         assertThrows(Exception.class,
                 () -> dynamicDataService.compareAndSet(MODEL, " ", "counter", 1, 2));
@@ -169,7 +178,9 @@ class DynamicDataAnalyticsCoverageIT extends BaseIntegrationTest {
         applyTestMetaContext();
         grantCommittedPermissionToTestRole("model." + MODEL + ".update", "model", MODEL, "update", "DD batch CAS update");
         String first = createRecord("CAS-BATCH-A", 41, 100);
+        batchPids.add(first);
         String second = createRecord("CAS-BATCH-B", 42, 200);
+        batchPids.add(second);
         var a = new com.auraboot.framework.plugin.extension.CompareAndSetUpdate(first, 41,
                 Map.of("ddan_counter", 51, "ddan_cap", 150));
         var b = new com.auraboot.framework.plugin.extension.CompareAndSetUpdate(second, 42,

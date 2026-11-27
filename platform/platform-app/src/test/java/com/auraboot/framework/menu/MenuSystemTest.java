@@ -57,6 +57,9 @@ class MenuSystemTest extends BaseIntegrationTest {
     @Autowired
     private RolePermissionMapper rolePermissionMapper;
 
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate fixtureJdbc;
+    @Autowired private com.auraboot.framework.menu.service.RoleNavigationService fixtureNavigation;
+
     // ========================================================================
     // Helper Methods
     // ========================================================================
@@ -291,7 +294,9 @@ class MenuSystemTest extends BaseIntegrationTest {
     @DisplayName("E5-06: Role menus returns menus accessible by role")
     void e5_06_roleMenus() {
         // When
-        List<Menu> roleMenus = menuService.getMenusByRoleId(getTestRole().getId());
+        List<Menu> roleMenus = com.auraboot.framework.integration.NativePermissionFixture.asTenantAdministrator(
+                fixtureJdbc, userPermissionService, com.auraboot.framework.permission.constants.MetaPermission.ROLE_MANAGE,
+                "API", "role", "update", () -> menuService.getMenusByRoleId(getTestRole().getId()));
 
         // Then: should not throw, returns menus (possibly empty)
         assertThat(roleMenus).isNotNull();
@@ -444,6 +449,15 @@ class MenuSystemTest extends BaseIntegrationTest {
                 parent.getId(),
                 20,
                 deniedPerm.getCode());
+
+        // Navigation membership is an independent role decision; business grants do not add entries.
+        com.auraboot.framework.integration.NativePermissionFixture.asTenantAdministrator(
+                fixtureJdbc, userPermissionService, com.auraboot.framework.permission.constants.MetaPermission.ROLE_MANAGE,
+                "API", "role", "update", () -> {
+                    var before = fixtureNavigation.read(getTestRole().getPid());
+                    return fixtureNavigation.save(getTestRole().getPid(),
+                            new com.auraboot.framework.menu.dto.RoleNavigation.Write(before.revision(), java.util.Set.of(allowedMenu.getPid())));
+                });
 
         // When
         List<Menu> userTree = menuService.getUserMenuTree(getTestUser().getId(), getTestTenant().getId());

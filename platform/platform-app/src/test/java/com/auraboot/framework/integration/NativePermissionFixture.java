@@ -18,7 +18,17 @@ public final class NativePermissionFixture implements AutoCloseable {
         try (var grants = new NativePermissionFixture(jdbc, permissions);
              var administration = TenantAdministrationFixture.grant(jdbc,
                      MetaContext.getCurrentTenantId(), MetaContext.getCurrentMemberId())) {
-            grants.grant(code, type, resource, action);
+            var definitions = jdbc.queryForList("SELECT resource_type,resource_code,action FROM ab_permission "
+                    + "WHERE tenant_id=? AND code=? AND deleted_flag=FALSE", MetaContext.getCurrentTenantId(), code);
+            if (definitions.isEmpty()) {
+                grants.grant(code, type, resource, action);
+            } else {
+                if (definitions.size() != 1) throw new IllegalStateException("Authoring permission is ambiguous");
+                var definition = definitions.getFirst();
+                // Authoring is code-based; preserve the registered definition's exact resource metadata.
+                grants.grant(code, (String) definition.get("resource_type"),
+                        (String) definition.get("resource_code"), (String) definition.get("action"));
+            }
             return operation.get();
         }
     }

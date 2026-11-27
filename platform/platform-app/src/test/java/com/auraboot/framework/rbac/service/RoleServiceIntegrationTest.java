@@ -35,6 +35,8 @@ class RoleServiceIntegrationTest extends BaseIntegrationTest {
     private RoleService roleService;
 
     private final String runId = String.valueOf(System.currentTimeMillis());
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate fixtureJdbc;
+    @Autowired private com.auraboot.framework.permission.service.UserPermissionService fixturePermissions;
     private Long roleId;
     private String rolePid;
 
@@ -185,7 +187,9 @@ class RoleServiceIntegrationTest extends BaseIntegrationTest {
     void copyRole_createsNewRole() {
         assertThat(roleId).as("roleId must be set by R1-01").isNotNull();
 
-        Role copy = roleService.copyRole(roleId, "Analyst Copy " + runId, "COPY-" + runId);
+        Role copy = com.auraboot.framework.integration.NativePermissionFixture.asTenantAdministrator(
+                fixtureJdbc, fixturePermissions, com.auraboot.framework.permission.constants.MetaPermission.ROLE_MANAGE,
+                "API", "role", "update", () -> roleService.copyRole(roleId, "Analyst Copy " + runId, "COPY-" + runId));
 
         assertThat(copy).isNotNull();
         assertThat(copy.getId()).isNotEqualTo(roleId);

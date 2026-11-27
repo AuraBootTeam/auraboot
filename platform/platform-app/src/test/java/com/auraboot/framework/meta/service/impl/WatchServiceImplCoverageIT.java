@@ -39,8 +39,14 @@ class WatchServiceImplCoverageIT extends BaseIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired private com.auraboot.framework.meta.service.MetaModelService fixtureModels;
+    @Autowired private com.auraboot.framework.meta.service.SchemaManagementService fixtureSchema;
+    @Autowired private com.auraboot.framework.meta.service.DynamicDataService fixtureData;
+    @Autowired private com.auraboot.framework.permission.service.UserPermissionService fixturePermissions;
+    private com.auraboot.framework.integration.NativePermissionFixture nativeAuthority;
+    private Long recordId1, recordId2;
+    private String recordPid1, recordPid2;
     private Long userId;
-    private Long otherUserId;
     private Long tenantId;
 
     @BeforeEach
@@ -48,8 +54,24 @@ class WatchServiceImplCoverageIT extends BaseIntegrationTest {
         applyTestMetaContext();
         tenantId = getTestTenant().getId();
         userId = getTestUser().getId();
-        otherUserId = getTestTenantMember().getId(); // any distinct Long works as a second watcher
+        fixtureModels.saveDefinition(com.auraboot.framework.meta.dto.ModelDefinition.builder()
+                .code(MODEL).modelType("entity").modelCategory("master")
+                .fields(List.of(com.auraboot.framework.meta.dto.FieldDefinition.builder()
+                        .code("watch_label_" + MODEL).dataType("string").build())).build());
+        var schema = fixtureSchema.createTableByModel(MODEL);
+        assertTrue(schema.isSuccess(), schema.getErrorMessage());
+        nativeAuthority = new com.auraboot.framework.integration.NativePermissionFixture(jdbcTemplate, fixturePermissions);
+        nativeAuthority.grantModel(MODEL, "create", "read");
+        var first = fixtureData.create(MODEL, java.util.Map.of("watch_label_" + MODEL, "first"));
+        var second = fixtureData.create(MODEL, java.util.Map.of("watch_label_" + MODEL, "second"));
+        recordId1 = ((Number) first.get("id")).longValue();
+        recordId2 = ((Number) second.get("id")).longValue();
+        recordPid1 = first.get("pid").toString();
+        recordPid2 = second.get("pid").toString();
     }
+
+    @org.junit.jupiter.api.AfterEach
+    void releaseOwnedAuthority() { if (nativeAuthority != null) nativeAuthority.close(); }
 
     @AfterAll
     void cleanup() {
@@ -60,31 +82,31 @@ class WatchServiceImplCoverageIT extends BaseIntegrationTest {
     @Test
     @DisplayName("toggleWatch alternates watch state and getWatchers/getWatched reflect it")
     void toggleAndListers() {
-        assertTrue(watchService.toggleWatch(MODEL, 101L), "first toggle starts watching");
-        assertTrue(watchService.toggleWatch(MODEL, 102L));
+        assertTrue(watchService.toggleWatch(MODEL, recordId1), "first toggle starts watching");
+        assertTrue(watchService.toggleWatch(MODEL, recordId2));
 
-        assertFalse(watchService.toggleWatch(MODEL, 101L), "second toggle stops watching");
-        assertTrue(watchService.toggleWatch(MODEL, 101L));
+        assertFalse(watchService.toggleWatch(MODEL, recordId1), "second toggle stops watching");
+        assertTrue(watchService.toggleWatch(MODEL, recordId1));
 
-        assertEquals(List.of(userId), watchService.getWatchers(MODEL, 101L));
+        assertEquals(List.of(userId), watchService.getWatchers(MODEL, recordId1));
         assertTrue(watchService.getWatchers(MODEL, 999L).isEmpty());
-        assertEquals(List.of(101L, 102L),
+        assertEquals(List.of(recordId1, recordId2),
                 watchService.getWatchedRecordIds(MODEL, userId).stream().sorted().toList());
     }
 
     @Test
     @DisplayName("recordPid-based toggles and queries mirror the recordId path")
     void recordPidPaths() {
-        assertTrue(watchService.toggleWatchByRecordPid(MODEL, "rec-pid-1"));
-        assertTrue(watchService.isWatchingByRecordPid(MODEL, "rec-pid-1"));
+        assertTrue(watchService.toggleWatchByRecordPid(MODEL, recordPid1));
+        assertTrue(watchService.isWatchingByRecordPid(MODEL, recordPid1));
         assertFalse(watchService.isWatchingByRecordPid(MODEL, "rec-pid-none"));
 
-        assertFalse(watchService.toggleWatchByRecordPid(MODEL, "rec-pid-1"), "toggle off");
-        assertFalse(watchService.isWatchingByRecordPid(MODEL, "rec-pid-1"));
+        assertFalse(watchService.toggleWatchByRecordPid(MODEL, recordPid1), "toggle off");
+        assertFalse(watchService.isWatchingByRecordPid(MODEL, recordPid1));
 
-        assertTrue(watchService.toggleWatchByRecordPid(MODEL, "rec-pid-2"));
-        assertEquals(List.of("rec-pid-2"), watchService.getWatchedRecordPids(MODEL, userId));
-        assertEquals(List.of(userId), watchService.getWatchersByRecordPid(MODEL, "rec-pid-2"));
+        assertTrue(watchService.toggleWatchByRecordPid(MODEL, recordPid2));
+        assertEquals(List.of(recordPid2), watchService.getWatchedRecordPids(MODEL, userId));
+        assertEquals(List.of(userId), watchService.getWatchersByRecordPid(MODEL, recordPid2));
         assertTrue(watchService.getWatchersByRecordPid(MODEL, "rec-pid-none").isEmpty());
 
         assertFalse(watchService.toggleWatchByRecordPid(MODEL, " "), "blank recordPid is a guarded no-op");

@@ -46,6 +46,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles("integration-test")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class CommandMembershipLockCapabilityIntegrationTest extends BaseIntegrationTest {
+    @Autowired private javax.sql.DataSource fixtureDataSource;
+    @Autowired private org.springframework.boot.data.redis.autoconfigure.DataRedisProperties fixtureRedis;
     @Autowired private CommandMembershipLockAccessor locks;
     @Autowired private PlatformTransactionManager transactions;
     @Autowired private TenantMemberService memberships;
@@ -55,10 +57,8 @@ class CommandMembershipLockCapabilityIntegrationTest extends BaseIntegrationTest
     private record Person(User user, TenantMember member) {
         MembershipAssertion assertion() { return new MembershipAssertion(user.getPid(), member.getPid()); }
     }
-    @BeforeEach void ownedAllocation() {
-        assertEquals("maritime-parallel-core", System.getenv("AURA_RUNTIME_NAME"));
-        assertEquals("auraboot_26", System.getenv("POSTGRES_DB"));
-        assertEquals("auraboot_26", jdbc.queryForObject("SELECT current_database()", String.class));
+    @BeforeEach void ownedAllocation() throws Exception {
+        com.auraboot.framework.integration.DeclaredTestInfrastructure.assertSelected(fixtureDataSource, fixtureRedis);
         baseIdentity();
     }
     @AfterEach void restoreContext() { baseIdentity(); }

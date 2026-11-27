@@ -585,6 +585,8 @@ PYLOG
     PGPASSWORD=auraboot psql -h 127.0.0.1 -p 5432 -U auraboot -d postgres -q \
       -c "DROP DATABASE IF EXISTS $pg_db WITH (FORCE)" -c "CREATE DATABASE $pg_db" \
       || die "could not recreate $pg_db"
+    # An explicitly recreated database invalidates its former administrator session.
+    rm -f "$sd/admin-session.json"
   elif [ "$(PGPASSWORD=auraboot psql -h 127.0.0.1 -p 5432 -U auraboot -d "$pg_db" -tAc \
             "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'" \
             2>/dev/null || echo 0)" = "0" ]; then
@@ -934,7 +936,7 @@ cmd_import() {
     read -r pg_host pg_port pg_user pg_db pg_pass <"$sd/pgenv"
   fi
 
-  local args=("--backend-url=http://127.0.0.1:$server_port" "--edition=oss" "--plugin-root=$REPO_ROOT/plugins")
+  local args=("--backend-url=http://127.0.0.1:$server_port" "--edition=oss" "--plugin-root=$REPO_ROOT/plugins" "--admin-session-file=$sd/admin-session.json")
   if [ "${#extra_plugin_roots[@]}" -gt 0 ]; then
     for extra_root in "${extra_plugin_roots[@]}"; do
       args+=("--extra-plugin-root=$extra_root")

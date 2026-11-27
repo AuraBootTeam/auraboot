@@ -47,6 +47,10 @@ import static org.assertj.core.api.Assertions.*;
 @ActiveProfiles("integration-test")
 @Import(PluginNotificationDeliveryPostgresIT.PollerIsolation.class)
 class PluginNotificationDeliveryPostgresIT {
+    // Explicit lease/replay tests drive the real worker themselves; hold commit signals to avoid a second claimant.
+    @org.springframework.test.context.bean.override.mockito.MockitoBean(name = "reliableOutboxDispatchExecutor")
+    private org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor heldCommitDispatch;
+
     @TestConfiguration(proxyBeanMethods = false)
     static class PollerIsolation {
         @Bean static BeanFactoryPostProcessor preventTestAppAutomaticPollers() {

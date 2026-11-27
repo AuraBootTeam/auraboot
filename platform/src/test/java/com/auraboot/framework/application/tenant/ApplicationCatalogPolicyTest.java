@@ -65,6 +65,19 @@ class ApplicationCatalogPolicyTest {
         assertThatThrownBy(()->policy.read(42L)).isInstanceOf(IllegalStateException.class);
     }
 
+    @Test void uncodedMenusDoNotMatchDefaultCatalogButCustomAncestorsRemainVisible() {
+        var root = menu(1L, null, null);
+        var uncoded = menu(2L, null, null);
+        var custom = menu(3L, 1L, null);
+        var extension = new ExtensionBean();
+        extension.setDynamicProperty("navigationCustom", true);
+        custom.setExtension(extension);
+        var current = menu(4L, null, "current");
+        var scope = ApplicationCatalogPolicy.parse(declaration());
+        assertThat(scope.menus(List.of(root, uncoded, custom, current))).containsExactly(root, custom, current);
+        assertThat(custom.getParentId()).isEqualTo(1L);
+    }
+
     @Test void customEntriesKeepTheirAncestorsAndLeaveStoredMenusUnchanged() {
         var root=menu(1L,null,"old_root");var current=menu(2L,null,"current");
         var custom=menu(3L,1L,"custom");var extension=new ExtensionBean();

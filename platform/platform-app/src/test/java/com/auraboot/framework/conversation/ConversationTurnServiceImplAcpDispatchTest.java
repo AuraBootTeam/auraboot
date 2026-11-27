@@ -255,8 +255,8 @@ class ConversationTurnServiceImplAcpDispatchTest extends BaseIntegrationTest {
                     eq("APPROVAL_PID_99"),
                     eq("agent_approval_gate"),
                     eq("Step 2 awaits approval"),
-                    org.mockito.ArgumentMatchers.<Map<String, Object>>any(),
-                    eq("APPROVAL_PID_99"));
+                    eq(Map.of("runPid", "RUN_PID_3", "approvalPid", "APPROVAL_PID_99", "message", "Step 2 awaits approval")),
+                    eq("APPROVAL_PID_99"), eq(Map.of()));
         });
     }
 
