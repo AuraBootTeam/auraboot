@@ -17,6 +17,7 @@ import { FieldRenderer } from '../FieldRenderer';
 import { LoadingOverlay } from '~/ui/LoadingOverlay';
 import { getLegacyCompatibleRecordPid } from '~/framework/meta/utils/publicRecordId';
 import { useActionTriggerFocus } from '~/hooks/useActionTriggerFocus';
+import { useRuntimeStateSubscription } from './workbenchBlockUtils';
 
 export interface ToolbarBlockRendererProps {
   block: BlockConfig;
@@ -31,6 +32,7 @@ const renderIcon = (icon?: ButtonConfig['icon']) => {
 };
 
 export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ block, runtime }) => {
+  useRuntimeStateSubscription(runtime);
   const context = runtime.getContext();
   const evaluator = runtime.getEvaluator();
   const locale = context.locale || 'zh-CN';
@@ -53,9 +55,18 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
     context.row,
     context.form,
   ];
-  const initialRecord = initialRecordCandidates.find((candidate) =>
+  const boundRecord = initialRecordCandidates.find((candidate) =>
     Boolean(getLegacyCompatibleRecordPid(candidate)),
   );
+  // A completed command may advance form state before the parent's loader runs
+  // again. Admit only a newer native version of this exact record; retain the
+  // bound parent for unrelated, older and unversioned contexts.
+  const formRecord = context.form;
+  const newerFormRecord = boundRecord && formRecord
+    && getLegacyCompatibleRecordPid(formRecord) === getLegacyCompatibleRecordPid(boundRecord)
+    && Number.isSafeInteger(boundRecord.row_version) && boundRecord.row_version >= 0
+    && Number.isSafeInteger(formRecord.row_version) && formRecord.row_version > boundRecord.row_version;
+  const initialRecord = newerFormRecord ? { ...boundRecord, ...formRecord } : boundRecord;
   const actionContext = initialRecord
     ? {
         ...context,

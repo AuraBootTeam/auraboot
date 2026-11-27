@@ -1,5 +1,5 @@
 import { MemoryRouter } from 'react-router';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToolbarBlockRenderer } from '../ToolbarBlockRenderer';
 import { ExpressionEvaluator } from '../../../runtime/expression/evaluator';
@@ -11,6 +11,35 @@ vi.mock('~/contexts/ToastContext', () => ({ useToastContext: () => ({}) }));
 
 describe('record-bound detail body toolbar', () => {
   beforeEach(() => mock.handleAction.mockClear());
+  it('observes a newer same-record command result without retaining the original disabled state or version', () => {
+    const original = { pid: 'task-a', row_version: 1, matchingReady: false };
+    let form = { ...original };
+    const listeners = new Set<() => void>();
+    const runtime = { getContext: () => ({ record: original, form }),
+      subscribeContext: (listener: () => void) => { listeners.add(listener); return () => listeners.delete(listener); },
+      getSchema: () => ({ modelCode: 'example' }), getDataSourceManager: () => null,
+      getEvaluator: () => new ExpressionEvaluator() };
+    const button = { code: 'send', label: 'Send', disableWhen: '${form.matchingReady !== true}', action: { type: 'flow', steps: [] } };
+    render(<MemoryRouter><ToolbarBlockRenderer block={{ id: 'actions', blockType: 'toolbar', record: original, buttons: [button] } as any} runtime={runtime as any} /></MemoryRouter>);
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
+    act(() => { form = { ...form, row_version: 2, matchingReady: true }; listeners.forEach(listener => listener()); });
+    expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    expect(mock.handleAction).toHaveBeenCalledExactlyOnceWith(button, form);
+    expect(original).toEqual({ pid: 'task-a', row_version: 1, matchingReady: false });
+  });
+  it('does not replace a newer bound parent with older or unrelated form state', () => {
+    const original = { pid: 'task-a', row_version: 7, matchingReady: false };
+    for (const form of [{ ...original, row_version: 6, matchingReady: true },
+      { pid: 'other-task', row_version: 99, matchingReady: true }]) {
+      const runtime = { getContext: () => ({ record: original, form }),
+        getSchema: () => ({ modelCode: 'example' }), getDataSourceManager: () => null,
+        getEvaluator: () => new ExpressionEvaluator() };
+      const view = render(<MemoryRouter><ToolbarBlockRenderer block={{ id: 'actions', blockType: 'toolbar', record: original,
+        buttons: [{ code: 'send', label: 'Send', disableWhen: '${form.matchingReady !== true}', action: { type: 'flow', steps: [] } }] } as any} runtime={runtime as any} /></MemoryRouter>);
+      expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled(); view.unmount();
+    }
+  });
   it('keeps preview availability tied to local drafts while fresh parent facts override stale context', () => {
     const stale = { pid: 'parent', first_read_at: null };
     const current = { ...stale, first_read_at: '2026-11-07T00:00:00Z' };
