@@ -56,16 +56,26 @@ class OutboxWorkerImplCoverageIT {
     @BeforeEach
     void setUp() {
         MetaContext.setContext(TENANT_ID, 991_900_002L, "outbox-test-pid", "outbox-test-user");
-        jdbcTemplate.update("DELETE FROM ab_outbox WHERE tenant_id = ?", TENANT_ID);
+        cleanupRows();
     }
 
     @AfterAll
     void cleanup() {
         try {
-            jdbcTemplate.update("DELETE FROM ab_outbox WHERE tenant_id = ?", TENANT_ID);
+            cleanupRows();
         } finally {
             MetaContext.clear();
         }
+    }
+
+    private void cleanupRows() {
+        new org.springframework.transaction.support.TransactionTemplate(transactions).executeWithoutResult(status -> {
+            jdbcTemplate.update("DELETE FROM ab_integration_dead_letter_quarantine WHERE tenant_id = ?", TENANT_ID);
+            jdbcTemplate.update("DELETE FROM ab_integration_dead_letter_replay WHERE tenant_id = ?", TENANT_ID);
+            jdbcTemplate.update("DELETE FROM ab_integration_dead_letter WHERE tenant_id = ?", TENANT_ID);
+            jdbcTemplate.update("DELETE FROM ab_integration_receipt WHERE tenant_id = ?", TENANT_ID);
+            jdbcTemplate.update("DELETE FROM ab_outbox WHERE tenant_id = ?", TENANT_ID);
+        });
     }
 
     private String seedPendingBad() {
@@ -85,7 +95,14 @@ class OutboxWorkerImplCoverageIT {
     void pollRetriesUndeliverable() {
         var eventIds = new java.util.ArrayList<String>();
         for (int index = 0; index < 501; index++) eventIds.add(seedPendingBad());
+        // Exhaust one owned poison event deterministically, so fixture cleanup must
+        // handle its real foreign-key dependents even when the poll finishes quickly.
+        jdbcTemplate.update("UPDATE ab_outbox SET max_retries=1 WHERE tenant_id=? AND event_id=?",
+                TENANT_ID, eventIds.getFirst());
         outboxWorker.pollAndDispatch();
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM ab_integration_dead_letter WHERE tenant_id=? AND event_id=?",
+                Integer.class, TENANT_ID, eventIds.getFirst()));
         int touched = 0;
         for (String eventId : eventIds) {
             var state = jdbcTemplate.queryForMap(
