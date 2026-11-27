@@ -194,8 +194,13 @@ class DynamicUpdateVersionConflictIT extends BaseIntegrationTest {
                 .resolve("../plugins/showcase").normalize();
         Assertions.assertTrue(java.nio.file.Files.exists(pluginDir),
                 "showcase plugin directory must exist at " + pluginDir);
+        var user = fixtureUsers.findByUserId(userId);
+        var member = tenantMemberService.findByTenantIdAndUserId(tenantId, userId);
+        Assertions.assertNotNull(user, "seeded plugin owner must exist");
+        Assertions.assertNotNull(member, "seeded plugin owner must have a membership");
         MetaContext.setContext(tenantId, userId, user.getPid(), user.getUserName());
-                MetaContext.setEnvironmentId(environment);
+        MetaContext.setMemberId(member.getId());
+        MetaContext.setEnvironmentId(fixtureEnvironments.findOrCreateDefaultId(tenantId));
         try {
             ImportPreviewResult preview = pluginImportService.parseDirectory(pluginDir.toString());
             Assertions.assertTrue(preview.isValid(), "showcase plugin parse must be valid: " + preview.getErrors());
