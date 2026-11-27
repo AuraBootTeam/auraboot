@@ -136,6 +136,7 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
     }
     
     @Override
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public MemberResponse getMemberById(String memberPid, Long userId) {
         try {
             TenantMember member = tenantMemberService.findByPid(memberPid);
@@ -336,6 +337,7 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
     }
 
     @Override
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public TenantMemberOffboardingImpactResponse inspectOffboardingImpact(
             String memberPid, String targetMemberPid, String action, Long userId) {
         TenantMember member = tenantMemberService.findByPid(memberPid);
@@ -355,6 +357,7 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
     }
 
     @Override
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public List<TenantMemberOffboardingCandidate> listOffboardingCandidates(
             String memberPid, String action, Long userId) {
         TenantMember member = tenantMemberService.findByPid(memberPid);
@@ -637,6 +640,7 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
     }
     
     @Override
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public List<Map<String, Object>> getMemberTeams(String memberPid) {
         TenantMember member = tenantMemberService.findByPid(memberPid);
         if (member == null) {
