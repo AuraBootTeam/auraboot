@@ -19,6 +19,19 @@ public interface DdlDialect {
 
     String getTableSuffix();
 
+    /**
+     * The USING clause of an {@code ALTER TABLE t ALTER COLUMN c TYPE targetType} statement, with
+     * its leading space, or an empty string when the database converts the stored values itself.
+     *
+     * @param columnName  the column being converted; it is placed in the clause as it is
+     * @param currentType the column's type as {@link #getColumnTypeDefinition} reports it, or null
+     *                    when it is not known
+     * @param targetType  the type as {@link #mapDataType} names it
+     */
+    default String getAlterColumnTypeUsing(String columnName, String currentType, String targetType) {
+        return "";
+    }
+
     boolean tableExists(java.sql.Connection connection, String tableName) throws java.sql.SQLException;
 
     boolean columnExists(java.sql.Connection connection, String tableName, String columnName) throws java.sql.SQLException;

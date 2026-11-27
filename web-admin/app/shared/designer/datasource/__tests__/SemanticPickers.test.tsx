@@ -10,12 +10,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, renderHook, waitFor, fireEvent, act } from '@testing-library/react';
-import {
-  encodeDimension,
-  decodeDimension,
-  selectedValueFor,
-} from '../SemanticDimensionPicker';
-import { SemanticDimensionPicker } from '../SemanticDimensionPicker';
+import { encodeDimension, decodeDimension, selectedValueFor, SemanticDimensionPicker } from '../SemanticDimensionPicker';
 import { SemanticMetricPicker } from '../SemanticMetricPicker';
 import { useSemanticModelMeta, useSemanticModels } from '../useMetaModels';
 import type { SemanticMetricOption, SemanticDimensionOption } from '../types';

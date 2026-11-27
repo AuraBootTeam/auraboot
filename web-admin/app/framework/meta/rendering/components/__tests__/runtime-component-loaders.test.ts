@@ -14,6 +14,7 @@ describe('runtime component loaders', () => {
 
   it('registers the DecisionOps integration impact custom block', () => {
     expect(getRuntimeComponentEntry('DecisionIntegrationImpactBlock')).toBeDefined();
+    expect(getRuntimeComponentEntry('WebhookDeliveryHistory')).toBeDefined();
     expect(getRuntimeComponentEntry('decision-integration-impact')).toBeDefined();
   });
 

@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import type { InputProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+import type { InputProps } from '~/framework/smart/schema/smart-components';
 import {
   useExpressionValue,
   useSmartField,
@@ -29,6 +29,10 @@ const Input: React.FC<InputProps> = ({
   size = 'medium',
   variant = 'default',
   className = '',
+  inline = false,
+  density = 'default',
+  controlClassName,
+  controlWidth,
   maxLength,
   minLength,
   pattern,
@@ -144,6 +148,10 @@ const Input: React.FC<InputProps> = ({
     return String(val);
   };
 
+  if (controlWidth !== undefined && (!Number.isFinite(controlWidth) || controlWidth < 48 || controlWidth > 320)) {
+    throw new Error('Input controlWidth must be between 48 and 320 pixels');
+  }
+
   // 同步外部 value 变化
   if (!isVisible) {
     return null;
@@ -156,7 +164,10 @@ const Input: React.FC<InputProps> = ({
       required={requiredValue}
       helpText={helpTextText}
       error={meta.showError ? errorText : undefined}
-      className="mb-4"
+      inline={inline}
+      controlClassName={controlClassName}
+      controlStyle={controlWidth === undefined ? undefined : { width: controlWidth, flex: `0 0 ${controlWidth}px`, minWidth: 0 }}
+      className={density === 'compact' ? 'mb-0' : 'mb-4'}
       labelClassName="cursor-pointer"
       onLabelClick={handleLabelClick}
     >

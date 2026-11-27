@@ -32,9 +32,9 @@ function clearLegacyAuthStorage(storage: Storage | undefined): void {
   if (!storage) return;
   try {
     for (const key of LEGACY_AUTH_KEYS) storage.removeItem(key);
-  } catch {
+  } catch (error) {
     // Storage may be unavailable in hardened/private browser modes.
-  }
+ console.warn('[legacy-session-migration] previously-silent catch', error);  }
 }
 
 export function clearLegacyBrowserAuthStorage(target: Window = window): void {

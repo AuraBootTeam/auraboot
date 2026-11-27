@@ -138,7 +138,12 @@ export async function registerGoldenLaunch(name, repo, cli, pid, key) {
   const report = JSON.parse(run(cli, ['runtime', 'show', name, '--json']));
   need(report.runtime === name && report.sources?.find(item => ['auraboot', 'core'].includes(item.key))?.expected.root === realpathSync(repo),
     'Launch source owner mismatch');
-  const token = readFileSync(join(report.stateDir, 'runtimes', name, 'processes', 'ownership.token'), 'utf8').trim();
+  // SC-19 symmetry (P1-13): a destroyed-and-reensured lease owns nothing yet — no token,
+  // no registered processes, so the stop is a trivially empty fence and unknown listeners
+  // on the declared ports still refuse below. A REGISTERED process requires the token.
+  const tokenPath = join(report.stateDir, 'runtimes', name, 'processes', 'ownership.token');
+  const token = existsSync(tokenPath) ? readFileSync(tokenPath, 'utf8').trim() : '';
+  need(Boolean(token) || report.processes.length === 0, 'Ownership token missing while processes are registered');
   let current, previous, ready = false;
   // A detached JVM can take seconds to exec its environment on a loaded host; the probe
   // requires stability, not speed. A dead child still fails fast on the snapshot probe.
@@ -162,7 +167,12 @@ export function stopGoldenProcesses(name, repo, cli) {
   const report = JSON.parse(run(cli, ['runtime', 'show', name, '--json']));
   need(report.runtime === name && report.sources?.find(item => ['auraboot', 'core'].includes(item.key))?.expected.root === repo,
     'Registered source root mismatch');
-  const token = readFileSync(join(report.stateDir, 'runtimes', name, 'processes', 'ownership.token'), 'utf8').trim();
+  // SC-19 symmetry (P1-13): a destroyed-and-reensured lease owns nothing yet — no token,
+  // no registered processes, so the stop is a trivially empty fence and unknown listeners
+  // on the declared ports still refuse below. A REGISTERED process requires the token.
+  const tokenPath = join(report.stateDir, 'runtimes', name, 'processes', 'ownership.token');
+  const token = existsSync(tokenPath) ? readFileSync(tokenPath, 'utf8').trim() : '';
+  need(Boolean(token) || report.processes.length === 0, 'Ownership token missing while processes are registered');
   const sd = goldenStackState(report.stateDir, name);
   const frontendFile = join(sd, 'frontend.pid');
   const frontendPid = existsSync(frontendFile) ? Number(readFileSync(frontendFile, 'utf8').trim()) : null;

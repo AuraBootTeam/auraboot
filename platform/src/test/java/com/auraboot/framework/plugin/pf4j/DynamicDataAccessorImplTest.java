@@ -41,6 +41,21 @@ class DynamicDataAccessorImplTest {
     @Mock private DynamicDataService dynamicDataService;
     @InjectMocks private DynamicDataAccessorImpl accessor;
 
+    @Test void queryPageBindsBothTimeBoundariesWithOwnerBeforeDatabaseCountAndPaging() {
+        when(dynamicDataService.list(eq("m"),any(DynamicQueryRequest.class)))
+                .thenReturn(PaginationResult.of(List.of(Map.of("pid","row")),100_001L,3,20));
+        var from=java.time.Instant.parse("2026-10-31T16:00:00Z");var until=java.time.Instant.parse("2026-11-30T16:00:00Z");
+        var page=accessor.queryPage("m",new DataPageQuery(Map.of("supplier","A"),Map.of(),List.of(),3,20,"",
+                Map.of("submitted_at",new DataPageQuery.TimeRange(from,until))));
+        assertThat(page.total()).isEqualTo(100_001L);
+        var capture=ArgumentCaptor.forClass(DynamicQueryRequest.class);verify(dynamicDataService).list(eq("m"),capture.capture());
+        var request=capture.getValue();assertThat(request.getPageNum()).isEqualTo(3);assertThat(request.getPageSize()).isEqualTo(20);
+        assertThat(request.getConditions()).hasSize(3).anySatisfy(c->{
+            assertThat(c.getFieldName()).isEqualTo("supplier");assertThat(c.getOperator()).isEqualTo(QueryCondition.Operator.EQ);assertThat(c.getValue()).isEqualTo("A");
+        }).anySatisfy(c->{assertThat(c.getFieldName()).isEqualTo("submitted_at");assertThat(c.getOperator()).isEqualTo(QueryCondition.Operator.GE);assertThat(c.getValue()).isEqualTo(from.toString());
+        }).anySatisfy(c->{assertThat(c.getFieldName()).isEqualTo("submitted_at");assertThat(c.getOperator()).isEqualTo(QueryCondition.Operator.LT);assertThat(c.getValue()).isEqualTo(until.toString());});
+    }
+
     @Test
     void queryPage_omitsAbsentKeywordForTheRealMachineQueryGuard() {
         var principal=new com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal(
@@ -193,6 +208,21 @@ class DynamicDataAccessorImplTest {
         assertThat(c.getFieldName()).isEqualTo("status");
         assertThat(c.getOperator()).isEqualTo(QueryCondition.Operator.EQ);
         assertThat(c.getValue()).isEqualTo("open");
+    }
+
+    @Test
+    void exactNullDimensionUsesIsNullRatherThanSqlNullEquality() {
+        when(dynamicDataService.list(eq("m"), any(DynamicQueryRequest.class)))
+                .thenReturn(PaginationResult.of(List.of(), 0L, 1, 1000));
+        var filters = new java.util.HashMap<String, Object>();
+        filters.put("lot_id", null);
+        accessor.query("m", filters);
+        ArgumentCaptor<DynamicQueryRequest> request = ArgumentCaptor.forClass(DynamicQueryRequest.class);
+        verify(dynamicDataService).list(eq("m"), request.capture());
+        assertThat(request.getValue().getConditions()).singleElement().satisfies(condition -> {
+            assertThat(condition.getFieldName()).isEqualTo("lot_id");
+            assertThat(condition.getOperator()).isEqualTo(QueryCondition.Operator.IS_NULL);
+        });
     }
 
     @Test

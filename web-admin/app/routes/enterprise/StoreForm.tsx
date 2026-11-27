@@ -1,3 +1,9 @@
+/**
+ * StoreForm — CREATE entry. Twin of StoreEditForm.tsx (EDIT entry): both are
+ * mounted by the enterprise build's route manifest by exact file path, so
+ * they cannot be merged into one file in the OSS repo. Any change here must
+ * be mirrored in the twin (2026-11-14 boundary note).
+ */
 import { useNavigate } from 'react-router';
 import { fetchResult } from '~/shared/services/http-client';
 import { useStoreForm } from '~/hooks/useStoreForm';

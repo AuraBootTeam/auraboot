@@ -14,11 +14,15 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class CapabilityRegistryServiceImpl implements CapabilityRegistryService {
+    private final com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
+
 
     private final CapabilityMapper capabilityMapper;
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public void saveDefinition(CapabilityDefinitionDTO dto) {
+        authorizationWriteLock.mutate();
         Long tenantId = MetaContext.getCurrentTenantId();
         CapabilityRecord record = toRecord(dto, tenantId);
         CapabilityRecord existing = capabilityMapper.findByTenantAndCode(tenantId, dto.getCode());
@@ -32,7 +36,8 @@ public class CapabilityRegistryServiceImpl implements CapabilityRegistryService 
 
     @Override
     public List<CapabilityDefinitionDTO> listDeclarations(Long tenantId) {
-        return capabilityMapper.findByTenant(tenantId).stream().map(this::toDto).toList();
+        return DomainCapabilityLevels.currentDeclarations(
+                capabilityMapper.findByTenant(tenantId).stream().map(this::toDto).toList());
     }
 
     private CapabilityRecord toRecord(CapabilityDefinitionDTO dto, Long tenantId) {

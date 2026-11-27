@@ -4,7 +4,7 @@
  * 支持动态路由生成、页面间导航、参数传递和权限控制
  */
 
-import type { PageSchema, PageType } from '~/types/page-schema';
+import type { UnifiedPageSchema, PageType } from '~/types/page-schema';
 import type { LowCodeContext } from '~/types/lowcode';
 
 // 路由配置
@@ -12,7 +12,7 @@ export interface RouteConfig {
   path: string;
   pageType?: PageType;
   schemaPath?: string;
-  schema?: PageSchema;
+  schema?: UnifiedPageSchema;
   name?: string;
   component?: string;
   title?: string;
@@ -162,7 +162,7 @@ export interface RouteManager {
 export interface RouteConfigBuilder {
   path(path: string): RouteConfigBuilder;
   pageType(type: PageType): RouteConfigBuilder;
-  schema(schema: PageSchema | string): RouteConfigBuilder;
+  schema(schema: UnifiedPageSchema | string): RouteConfigBuilder;
   title(title: string): RouteConfigBuilder;
   icon(icon: string): RouteConfigBuilder;
   permissions(permissions: string[]): RouteConfigBuilder;

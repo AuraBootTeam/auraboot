@@ -25,7 +25,7 @@ function baseApi(overrides: Partial<PageSchemaV3Api> = {}): PageSchemaV3Api {
   };
 }
 
-describe('PageSchema V3 version repository', () => {
+describe('UnifiedPageSchema V3 version repository', () => {
   it('getPageVersions returns the version list on code 0', async () => {
     const versions = [
       { id: 2, pagePid: 'p1', version: 2, operation: 'update', snapshot: {} },

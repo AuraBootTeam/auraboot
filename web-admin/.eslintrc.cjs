@@ -24,7 +24,7 @@ module.exports = {
       parser: "@typescript-eslint/parser",
       plugins: ["@typescript-eslint", "react-hooks"],
       rules: {
-        // Demoted to warn for baseline cleanup — 96 violations across 173 files exist on main.
+        // Demoted to warn for baseline cleanup — 89 violations remain (2026-11-14: 16 merged in batch H; target: zero, then restore error).
         // Track and fix in a dedicated cleanup task.
         "@typescript-eslint/no-unused-vars": [
           "warn",
@@ -38,7 +38,7 @@ module.exports = {
         "no-redeclare": "off",
         // Demoted to warn — 1 violation on main; fix in cleanup task.
         "@typescript-eslint/no-redeclare": "warn",
-        // Demoted to warn for baseline cleanup — 75 violations across 173 files exist on main.
+        // Demoted to warn for baseline cleanup — 155 violations remain (2026-11-14 count; 87 unused defs, 43 unused assignments, 25 unused args; target: zero, then restore error).
         // Track and fix in a dedicated cleanup task.
         "no-duplicate-imports": "warn",
         "react-hooks/rules-of-hooks": "error",
@@ -67,6 +67,29 @@ module.exports = {
                 group: ["~/plugins/*/!(index|manifest)*"],
                 message:
                   "Cross-plugin imports must go through the kernel registries (PluginContext / SlotRegistry / WidgetRegistry). Direct imports of another plugin's internals are forbidden.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+
+    // Framework core must not import plugin internals — the dependency
+    // direction is plugins → framework only. The boot assembly file is the
+    // single sanctioned place that wires plugins in. (2026-11-14 boundary
+    // cleanup: the last reverse imports were removed; this keeps it that way.)
+    {
+      files: ["app/framework/**/*.{ts,tsx}"],
+      excludedFiles: ["app/framework/**/__tests__/**", "app/framework/boot-plugins.ts"],
+      rules: {
+        "no-restricted-imports": [
+          "error",
+          {
+            patterns: [
+              {
+                group: ["~/plugins/*", "~/plugins/*/**"],
+                message:
+                  "Framework code must not import plugin internals. Invert the dependency: define a contract/registry in the framework and let the plugin register an implementation.",
               },
             ],
           },

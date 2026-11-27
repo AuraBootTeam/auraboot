@@ -178,6 +178,30 @@ if [ "${#PLUGINS[@]}" -eq 0 ]; then
     exit 2
 fi
 
+# Retired optional packages and replaced wrappers must not resolve from stale roots.
+# Reject before login and path discovery so stale checkout roots cannot revive them.
+for selected_plugin in "${PLUGINS[@]}"; do
+    selected_name="${selected_plugin%/}"
+    selected_name="${selected_name##*/}"
+    case "$selected_name" in
+        dataquality-observability|com.auraboot.dataquality-observability)
+            echo "ERROR: retired plugin dataquality-observability; no replacement; GE validation support has been retired" >&2
+            exit 2 ;;
+        airflow-observability|com.auraboot.airflow-observability)
+            echo "ERROR: retired plugin airflow-observability; no replacement; Core webhook support is unchanged" >&2
+            exit 2 ;;
+        pcba-warehouse|com.auraboot.pcba-warehouse)
+            echo "ERROR: retired plugin pcba-warehouse; import inventory; manufacturing roles come from pcba-solution" >&2
+            exit 2 ;;
+        quarry-solution|com.auraboot.quarry-solution)
+            echo "ERROR: retired plugin quarry-solution; use --profile=quarry-delivery" >&2
+            exit 2 ;;
+        marketing-crm-demo|com.auraboot.marketing-crm-demo)
+            echo "ERROR: retired plugin marketing-crm-demo; use showcase/media/marketing-crm (no plugin import)" >&2
+            exit 2 ;;
+    esac
+done
+
 path_has_plugin() {
     local path="$1"
     if [ -n "$BACKEND_CONTAINER" ]; then

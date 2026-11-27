@@ -4,7 +4,7 @@ status: active
 ---
 
 # Controller Permission-Annotation Exemption Registry
-Generated 2026-10-01 (batch4 E4). 232 `@RestController` classes; 132 carry `@RequirePermission`; the 100 below do not and rely on `SecurityConfig` (`anyRequest().authenticated()` / explicit `PermitAll`) plus service-layer scoping.
+Regenerated 2026-11-23 (CI-anchored by scripts/check-controller-authz.mjs — the counts below now fail the controller-authz gate when they drift). 268 `@RestController` classes; 145 carry `@RequirePermission`; the controllers listed below do not and rely on `SecurityConfig` (`anyRequest().authenticated()` / explicit `PermitAll`) plus service-layer scoping.
 Policy: this registry is the year-reviewable record of WHY each controller has no `@RequirePermission`. New controllers default to annotated; removals from annotation need an entry here.
 
 ## agent (6)
@@ -199,7 +199,7 @@ Rationale: domain-specific scoping enforced at service layer; A4 census classifi
 - `NotificationController.java`
 - `NotificationSseController.java`
 
-## openplatform (5)
+## openplatform (6)
 
 Rationale: domain-specific scoping enforced at service layer; A4 census classification pending (TBD)
 - `ExternalEventIngressController.java`
@@ -207,6 +207,7 @@ Rationale: domain-specific scoping enforced at service layer; A4 census classifi
 - `OpenPlatformManagementController.java`
 - `OpenPlatformPublicController.java`
 - `OpenPlatformTokenController.java`
+- `SignedIntegrationCallbackController.java` — explicit class-level `@AuthenticatedAccess`; the JWT-exempt callback requires an active tenant-owned installation, current scope, loaded provider artifact, tenant-owned secret and provider signature before installed command execution. Socket-peer rate limits and bounded request bodies apply; payload/query values cannot supply tenant or installation authority.
 
 ## p1demo (1)
 
@@ -244,10 +245,11 @@ Rationale: domain-specific scoping enforced at service layer; A4 census classifi
 Rationale: domain-specific scoping enforced at service layer; A4 census classification pending (TBD)
 - `ReviewController.java`
 
-## saas (1)
+## saas (2)
 
 Rationale: bootstrap/platform-admin surfaces — guarded by explicit role checks in service layer (AdminRoleChecker family)
 - `controller/BootstrapController.java`
+- `controller/PlatformNavigationMaintenanceController.java` — `@RequirePlatformAdmin`, `@DisallowImpersonation` and an explicit System-space/platform-scope role check protect the audited maintenance operation.
 
 ## tenant (1)
 
@@ -276,3 +278,25 @@ Rationale: domain-specific scoping enforced at service layer; A4 census classifi
 `PluginRestDispatcher.dispatch` explicitly declares `@AuthenticatedAccess` as an authorization delegation boundary. The default-deny controller interceptor admits this method so that the registered route contract can decide access; it does not grant a permission or alter the global unannotated policy. For authenticated routes the dispatcher requires a current user and the exact registered `permissionCode` before invoking the governed pipeline. Explicit PUBLIC routes retain their per-IP rate limit, default-tenant public context and audit pipeline. Unmatched routes remain absent; unregistered handlers remain denied. Upstream authentication still protects non-public paths.
 
 The combined MVC/interceptor regressions in `PluginRestDispatcherTest` verify permitted-route execution, rejection without the route permission, and public-route rate limiting with the shipped default-deny interceptor. Direct dispatcher tests alone do not cover this boundary.
+
+
+## Domain application boundaries (2026-11-08)
+
+Published operation permissions may declare `extension.domainModels`, a finite map from model code to native actions (`read`, `create`, `update`, `delete`). A domain level is an actual permission, not a grant expansion into model CRUD. Its action is `read`, `write`, or `manage`; higher levels imply lower levels within the same resource/domain. Only explicitly declared models change behavior. Other products retain the existing path.
+
+`DomainCommandAuthorization` admits one command function decision and retains its role-local binding provenance for the synchronous invocation. `BusinessCommandRecordAuthorization` continues to evaluate record scope, conditions, and fields for the actual record. `dataPolicyReferences` retains existing operation-bound constraints; generated model bindings are also consulted as constraints, never positive function fallbacks. `dataControlledReads` keeps sensitive model reading on its existing data-control grants. Scope rows and field/masking policies are not rewritten.
+
+For a published domain Command execute route, `PermissionInterceptor` keeps authentication and delegates function qualification to the shared command pipeline, including read-only commands without a generic command-execute grant. For the explicitly listed native CRUD methods, HTTP authentication remains mandatory and the domain operation check executes in `DynamicDataServiceImpl`, so direct non-HTTP calls use the same boundary. Metadata endpoints, the list/query namespace admission, other controllers, and other products retain their existing interceptor checks. Native reads with empty results still require application authorization. Export downloads re-run `DynamicDataService.exportData` and its current data/field policy before releasing bytes.
+
+Asynchronous delivery re-establishes the actor and uses the same command/domain declaration with current authorization. Transaction-local internal resource handles are not serialized across the queue. Domain refusal cannot fall back to record-sharing as a separate function grant; sharing remains part of record access once domain eligibility is satisfied. Internal handlers do not require separately granted child model-operation codes. Tenant, relationship, field, writer, version, and transaction constraints remain enforced.
+
+The permission mapper uses its generated entity result map for catalog, active definitions, and ID/code lookups consumed by these boundaries. JSONB extension values must hydrate as structured objects, not strings. Real PostgreSQL regression coverage is in `BusinessCommandGrantPostgresIT`.
+
+Domain transaction admission reuses `CommandTransactionIsolationPolicy` for an existing explicit serializable declaration. An automatically selected repeatable-read minimum must not reject an already established serializable transaction. Explicit handler/resource isolation conflicts and weak outer transactions remain closed.
+
+An admitted write/manage command may mutate a model explicitly owned by its domain even when standalone CRUD for that model has a higher minimum. Internal effects require the current server-authorized command code, its permit plan, and the matching domain authority. A bare authority string, read-only command, unowned model, or standalone request gains nothing. The record evaluator still resolves the actual model/action scope and intersects existing field/condition constraints from the granting role. Sensitive reads continue through `dataControlledReads`; immutable, exact-writer, relationship, and version gates remain independent. This prevents a conversion's derived draft structure from requiring a second manage grant, without lowering the standalone structure management boundary.
+
+## installed integration recovery (1)
+
+Rationale: `/api/admin/**` is restricted by `AdminRoleInterceptor`; `@AuthenticatedAccess` declares authentication. The recovery service scopes every receipt, outbox and audit lookup to the current tenant. Requests cannot select an actor or tenant.
+- `InstalledIntegrationRecoveryController.java`

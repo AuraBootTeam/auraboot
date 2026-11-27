@@ -56,6 +56,12 @@ public class ReliableEventDeliveryExecutor {
         this.metrics = metrics;
         this.transaction = new TransactionTemplate(transactionManager);
         this.transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        // The delivery unit wraps exactly one consumer command execution, and
+        // CommandExecutionTransaction preserves the caller's transaction instead of
+        // suspending it — the unit must open at the coherent level commands require
+        // (REPEATABLE_READ), or every machine follow-up command is denied by the
+        // resource isolation contract (same root cause as the ingress admission fix).
+        this.transaction.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
         this.serializableTransaction = new TransactionTemplate(transactionManager);
         this.serializableTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.serializableTransaction.setIsolationLevel(TransactionDefinition.ISOLATION_SERIALIZABLE);

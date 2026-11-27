@@ -34,6 +34,9 @@ public class MenuController {
     @Autowired
     private MenuService menuService;
 
+    @Autowired
+    private com.auraboot.framework.menu.service.PlatformManagementNavigation platformNavigation;
+
     /**
      * 获取当前用户的菜单树
      * 用于前端动态渲染菜单
@@ -45,7 +48,7 @@ public class MenuController {
             @CurrentUserId Long userId ) {
 
         List<Menu> menuTree = menuService.getUserMenuTree(userId, MetaContext.getCurrentTenantId());
-        return ApiResponse.success(menuTree);
+        return ApiResponse.success(platformNavigation.append(menuTree, userId, MetaContext.getCurrentTenantId()));
     }
 
     /**
@@ -119,9 +122,7 @@ public class MenuController {
     public ApiResponse<Menu> createMenu(
             @RequestBody Menu menu,
             @CurrentUserId Long userId) {
-        menu.setCreatedBy(userId);
-        Menu createdMenu = menuService.createMenu(menu);
-        return ApiResponse.success(createdMenu);
+        throw new RootUnCheckedException(ResponseCode.BadParam,"Use revisioned navigation configuration to create menus");
     }
 
     /**
@@ -134,9 +135,7 @@ public class MenuController {
     public ApiResponse<Menu> updateMenu(
             @RequestBody Menu menu,
             @CurrentUserId Long userId) {
-        menu.setUpdatedBy(userId);
-        Menu updatedMenu = menuService.updateMenu(menu);
-        return ApiResponse.success(updatedMenu);
+        throw new RootUnCheckedException(ResponseCode.BadParam,"Use revisioned navigation configuration to update menus");
     }
 
     /**
@@ -147,8 +146,7 @@ public class MenuController {
     @ResponseBody
     @RequirePermission(MetaPermission.MENU_MANAGE)
     public ApiResponse<Boolean> deleteMenu(@PathVariable("menuId") Long menuId) {
-        boolean result = menuService.deleteMenu(menuId);
-        return ApiResponse.success(result);
+        throw new RootUnCheckedException(ResponseCode.BadParam,"Use revisioned navigation configuration to remove menus");
     }
 
     /**

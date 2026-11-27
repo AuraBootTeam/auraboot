@@ -1,6 +1,7 @@
 // web-admin/app/smart/automation/templates/automationTemplates.ts
-import type { FlowData } from '~/plugins/core-designer/components/flow-designer-sdk';
+import type { FlowData } from '~/framework/smart/flows/sdk';
 import type { LocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 
 /**
  * Automation Template
@@ -716,12 +717,8 @@ export function searchTemplates(query: string): AutomationTemplate[] {
   const q = query.toLowerCase().trim();
   if (!q) return automationTemplates;
   return automationTemplates.filter((t) => {
-    const nameMatches =
-      (t.name['en-US'] || '').toLowerCase().includes(q) ||
-      (t.name['zh-CN'] || '').toLowerCase().includes(q);
-    const descMatches =
-      (t.description['en-US'] || '').toLowerCase().includes(q) ||
-      (t.description['zh-CN'] || '').toLowerCase().includes(q);
+    const nameMatches = getLocalizedText(t.name).toLowerCase().includes(q);
+    const descMatches = getLocalizedText(t.description).toLowerCase().includes(q);
     const tagMatches = t.tags.some((tag) => tag.includes(q));
     return nameMatches || descMatches || tagMatches;
   });

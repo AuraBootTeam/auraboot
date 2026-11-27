@@ -87,4 +87,19 @@ class RoleControllerTest {
         assertFalse(first.has("updatedBy"));
         assertFalse(first.has("deletedFlag"));
     }
+    @Test
+    void completeCatalogKeepsMemberCountsAndManagementGrouping() throws Exception {
+        Role role = new Role();
+        role.setId(42L);role.setPid("role-admin");role.setTenantId(100L);
+        role.setCode("manager");role.setName("Manager");
+        when(roleService.findByTenantId(100L)).thenReturn(List.of(role));
+        var summary = new com.auraboot.framework.rbac.dto.RoleDisplaySummary();
+        summary.setRoleId(42L);summary.setMemberCount(7L);summary.setManagementRole(true);
+        org.mockito.Mockito.lenient().when(roleService.displaySummaries(100L,List.of(42L))).thenReturn(List.of(summary));
+        var row = objectMapper.valueToTree(controller.getAllRoles()).path("data").get(0);
+        assertEquals(7L,row.path("memberCount").asLong());
+        org.junit.jupiter.api.Assertions.assertTrue(row.path("managementRole").asBoolean());
+        assertFalse(row.has("id"));
+    }
+
 }

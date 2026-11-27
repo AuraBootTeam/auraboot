@@ -186,15 +186,23 @@ runtime_env() {
   grep -E "^${key}=" "$f" | head -1 | cut -d= -f2-
 }
 
+# A candidate is linked from another checkout, so it must also stay consistent once it is
+# reached through this checkout's path (web_admin_node_modules_seedable). This checkout's own
+# view cannot match here any more: step 7/9 has already tried it and removed a stale link.
+web_admin_node_modules_seed_candidate() {
+  web_admin_node_modules_matches_checkout "$1" "$REPO_ROOT" || return 1
+  web_admin_node_modules_seedable "$1" || return 1
+  echo "$1"
+}
+
 web_admin_node_modules_seed() {
   local candidate
   for candidate in "$CANONICAL/web-admin/node_modules" "$REPO_ROOT/web-admin/node_modules"; do
-    web_admin_node_modules_matches_checkout "$candidate" "$REPO_ROOT" && { echo "$candidate"; return 0; }
+    web_admin_node_modules_seed_candidate "$candidate" && return 0
   done
 
   while IFS= read -r candidate; do
-    candidate="$candidate/web-admin/node_modules"
-    web_admin_node_modules_matches_checkout "$candidate" "$REPO_ROOT" && { echo "$candidate"; return 0; }
+    web_admin_node_modules_seed_candidate "$candidate/web-admin/node_modules" && return 0
   done < <(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree /{print substr($0,10)}')
 
   return 1
@@ -963,7 +971,8 @@ cmd_warm() {
   local name="$1" sd; sd="$(state_dir "$name")" || return 1
   [ -f "$sd/ports" ] || die "no running stack for '$name' (run 'up' first)"
   local fe="$REPO_ROOT/web-admin"
-  local admin_json="$fe/tests/storage/admin.json"
+  local admin_json="${PW_ADMIN_STORAGE_STATE:-${PW_STORAGE_DIR:-tests/storage}/admin.json}"
+  [[ "$admin_json" = /* ]] || admin_json="$fe/$admin_json"
   local env_exports; env_exports="$(cmd_env "$name")"
   eval "$env_exports"
   local evidence_root="$AURA_EVIDENCE_ROOT"

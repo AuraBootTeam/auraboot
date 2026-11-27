@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { closeSync, fstatSync, openSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, mkdirSync, writeFileSync, existsSync, symlinkSync, cpSync } from 'node:fs';
+import { closeSync, fstatSync, openSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, mkdirSync, writeFileSync, existsSync, symlinkSync, unlinkSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path, { join, resolve } from 'node:path';
 import {createHash} from 'node:crypto';
@@ -12,6 +12,7 @@ import {canonicalJson,readStructuredFile,resolveApplication,sha256Path} from './
 import {captureCoreWebInputs,coreWebEnvironment,createCoreWebComponent,copyCoreWebComponent,verifyCoreWebComponent,readCoreWebSelection}
   from './core-web-component.mjs';
 import test from 'node:test';
+import { distributionLicenseFiles, copyDistributionLicenses, copyPackageLicense } from './distribution-licenses.mjs';
 
 const root = resolve(import.meta.dirname, '../..');
 const stage = readFileSync(resolve(root, 'scripts/application/stage-core-only-artifacts.mjs'), 'utf8');
@@ -23,6 +24,56 @@ const deploy = readFileSync(resolve(root, 'scripts/application/auraboot-core-env
 const audit = readFileSync(resolve(root, 'scripts/application/audit-core-only-schema.sh'), 'utf8');
 const oci = readFileSync(resolve(root, 'scripts/application/oci-layout.mjs'), 'utf8');
 const productImageGate = readFileSync(resolve(root, 'scripts/application/run-product-release-image-gate.sh'), 'utf8');
+
+test('application version guard accepts the library adapter without accepting drift or a hardcoded substitute', t => {
+  const fixture = mkdtempSync(join(tmpdir(), 'application-version-'));
+  t.after(() => rmSync(fixture, { recursive: true, force: true }));
+  for (const dir of ['scripts', 'platform/gradle', 'platform/platform-app/src/main/resources']) {
+    mkdirSync(join(fixture, dir), { recursive: true });
+  }
+  cpSync(join(root, 'scripts/check-version-sync.sh'), join(fixture, 'scripts/check-version-sync.sh'));
+  writeFileSync(join(fixture, 'VERSION'), '1.0.0\n');
+  writeFileSync(join(fixture, 'LIBRARY_VERSION'), '1.0.1-rc.3\n');
+  const config = join(fixture, 'platform/platform-app/src/main/resources/application.yml');
+  writeFileSync(config, 'auraboot:\n  platform:\n    version: 1.0.0\n');
+  writeFileSync(join(fixture, 'platform/build.gradle'), "apply from: 'gradle/library-version.gradle'\n");
+  const adapter = join(fixture, 'platform/gradle/library-version.gradle');
+  cpSync(join(root, 'platform/gradle/library-version.gradle'), adapter);
+  const run = () => spawnSync('bash', [join(fixture, 'scripts/check-version-sync.sh')], { encoding: 'utf8' });
+  assert.equal(run().status, 0);
+  writeFileSync(config, 'auraboot:\n  platform:\n    version: 1.0.1\n');
+  const drift = run();
+  assert.notEqual(drift.status, 0);
+  assert.match(drift.stderr, /DRIFT/);
+  writeFileSync(config, 'auraboot:\n  platform:\n    version: 1.0.0\n');
+  writeFileSync(adapter, "allprojects { version = '1.0.0' }\n");
+  assert.notEqual(run().status, 0);
+  writeFileSync(join(fixture, 'platform/build.gradle'), "version = file('../VERSION').text.trim()\n");
+  assert.equal(run().status, 0);
+});
+
+test('unpublished RC metadata binds the actual product version and leaves library versions independent', () => {
+  const candidate = JSON.parse(readFileSync(join(root, 'distribution/application/examples/core-only/release-candidate.json')));
+  const version = readFileSync(join(root, 'VERSION'), 'utf8').trim();
+  const manifest = readStructuredFile(join(root, 'distribution/application/examples/core-only/app.yaml'));
+  assert.equal(candidate.version, version);
+  assert.equal(manifest.app.version, version);
+  assert.ok(candidate.id.startsWith(`v${version}-rc.`));
+  assert.match(candidate.id.slice(`v${version}-rc.`.length), /^[1-9]\d*$/);
+  assert.equal(candidate.status, 'unpublished');
+  assert.equal(candidate.phase, 'release-candidate');
+  assert.equal(candidate.targetPlatform, 'linux-amd64');
+  assert.equal(candidate.licenseFile, 'LICENSE.txt');
+  assert.equal(candidate.noticeFile, 'NOTICE');
+});
+
+test('native and OCI SMS budget probes reject missing, premature and non-OTP controls', () => {
+  execFileSync('python3', ['-B', join(root, 'scripts/ci/oss-security-probes.test.py')], { encoding: 'utf8' });
+  const native = readFileSync(join(root, 'scripts/ci/oss-native-install.py'), 'utf8');
+  const probes = readFileSync(join(root, 'scripts/ci/oss-security-probes.py'), 'utf8');
+  assert.match(native, /security_module\.verify_sms_mobile_window\(request, check, require, 'oci'\)/);
+  assert.match(probes, /verify_sms_mobile_window\(request, check, require, 'native'\)/);
+});
 
 test('product image reentry preserves the existing work root and refuses implicit replacement', t => {
   const directory = mkdtempSync(join(tmpdir(), 'product-work-root-'));
@@ -38,7 +89,7 @@ test('product image reentry preserves the existing work root and refuses implici
   rmSync(existing, { recursive: true });
   symlinkSync(directory, existing, 'dir');
   assert.equal(run().status, 2);
-  rmSync(existing);
+  unlinkSync(existing);
   assert.equal(run().status, 0);
   assert.ok(statSync(existing).isDirectory());
 });
@@ -285,7 +336,11 @@ test('core schema audit keeps provider-neutral automation storage in core', () =
 });
 
 test('release OCI is built on a pinned Linux JRE and requires a real image builder', () => {
-  assert.match(oci, /eclipse-temurin:21-jre-noble@sha256:0eda5830ed7b669abc246a8dc520ea8a23cab06f9a8d4b6964109e2f2394e46f/);
+  assert.match(oci, /eclipse-temurin:21-jre-alpine@sha256:b6ea71e690a72ba240b3d1b5c477410014862f9ea2cc73ab40e41ff21b03ba1c/);
+  assert.match(oci, /apk add --no-cache zlib=1\.4-r0 openssl=3\.5\.9-r1 libssl3=3\.5\.9-r1 libcrypto3=3\.5\.9-r1 gnutls=3\.8\.14-r0 && apk info -v zlib openssl libssl3 libcrypto3 gnutls/);
+  assert.match(oci, /apk add --no-cache[^\n]*gnutls=3\.8\.14-r0/);
+  assert.match(readFileSync(resolve(root, 'platform/Dockerfile'), 'utf8'), /apk add --no-cache[^\n]*gnutls=3\.8\.14-r0/);
+  assert.doesNotMatch(oci, /--allow-unauthenticated|--allow-untrusted|trusted=yes/);
   assert.doesNotMatch(oci, /execFileSync\('container'/);
   assert.match(oci, /self-hosted Linux CI Docker builder \(linux\/amd64\)/);
   assert.match(oci, /AURA_OCI_BUILDER must be docker/);
@@ -468,7 +523,9 @@ function platformFixture(t) {
 function webComponentFixture(t) {
   const f=platformFixture(t),repo=join(f.directory,'source');mkdirSync(repo);
   const put=(name,body)=>{mkdirSync(path.dirname(join(repo,name)),{recursive:true});writeFileSync(join(repo,name),body);};
-  for(const name of ['VERSION','LICENSE.txt','package.json','pnpm-lock.yaml','pnpm-workspace.yaml',
+  for(const name of ['VERSION','LICENSE.txt','NOTICE','LICENSE-SCOPE.md','LICENSE-LEGACY-2.0.txt',
+    'platform/platform-mybatis-compat/NOTICE.auraboot',
+    'platform/platform-mybatis-compat/licenses/ognl-3.4.17/LICENSE.txt','package.json','pnpm-lock.yaml','pnpm-workspace.yaml',
     'web-admin/package.json','web-admin/app/view.ts','packages/sdk/package.json',
     'scripts/application/stage-core-only-artifacts.mjs','scripts/application/core-web-component.mjs',
     'scripts/application/application-contract.mjs','distribution/application/manifest.json','platform/Backend.java'])put(name,name+'\n');
@@ -733,4 +790,71 @@ test('platform consumer uses the original frozen dataset selection and never res
     writeFileSync(inputs,JSON.stringify({files}));const destination=join(f.directory,name);
     await assert.rejects(consumePlatformArtifacts({...f,inputs,destination}));assert.equal(existsSync(destination),false);
   }
+});
+
+
+test('1.0 distribution retains byte-identical scope, historical and independent third-party licenses', t => {
+  const destination = mkdtempSync(join(tmpdir(), 'aura-license-envelope-'));
+  t.after(() => rmSync(destination, { recursive: true, force: true }));
+  copyDistributionLicenses(root, destination);
+  assert.ok(distributionLicenseFiles.length >= 14);
+  for (const name of distributionLicenseFiles) {
+    assert.deepEqual(readFileSync(join(destination, name)), readFileSync(join(root, name)), name);
+  }
+  assert.match(readFileSync(join(destination, 'LICENSE.txt'), 'utf8'), /source-available/);
+  assert.match(readFileSync(join(destination, 'packages/plugin-sdk/LICENSE'), 'utf8'), /Apache License/);
+});
+
+test('SDK staging and actual npm packing retain the independent Apache license', t => {
+  const destination = mkdtempSync(join(tmpdir(), 'aura-sdk-license-'));
+  t.after(() => rmSync(destination, { recursive: true, force: true }));
+  const source = join(root, 'packages/plugin-sdk');
+  copyPackageLicense(source, destination);
+  const manifest = JSON.parse(readFileSync(join(source, 'package.json'), 'utf8'));
+  writeFileSync(join(destination, 'package.json'), JSON.stringify({
+    name: manifest.name, version: manifest.version, license: manifest.license, files: ['index.js'],
+  }));
+  writeFileSync(join(destination, 'index.js'), 'export const licenseFixture = true;\n');
+  execFileSync('pnpm', ['pack', '--pack-destination', destination], { cwd: destination, stdio: 'pipe' });
+  const archive = readdirSync(destination).filter(name => name.endsWith('.tgz'));
+  assert.equal(archive.length, 1);
+  const bytes = execFileSync('tar', ['-xOf', join(destination, archive[0]), 'package/LICENSE']);
+  assert.deepEqual(bytes, readFileSync(join(source, 'LICENSE')));
+  const packedManifest = JSON.parse(execFileSync('tar', ['-xOf', join(destination, archive[0]), 'package/package.json']));
+  assert.equal(packedManifest.license, 'Apache-2.0');
+  assert.ok(!bytes.toString().includes('AURABOOT COMMUNITY LICENSE'));
+});
+
+test('independent license staging refuses a missing package license rather than borrowing platform terms', t => {
+  const directory = mkdtempSync(join(tmpdir(), 'aura-license-missing-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  assert.throws(() => copyPackageLicense(join(directory, 'missing-sdk'), join(directory, 'out')), /ENOENT/);
+});
+
+
+test('frozen v1 Web receipts remain readable while new capture requires the 1.0 legal envelope', t => {
+  const f = webComponentFixture(t);
+  const historical = structuredClone(f.receipt);
+  const additions = new Set(['NOTICE', 'LICENSE-SCOPE.md', 'LICENSE-LEGACY-2.0.txt',
+    'platform/platform-mybatis-compat/NOTICE.auraboot',
+    'platform/platform-mybatis-compat/licenses/ognl-3.4.17/LICENSE.txt']);
+  const component = historical.webComponent;
+  component.inputs.files = component.inputs.files.filter(entry => !additions.has(entry.path));
+  component.inputDigest = 'sha256:' + createHash('sha256').update(canonicalJson(component.inputs)).digest('hex');
+  assert.equal(verifyCoreWebComponent({ root: f.root, catalog: f.catalog, receipt: historical }).source.commit, f.before.source.commit);
+  // Old provenance remains internally bound; omitting an original required recipe still fails.
+  const incomplete = structuredClone(historical);
+  incomplete.webComponent.inputs.files = incomplete.webComponent.inputs.files.filter(entry => entry.path !== 'pnpm-lock.yaml');
+  incomplete.webComponent.inputDigest = 'sha256:' + createHash('sha256').update(canonicalJson(incomplete.webComponent.inputs)).digest('hex');
+  assert.throws(() => verifyCoreWebComponent({ root: f.root, catalog: f.catalog, receipt: incomplete }), /Complete Web recipe/);
+  rmSync(join(f.repo, 'LICENSE-SCOPE.md'));
+  assert.throws(() => f.commit(), error => error.code === 'ENOENT' && error.path === join(f.repo, 'LICENSE-SCOPE.md'));
+});
+
+test('a changed 1.0 license scope invalidates the current Web input identity', t => {
+  const f = webComponentFixture(t);
+  f.put('LICENSE-SCOPE.md', 'Changed covered license scope\n');
+  const changed = f.commit();
+  assert.notEqual(changed.inputDigest, f.before.inputDigest);
+  assert.ok(changed.inputs.files.some(entry => entry.path === 'LICENSE-SCOPE.md'));
 });

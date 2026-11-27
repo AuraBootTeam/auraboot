@@ -288,6 +288,65 @@ class CloudConfigServiceImplTest {
     }
 
     @Test
+    void callbackSaltUsesExistingEncryptionAndMasking() {
+        var request = new CloudConfigSaveRequest();
+        request.setServiceType("integration"); request.setProviderCode("sample"); request.setConfigLevel("tenant");
+        request.setConfig("{\"callbackSalt\":\"synthetic-callback-salt\",\"callbackInstallationPid\":\"installation\"}");
+        request.setEnabled(true);
+        when(fieldEncryptionService.encrypt("synthetic-callback-salt")).thenReturn("ENC:callback-fixture");
+        var saved = ArgumentCaptor.forClass(CloudConfig.class);
+        cloudConfigService.saveConfig(request);
+        verify(cloudConfigMapper).insert(saved.capture());
+        assertThat(saved.getValue().getConfig()).contains("ENC:callback-fixture", "installation")
+                .doesNotContain("synthetic-callback-salt");
+        sampleConfig.setConfig(saved.getValue().getConfig());
+        when(cloudConfigMapper.findByPid("test-pid-001", 100L)).thenReturn(sampleConfig);
+        when(fieldEncryptionService.maskJsonFields(eq(sampleConfig.getConfig()), argThat(fields -> fields.contains("callbackSalt"))))
+                .thenReturn("{\"callbackSalt\":\"****\"}");
+        assertThat(cloudConfigService.getConfigMasked("test-pid-001").getConfig()).contains("****").doesNotContain("ENC:");
+    }
+
+    @Test
+    void purchaseContractDefinitionUsesExistingEncryptionBeforePersistence() {
+        MetaContext.setContext(100L, 200L, "user-pid", "tester");
+        var request = new CloudConfigSaveRequest();
+        request.setServiceType("integration");request.setProviderCode("procurement-contract");request.setConfigLevel("tenant");
+        request.setConfig("{\"purchaseContractDefinition\":\"private-definition-and-stamp\"}");request.setEnabled(true);
+        when(fieldEncryptionService.encrypt("private-definition-and-stamp")).thenReturn("ENC:contract-fixture");
+        var saved = ArgumentCaptor.forClass(CloudConfig.class);
+        cloudConfigService.saveConfig(request);
+        verify(cloudConfigMapper).insert(saved.capture());
+        assertThat(saved.getValue().getConfig()).contains("ENC:contract-fixture").doesNotContain("private-definition-and-stamp");
+        assertThat(saved.getValue().getTenantId()).isEqualTo(100L);
+    }
+
+    @Test
+    void purchaseContractDefinitionIsIncludedInAdminMasking() {
+        MetaContext.setContext(100L, 200L, "user-pid", "tester");
+        sampleConfig.setConfig("{\"purchaseContractDefinition\":\"ENC:contract-fixture\"}");
+        when(cloudConfigMapper.listByLevel("tenant",100L)).thenReturn(List.of(sampleConfig));
+        when(fieldEncryptionService.maskJsonFields(eq(sampleConfig.getConfig()),argThat(names -> names.contains("purchaseContractDefinition"))))
+                .thenReturn("{\"purchaseContractDefinition\":\"****\"}");
+        var rows=cloudConfigService.listConfigs("tenant");
+        assertThat(rows).hasSize(1);assertThat(rows.getFirst().getConfig()).contains("****").doesNotContain("ENC:contract-fixture");
+    }
+
+    @Test
+    void unchangedMaskedContractDefinitionPreservesItsCiphertext() {
+        MetaContext.setContext(100L, 200L, "user-pid", "tester");
+        sampleConfig.setConfig("{\"purchaseContractDefinition\":\"ENC:contract-fixture\"}");
+        when(cloudConfigMapper.findByPid("test-pid-001",100L)).thenReturn(sampleConfig);
+        when(cloudConfigMapper.updateScoped(any(),eq(100L))).thenReturn(1);
+        when(fieldEncryptionService.mask("ENC:contract-fixture")).thenReturn("****");
+        var request=new CloudConfigSaveRequest();request.setPid("test-pid-001");request.setConfigLevel("tenant");
+        request.setServiceType("integration");request.setProviderCode("procurement-contract");request.setEnabled(true);
+        request.setConfig("{\"purchaseContractDefinition\":\"****\"}");
+        cloudConfigService.saveConfig(request);
+        assertThat(sampleConfig.getConfig()).contains("ENC:contract-fixture").doesNotContain("****");
+        verify(fieldEncryptionService,never()).encrypt(anyString());
+    }
+
+    @Test
     void saveConfig_encryptsLlmApiKey() {
         CloudConfigSaveRequest request = new CloudConfigSaveRequest();
         request.setServiceType("llm");

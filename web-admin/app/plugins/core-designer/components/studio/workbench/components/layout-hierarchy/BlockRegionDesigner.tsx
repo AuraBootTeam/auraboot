@@ -1,5 +1,5 @@
 import React from 'react';
-import type { BlockConfig, FieldCellConfig } from '~/plugins/core-designer/components/studio/domain/schema/layout-hierarchy';
+import type { BlockConfig, FieldCellConfig } from '~/framework/smart/schema/layout-hierarchy';
 import { FieldCellDesigner } from './FieldCellDesigner';
 
 interface BlockRegionDesignerProps {

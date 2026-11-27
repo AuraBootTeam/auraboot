@@ -29,13 +29,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const storeList = await getStoreList(request, { pageNum, pageSize, keyword });
     return { storeList, pageNum, pageSize, keyword };
   } catch (error) {
+    // Surface the failure instead of rendering it as "no data" — an empty
+    // list here would mislead operators during an outage.
     console.error('获取Store列表失败:', error);
-    return {
-      storeList: { records: [], total: 0, totalPages: 0, pageNum: 1, pageSize: 10 },
-      pageNum,
-      pageSize,
-      keyword,
-    };
+    throw error;
   }
 };
 

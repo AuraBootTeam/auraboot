@@ -66,13 +66,14 @@ describe('UserMenuWidget', () => {
     expect(dropdown.querySelector('a[href="/logout"]')).not.toBeNull();
     expect(screen.getByText('Admin User')).toBeInTheDocument();
     expect(screen.getByText('admin@auraboot.com')).toBeInTheDocument();
-    expect(screen.getByTestId('open-platform-link')).toHaveAttribute('href', '/settings/api-docs');
+    expect(screen.queryByTestId('open-platform-link')).toBeNull();
+    expect(screen.queryByTestId('platform-console-link')).toBeNull();
     expect(screen.getByTestId('profile-link')).toHaveAttribute('href', '/personal/profile');
     fireEvent.click(screen.getByTestId('profile-link'));
     expect(screen.queryByTestId('user-dropdown')).toBeNull();
   });
 
-  it('exposes Open Platform to authenticated collaborators without a global admin grant', () => {
+  it('keeps platform navigation out of the account menu for authenticated collaborators', () => {
     rootLoaderData.value = {
       ...authedRootData,
       permissions: { permissionCodes: [] },
@@ -84,7 +85,8 @@ describe('UserMenuWidget', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'User avatar' }));
-    expect(screen.getByTestId('open-platform-link')).toHaveAttribute('href', '/settings/api-docs');
+    expect(screen.queryByTestId('open-platform-link')).toBeNull();
+    expect(screen.queryByTestId('platform-console-link')).toBeNull();
   });
 
   it('renders nothing for anonymous visitors', () => {

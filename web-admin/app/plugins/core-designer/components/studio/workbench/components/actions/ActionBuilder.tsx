@@ -565,7 +565,7 @@ const ActionParameterEditor: React.FC<ActionParameterEditorProps> = ({
             onChange(newParams);
           } catch (error) {
             // 忽略 JSON 解析错误
-          }
+            console.warn('[ActionBuilder] previously-silent catch', error);          }
         }}
         className="w-full rounded border px-3 py-2 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
         rows={6}

@@ -10,7 +10,7 @@ import React, { useRef, useState, useCallback } from 'react';
 import type {
   UploadProps,
   UploadFile,
-} from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+} from '~/framework/smart/schema/smart-components';
 import { useSmartField } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
 import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
 import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';

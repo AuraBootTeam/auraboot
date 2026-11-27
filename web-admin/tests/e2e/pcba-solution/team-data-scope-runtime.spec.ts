@@ -85,17 +85,36 @@ test.describe('Team data scope runtime (X03-04)', () => {
     await page.getByTestId('role-search-input').fill(roleCode);
     await page.getByTestId(`role-item-${roleCode}`).click();
     await expect(page.getByTestId('capability-role-editor')).toHaveAttribute('data-role-pid', rolePid);
+    const draftUrl = `/api/permission/roles/${rolePid}/draft`;
+    const beforeResponse = await page.request.get(draftUrl);
+    expect(beforeResponse.status()).toBe(200);
+    const before = (await beforeResponse.json()).data;
+    await page.getByTestId('permission-right-tab-capabilities').click();
     await page.getByTestId('capability-checkbox-sys.cap.query_builder').check();
+    const previewResponse = page.waitForResponse(response =>
+      response.request().method() === 'POST' && new URL(response.url()).pathname === `${draftUrl}/preview`);
     await page.getByTestId('capability-save').click();
+    const preview = await previewResponse;
+    expect(preview.status()).toBe(200);
+    const reviewed = await preview.json();
+    expect(String(reviewed.code)).toBe('0');
+    expect(reviewed.data.defaultScopeChanged).toBe(false);
+    expect(reviewed.data.scopeChanges).toHaveLength(0);
     await expect(page.getByTestId('confirm-dialog')).toBeVisible();
     const capabilitiesSaved = page.waitForResponse(response =>
-      response.request().method() === 'PUT' && response.url().includes('/api/permission/capabilities?'));
+      response.request().method() === 'PUT' && new URL(response.url()).pathname === draftUrl);
     await page.getByTestId('confirm-ok').click();
     const saved = await capabilitiesSaved;
     expect(saved.status()).toBe(200);
     expect(String((await saved.json()).code)).toBe('0');
-    expect(saved.request().postDataJSON()).toEqual(['sys.cap.query_builder']);
+    expect(saved.request().postDataJSON().selectedCapabilityCodes).toContain('sys.cap.query_builder');
     await expect(page.getByTestId('capability-save')).toBeDisabled();
+    const afterResponse = await page.request.get(draftUrl);
+    expect(afterResponse.status()).toBe(200);
+    const after = (await afterResponse.json()).data;
+    expect(after.defaultScopeType).toEqual(before.defaultScopeType);
+    expect(after.scopes).toEqual(before.scopes);
+    expect(after.fieldPolicies).toEqual(before.fieldPolicies);
 
     const member: TestUser = {
       email: `${roleCode}_a@e2e.local`,
@@ -167,12 +186,12 @@ test.describe('Team data scope runtime (X03-04)', () => {
       await openDynamicList(memberPage, resolvedBaseURL);
       await expectRowVisible(memberPage, recordOne);
       await expectRowAbsent(memberPage, recordTwo);
-      await memberPage.screenshot({ path: 'test-results/x03-member-sees-own-team.png', fullPage: true });
+      await memberPage.screenshot({ path: test.info().outputPath('x03-member-sees-own-team.png'), fullPage: true });
 
       await openDynamicList(outsiderPage, resolvedBaseURL);
       await expectRowAbsent(outsiderPage, recordOne);
       await expectRowAbsent(outsiderPage, recordTwo);
-      await outsiderPage.screenshot({ path: 'test-results/x03-outsider-sees-none.png', fullPage: true });
+      await outsiderPage.screenshot({ path: test.info().outputPath('x03-outsider-sees-none.png'), fullPage: true });
 
       // Removing the member from the team must hide the rows immediately —
       // the team-member service evicts the dataScopeCondition cache (#2102).
@@ -186,7 +205,7 @@ test.describe('Team data scope runtime (X03-04)', () => {
 
       await openDynamicList(memberPage, resolvedBaseURL);
       await expectRowAbsent(memberPage, recordOne);
-      await memberPage.screenshot({ path: 'test-results/x03-removed-member-sees-none.png', fullPage: true });
+      await memberPage.screenshot({ path: test.info().outputPath('x03-removed-member-sees-none.png'), fullPage: true });
     } finally {
       await memberContext.close();
       await outsiderContext.close();

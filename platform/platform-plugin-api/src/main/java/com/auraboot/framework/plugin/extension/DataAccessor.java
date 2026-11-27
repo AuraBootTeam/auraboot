@@ -30,6 +30,12 @@ public interface DataAccessor extends RecordReadAccessor {
      */
     Map<String, Object> getById(String modelCode, String recordId);
 
+    /** Read authorized, masked business fields without expanding display-only reference labels. */
+    default Map<String,Object> getByIdForProcessing(String modelCode, String recordId) {
+        return getById(modelCode,recordId);
+    }
+
+
     /**
      * Get a single record by ID, mapping a record-not-found outcome to
      * {@code null} without relying on the platform exception's message text.
@@ -76,6 +82,36 @@ public interface DataAccessor extends RecordReadAccessor {
      */
     default DataPage queryPage(String modelCode, DataPageQuery query) {
         throw new UnsupportedOperationException("DataAccessor database pagination is unavailable");
+    }
+
+    /**
+     * Public scalar views of already-read, owner-authorized records, keyed by the requested PIDs.
+     * No row data is accepted from the handler. Requires an explicit host output policy and must
+     * run before business writes. Internal reads and derived writes retain their canonical values.
+     */
+    default Map<String, Map<String, Object>> projectForPublicOutput(String modelCode, List<String> recordIds) {
+        throw new UnsupportedOperationException("DataAccessor public output projection is unavailable");
+    }
+
+    /**
+     * Read original uploaded bytes from one owner-declared attachment field on the authorized root.
+     * No caller-selected file identity, URL, storage key or reusable stream is exposed.
+     * Available only within the original invocation and transaction; returned bytes are a private copy.
+     */
+    default byte[] readBusinessSourceFile(String fieldCode) {
+        throw new UnsupportedOperationException("Business source file reading is unavailable");
+    }
+
+    /**
+     * Save one generated artifact to an owner-declared file field of this command's exact root.
+     * Atomically updates that field together with the supplied root changes, retains the bytes,
+     * and establishes their relation. Requires prior public projection of every declared source.
+     * No caller-selected model/PID, arbitrary file reads, or cloud URL signing is exposed.
+     * One artifact per invocation; the capability has the same lifetime as this DataAccessor.
+     */
+    default FileAccessor.SavedFile savePublicArtifact(String fieldCode, String originalName, String contentType,
+                                                     byte[] bytes, Map<String, Object> rootChanges) {
+        throw new UnsupportedOperationException("DataAccessor public artifact persistence is unavailable");
     }
 
     /**
@@ -127,6 +163,14 @@ public interface DataAccessor extends RecordReadAccessor {
      * @return the created record with generated ID
      */
     Map<String, Object> create(String modelCode, Map<String, Object> data);
+
+    /**
+     * Create with the ordinary write checks and lifecycle, without returning record contents.
+     * Does not provide a created-record file-link proof. Older hosts may perform extra readback.
+     */
+    default void createWithoutResult(String modelCode, Map<String, Object> data) {
+        create(modelCode, data);
+    }
 
     /**
      * Insert a record idempotently.
@@ -224,6 +268,12 @@ public interface DataAccessor extends RecordReadAccessor {
     default List<Map<String, Object>> bulkCreate(String modelCode, List<Map<String, Object>> dataList) {
         return batchCreate(modelCode, dataList);
     }
+
+    /** Same atomic write and public read projection, without display-only reference labels. */
+    default List<Map<String,Object>> bulkCreateForProcessing(String modelCode,List<Map<String,Object>> rows) {
+        return bulkCreate(modelCode,rows);
+    }
+
 
     /**
      * Delete a record by ID.

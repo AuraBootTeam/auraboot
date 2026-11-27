@@ -3,11 +3,33 @@ import {
   ACTION_COLUMN_MIN_WIDTH,
   ACTION_COLUMN_MAX_WIDTH,
   MAX_INLINE_ACTIONS,
+  desktopRowActions,
   estimateActionColumnWidth,
   partitionRowActions,
 } from '../actionColumnWidth';
 
-const btn = (code: string, inline?: boolean) => ({ code, inline }) as any;
+const btn = (code: string, inline?: boolean, extra?: object) => ({ code, inline, ...extra }) as any;
+
+describe('desktopRowActions', () => {
+  it('drops the buttons marked mobileOnly and keeps every other one in order', () => {
+    // Regression: the CRM lead list has a desktop "move to pool" that asks for the target
+    // pool and a mobile-only one that opens a form. Both reached the desktop overflow menu,
+    // so "移入线索池" was listed twice.
+    const buttons = [
+      btn('view'),
+      btn('move_to_pool'),
+      btn('move_to_pool_mobile', undefined, { mobileOnly: true }),
+      btn('delete'),
+    ];
+    expect(desktopRowActions(buttons).map((b) => b.code)).toEqual(['view', 'move_to_pool', 'delete']);
+  });
+
+  it('returns the list unchanged when no button is mobile-only', () => {
+    const buttons = [btn('a'), btn('b')];
+    expect(desktopRowActions(buttons).map((b) => b.code)).toEqual(['a', 'b']);
+    expect(desktopRowActions([])).toEqual([]);
+  });
+});
 
 describe('partitionRowActions', () => {
   it('keeps the legacy layout when no button opts in', () => {

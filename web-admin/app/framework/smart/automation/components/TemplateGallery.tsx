@@ -1,5 +1,6 @@
 // web-admin/app/smart/automation/components/TemplateGallery.tsx
 import React, { useState, useMemo, useCallback } from 'react';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { cn } from '~/utils/cn';
 import { useSmartText } from '~/utils/i18n';
 import {
@@ -56,12 +57,10 @@ export function TemplateGallery({ open, onClose, onSelectTemplate }: TemplateGal
     const q = searchQuery.toLowerCase().trim();
     if (q) {
       results = results.filter((t) => {
-        const nameMatches =
-          (t.name['en-US'] || '').toLowerCase().includes(q) ||
-          (t.name['zh-CN'] || '').toLowerCase().includes(q);
-        const descMatches =
-          (t.description['en-US'] || '').toLowerCase().includes(q) ||
-          (t.description['zh-CN'] || '').toLowerCase().includes(q);
+        const nameMatches = getLocalizedText(t.name).toLowerCase().includes(q);
+        const descMatches = t.description
+          ? getLocalizedText(t.description).toLowerCase().includes(q)
+          : false;
         return nameMatches || descMatches || t.tags.some((tag) => tag.includes(q));
       });
     }

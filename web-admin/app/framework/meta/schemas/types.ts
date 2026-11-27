@@ -14,17 +14,17 @@ import type { CrossFieldRule, RuleOverride } from '../validation/crossFieldRuleT
  * 基于 final.v1.0 DSL 结构
  */
 
-import type { LinkageRule } from '~/plugins/core-designer/components/studio/workbench/panels/linkage/types';
+import type { LinkageRule } from '~/framework/meta/schemas/linkage-types';
 
 // 多语言文本类型
 // 注意: 此类型应与 i18n-renderer.ts 中的定义保持一致
-export interface LocalizedText {
-  'zh-CN'?: string;
-  'en-US'?: string;
-  'ja-JP'?: string;
-  'ko-KR'?: string;
-  [locale: string]: string | undefined; // 支持动态 locale
-}
+// Single source: the published DSL contract (packages/dsl-types, >=0.0.2).
+// The renderer consumes the record form through ResolvedLocalizedText /
+// getLocalizedText — derived views, not a second definition.
+import type { LocalizedText } from '@auraboot/dsl-types';
+export type { LocalizedText } from '@auraboot/dsl-types';
+/** Record-form view for consumers that require a locale map (not a bare string). */
+export type ResolvedLocalizedText = Exclude<LocalizedText, string>;
 
 /** Optional shared workspace shell. Omission preserves the existing shell. */
 export interface WorkspaceShellConfig {
@@ -46,8 +46,12 @@ export interface WorkspaceShellConfig {
 export interface PageExtensionConfig {
   [key: string]: any;
   workspaceShell?: WorkspaceShellConfig;
+  /** Custom composed lists may supply their own individual panel surfaces. */
+  resultsSurface?: 'panel' | 'canvas';
   detailHeaderLayout?: LayoutConfig;
   detailBodyOrder?: 'schema';
+  /** Overrides the utility action menu default for standalone detail pages. */
+  compactHeaderActions?: boolean;
 }
 
 // Layout 配置
@@ -106,6 +110,32 @@ export interface BusinessActivityDetailField {
 export interface BusinessActivitySnapshotField extends BusinessActivityDetailField {}
 
 // Block 配置 (新 DSL)
+export interface CardDraftRows {
+  identityFields: string[];
+  preserveFields: string[];
+  preserveWhen?: string;
+}
+
+export interface CardGroupRows {
+  /** Omit only when parent rows already reside in the declared form array. */
+  dataSource?: string;
+  field: string;
+  identityField: string;
+  titleField: string;
+  summaryFields?: FieldConfig[];
+  asideFields?: FieldConfig[];
+  asideDetailsFields?: FieldConfig[];
+  asideDetailsLabel?: string | LocalizedText;
+  footerFields?: FieldConfig[];
+  footerLayout?: 'grid' | 'inline';
+  detailsPlacement?: 'before-items' | 'after-items';
+  detailsFields?: FieldConfig[];
+  detailsLabel?: string | LocalizedText;
+  fields?: FieldConfig[];
+  emptyText?: string | LocalizedText;
+  draftRows?: CardDraftRows;
+}
+
 export interface BlockConfig {
   id: string;
   blockType: string; // block 类型: form-section, form-buttons, table, filters 等
@@ -129,6 +159,42 @@ export interface BlockConfig {
   rowSelection?: CardRowSelection;
   /** Fit card-grid tracks to the available width, collapsing unused tracks. */
   autoFitColumns?: boolean;
+  /** Reserve unused adaptive tracks so a short row does not stretch each card. */
+  autoFillColumns?: boolean;
+  /** Optional adaptive-card minimum in logical pixels, bounded to 180..640. */
+  minCardWidth?: number;
+  /** Accessible native disclosure groups retain mounted row inputs when closed. */
+  collapsibleGroups?: boolean;
+  groupsDefaultOpen?: boolean | 'first';
+  /** Limit only the group summary; full detail fields remain available. */
+  groupDescriptionLines?: 1 | 2;
+  /** Visual emphasis derived from the current row; does not select or allocate it. */
+  cardEmphasisWhen?: string;
+  /** Optional semantic tones keyed by the raw card badge value. */
+  badgeTones?: Record<string, string>;
+  groupDescriptionField?: string;
+  /** Boolean row fact: highlight a group if any member requires attention. */
+  groupWarningField?: string;
+  /** Join child cards to explicit parent rows, including parents without children. */
+  groupRows?: CardGroupRows;
+  /** Render nested child arrays while preserving the parent data source for grouping. */
+  childrenField?: string;
+  /** Reuse the same bound rows as cards, document lines, or a read-only table. */
+  itemPresentation?: 'cards' | 'rows' | 'table';
+  collectionDialog?: { title: string | LocalizedText; headerFields?: FieldConfig[]; footerFields?: FieldConfig[]; buttons: ButtonConfig[]; dismissAction: ButtonConfig };
+  primaryField?: string;
+  primarySupportingField?: string;
+  /** Separate an editing area from the preceding card facts. */
+  separatedFields?: string[];
+  fieldDensity?: 'default' | 'compact';
+  groupBadgeField?: string;
+  groupLayout?: 'cards' | 'divided';
+  /** Reconcile refreshed facts by stable identity while preserving declared draft fields. */
+  draftRows?: CardDraftRows;
+  cardActions?: ButtonConfig[];
+  /** Per-group local search never removes rows from the submitted draft array. */
+  searchFields?: string[];
+  searchPlaceholder?: string | LocalizedText;
   buttons?: ButtonConfig[];
 
   // 表格相关
@@ -147,6 +213,8 @@ export interface BlockConfig {
   previewLimit?: number;
 
   // List tabs
+  /** Optional unified panel around tab navigation and its content. */
+  surface?: 'bare' | 'card';
   tabs?: ListTabConfig[] | DetailTabConfig[];
 
   // Sub-table (master-detail)
@@ -332,6 +400,9 @@ export interface EventConfig {
 
 // Column 配置（用于列表）
 export interface ColumnConfig {
+  /** Optional disclosure for long read-only text; the complete value remains available. */
+  textPreviewLength?: number;
+  verticalAlign?: 'top' | 'middle' | 'bottom';
   /** Localized placeholder for explicitly empty values, including empty arrays. */
   emptyText?: string | LocalizedText;
   /** Structured, reusable business cell presentation. */
@@ -345,6 +416,8 @@ export interface ColumnConfig {
   align?: 'left' | 'center' | 'right';
   width?: number | string;
   ellipsis?: boolean;
+  /** Text renderer: preserve line breaks and wrap long identifiers without HTML interpretation. */
+  multiline?: boolean;
   fixed?: 'left' | 'right'; // sticky column
 
   // Format
@@ -512,6 +585,8 @@ export type ActionDef =
       type: 'command';
       command: string;
       download?: { fileIdField: string };
+      /** Protected PDF preview; cannot be combined with an automatic download. */
+      preview?: { fileIdField: string; contentType: 'application/pdf' };
     } & CommandActionConfig)
   | ({ type: 'state_transition'; command: string } & CommandActionConfig)
   | ({ type: 'bulk_command'; command: string } & CommandInputFormConfig)
@@ -537,7 +612,11 @@ export type ActionDef =
       presentation?: { mode: 'modal'; width?: number };
     }
   | { type: 'builtin'; name: string }
-  | { type: 'flow'; steps: FlowStep[] }
+  | {
+      type: 'flow';
+      steps: FlowStep[];
+      /** False when steps own refresh and must retain parent drafts. */ refresh?: boolean;
+    }
   | { type: 'flow'; handler: string }
   | {
       type: 'workflow';
@@ -567,7 +646,7 @@ export interface ButtonConfig {
   label?: string | LocalizedText;
   primary?: boolean;
   danger?: boolean;
-  variant?: 'default' | 'primary' | 'danger';
+  variant?: 'default' | 'primary' | 'danger' | 'link';
   icon?: string;
   /**
    * Row actions only — render this button inline in the action column instead of
@@ -613,7 +692,29 @@ export interface ButtonConfig {
 }
 
 // Table 配置
+/** Lazy, read-only child records; the parent list and its navigation remain independent. */
+export interface RowExpansionConfig {
+  endpoint: string;
+  titleField?: string;
+  label?: string | LocalizedText;
+  rowKey?: string;
+  pageParam?: string;
+  sizeParam?: string;
+  pageIndexBase?: 0 | 1;
+  pageSize?: number;
+  columns: Array<{
+    field: string;
+    label: string | LocalizedText;
+    multiline?: boolean;
+    width?: number;
+  }>;
+}
+
 export interface TableConfig {
+  /** Render the block title and existing block buttons together above the rows. */
+  showTitle?: boolean;
+  /** Optional panel minimum height, including heading, for balanced master-detail layouts. */
+  minHeight?: number;
   rowKey?: string;
   dataSource?: string;
   maxHeight?: number | string;
@@ -633,6 +734,7 @@ export interface TableConfig {
   rowActions?: ButtonConfig[];
   /** Tree configuration — enables hierarchical expandable rows */
   treeConfig?: TreeConfig;
+  rowExpansion?: RowExpansionConfig;
   /**
    * Show the column summary/footer row (T10). Defaults to showing the footer
    * automatically when any column declares an `aggregate`; set explicitly to
@@ -645,6 +747,8 @@ export interface TableConfig {
 export interface PaginationConfig {
   /** Explicit opt-in for paged API data sources on a table block. */
   mode?: 'server';
+  /** Hide pagination only on the first page when the entire result fits. */
+  hideOnSinglePage?: boolean;
   /** Use the declared response field; request parameters remain pageNum/pageSize. */
   pageField?: 'pageNum' | 'current' | 'page';
   pageSize?: number;
@@ -670,7 +774,10 @@ export interface SelectionConfig {
    * Renders exclusive multiple-selection rows as one decision card per group.
    * The bound value remains an array containing at most one row per group.
    */
-  presentation?: 'table' | 'grouped-radio';
+  presentation?: 'table' | 'grouped-radio' | 'navigation';
+  labelField?: string;
+  countField?: string;
+  searchPlaceholder?: string | LocalizedText;
   /**
    * Field whose value defines an exclusive selection group. In multiple mode,
    * selecting another row with the same value replaces the previous row.
@@ -741,6 +848,8 @@ export interface SubTableConfig {
   childModel: string;
   parentField: string;
   readOnly?: boolean;
+  /** Overrides automatic first-column pinning for a read-only table. */
+  pinFirstColumn?: boolean;
   editableWhen?: string;
   columns: ColumnConfig[];
   /** Parent-record actions rendered above the child collection, including when it is empty. */
@@ -810,6 +919,8 @@ export interface CrossRowValidationRule {
 }
 
 export interface TreeConfig {
+  /** Optional nested children array; pagination counts root records. */
+  childrenField?: string;
   /** Self-referencing field (e.g., 'parent_id') */
   parentField: string;
   /** Max nesting depth (default: 5) */
@@ -1010,7 +1121,7 @@ export interface ListSchema extends UnifiedSchema {
 }
 
 // 页面专用 Schema
-export interface PageSchema extends UnifiedSchema {
+export interface UnifiedPageSchema extends UnifiedSchema {
   kind: 'page';
 }
 

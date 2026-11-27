@@ -19,19 +19,26 @@
 import { test, expect } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { BACKEND_URL } from '../../helpers/environments';
-
-const ADMIN = DEFAULT_TEST_ACCOUNT;
+import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
 test.describe('Space Selection API', () => {
-  test('my-spaces API returns platform + business spaces', async ({ page }) => {
-    // Login to get token
-    const loginRes = await page.request.post('/api/auth/login', {
-      data: { email: ADMIN.email, password: ADMIN.password },
+  // Each successful selection revokes the old session. Own one isolated session
+  // and carry forward its replacement token, without invalidating auth.setup state
+  // or spending three credential logins against the real ten-per-minute limiter.
+  test.describe.configure({ mode: 'serial' });
+  let currentToken: string;
+  test.beforeAll(async ({ request }) => {
+    const response = await request.post('/api/auth/login', {
+      data: { email: DEFAULT_TEST_ACCOUNT.email, password: DEFAULT_TEST_ACCOUNT.password },
     });
-    expect(loginRes.ok()).toBeTruthy();
-    const token = (await loginRes.json()).data.jwt;
+    expect(response.ok()).toBe(true);
+    const body = await response.json();
+    expect(body.data?.jwt, `Space fixture login failed: code=${body.code}`).toBeTruthy();
+    currentToken = body.data.jwt;
+  });
+  test('my-spaces API returns platform + business spaces', async ({ page }) => {
+    const token = currentToken;
 
     // Fetch spaces
     const spacesRes = await page.request.get('/api/tenant-selection/my-spaces', {
@@ -59,11 +66,7 @@ test.describe('Space Selection API', () => {
   });
 
   test('selecting a space returns new JWT with tenantId', async ({ page }) => {
-    // Login
-    const loginRes = await page.request.post('/api/auth/login', {
-      data: { email: ADMIN.email, password: ADMIN.password },
-    });
-    const token = (await loginRes.json()).data.jwt;
+    const token = currentToken;
 
     // Get business space
     const spacesRes = await page.request.get('/api/tenant-selection/my-spaces', {
@@ -88,19 +91,19 @@ test.describe('Space Selection API', () => {
     const selectBody = await selectRes.json();
     expect(selectBody.data.status).toBe('success');
     expect(selectBody.data.jwt).toBeTruthy();
+    currentToken = selectBody.data.jwt;
     // tenantId is now serialized as string from backend
     expect(String(selectBody.data.tenantId)).toBe(String(businessSpace.tenantId));
+    const claims = Buffer.from(selectBody.data.jwt.split('.')[1], 'base64url').toString();
+    // Preserve Snowflake identifiers instead of rounding them through JSON.parse numbers.
+    expect(claims.match(/"tenantId"\s*:\s*"?(\d+)"?(?=\s*[,}])/)?.[1]).toBe(String(businessSpace.tenantId));
 
     // JWT should be valid (may be same as original in SINGLE mode where login already has tenantId)
     expect(selectBody.data.jwt.length).toBeGreaterThan(50);
   });
 
   test('selecting platform space returns JWT with system tenant', async ({ page }) => {
-    // Login
-    const loginRes = await page.request.post('/api/auth/login', {
-      data: { email: ADMIN.email, password: ADMIN.password },
-    });
-    const token = (await loginRes.json()).data.jwt;
+    const token = currentToken;
 
     // Get platform space
     const spacesRes = await page.request.get('/api/tenant-selection/my-spaces', {
@@ -125,7 +128,10 @@ test.describe('Space Selection API', () => {
     const selectBody = await selectRes.json();
     expect(selectBody.data.status).toBe('success');
     expect(selectBody.data.jwt).toBeTruthy();
+    currentToken = selectBody.data.jwt;
     expect(String(selectBody.data.tenantId)).toBe(String(platformSpace.tenantId));
+    const claims = Buffer.from(selectBody.data.jwt.split('.')[1], 'base64url').toString();
+    expect(claims.match(/"tenantId"\s*:\s*"?(\d+)"?(?=\s*[,}])/)?.[1]).toBe(String(platformSpace.tenantId));
   });
 });
 

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { test, expect } from '../../fixtures';
 import {
   cleanupRows,
@@ -5,6 +7,7 @@ import {
   ensureQuoteRoleUser,
   makeQuoteRoleUser,
   openQuoteRolePage,
+  openQuoteDetailFromList,
   queryDynamicRecords,
   seedQuoteForCorrectedBomUpload,
   type CreatedRows,
@@ -37,6 +40,8 @@ test.describe('PCBA quote customer view golden', () => {
       await expect(page.locator('main')).toContainText(seeded.quoteCode, { timeout: 20_000 });
       await expect(page.locator('main')).not.toContainText(/加载失败|Business error/);
       expect(await page.getByRole('button', { name: /保存|Save/ }).count()).toBe(0);
+      await expect(page.getByRole('button', { name: /^(编辑|Edit)$/ })).toHaveCount(0);
+      await expect(page.locator('main input:not([readonly]):not([disabled]), main textarea:not([readonly]):not([disabled])')).toHaveCount(0);
 
       // 只读面:只读角色(viewer)对报价直写被拒绝;admin 特权写是设计内行为,不作断言
       // viewer 会话在测试内自建(空角色用户 + UI 登录):不依赖 checkout 本地的
@@ -71,7 +76,7 @@ test.describe('PCBA quote customer view golden', () => {
   // Q20-02: 下载报价附件——文件名为原文件名而非内部 ID;内容与记录一致。
   test('Q20-02 customer attachment download keeps the original filename and content', async ({
     page,
-  }) => {
+  }, info) => {
     const marker = `CUSTATT-${Date.now()}`;
     const originalName = `customer-official-quote-${marker}.pdf`;
     const content = '%PDF-1.4 E2E customer attachment payload\n';
@@ -80,6 +85,7 @@ test.describe('PCBA quote customer view golden', () => {
       // 自播种报价:不依赖库中已有数据(fresh 库为空也可跑)。
       const seeded = await seedQuoteForCorrectedBomUpload(page);
       created.quoteId = seeded.quoteId;
+      created.quoteCode = seeded.quoteCode;
       created.rows.push({ model: 'qo_quote_common', pid: seeded.quoteId });
       const quotePid = seeded.quoteId;
 
@@ -93,23 +99,63 @@ test.describe('PCBA quote customer view golden', () => {
         qo_qca_quote_id: quotePid,
         qo_qca_filename: originalName,
         qo_qca_file_id: fileId,
-        qo_qca_type: 'official_quote',
+        qo_qca_type: 'signed_quote',
         qo_qca_received_at: new Date().toISOString(),
-        qo_qca_status: 'sent',
+        qo_qca_status: 'received',
         qo_qca_received_from: 'E2E customer',
       }, created.rows);
 
-      // 下载:文件名保持原文件名(而非内部 ID),内容与记录一致
-      const download = await page.request.get(`/api/file/download/${fileId}`);
-      expect(download.status()).toBe(200);
-      const disposition = download.headers()['content-disposition'] ?? '';
-      expect(disposition, `content-disposition: ${disposition}`).toContain(originalName);
-      expect(await download.text()).toBe(content);
       const records = await queryDynamicRecords(page, 'qo_quote_customer_attachment_common', [
         { fieldName: 'qo_qca_filename', operator: 'EQ', value: originalName },
       ]);
       expect(records, 'attachment record keeps the original filename').toHaveLength(1);
       expect(String(records[0].qo_qca_file_id)).toBe(fileId);
+      const attachmentResponses: import('@playwright/test').Response[] = [];
+      page.on('response', response => {
+        if (new URL(response.url()).pathname === '/api/dynamic/qo_quote_customer_attachment_common/list'
+            && response.request().method() === 'GET') attachmentResponses.push(response);
+      });
+      await openQuoteDetailFromList(page, created);
+      await page.getByRole('tab', { name: '报价Excel', exact: true }).click();
+      await expect.poll(() => attachmentResponses.length, { timeout: 20_000 }).toBeGreaterThan(0);
+      const listResponse = attachmentResponses.at(-1)!;
+      expect(listResponse.status()).toBe(200);
+      const filters = JSON.parse(new URL(listResponse.url()).searchParams.get('filters') || '[]');
+      expect(filters).toContainEqual({ fieldName: 'qo_qca_quote_id', operator: 'EQ', value: quotePid });
+      const attachmentRow = page.getByRole('row').filter({ hasText: originalName });
+      await expect(attachmentRow).toContainText('签回报价');
+      await expect(attachmentRow.getByRole('cell').first()).not.toContainText(/\d{4}-\d{2}-\d{2}T/);
+      await expect(attachmentRow).toContainText('已接收');
+      await expect(attachmentRow).not.toContainText(fileId);
+      await expect(attachmentRow).not.toContainText(/关联记录不存在|无权访问/);
+      const link = attachmentRow.getByRole('link', { name: '下载文件', exact: true });
+      await expect(link).toHaveAttribute('href', `/api/file/download/${fileId}`);
+      const downloadResponse = page.waitForResponse(response =>
+        new URL(response.url()).pathname === `/api/file/download/${fileId}`
+        && response.request().method() === 'GET');
+      const downloaded = page.waitForEvent('download');
+      await link.click();
+      const download = await downloaded;
+      const received = await downloadResponse;
+      expect(received.status()).toBe(200);
+      const disposition = await received.headerValue('content-disposition') ?? '';
+      expect(disposition, `content-disposition: ${disposition}`).toContain(originalName);
+      expect(await download.failure()).toBeNull();
+      expect(download.suggestedFilename()).toBe(originalName);
+      const target = info.outputPath(originalName);
+      await download.saveAs(target);
+      const bytes = readFileSync(target);
+      expect(bytes.subarray(0, 8).toString()).toBe('%PDF-1.4');
+      expect(bytes).toEqual(Buffer.from(content));
+      await info.attach('customer-attachment-browser-download', { path: target, contentType: 'application/pdf' });
+      await info.attach('customer-attachment-download-receipt', {
+        body: JSON.stringify({ quotePid, attachmentPid: records[0].pid,
+          url: download.url(), suggestedFilename: download.suggestedFilename(),
+          bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') }),
+        contentType: 'application/json',
+      });
+      await attachmentRow.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('customer-attachment-original-filename.png'), fullPage: true });
     } finally {
       await cleanupRows(page, created);
     }

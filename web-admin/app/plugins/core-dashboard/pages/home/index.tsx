@@ -7,11 +7,10 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Link, useLoaderData, type LoaderFunctionArgs } from 'react-router';
 import { DashboardViewer } from '~/plugins/core-dashboard/components/DashboardViewer';
 import type { Dashboard } from '~/plugins/core-dashboard/types';
-import { fetchResult } from '~/shared/services/http-client';
+import { fetchResult, get } from '~/shared/services/http-client';
 import { dashboardService, normalizeDashboard } from '~/plugins/core-dashboard/services/dashboardService';
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
-import { get } from '~/shared/services/http-client';
 import { listInboxItems } from '~/shared/services/inboxService';
 import { fetchRecentVisits } from '~/plugins/core-dashboard/widgets/workbench/useRecentVisits';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
@@ -95,9 +94,9 @@ export default function WorkbenchPage() {
             : raw
         ) as Record<string, unknown>;
         addSheet('stats', Object.entries(stats).map(([key, value]) => ({ key, value: String(value) })));
-      } catch {
+      } catch (error) {
         // stats are optional for the export
-      }
+ console.warn('[index] previously-silent catch', error);      }
 
       // 3) inbox items
       try {
@@ -109,9 +108,9 @@ export default function WorkbenchPage() {
           priority: item.priority,
           status: item.status,
         })));
-      } catch {
+      } catch (error) {
         // inbox is optional for the export
-      }
+ console.warn('[index] previously-silent catch', error);      }
 
       // 4) recent visits
       try {
@@ -121,9 +120,9 @@ export default function WorkbenchPage() {
           path: v.path,
           visitedAt: v.visitedAt,
         })));
-      } catch {
+      } catch (error) {
         // recent visits are optional for the export
-      }
+ console.warn('[index] previously-silent catch', error);      }
 
       if (sheetCount === 0) {
         showErrorToast(t('workbench.exportNoData', undefined, 'No data to export'));

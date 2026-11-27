@@ -9,7 +9,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { FieldAdapter } from '~/ui/field-adapter';
 import { fetchDictOptions, fetchFieldOptions, fetchFieldDictOptions } from '~/shared/services/resourceSelectService';
-import { useFlowStore } from '~/plugins/core-designer/components/flow-designer-sdk/store';
+import { useFlowStore } from '~/framework/smart/flows/sdk/store';
 import type { ResourceOption } from '~/ui/base-fields/BaseResourceSelect';
 import { useSmartText } from '~/utils/i18n';
 

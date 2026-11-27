@@ -129,9 +129,9 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
           },
         ];
       });
-    } catch {
+    } catch (error) {
       // CATCH: non-transactional HTTP call, safe to handle
-    } finally {
+ console.warn('[MemberPicker] previously-silent catch', error);    } finally {
       if (requestId === searchRequestIdRef.current) {
         // Fail closed: an error or unsuccessful response must not leave stale
         // member candidates visible for a different keyword.
@@ -179,9 +179,9 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
                 continue;
               }
             }
-          } catch {
+          } catch (error) {
             // CATCH: non-transactional HTTP call; raw-value fallback is appended below.
-          }
+ console.warn('[MemberPicker] previously-silent catch', error);          }
           // Preserve the persisted value when a stale/deleted user cannot be resolved.
           members.push({ id, name: id });
         }
@@ -249,12 +249,10 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
                 className="rounded-pill bg-subtle text-text-2 inline-flex items-center gap-1.5 py-0.5 pr-2.5 pl-1 text-sm"
               >
                 <span
-                  className={cn(
-                    'rounded-pill flex h-5 w-5 flex-shrink-0 items-center justify-center text-[10px] font-semibold text-white',
-                    getAvatarColor(m.name),
-                  )}
+                  className="rounded-pill bg-accent-weak text-accent flex h-5 w-5 shrink-0 items-center justify-center text-[10px] font-semibold"
+                  aria-hidden="true"
                 >
-                  {getInitials(m.name)}
+                  {getInitials(m.name).slice(0, 1)}
                 </span>
                 {m.name}
               </span>
@@ -281,7 +279,7 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
         <div
           data-testid="member-picker-trigger"
           className={cn(
-            'rounded-card min-h-[38px] border px-2 py-1.5 transition-all',
+            'rounded-control min-h-[var(--ds-control-field)] border px-2 py-1 shadow-card transition-all',
             disabled
               ? 'border-border bg-subtle cursor-not-allowed opacity-60'
               : open
@@ -298,12 +296,10 @@ export const MemberPicker: React.FC<MemberPickerProps> = ({
                 className="rounded-pill bg-hover text-text hover:bg-hover inline-flex items-center gap-1 py-0.5 pr-1 pl-0.5 text-sm transition-colors"
               >
                 <span
-                  className={cn(
-                    'rounded-pill flex h-5 w-5 flex-shrink-0 items-center justify-center text-[10px] font-semibold text-white',
-                    getAvatarColor(m.name),
-                  )}
+                  className="rounded-pill bg-accent-weak text-accent flex h-5 w-5 shrink-0 items-center justify-center text-[10px] font-semibold"
+                  aria-hidden="true"
                 >
-                  {getInitials(m.name)}
+                  {getInitials(m.name).slice(0, 1)}
                 </span>
                 <span className="max-w-[100px] truncate text-xs font-medium">{m.name}</span>
                 {!disabled && (

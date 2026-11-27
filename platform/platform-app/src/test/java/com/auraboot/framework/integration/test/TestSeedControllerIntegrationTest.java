@@ -635,4 +635,32 @@ class TestSeedControllerIntegrationTest extends BaseIntegrationTest {
         Assertions.assertEquals(member.getId(), jwtUtil.extractMemberId(jwt),
                 "seed JWT must include memberId for permission resolution");
     }
+
+    @Test
+    void isolatedIdentityIsStableAndDoesNotReuseTheDefaultTenant() throws Exception {
+        String runId = "wms" + UniqueIdGenerator.generate().substring(12).toLowerCase(java.util.Locale.ROOT);
+        MvcResult first = mockMvc.perform(post("/api/test/seed-isolated").param("testRunId", runId))
+                .andExpect(status().isOk()).andReturn();
+        JsonNode identity = objectMapper.readTree(first.getResponse().getContentAsString());
+        org.assertj.core.api.Assertions.assertThat(identity.get("tenantName").asText()).isEqualTo("e2e_" + runId);
+        org.assertj.core.api.Assertions.assertThat(identity.get("jwt").asText()).isNotBlank();
+        MvcResult repeated = mockMvc.perform(post("/api/test/seed-isolated").param("testRunId", runId))
+                .andExpect(status().isOk()).andReturn();
+        JsonNode repeatedIdentity = objectMapper.readTree(repeated.getResponse().getContentAsString());
+        org.assertj.core.api.Assertions.assertThat(repeatedIdentity.get("tenantId")).isEqualTo(identity.get("tenantId"));
+        org.assertj.core.api.Assertions.assertThat(repeatedIdentity.get("userId")).isEqualTo(identity.get("userId"));
+        Long defaultTenant = jdbcTemplate.queryForObject("SELECT id FROM ab_tenant WHERE name='e2e_test'", Long.class);
+        org.assertj.core.api.Assertions.assertThat(identity.get("tenantId").asLong()).isNotEqualTo(defaultTenant);
+        org.assertj.core.api.Assertions.assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM ab_plugin WHERE tenant_id=? AND plugin_id='com.auraboot.inventory' AND deleted_flag=false",
+                Integer.class, identity.get("tenantId").asLong())).isZero();
+    }
+
+    @Test
+    void isolatedIdentityRejectsUnsafeRunIds() throws Exception {
+        mockMvc.perform(post("/api/test/seed-isolated").param("testRunId", "../unsafe"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/test/seed-isolated").param("testRunId", "x"))
+                .andExpect(status().isBadRequest());
+    }
 }

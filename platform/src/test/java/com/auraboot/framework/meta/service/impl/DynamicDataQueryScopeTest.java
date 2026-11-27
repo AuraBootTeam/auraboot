@@ -33,13 +33,14 @@ class DynamicDataQueryScopeTest {
         AtomicInteger loads = new AtomicInteger();
 
         try (DynamicDataQueryScope ignored = DynamicDataQueryScope.open()) {
-            DynamicDataQueryScope.fieldPermissions(1L, "order", 2L, () -> permissions(loads));
-            DynamicDataQueryScope.fieldPermissions(2L, "order", 2L, () -> permissions(loads));
-            DynamicDataQueryScope.fieldPermissions(1L, "quote", 2L, () -> permissions(loads));
-            DynamicDataQueryScope.fieldPermissions(1L, "order", 3L, () -> permissions(loads));
+            DynamicDataQueryScope.fieldPermissions(1L, "order", 9L, 2L, () -> permissions(loads));
+            DynamicDataQueryScope.fieldPermissions(2L, "order", 9L, 2L, () -> permissions(loads));
+            DynamicDataQueryScope.fieldPermissions(1L, "quote", 9L, 2L, () -> permissions(loads));
+            DynamicDataQueryScope.fieldPermissions(1L, "order", 9L, 3L, () -> permissions(loads));
+            DynamicDataQueryScope.fieldPermissions(1L, "order", 10L, 2L, () -> permissions(loads));
         }
 
-        assertThat(loads).hasValue(4);
+        assertThat(loads).hasValue(5);
     }
 
     @Test

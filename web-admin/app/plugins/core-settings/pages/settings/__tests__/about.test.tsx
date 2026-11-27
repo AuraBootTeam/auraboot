@@ -16,7 +16,7 @@ const rootLoaderData = vi.hoisted(() => ({
       supportUrl: 'https://auraboot.com/contact',
       sourceUrl: 'https://github.com/AuraBootTeam/auraboot',
       commercialContactUrl: 'https://auraboot.com/contact',
-      licenseName: 'AuraBoot License Agreement 1.3',
+      licenseName: 'AuraBoot Community License 3.0 (1.0 distribution)',
       licenseUrl: 'https://github.com/AuraBootTeam/auraboot/blob/main/LICENSE.txt',
       copyrightHolder: 'The AuraBoot Project and its contributors',
       aurabootCopyrightHolder: 'The AuraBoot Project and its contributors',
@@ -45,7 +45,7 @@ describe('AboutPage', () => {
     expect(screen.getByTestId('about-edition')).toHaveTextContent('Community');
     expect(screen.getByText('1.2.3')).toBeVisible();
     expect(screen.getByText('abc123')).toBeVisible();
-    expect(screen.getByRole('link', { name: /AuraBoot License Agreement 1.3/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'AuraBoot Community License 3.0 (1.0 distribution)' })).toHaveAttribute(
       'href',
       'https://github.com/AuraBootTeam/auraboot/blob/main/LICENSE.txt',
     );
@@ -103,7 +103,26 @@ describe('AboutPage', () => {
       'Northstar Holdings Ltd.',
     );
     expect(screen.getByTestId('about-auraboot-notice')).toHaveTextContent(
-      'AuraBoot License Agreement 1.3',
+      'AuraBoot Community License 3.0 (1.0 distribution)',
     );
   });
+
+  it('labels the Business authorization without changing the customer or license identity', () => {
+    rootLoaderData.value = { ...rootLoaderData.value, edition: ' Business ' };
+    render(<AboutPage />);
+    expect(screen.getByTestId('about-edition')).toHaveTextContent('Business');
+    expect(screen.getByTestId('about-auraboot-notice')).toHaveTextContent('Community License 3.0');
+  });
+
+
+  it('pins the license link to an immutable deployment source when available', () => {
+    const revision = 'a'.repeat(40);
+    rootLoaderData.value = {
+      ...rootLoaderData.value, buildIdentity: { version: '1.0.0', revision },
+    };
+    render(<AboutPage />);
+    expect(screen.getByRole('link', { name: 'AuraBoot Community License 3.0 (1.0 distribution)' }))
+      .toHaveAttribute('href', `https://github.com/AuraBootTeam/auraboot/blob/${revision}/LICENSE.txt`);
+  });
+
 });

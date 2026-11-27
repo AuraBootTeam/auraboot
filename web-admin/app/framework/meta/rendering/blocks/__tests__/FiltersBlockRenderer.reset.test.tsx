@@ -8,6 +8,9 @@ import Input from '~/ui/smart/form/Input';
 vi.mock('react-router', async () => ({
   ...(await vi.importActual<any>('react-router')),
   useActionData: () => null,
+  useSearchParams: () => [new URLSearchParams(), vi.fn()],
+  useNavigate: () => vi.fn(),
+  useLocation: () => ({ hash: '' }),
 }));
 vi.mock('~/contexts/AuthContext', () => ({ usePermission: () => true }));
 vi.mock('~/framework/meta/hooks/useActionHandler', () => ({

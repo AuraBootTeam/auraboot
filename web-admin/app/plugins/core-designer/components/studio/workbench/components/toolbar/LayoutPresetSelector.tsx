@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FORM_LAYOUT_PRESETS } from '~/plugins/core-designer/components/studio/domain/schema/layout-presets';
-import type { LayoutPreset } from '~/plugins/core-designer/components/studio/domain/schema/layout-presets';
+import { FORM_LAYOUT_PRESETS } from '~/framework/smart/schema/layout-presets';
+import type { LayoutPreset } from '~/framework/smart/schema/layout-presets';
 
 interface LayoutPresetSelectorProps {
   currentColumns?: number;

@@ -8,16 +8,16 @@ import TEXT from './PagedChoiceField.i18n.json';
 
 interface Choice { value: string; label: string | Record<string, string> }
 interface ChoicePage { records: Choice[]; total: number; pageNum: number; pageSize: number }
-interface Props { endpoint: string; value: string[]; onChange: (value: string[]) => void; label: string }
+interface Props { endpoint: string; value: string[]; onChange: (value: string[]) => void; label: string; multiple?: boolean }
 
 /** Bounded server-side choices; selected labels use the same authorized endpoint. */
-export default function PagedChoiceField({ endpoint, value, onChange, label }: Props) {
+export default function PagedChoiceField({ endpoint, value, onChange, label, multiple = true }: Props) {
   const { user } = useAuth();
   const identity = `${user?.tenantId ?? ''}:${user?.pid ?? ''}:${endpoint}`;
-  return <PagedChoiceSession key={identity} identity={identity} endpoint={endpoint} value={value} onChange={onChange} label={label} />;
+  return <PagedChoiceSession key={identity} identity={identity} endpoint={endpoint} value={value} onChange={onChange} label={label} multiple={multiple} />;
 }
 
-function PagedChoiceSession({ identity, endpoint, value, onChange, label }: Props & { identity: string }) {
+function PagedChoiceSession({ identity, endpoint, value, onChange, label, multiple }: Props & { identity: string }) {
   const { locale, t } = useI18n();
   const text = (key: keyof typeof TEXT) => getLocalizedText(TEXT[key], locale, t);
   const currentIdentity = useRef(identity); currentIdentity.current = identity;
@@ -90,7 +90,8 @@ function PagedChoiceSession({ identity, endpoint, value, onChange, label }: Prop
     {unavailable && <p role="alert" className="px-3 py-2 text-sm text-amber-700">{text('unavailable')}</p>}
     <div className="max-h-48 overflow-y-auto">
       {choices.map(choice => <label key={choice.value} className="flex min-h-11 cursor-pointer items-center gap-3 border-t border-gray-100 px-3 py-2 text-sm">
-        <input type="checkbox" checked={value.includes(choice.value)} onChange={() => onChange(value.includes(choice.value)
+        <input type={multiple ? 'checkbox' : 'radio'} name={multiple ? undefined : identity}
+          checked={value.includes(choice.value)} onChange={() => onChange(!multiple ? [choice.value] : value.includes(choice.value)
           ? value.filter(id => id !== choice.value) : [...value, choice.value])} />
         <span className="min-w-0 break-words">{getLocalizedText(choice.label, locale, t)}</span>
       </label>)}

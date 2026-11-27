@@ -19,8 +19,7 @@ async function shot(page: Page, id: string) {
   await page.screenshot({ path: join(evidence, 'screenshots', `${id}.png`) });
 }
 async function platform(page: Page, name: string) {
-  await page.getByTestId('user-menu').getByRole('button').first().click();
-  await page.getByTestId('open-platform-link').click();
+  await page.getByTestId('sidebar').locator('a[href="/settings/api-docs?view=applications"]').click();
   const card = page.getByTestId('open-platform-application-list').locator('article').filter({ hasText: name });
   await expect(card).toHaveCount(1); return card;
 }

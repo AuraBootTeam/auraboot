@@ -1334,33 +1334,33 @@
   },
   {
     "key": "auth.feature.aiAgent",
-    "zh-CN": "配置即 AI",
-    "en-US": "Config is AI"
+    "zh-CN": "AI 业务助手",
+    "en-US": "AI assistant"
   },
   {
     "key": "auth.feature.aiAgent.desc",
-    "zh-CN": "Agent 在租户内调用全部业务命令",
-    "en-US": "Agents call every business command in your tenant"
+    "zh-CN": "在权限范围内查询数据、整理草稿和办理业务",
+    "en-US": "Query data, prepare drafts and carry out authorized actions"
   },
   {
     "key": "auth.feature.dataModel",
-    "zh-CN": "建模即数据",
-    "en-US": "Models are data"
+    "zh-CN": "数据模型",
+    "en-US": "Data models"
   },
   {
     "key": "auth.feature.dataModel.desc",
-    "zh-CN": "动态模型 + 字段级权限审计",
-    "en-US": "Dynamic models + field-level permission audit"
+    "zh-CN": "定义业务对象、字段和关联关系",
+    "en-US": "Define business objects, fields and relationships"
   },
   {
     "key": "auth.feature.designer",
-    "zh-CN": "拖拽即页面",
-    "en-US": "Pages by drag"
+    "zh-CN": "业务页面",
+    "en-US": "Business pages"
   },
   {
     "key": "auth.feature.designer.desc",
-    "zh-CN": "可视化设计器,零代码上线",
-    "en-US": "Visual designer, ship with zero code"
+    "zh-CN": "用现成组件搭建页面，按业务需要微调",
+    "en-US": "Build pages with existing components and adjust them to your needs"
   },
   {
     "key": "auth.feature.multiPlatform",
@@ -1384,13 +1384,13 @@
   },
   {
     "key": "auth.feature.workflow",
-    "zh-CN": "画布即流程",
-    "en-US": "Canvas is flow"
+    "zh-CN": "规则与审批",
+    "en-US": "Rules and approvals"
   },
   {
     "key": "auth.feature.workflow.desc",
-    "zh-CN": "BPMN 编排 + 规则引擎自动执行",
-    "en-US": "BPMN orchestration + rules engine auto-run"
+    "zh-CN": "配置审批流程、判断条件和处理时限",
+    "en-US": "Set approval steps, conditions and time limits"
   },
   {
     "key": "auth.forgotPassword",
@@ -1539,43 +1539,43 @@
   },
   {
     "key": "auth.badge",
-    "zh-CN": "AI 原生 · 企业应用运行时",
-    "en-US": "AI-native application runtime"
+    "zh-CN": "企业应用平台",
+    "en-US": "Business application platform"
   },
   {
     "key": "auth.headline.pre",
-    "zh-CN": "配置即应用,",
-    "en-US": "Configuration ships the app."
+    "zh-CN": "内置成体系，",
+    "en-US": "Built-in essentials,"
   },
   {
     "key": "auth.headline.em",
-    "zh-CN": "AI 即战力",
-    "en-US": "AI"
+    "zh-CN": "定制有空间",
+    "en-US": "room to customize"
   },
   {
     "key": "auth.headline.post",
     "zh-CN": "",
-    "en-US": "is the workforce."
+    "en-US": ""
   },
   {
     "key": "auth.lead",
-    "zh-CN": "把每个业务能力沉淀为命令——人能点、AI 能调、全端可交付。",
-    "en-US": "Every business capability becomes a command — clicked by people, called by AI, delivered to every device."
+    "zh-CN": "把工程经验做进底座，让人和 AI 专注业务。",
+    "en-US": "Engineering experience, built into the foundation. Let people and AI focus on the business."
   },
   {
     "key": "auth.pillar.model",
-    "zh-CN": "模型驱动",
-    "en-US": "Model-driven"
+    "zh-CN": "数据与页面",
+    "en-US": "Data and pages"
   },
   {
     "key": "auth.pillar.command",
-    "zh-CN": "命令治理",
-    "en-US": "Command-governed"
+    "zh-CN": "规则与流程",
+    "en-US": "Rules and workflows"
   },
   {
     "key": "auth.pillar.plugin",
-    "zh-CN": "全端交付",
-    "en-US": "Omni-channel delivery"
+    "zh-CN": "插件与扩展",
+    "en-US": "Plugins and extensions"
   },
   {
     "key": "auth.ssoLogin",
@@ -2721,6 +2721,16 @@
     "en-US": "Reports"
   },
   {
+    "key": "workbench.shortcuts.more",
+    "zh-CN": "更多",
+    "en-US": "More"
+  },
+  {
+    "key": "workbench.shortcuts.collapse",
+    "zh-CN": "收起",
+    "en-US": "Show less"
+  },
+  {
     "key": "workbench.shortcuts.customize_hint",
     "zh-CN": "点击编辑自定义",
     "en-US": "Click Edit to customize"
@@ -2729,6 +2739,36 @@
     "key": "workbench.recent.title",
     "zh-CN": "最近访问",
     "en-US": "Recent Visits"
+  },
+  {
+    "key": "workbench.recent.more",
+    "zh-CN": "更多",
+    "en-US": "More"
+  },
+  {
+    "key": "workbench.recent.collapse",
+    "zh-CN": "收起",
+    "en-US": "Show less"
+  },
+  {
+    "key": "workbench.recent.subpage.new",
+    "zh-CN": "新建",
+    "en-US": "New"
+  },
+  {
+    "key": "workbench.recent.subpage.edit",
+    "zh-CN": "编辑",
+    "en-US": "Edit"
+  },
+  {
+    "key": "workbench.recent.subpage.view",
+    "zh-CN": "详情",
+    "en-US": "Details"
+  },
+  {
+    "key": "detail.section.empty",
+    "zh-CN": "这一段还没有内容。",
+    "en-US": "Nothing has been recorded in this section yet."
   },
   {
     "key": "workbench.recent.empty",
@@ -6503,5 +6543,1255 @@
     "en-US": "Valid currency and exchange-rate configuration is unavailable. Ask an administrator to check it and try again.",
     "ja-JP": "有効な通貨・為替レート設定を読み込めません。管理者に設定の確認を依頼してください。",
     "ko-KR": "유효한 통화 및 환율 설정을 읽을 수 없습니다. 관리자에게 설정 확인을 요청하세요."
+  },
+  {
+    "key": "admin.permission.scope.draftNote",
+    "zh-CN": "暂存角色默认范围，新授权将继承此范围。所有变更统一预览并保存。",
+    "en-US": "Stage the role default for new grants. Review and save all role changes together."
+  },
+  {
+    "key": "admin.permission.scope.applyCurrentDraft",
+    "zh-CN": "同时应用到当前授权",
+    "en-US": "Also apply to current grants"
+  },
+  {
+    "key": "admin.permission.scope.stageDraft",
+    "zh-CN": "加入草稿",
+    "en-US": "Add to draft"
+  },
+  {
+    "key": "admin.permission.scope.draftActions",
+    "zh-CN": "草稿中的动作范围",
+    "en-US": "Draft action scopes"
+  },
+  {
+    "key": "admin.permission.capability.scopeDraftNote",
+    "zh-CN": "暂存此职责的记录范围。共享动作也会影响相关职责，所有变更统一预览并保存。",
+    "en-US": "Stage record scopes for this duty. Shared actions affect related duties. All changes are reviewed and saved together."
+  },
+  {
+    "key": "admin.permission.editor.draftSaveError",
+    "zh-CN": "尚未确认保存结果，草稿已保留。可重新载入查看当前配置。",
+    "en-US": "Could not confirm the save. Your draft is preserved; reload to check the current configuration."
+  },
+  {
+    "key": "admin.permission.editor.conflictDraft",
+    "zh-CN": "授权配置已被修改。当前草稿已保留，不能覆盖新版本。",
+    "en-US": "Authorization configuration changed. Your draft is preserved and cannot overwrite the newer version."
+  },
+  {
+    "key": "admin.permission.editor.reloadDraft",
+    "zh-CN": "放弃草稿并重新载入",
+    "en-US": "Discard draft and reload"
+  },
+  {
+    "key": "admin.permission.editor.jointDraft",
+    "zh-CN": "待保存：{count} 项职责变更、{scopes} 项记录范围例外。默认范围变更也将一并预览和保存。",
+    "en-US": "{count} duty changes and {scopes} record scope overrides pending. Default scope changes are reviewed and saved together."
+  },
+  {
+    "key": "admin.permission.editor.scopeChangeCount",
+    "zh-CN": "{count} 项记录范围例外",
+    "en-US": "{count} record scope overrides"
+  },
+  {
+    "key": "permission.capability.details.title",
+    "zh-CN": "权限明细",
+    "en-US": "Permission details"
+  },
+  {
+    "key": "permission.capability.details.guidance",
+    "zh-CN": "按业务职责授权。权限项数量表示配置覆盖，实际访问仍受记录范围、字段和运行条件限制。",
+    "en-US": "Select duties for authorization. Permission counts describe configuration coverage; actual access also depends on record scope, fields and runtime conditions."
+  },
+  {
+    "key": "permission.capability.details.groupSummary",
+    "zh-CN": "已选职责 {granted}/{total}",
+    "en-US": "Selected duties {granted}/{total}"
+  },
+  {
+    "key": "permission.capability.details.draftNote",
+    "zh-CN": "分别展示已保存配置和本地草稿。草稿变化以保存前服务端预览为准；配置齐备不代表实际可执行。",
+    "en-US": "Saved configuration and local draft are shown separately. The server confirms draft changes before saving; these counts do not prove runtime access."
+  },
+  {
+    "key": "permission.capability.details.search",
+    "zh-CN": "按名称或权限码筛选",
+    "en-US": "Filter by name or permission code"
+  },
+  {
+    "key": "permission.capability.details.undefined",
+    "zh-CN": "定义未提供，请核实此权限项",
+    "en-US": "Definition unavailable; verify this permission"
+  },
+  {
+    "key": "permission.capability.details.saved",
+    "zh-CN": "已保存",
+    "en-US": "Saved"
+  },
+  {
+    "key": "permission.capability.details.draft",
+    "zh-CN": "草稿",
+    "en-US": "Draft"
+  },
+  {
+    "key": "permission.capability.details.unknown",
+    "zh-CN": "待核实",
+    "en-US": "Unresolved"
+  },
+  {
+    "key": "permission.capability.details.configured",
+    "zh-CN": "已配置",
+    "en-US": "Configured"
+  },
+  {
+    "key": "permission.capability.details.missing",
+    "zh-CN": "未配置",
+    "en-US": "Not configured"
+  },
+  {
+    "key": "permission.capability.details.unchanged",
+    "zh-CN": "保持",
+    "en-US": "Unchanged"
+  },
+  {
+    "key": "permission.capability.details.add",
+    "zh-CN": "拟授予",
+    "en-US": "Will grant"
+  },
+  {
+    "key": "permission.capability.details.remove",
+    "zh-CN": "拟撤销",
+    "en-US": "Will revoke"
+  },
+  {
+    "key": "permission.capability.details.shared",
+    "zh-CN": "也被 {count} 个职责包含（声明关系，非授权来源）",
+    "en-US": "Also included by {count} duties (declarations, not grant provenance)"
+  },
+  {
+    "key": "permission.capability.details.empty",
+    "zh-CN": "没有匹配的权限项",
+    "en-US": "No matching permission items"
+  },
+  {
+    "key": "permission.capability.details.partial",
+    "zh-CN": "部分权限项已配置",
+    "en-US": "Some permission items configured"
+  },
+  {
+    "key": "permission.capability.details.coverage",
+    "zh-CN": "权限项已配置 {granted}/{total}",
+    "en-US": "Permission items {granted}/{total}"
+  },
+  {
+    "key": "permission.capability.details.partialGuidance",
+    "zh-CN": "权限项可被多个职责共用；部分配置不代表职责完整可用。勾选可补齐，撤销影响以保存前预览为准。",
+    "en-US": "Permission items may be shared by other duties. Partial configuration does not grant the complete duty. Select to complete; review revocation effects before saving."
+  },
+  {
+    "key": "permission.capability.details.permissionDiff",
+    "zh-CN": "新增 {added} 个权限项，移除 {removed} 个权限项；另有 {preserved} 个现有权限项保持不变。",
+    "en-US": "Add {added} permission items, remove {removed}; {preserved} existing permission items remain unchanged."
+  },
+  {
+    "key": "permission.capability.details.impactDetails",
+    "zh-CN": "查看关联职责状态、菜单及权限明细",
+    "en-US": "Review related duty states, menus and permission details"
+  },
+  {
+    "key": "permission.capability.details.previewCounts",
+    "zh-CN": "关联职责保存后配置：齐备 {full} 项 · 部分权限项 {partial} 项 · 未配置 {none} 项",
+    "en-US": "Related duties after saving: {full} complete · {partial} partially configured · {none} not configured"
+  },
+  {
+    "key": "command.download.fileUnavailable",
+    "zh-CN": "当前记录未提供可下载文件，或文件字段不可见。请联系管理员核对权限。",
+    "en-US": "The record does not provide an accessible file. Ask an administrator to check access."
+  },
+  {
+    "key": "roleGrantFields.title",
+    "zh-CN": "每份授权的允许字段",
+    "en-US": "Allowed fields per authorization"
+  },
+  {
+    "key": "roleGrantFields.help",
+    "zh-CN": "字段列表仅作用于对应授权及其记录范围，不授予业务操作权；隐藏、只读及共享限制继续生效。",
+    "en-US": "Field lists apply to one authorization and its record scope. They do not grant business access. Hidden, read-only and shared restrictions still apply."
+  },
+  {
+    "key": "roleGrantFields.loading",
+    "zh-CN": "正在核对当前草稿的字段候选…",
+    "en-US": "Checking the current draft…"
+  },
+  {
+    "key": "roleGrantFields.error",
+    "zh-CN": "无法核对字段候选，已保留草稿，暂时不能编辑字段。",
+    "en-US": "Could not check field candidates. Your edits are preserved; field editing is disabled."
+  },
+  {
+    "key": "roleGrantFields.empty",
+    "zh-CN": "此对象当前没有绑定模型的授权。受管来源仍须按原授权来源的规则配置。",
+    "en-US": "No model-bound authorization is available for this object. Managed sources retain their original authoring rules."
+  },
+  {
+    "key": "roleGrantFields.pending",
+    "zh-CN": "本草稿新增",
+    "en-US": "New in this draft"
+  },
+  {
+    "key": "roleGrantFields.reset",
+    "zh-CN": "撤回字段编辑",
+    "en-US": "Discard field edits"
+  },
+  {
+    "key": "roleGrantFields.managed",
+    "zh-CN": "此授权由来源管理，不能在此覆盖。",
+    "en-US": "This authorization is managed by its source. It cannot be overwritten here."
+  },
+  {
+    "key": "roleGrantFields.legacy",
+    "zh-CN": "尚未设置明确字段列表，保持现有授权规则。",
+    "en-US": "No explicit field list. Existing authorization rules are preserved."
+  },
+  {
+    "key": "roleGrantFields.configure",
+    "zh-CN": "设置明确字段列表",
+    "en-US": "Set a finite field list"
+  },
+  {
+    "key": "roleGrantFields.finite",
+    "zh-CN": "仅允许选中的字段；空列表表示不允许任何字段，未来新增字段不会自动加入。读取和写入仍受该授权的操作类型限制。",
+    "en-US": "Only selected fields are allowed. An empty list allows no fields; future fields are not included automatically. Reading and writing remain subject to the authorization’s action."
+  },
+  {
+    "key": "roleGrantFields.read",
+    "zh-CN": "允许读取",
+    "en-US": "May read"
+  },
+  {
+    "key": "roleGrantFields.write",
+    "zh-CN": "允许写入",
+    "en-US": "May write"
+  },
+  {
+    "key": "roleGrantFields.none",
+    "zh-CN": "无允许字段",
+    "en-US": "No fields"
+  },
+  {
+    "key": "roleGrantFields.pendingChanges",
+    "zh-CN": "{count} 份授权的字段编辑待保存，请与当前草稿一起预览并保存。",
+    "en-US": "{count} authorization field edits pending. Review and save with the same draft."
+  },
+  {
+    "key": "roleGrantFields.action.read",
+    "zh-CN": "读取授权",
+    "en-US": "Read authorization"
+  },
+  {
+    "key": "roleGrantFields.action.create",
+    "zh-CN": "创建授权",
+    "en-US": "Create authorization"
+  },
+  {
+    "key": "roleGrantFields.action.update",
+    "zh-CN": "修改授权",
+    "en-US": "Update authorization"
+  },
+  {
+    "key": "permission.capability_binding_review",
+    "zh-CN": "该职责涉及已有约束或受管来源的授权，请先审阅并从原授权来源调整。",
+    "en-US": "This duty involves existing constraints or managed authorization. Review and update the original authorization source first."
+  },
+  {
+    "key": "roleGrantFields.authorization",
+    "zh-CN": "业务授权",
+    "en-US": "Business authorization"
+  },
+  {
+    "key": "roleGrantFields.action.manage",
+    "zh-CN": "管理授权",
+    "en-US": "Manage authorization"
+  },
+  {
+    "key": "roleGrantFields.action.execute",
+    "zh-CN": "执行授权",
+    "en-US": "Execute authorization"
+  },
+  {
+    "key": "roleGrantFields.unconfigured",
+    "zh-CN": "此职责尚未配置当前对象。需明确配置后才能执行，仍受职责和记录范围约束。",
+    "en-US": "This object is not configured for the duty. Configure it explicitly; record scope still applies."
+  },
+  {
+    "key": "roleGrantFields.configureObject",
+    "zh-CN": "配置此对象",
+    "en-US": "Configure this object"
+  },
+  {
+    "key": "roleGrantFields.enableObjectPreview",
+    "zh-CN": "为已选职责启用此对象；仍受记录范围约束，只允许选中的字段。",
+    "en-US": "Enable this object under the selected duty. Record scope still applies; only selected fields are allowed."
+  },
+  {
+    "key": "auth.capability.build",
+    "zh-CN": "搭得快，改得动",
+    "en-US": "Build faster, adapt easily"
+  },
+  {
+    "key": "auth.capability.build.desc",
+    "zh-CN": "AI、Skills 与 DSL 协同搭建，现成组件复用，设计器随时微调。",
+    "en-US": "Build with AI, Skills and DSL. Reuse components and refine pages in the designer."
+  },
+  {
+    "key": "auth.capability.workflow",
+    "zh-CN": "有规则，有闭环",
+    "en-US": "Set rules, follow through"
+  },
+  {
+    "key": "auth.capability.workflow.desc",
+    "zh-CN": "规则引擎、审批、SLA 与自动化协同，串起业务处理全过程。",
+    "en-US": "Connect rules, approvals, SLA tracking and automation from submission to completion."
+  },
+  {
+    "key": "auth.capability.insight",
+    "zh-CN": "看全局，查明细",
+    "en-US": "See the big picture, explore the details"
+  },
+  {
+    "key": "auth.capability.insight.desc",
+    "zh-CN": "看板掌握进展，报告梳理结果，关键数据追到原始单据。",
+    "en-US": "Track progress in dashboards, review reports and trace key figures to source records."
+  },
+  {
+    "key": "auth.capability.agent",
+    "zh-CN": "懂业务，能办事",
+    "en-US": "Understand the work, get it done"
+  },
+  {
+    "key": "auth.capability.agent.desc",
+    "zh-CN": "Agent 连接知识、工具和业务命令，在权限与确认机制下执行任务。",
+    "en-US": "Connect knowledge, tools and business commands. Execute tasks with permissions and confirmation."
+  },
+  {
+    "key": "auth.capability.extend",
+    "zh-CN": "可复用，能扩展",
+    "en-US": "Reuse the essentials, extend what matters"
+  },
+  {
+    "key": "auth.capability.extend.desc",
+    "zh-CN": "从按钮、组件到页面和业务命令，按需定制，通过插件与 API 连接系统。",
+    "en-US": "Customize buttons, components, pages and commands. Connect systems through plugins and APIs."
+  },
+  {
+    "key": "auth.capability.security",
+    "zh-CN": "分权限，可追溯",
+    "en-US": "Control access, trace actions"
+  },
+  {
+    "key": "auth.capability.security.desc",
+    "zh-CN": "多租户与细粒度权限管理访问范围，审计与 Trace 记录执行过程。",
+    "en-US": "Scope access by tenant and permission. Review execution with audit records and traces."
+  },
+  {
+    "key": "openPlatform.logs.copied",
+    "zh-CN": "已复制脱敏内容",
+    "en-US": "Redacted content copied"
+  },
+  {
+    "key": "openPlatform.logs.copyFailed",
+    "zh-CN": "剪贴板不可用，请下载脱敏记录。",
+    "en-US": "Clipboard unavailable. Download the redacted record instead."
+  },
+  {
+    "key": "openPlatform.logs.downloaded",
+    "zh-CN": "已下载脱敏报文",
+    "en-US": "Redacted record downloaded"
+  },
+  {
+    "key": "openPlatform.logs.emptyBody",
+    "zh-CN": "本次调用未携带正文。",
+    "en-US": "This call has no body."
+  },
+  {
+    "key": "openPlatform.logs.truncatedBody",
+    "zh-CN": "报文超过 64 KB 采集上限。为保证可靠脱敏，不保存截断的正文。",
+    "en-US": "Body exceeds the 64 KB capture limit. No partial body is stored because it cannot be safely redacted."
+  },
+  {
+    "key": "openPlatform.logs.invalidJson",
+    "zh-CN": "正文不是有效 JSON，未保存原文。",
+    "en-US": "Invalid JSON was not stored."
+  },
+  {
+    "key": "openPlatform.logs.unreadBody",
+    "zh-CN": "请求在读取正文前被拒绝，未采集请求体。",
+    "en-US": "The request was rejected before its body was read. No body was captured."
+  },
+  {
+    "key": "openPlatform.logs.incompleteResponse",
+    "zh-CN": "响应未完整结束，未采集响应体。",
+    "en-US": "The response did not complete. No response body was captured."
+  },
+  {
+    "key": "openPlatform.logs.unsupportedBody",
+    "zh-CN": "此报文格式无法安全采集，当前仅采集 JSON。",
+    "en-US": "Body format is not supported for safe capture. Only JSON is captured."
+  },
+  {
+    "key": "openPlatform.logs.request",
+    "zh-CN": "请求 Request",
+    "en-US": "Request"
+  },
+  {
+    "key": "openPlatform.logs.response",
+    "zh-CN": "响应 Response",
+    "en-US": "Response"
+  },
+  {
+    "key": "openPlatform.logs.copyCurl",
+    "zh-CN": "复制 cURL 模板",
+    "en-US": "Copy cURL template"
+  },
+  {
+    "key": "openPlatform.logs.requestHeaders",
+    "zh-CN": "请求头 Headers",
+    "en-US": "Request headers"
+  },
+  {
+    "key": "openPlatform.logs.responseHeaders",
+    "zh-CN": "响应头 Headers",
+    "en-US": "Response headers"
+  },
+  {
+    "key": "openPlatform.logs.query",
+    "zh-CN": "查询参数 Query",
+    "en-US": "Query parameters"
+  },
+  {
+    "key": "openPlatform.logs.queryTruncated",
+    "zh-CN": "查询参数超过采集上限，未保存原文。",
+    "en-US": "Query parameters exceeded the capture limit and were not stored."
+  },
+  {
+    "key": "openPlatform.logs.requestBody",
+    "zh-CN": "请求体 Body",
+    "en-US": "Request body"
+  },
+  {
+    "key": "openPlatform.logs.responseBody",
+    "zh-CN": "响应体 Body",
+    "en-US": "Response body"
+  },
+  {
+    "key": "openPlatform.logs.copyRequest",
+    "zh-CN": "复制请求体",
+    "en-US": "Copy request body"
+  },
+  {
+    "key": "openPlatform.logs.copyResponse",
+    "zh-CN": "复制响应体",
+    "en-US": "Copy response body"
+  },
+  {
+    "key": "openPlatform.logs.callDetail",
+    "zh-CN": "调用详情",
+    "en-US": "Call details"
+  },
+  {
+    "key": "openPlatform.logs.callResult",
+    "zh-CN": "接口调用结果",
+    "en-US": "API call result"
+  },
+  {
+    "key": "openPlatform.logs.restore",
+    "zh-CN": "还原详情宽度",
+    "en-US": "Restore detail width"
+  },
+  {
+    "key": "openPlatform.logs.expand",
+    "zh-CN": "展开详情",
+    "en-US": "Expand details"
+  },
+  {
+    "key": "openPlatform.logs.close",
+    "zh-CN": "关闭详情",
+    "en-US": "Close details"
+  },
+  {
+    "key": "openPlatform.logs.requestId",
+    "zh-CN": "请求 ID",
+    "en-US": "Request ID"
+  },
+  {
+    "key": "openPlatform.logs.copyId",
+    "zh-CN": "复制请求 ID",
+    "en-US": "Copy request ID"
+  },
+  {
+    "key": "openPlatform.logs.acceptedHelp",
+    "zh-CN": "请求已接收，尚不代表业务处理成功。请按该接口约定确认最终业务状态。",
+    "en-US": "Accepted for processing, not final business success. Confirm the final result using the contract of this API."
+  },
+  {
+    "key": "openPlatform.logs.failureHelp",
+    "zh-CN": "本次调用失败。请结合响应体与响应头排查，再由调用方按接口约定处理。",
+    "en-US": "The call failed. Review the response body and headers before the caller submits another request."
+  },
+  {
+    "key": "openPlatform.logs.detailSections",
+    "zh-CN": "调用详情内容",
+    "en-US": "Call detail sections"
+  },
+  {
+    "key": "openPlatform.logs.messages",
+    "zh-CN": "请求与响应",
+    "en-US": "Request and response"
+  },
+  {
+    "key": "openPlatform.logs.execution",
+    "zh-CN": "执行信息",
+    "en-US": "Execution info"
+  },
+  {
+    "key": "openPlatform.logs.redaction",
+    "zh-CN": "敏感字段已脱敏，复制与下载使用相同内容。",
+    "en-US": "Sensitive fields are redacted. Copies and downloads use the same redacted content."
+  },
+  {
+    "key": "openPlatform.logs.historical",
+    "zh-CN": "此条历史日志未采集报文",
+    "en-US": "This historical record has no captured HTTP content"
+  },
+  {
+    "key": "openPlatform.logs.historicalHelp",
+    "zh-CN": "当时仅记录调用摘要。启用采集不会补齐历史请求与响应。",
+    "en-US": "Only the call summary was recorded. Enabling capture cannot recover old request or response bodies."
+  },
+  {
+    "key": "openPlatform.logs.app",
+    "zh-CN": "应用",
+    "en-US": "Application"
+  },
+  {
+    "key": "openPlatform.logs.environment",
+    "zh-CN": "环境",
+    "en-US": "Environment"
+  },
+  {
+    "key": "openPlatform.logs.occurredAt",
+    "zh-CN": "调用时间",
+    "en-US": "Call time"
+  },
+  {
+    "key": "openPlatform.logs.duration",
+    "zh-CN": "耗时",
+    "en-US": "Duration"
+  },
+  {
+    "key": "openPlatform.logs.remote",
+    "zh-CN": "请求来源",
+    "en-US": "Source address"
+  },
+  {
+    "key": "openPlatform.logs.tenantOnly",
+    "zh-CN": "仅展示当前租户日志",
+    "en-US": "Current tenant only"
+  },
+  {
+    "key": "openPlatform.logs.download",
+    "zh-CN": "下载脱敏报文",
+    "en-US": "Download redacted record"
+  },
+  {
+    "key": "openPlatform.logs.accepted",
+    "zh-CN": "已接收",
+    "en-US": "Accepted"
+  },
+  {
+    "key": "openPlatform.logs.success",
+    "zh-CN": "成功",
+    "en-US": "Success"
+  },
+  {
+    "key": "openPlatform.logs.limited",
+    "zh-CN": "限流",
+    "en-US": "Rate limited"
+  },
+  {
+    "key": "openPlatform.logs.failed",
+    "zh-CN": "失败",
+    "en-US": "Failed"
+  },
+  {
+    "key": "openPlatform.logs.redirected",
+    "zh-CN": "重定向",
+    "en-US": "Redirected"
+  },
+  {
+    "key": "openPlatform.logs.total",
+    "zh-CN": "调用总数",
+    "en-US": "Total calls"
+  },
+  {
+    "key": "openPlatform.logs.errorRate",
+    "zh-CN": "错误率",
+    "en-US": "Error rate"
+  },
+  {
+    "key": "openPlatform.logs.failureCount",
+    "zh-CN": "失败调用",
+    "en-US": "Failed calls"
+  },
+  {
+    "key": "openPlatform.logs.p95",
+    "zh-CN": "P95 响应耗时",
+    "en-US": "P95 response time"
+  },
+  {
+    "key": "openPlatform.logs.overview",
+    "zh-CN": "调用概览",
+    "en-US": "Call overview"
+  },
+  {
+    "key": "openPlatform.logs.currentWindow",
+    "zh-CN": "当前应用、环境及时间范围",
+    "en-US": "Current application, environment and time window"
+  },
+  {
+    "key": "openPlatform.logs.search",
+    "zh-CN": "搜索请求 ID 或接口路径",
+    "en-US": "Search request ID or API path"
+  },
+  {
+    "key": "openPlatform.logs.timeRange",
+    "zh-CN": "时间范围",
+    "en-US": "Time range"
+  },
+  {
+    "key": "openPlatform.logs.lastHour",
+    "zh-CN": "最近 1 小时",
+    "en-US": "Last hour"
+  },
+  {
+    "key": "openPlatform.logs.lastDay",
+    "zh-CN": "最近 24 小时",
+    "en-US": "Last 24 hours"
+  },
+  {
+    "key": "openPlatform.logs.lastWeek",
+    "zh-CN": "最近 7 天",
+    "en-US": "Last 7 days"
+  },
+  {
+    "key": "openPlatform.logs.statusFilter",
+    "zh-CN": "调用状态",
+    "en-US": "Call status"
+  },
+  {
+    "key": "openPlatform.logs.allStatuses",
+    "zh-CN": "全部状态",
+    "en-US": "All statuses"
+  },
+  {
+    "key": "openPlatform.logs.onlyFailures",
+    "zh-CN": "仅失败",
+    "en-US": "Failed calls"
+  },
+  {
+    "key": "openPlatform.logs.onlySuccess",
+    "zh-CN": "仅成功（HTTP 2xx）",
+    "en-US": "HTTP 2xx"
+  },
+  {
+    "key": "openPlatform.logs.method",
+    "zh-CN": "请求方法",
+    "en-US": "HTTP method"
+  },
+  {
+    "key": "openPlatform.logs.allMethods",
+    "zh-CN": "全部方法",
+    "en-US": "All methods"
+  },
+  {
+    "key": "openPlatform.logs.reset",
+    "zh-CN": "重置",
+    "en-US": "Reset"
+  },
+  {
+    "key": "openPlatform.logs.refresh",
+    "zh-CN": "刷新日志",
+    "en-US": "Refresh logs"
+  },
+  {
+    "key": "openPlatform.logs.records",
+    "zh-CN": "调用记录",
+    "en-US": "Call records"
+  },
+  {
+    "key": "openPlatform.logs.newest",
+    "zh-CN": "按时间倒序",
+    "en-US": "Newest first"
+  },
+  {
+    "key": "openPlatform.logs.loading",
+    "zh-CN": "正在加载日志",
+    "en-US": "Loading logs"
+  },
+  {
+    "key": "openPlatform.logs.loadFailed",
+    "zh-CN": "日志加载失败",
+    "en-US": "Unable to load logs"
+  },
+  {
+    "key": "openPlatform.logs.loadFailedHelp",
+    "zh-CN": "筛选条件已保留，请检查网络后重试。",
+    "en-US": "Filters are preserved. Check the connection and retry."
+  },
+  {
+    "key": "openPlatform.logs.retry",
+    "zh-CN": "重试",
+    "en-US": "Retry"
+  },
+  {
+    "key": "openPlatform.logs.noCalls",
+    "zh-CN": "没有符合条件的调用",
+    "en-US": "No matching calls"
+  },
+  {
+    "key": "openPlatform.logs.noCallsHelp",
+    "zh-CN": "试试调整请求 ID、接口路径、时间范围或状态筛选。",
+    "en-US": "Adjust the request ID, API path, time range or status filters."
+  },
+  {
+    "key": "openPlatform.logs.clearFilters",
+    "zh-CN": "清空筛选",
+    "en-US": "Clear filters"
+  },
+  {
+    "key": "openPlatform.logs.timeAndId",
+    "zh-CN": "调用时间 / 请求 ID",
+    "en-US": "Call time / Request ID"
+  },
+  {
+    "key": "openPlatform.logs.api",
+    "zh-CN": "接口",
+    "en-US": "API"
+  },
+  {
+    "key": "openPlatform.logs.result",
+    "zh-CN": "结果",
+    "en-US": "Result"
+  },
+  {
+    "key": "openPlatform.logs.viewCall",
+    "zh-CN": "查看调用",
+    "en-US": "View call"
+  },
+  {
+    "key": "openPlatform.logs.timeZone",
+    "zh-CN": "时间遵循账号时区",
+    "en-US": "Times use your account time zone"
+  },
+  {
+    "key": "openPlatform.logs.previous",
+    "zh-CN": "上一页",
+    "en-US": "Previous page"
+  },
+  {
+    "key": "openPlatform.logs.next",
+    "zh-CN": "下一页",
+    "en-US": "Next page"
+  },
+  {
+    "key": "openPlatform.logs.loadingDetail",
+    "zh-CN": "正在加载调用详情",
+    "en-US": "Loading call details"
+  },
+  {
+    "key": "openPlatform.logs.payloadDenied",
+    "zh-CN": "暂无报文查看权限",
+    "en-US": "No permission to view HTTP content"
+  },
+  {
+    "key": "openPlatform.logs.detailFailed",
+    "zh-CN": "调用详情加载失败",
+    "en-US": "Unable to load call details"
+  },
+  {
+    "key": "openPlatform.logs.payloadDeniedHelp",
+    "zh-CN": "仍可查看调用摘要。请联系应用 owner 申请维护权限。",
+    "en-US": "Call summaries remain available. Ask an application owner for maintenance access."
+  },
+  {
+    "key": "openPlatform.logs.detailFailedHelp",
+    "zh-CN": "日志可能已不可用，请重试或刷新调用列表。",
+    "en-US": "The record may be unavailable. Retry or refresh the call list."
+  },
+  {
+    "key": "openPlatform.logs.wait",
+    "zh-CN": "请稍候…",
+    "en-US": "Please wait…"
+  },
+  {
+    "key": "openPlatform.logs.retentionHelp",
+    "zh-CN": "202 仅表示请求已接收，不代表业务处理成功。历史报文无法补采，采集记录遵循现有日志保留策略。",
+    "en-US": "202 means accepted, not final business success. Historical HTTP content cannot be recovered. Captures follow the existing audit retention policy."
+  },
+  {
+    "key": "openPlatform.logs.navigation",
+    "zh-CN": "开放平台导航",
+    "en-US": "Open Platform navigation"
+  },
+  {
+    "key": "openPlatform.logs.applications",
+    "zh-CN": "应用管理",
+    "en-US": "Applications"
+  },
+  {
+    "key": "openPlatform.logs.callLogs",
+    "zh-CN": "接口调用日志",
+    "en-US": "API call logs"
+  },
+  {
+    "key": "openPlatform.logs.webhooks",
+    "zh-CN": "Webhook 投递",
+    "en-US": "Webhook deliveries"
+  },
+  {
+    "key": "openPlatform.logs.production",
+    "zh-CN": "生产环境",
+    "en-US": "Production"
+  },
+  {
+    "key": "openPlatform.logs.staging",
+    "zh-CN": "预发布环境",
+    "en-US": "Staging"
+  },
+  {
+    "key": "openPlatform.logs.development",
+    "zh-CN": "开发环境",
+    "en-US": "Development"
+  },
+  {
+    "key": "openPlatform.logs.openPlatform",
+    "zh-CN": "开放平台",
+    "en-US": "Open Platform"
+  },
+  {
+    "key": "openPlatform.logs.subtitle",
+    "zh-CN": "追踪每一次接口调用，查看请求、响应与执行结果。",
+    "en-US": "Trace API calls and inspect their requests, responses and results."
+  },
+  {
+    "key": "openPlatform.logs.webhookSubtitle",
+    "zh-CN": "独立查看出站投递、重试记录与集成健康状态。",
+    "en-US": "Inspect outbound deliveries, retries and integration health separately."
+  },
+  {
+    "key": "openPlatform.logs.noApplications",
+    "zh-CN": "暂无可查看的应用",
+    "en-US": "No applications available"
+  },
+  {
+    "key": "openPlatform.logs.noApplicationsHelp",
+    "zh-CN": "请创建应用，或联系应用 owner 将你加入应用。",
+    "en-US": "Create an application or ask an owner to share it with you."
+  },
+  {
+    "key": "openPlatform.logs.disabled",
+    "zh-CN": "已停用",
+    "en-US": "Disabled"
+  },
+  {
+    "key": "openPlatform.logs.isolation",
+    "zh-CN": "按应用与环境查询 · 租户数据已隔离",
+    "en-US": "Application and environment scoped · Tenant isolated"
+  },
+  {
+    "key": "openPlatform.logs.noInstallation",
+    "zh-CN": "此应用尚未安装，请先安装后再查看调用记录。",
+    "en-US": "This application has no installations. Install it before inspecting calls."
+  },
+  {
+    "key": "header.platform_console",
+    "zh-CN": "平台控制台",
+    "en-US": "Platform Console"
+  },
+  {
+    "key": "sidebar.platformManagement",
+    "zh-CN": "平台管理",
+    "en-US": "Platform management"
+  },
+  {
+    "key": "openPlatform.title",
+    "zh-CN": "开放平台",
+    "en-US": "Open Platform"
+  },
+  {
+    "key": "openPlatform.applications",
+    "zh-CN": "应用管理",
+    "en-US": "Applications"
+  },
+  {
+    "key": "openPlatform.callLogs",
+    "zh-CN": "接口调用日志",
+    "en-US": "API call logs"
+  },
+  {
+    "key": "openPlatform.webhookDeliveries",
+    "zh-CN": "Webhook 投递",
+    "en-US": "Webhook deliveries"
+  },
+  {
+    "key": "openPlatform.logs.fullDetails",
+    "zh-CN": "查看请求与响应详情",
+    "en-US": "View requests and responses"
+  },
+  {
+    "key": "openPlatform.logs.unsafeEcho",
+    "en-US": "Response body was not stored because it may echo request content that could not be safely redacted.",
+    "zh-CN": "请求内容无法可靠脱敏，响应可能回显输入，因此未保存响应正文。"
+  },
+  {
+    "key": "openPlatform.logs.unstructuredJson",
+    "en-US": "Unstructured JSON values are not stored. Only JSON objects and arrays support safe field redaction.",
+    "zh-CN": "未保存非结构化 JSON 值；仅 JSON 对象和数组支持按字段可靠脱敏。"
+  },
+  {
+    "key": "kernelPlugins.title",
+    "zh-CN": "内核插件管理",
+    "en-US": "Kernel Plugin Manager"
+  },
+  {
+    "key": "kernelPlugins.description",
+    "zh-CN": "查看运行时已注册插件及其激活状态。此清单仅供查看。",
+    "en-US": "View registered runtime plugins and their activation status. This inventory is read-only."
+  },
+  {
+    "key": "kernelPlugins.backendManager",
+    "zh-CN": "后台插件管理",
+    "en-US": "Backend plugin management"
+  },
+  {
+    "key": "kernelPlugins.empty",
+    "zh-CN": "暂未注册插件，系统可能仍在启动中。",
+    "en-US": "No plugins registered yet. Startup may still be in progress."
+  },
+  {
+    "key": "kernelPlugins.registryHelp",
+    "zh-CN": "刷新可重新读取当前运行时插件清单，不改变插件状态。",
+    "en-US": "Refresh reads the current runtime registry without changing plugin state."
+  },
+  {
+    "key": "kernelPlugins.refresh",
+    "zh-CN": "刷新",
+    "en-US": "Refresh"
+  },
+  {
+    "key": "kernelPlugins.summary.total",
+    "zh-CN": "插件总数",
+    "en-US": "Total"
+  },
+  {
+    "key": "kernelPlugins.summary.active",
+    "zh-CN": "已激活",
+    "en-US": "Active"
+  },
+  {
+    "key": "kernelPlugins.state.active",
+    "zh-CN": "已激活",
+    "en-US": "Active"
+  },
+  {
+    "key": "kernelPlugins.summary.licensed",
+    "zh-CN": "已授权",
+    "en-US": "Licensed"
+  },
+  {
+    "key": "kernelPlugins.state.licensed",
+    "zh-CN": "已授权",
+    "en-US": "Licensed"
+  },
+  {
+    "key": "kernelPlugins.summary.enabled",
+    "zh-CN": "已启用",
+    "en-US": "Enabled"
+  },
+  {
+    "key": "kernelPlugins.state.enabled",
+    "zh-CN": "已启用",
+    "en-US": "Enabled"
+  },
+  {
+    "key": "kernelPlugins.summary.installed",
+    "zh-CN": "已安装",
+    "en-US": "Installed"
+  },
+  {
+    "key": "kernelPlugins.state.installed",
+    "zh-CN": "已安装",
+    "en-US": "Installed"
+  },
+  {
+    "key": "kernelPlugins.state.discovered",
+    "zh-CN": "已发现",
+    "en-US": "Discovered"
+  },
+  {
+    "key": "kernelPlugins.column.plugin",
+    "zh-CN": "插件",
+    "en-US": "Plugin"
+  },
+  {
+    "key": "kernelPlugins.column.kind",
+    "zh-CN": "类型",
+    "en-US": "Kind"
+  },
+  {
+    "key": "kernelPlugins.column.version",
+    "zh-CN": "版本",
+    "en-US": "Version"
+  },
+  {
+    "key": "kernelPlugins.column.state",
+    "zh-CN": "状态",
+    "en-US": "State"
+  },
+  {
+    "key": "kernelPlugins.column.features",
+    "zh-CN": "功能授权",
+    "en-US": "Features"
+  },
+  {
+    "key": "kernelPlugins.column.dependencies",
+    "zh-CN": "依赖插件",
+    "en-US": "Dependencies"
+  },
+  {
+    "key": "kernelPlugins.column.inactiveReason",
+    "zh-CN": "未激活原因",
+    "en-US": "Inactive Reason"
+  },
+  {
+    "key": "kernelPlugins.kind.core",
+    "zh-CN": "核心",
+    "en-US": "Core"
+  },
+  {
+    "key": "kernelPlugins.kind.oss",
+    "zh-CN": "开源",
+    "en-US": "Open source"
+  },
+  {
+    "key": "kernelPlugins.kind.enterprise",
+    "zh-CN": "企业版",
+    "en-US": "Enterprise"
+  },
+  {
+    "key": "kernelPlugins.kind.solution",
+    "zh-CN": "解决方案",
+    "en-US": "Solution"
+  },
+  {
+    "key": "kernelPlugins.reason.moduleUnavailable",
+    "zh-CN": "应用模块不可用",
+    "en-US": "Application module unavailable"
+  },
+  {
+    "key": "kernelPlugins.reason.circularDependency",
+    "zh-CN": "插件之间存在循环依赖",
+    "en-US": "Circular dependency"
+  },
+  {
+    "key": "kernelPlugins.reason.dependencyInactive",
+    "zh-CN": "依赖插件未激活：{detail}",
+    "en-US": "Dependency inactive: {detail}"
+  },
+  {
+    "key": "kernelPlugins.reason.moduleUnavailableDetail",
+    "zh-CN": "应用模块不可用：{detail}",
+    "en-US": "Application module unavailable: {detail}"
+  },
+  {
+    "key": "kernelPlugins.reason.missingFeature",
+    "zh-CN": "缺少功能授权：{detail}",
+    "en-US": "Missing feature: {detail}"
+  },
+  {
+    "key": "kernelPlugins.reason.setupFailed",
+    "zh-CN": "初始化失败：{detail}",
+    "en-US": "Setup failed: {detail}"
+  },
+  {
+    "key": "kernelPlugins.reason.missingDependency",
+    "zh-CN": "缺少依赖插件：{detail}",
+    "en-US": "Missing dependency: {detail}"
+  },
+  {
+    "key": "kernelPlugins.reason.dependencyNotEnabled",
+    "zh-CN": "依赖插件未启用：{detail}",
+    "en-US": "Dependency not enabled: {detail}"
+  },
+  {
+    "key": "kernelPlugins.reason.dependencyFailed",
+    "zh-CN": "依赖插件激活失败：{detail}",
+    "en-US": "Dependency failed: {detail}"
+  },
+  {
+    "key": "kernelPlugins.reason.laterPhase",
+    "zh-CN": "依赖插件 {dependency} 的激活阶段较晚：{phase}",
+    "en-US": "Dependency {dependency} is in a later activation phase: {phase}"
+  },
+  {
+    "key": "plugin.core.admin.name",
+    "zh-CN": "系统管理",
+    "en-US": "Admin"
+  },
+  {
+    "key": "plugin.core.admin.description",
+    "zh-CN": "云配置、登录渠道、功能授权、基础设施、模板、环境及文档上传管理。",
+    "en-US": "System admin: cloud config, login channels, entitlements, infrastructure, templates, environments, document upload."
+  },
+  {
+    "key": "plugin.core.ai-colleagues.name",
+    "zh-CN": "AI 同事",
+    "en-US": "AI Colleagues"
+  },
+  {
+    "key": "plugin.core.ai-colleagues.description",
+    "zh-CN": "AI 智能体设置、列表、创建引导、详情与对话。",
+    "en-US": "AI agent management — center settings, agent grid, creation wizard, detail, chat."
+  },
+  {
+    "key": "plugin.core.aurabot.name",
+    "zh-CN": "AuraBot",
+    "en-US": "AuraBot"
+  },
+  {
+    "key": "plugin.core.aurabot.description",
+    "zh-CN": "AuraBot 工作台、调用追踪、运行日志、模型服务、提示词及检索知识库。",
+    "en-US": "AuraBot dashboard, traces, run logs, providers, prompts, RAG knowledge."
+  },
+  {
+    "key": "plugin.core.automation.name",
+    "zh-CN": "自动化",
+    "en-US": "Automation"
+  },
+  {
+    "key": "plugin.core.automation.description",
+    "zh-CN": "自动化流程设计与基础运行能力。",
+    "en-US": "Automation builder and runtime (basic)."
+  },
+  {
+    "key": "plugin.core.dashboard.name",
+    "zh-CN": "仪表盘",
+    "en-US": "Dashboard"
+  },
+  {
+    "key": "plugin.core.dashboard.description",
+    "zh-CN": "仪表盘查看与设计、图表组件、工作台布局及编辑工具。",
+    "en-US": "Dashboard viewer and designer with chart widgets, workbench layouts, and authoring tools."
+  },
+  {
+    "key": "plugin.core.decisionops.name",
+    "zh-CN": "规则中心",
+    "en-US": "Rule Center"
+  },
+  {
+    "key": "plugin.core.decisionops.description",
+    "zh-CN": "条件片段、策略设计、决策定义、执行日志及治理。",
+    "en-US": "Rule Center console — condition fragments, strategy studio, decision definitions, execution logs, governance."
+  },
+  {
+    "key": "plugin.core.demo.name",
+    "zh-CN": "示例",
+    "en-US": "Demo"
+  },
+  {
+    "key": "plugin.core.demo.description",
+    "zh-CN": "验证内核与插件之间的集成契约。",
+    "en-US": "Hello-world plugin proving the kernel ↔ plugin contract is wired."
+  },
+  {
+    "key": "plugin.core.designer.name",
+    "zh-CN": "设计器",
+    "en-US": "Designers"
+  },
+  {
+    "key": "plugin.core.designer.description",
+    "zh-CN": "页面设计器、流程设计器及查询构建器。",
+    "en-US": "Page Designer, Flow Designer, Query Builder."
+  },
+  {
+    "key": "plugin.core.email.name",
+    "zh-CN": "电子邮件",
+    "en-US": "Email"
+  },
+  {
+    "key": "plugin.core.email.description",
+    "zh-CN": "Gmail 账号管理、邮件撰写及会话查看。",
+    "en-US": "Gmail account management, compose, and message thread views."
+  },
+  {
+    "key": "plugin.core.meta.name",
+    "zh-CN": "元数据",
+    "en-US": "Meta"
+  },
+  {
+    "key": "plugin.core.meta.description",
+    "zh-CN": "模型、字段、字典、命名查询、一致性规则及 AI 建模。",
+    "en-US": "Models, fields, dictionaries, named queries, consistency rules, AI-driven modeling."
+  },
+  {
+    "key": "plugin.core.ops.name",
+    "zh-CN": "运维工具",
+    "en-US": "Operations"
+  },
+  {
+    "key": "plugin.core.ops.description",
+    "zh-CN": "通知、通知规则、定时任务、审计日志及文档管理。",
+    "en-US": "Operational tools — notifications, notification rules, scheduler, audit logs, documents."
+  },
+  {
+    "key": "plugin.core.organization.name",
+    "zh-CN": "组织管理",
+    "en-US": "Organization"
+  },
+  {
+    "key": "plugin.core.organization.description",
+    "zh-CN": "组织成员与团队基础管理。",
+    "en-US": "Organization members and teams (basic)."
+  },
+  {
+    "key": "plugin.core.personal.name",
+    "zh-CN": "个人中心",
+    "en-US": "Personal"
+  },
+  {
+    "key": "plugin.core.personal.description",
+    "zh-CN": "个人资料、安全设置、社交账号关联及账号停用。",
+    "en-US": "Personal profile, security, social links, account deactivation."
+  },
+  {
+    "key": "plugin.core.platform.name",
+    "zh-CN": "平台管理",
+    "en-US": "Platform"
+  },
+  {
+    "key": "plugin.core.platform.description",
+    "zh-CN": "系统级插件清单及跨租户管理入口。",
+    "en-US": "System-wide plugin manager (cross-tenant view)."
+  },
+  {
+    "key": "plugin.core.settings.name",
+    "zh-CN": "系统设置",
+    "en-US": "Settings"
+  },
+  {
+    "key": "plugin.core.settings.description",
+    "zh-CN": "租户插件、偏好、账单、Webhook、API 文档、连接器、币种、时区及国际化设置。",
+    "en-US": "Tenant settings: plugins, preferences, billing, webhooks, API docs, connectors, currency, timezone, i18n."
   }
 ]

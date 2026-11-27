@@ -1,5 +1,5 @@
 import React, { forwardRef } from 'react';
-import type { CheckboxProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+import type { CheckboxProps } from '~/framework/smart/schema/smart-components';
 import {
   useConditionalRender,
   useExpressionValue,

@@ -1,7 +1,7 @@
 import React, { forwardRef } from 'react';
 import { useActionData } from 'react-router';
 import clsx from 'clsx';
-import type { DatePickerProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+import type { DatePickerProps } from '~/framework/smart/schema/smart-components';
 import {
   useExpressionValue,
   useSmartField,
@@ -210,9 +210,9 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
             // Open the native date picker when clicking anywhere on the input
             try {
               (e.target as HTMLInputElement).showPicker?.();
-            } catch {
+            } catch (error) {
               // showPicker() may throw in some browsers; ignore
-            }
+ console.warn('[DatePicker] previously-silent catch', error);            }
           }}
           className={clsx(
             baseStyles,

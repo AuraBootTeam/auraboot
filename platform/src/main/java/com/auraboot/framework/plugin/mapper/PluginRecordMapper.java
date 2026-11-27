@@ -68,6 +68,11 @@ public interface PluginRecordMapper extends BaseMapper<PluginRecord> {
     @Select("SELECT * FROM ab_plugin WHERE plugin_id = #{pluginId} AND deleted_flag = false")
     PluginRecord findByTenantAndPluginId(@Param("pluginId") String pluginId);
 
+    /** Reliable integrations must distinguish never-installed owners from retired identities. */
+    @ResultMap("mybatis-plus_PluginRecord")
+    @Select("SELECT * FROM ab_plugin WHERE tenant_id = #{tenantId} AND plugin_id = #{pluginId}")
+    PluginRecord findIntegrationIdentity(@Param("tenantId") Long tenantId, @Param("pluginId") String pluginId);
+
     /**
      * Find all plugins for a tenant.
      *

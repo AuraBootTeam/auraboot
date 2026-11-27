@@ -70,7 +70,7 @@ public class RoleController {
     public ApiResponse<List<RoleResponse>> getAllRoles() {
         Long tenantId = MetaContext.getCurrentTenantId();
         List<Role> roles = roleService.findByTenantId(tenantId);
-        return ApiResponse.success(roles.stream().map(RoleResponse::from).toList());
+        return ApiResponse.success(toResponses(roles));
     }
 
     /**
@@ -264,14 +264,36 @@ public class RoleController {
         if (role == null) {
             throw new RootUnCheckedException(BadParam, "Not found by the param: " + pid);
         }
-        boolean result = rolePermissionService.copyRolePermissions(role.getId(), request.targetRoleId());
+        Long targetId=request.targetRoleId();
+        if(request.targetRolePid()!=null) {
+            Role target=resolveRoleForCurrentTenant(request.targetRolePid());
+            if(target==null)throw new RootUnCheckedException(BadParam,"Copy target role is unavailable");
+            targetId=target.getId();
+        }
+        boolean result = rolePermissionService.copyRolePermissions(role.getId(),targetId);
         return ApiResponse.success(result);
     }
 
     private Page<RoleResponse> toResponsePage(Page<Role> roles) {
         Page<RoleResponse> response = new Page<>(roles.getCurrent(), roles.getSize(), roles.getTotal());
         response.setPages(roles.getPages());
-        response.setRecords(roles.getRecords().stream().map(RoleResponse::from).toList());
+        response.setRecords(toResponses(roles.getRecords()));
         return response;
+    }
+
+    private List<RoleResponse> toResponses(List<Role> roles) {
+        var summaries = roleService.displaySummaries(MetaContext.getCurrentTenantId(),
+                roles.stream().map(Role::getId).toList()).stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        com.auraboot.framework.rbac.dto.RoleDisplaySummary::getRoleId, value -> value));
+        return roles.stream().map(role -> {
+            RoleResponse value = RoleResponse.from(role);
+            var summary = summaries.get(role.getId());
+            if (summary != null) {
+                value.setMemberCount(summary.getMemberCount());
+                value.setManagementRole(summary.getManagementRole());
+            }
+            return value;
+        }).toList();
     }
 }

@@ -26,6 +26,7 @@ export interface FieldBaseProps {
   className?: string;
   labelClassName?: string;
   controlClassName?: string;
+  controlStyle?: React.CSSProperties;
   onLabelClick?: React.MouseEventHandler<HTMLLabelElement>;
   children: React.ReactNode;
 }
@@ -43,6 +44,7 @@ export const FieldBase = React.forwardRef<HTMLDivElement, FieldBaseProps>(
       className,
       labelClassName,
       controlClassName,
+      controlStyle,
       onLabelClick,
       children,
     },
@@ -76,17 +78,17 @@ export const FieldBase = React.forwardRef<HTMLDivElement, FieldBaseProps>(
         {labelPosition === 'left' || inline ? (
           <div className="flex items-start gap-3">
             {labelElement}
-            <div className={cn('flex-1', controlClassName)}>{children}</div>
+            <div className={cn('flex-1', controlClassName)} style={controlStyle}>{children}</div>
           </div>
         ) : labelPosition === 'right' ? (
           <div className="flex items-center gap-2">
-            <div className={controlClassName}>{children}</div>
+            <div className={controlClassName} style={controlStyle}>{children}</div>
             {labelElement}
           </div>
         ) : (
           <>
             {labelElement}
-            <div className={controlClassName}>{children}</div>
+            <div className={controlClassName} style={controlStyle}>{children}</div>
           </>
         )}
 

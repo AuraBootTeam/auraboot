@@ -42,7 +42,7 @@ async function selectCustomer(page: Page, accountId: string, accountName: string
 
   const option = page.locator(`[role="option"][data-value="${accountId}"]`).first();
   if (!(await option.isVisible({ timeout: 1_000 }).catch(() => false))) {
-    const search = page.getByTestId('select-search-qo_quote_crm_account_id');
+    const search = page.getByTestId('select-trigger-qo_quote_crm_account_id');
     await expect(search, 'customer reference search').toBeVisible({ timeout: 5_000 });
     await search.fill(accountName);
   }
@@ -50,7 +50,7 @@ async function selectCustomer(page: Page, accountId: string, accountName: string
     timeout: 15_000,
   });
   await option.click();
-  await expect(trigger).toContainText(accountName, { timeout: 5_000 });
+  await expect(trigger).toHaveValue(accountName, { timeout: 5_000 });
 }
 
 async function selectProject(page: Page, projectId: string, projectName: string): Promise<void> {
@@ -60,7 +60,7 @@ async function selectProject(page: Page, projectId: string, projectName: string)
 
   const option = page.locator(`[role="option"][data-value="${projectId}"]`).first();
   if (!(await option.isVisible({ timeout: 1_000 }).catch(() => false))) {
-    const search = page.getByTestId('select-search-qo_quote_project_id');
+    const search = page.getByTestId('select-trigger-qo_quote_project_id');
     await expect(search, 'project reference search').toBeVisible({ timeout: 5_000 });
     await search.fill(projectName);
   }
@@ -68,7 +68,7 @@ async function selectProject(page: Page, projectId: string, projectName: string)
     timeout: 15_000,
   });
   await option.click();
-  await expect(trigger).toContainText(projectName, { timeout: 5_000 });
+  await expect(trigger).toHaveValue(projectName, { timeout: 5_000 });
 }
 
 async function uploadSmartUploadFile(
@@ -171,7 +171,7 @@ test.describe('PCBA quote minimal create regression', () => {
   test.describe.configure({ timeout: 120_000 });
 
   test.beforeEach(async ({ page }) => {
-    await ensureTenantAdminRegisteredPermissions(page, ['qo.quote.read', 'qo.quote.create', 'qo.quote.manage', 'qo.price.manage']);
+    await ensureTenantAdminRegisteredPermissions(page, ['qo.cap.read', 'qo.cap.write']);
   });
 
   test('Q01-02 creates customer and linked project inside quote reference dropdowns', async ({ page }, testInfo) => {
@@ -199,14 +199,14 @@ test.describe('PCBA quote minimal create regression', () => {
       expect(accountId).toBeTruthy();
       created.rows.push({ model: 'crm_account_common', pid: accountId });
       await expect(customerDialog).toHaveCount(0);
-      await expect(page.getByTestId('select-trigger-qo_quote_crm_account_id')).toContainText(accountName);
+      await expect(page.getByTestId('select-trigger-qo_quote_crm_account_id')).toHaveValue(accountName);
       expect((await readDynamicRecord(page, 'crm_account_common', accountId)).crm_acc_name).toBe(accountName);
 
       await page.getByTestId('select-trigger-qo_quote_project_id').click();
       await page.getByTestId('select-create-new-qo_quote_project_id').click();
       const projectDialog = page.getByRole('dialog', { name: '新建BOM 项目', exact: true });
       await expect(projectDialog).toBeVisible();
-      await expect(projectDialog.getByRole('combobox', { name: '客户', exact: true })).toContainText(accountName);
+      await expect(projectDialog.getByRole('combobox', { name: '客户', exact: true })).toHaveValue(accountName);
       await projectDialog.getByRole('textbox', { name: '项目名称', exact: true }).fill(projectName);
       const projectResponse = page.waitForResponse((response) =>
         response.request().method() === 'POST' && response.url().includes('/api/meta/commands/execute/bom:create_project'));
@@ -222,12 +222,16 @@ test.describe('PCBA quote minimal create regression', () => {
       expect(projectId).toBeTruthy();
       created.rows.push({ model: 'req_requirement_set_pcba_bom', pid: projectId });
       await expect(projectDialog).toHaveCount(0);
-      await expect(page.getByTestId('select-trigger-qo_quote_project_id')).toContainText(projectName);
+      await expect(page.getByTestId('select-trigger-qo_quote_project_id')).toHaveValue(projectName);
       const persistedProject = await readDynamicRecord(page, 'req_requirement_set_pcba_bom', projectId);
       expect(persistedProject.bom_project_customer_id).toBe(accountId);
       expect(persistedProject.bom_project_name).toBe(projectName);
+      await expect(page.getByTestId('form-field-qo_quote_crm_account_id').getByText('此字段为必填项', { exact: true })).toHaveCount(0);
+      await expect(page.getByTestId('form-field-qo_quote_project_id').getByText('此字段为必填项', { exact: true })).toHaveCount(0);
       await page.screenshot({ path: testInfo.outputPath('quote-inline-customer-project-selected.png'), fullPage: true });
     } finally {
+      // Keep the business deadline; fixture teardown receives its own bounded allowance.
+      testInfo.setTimeout(testInfo.timeout + 60_000);
       await cleanupRows(page, created);
     }
   });
@@ -287,29 +291,8 @@ test.describe('PCBA quote minimal create regression', () => {
       expect(projectId, 'bom:create_project should return recordId').toBeTruthy();
       created.rows.push({ model: 'req_requirement_set_pcba_bom', pid: projectId });
 
-      // This golden owns the create/RFQ linkage contract, not the external-source contract. Seed
-      // fresh unbound Yunhan evidence (the quote-line binding is optional) for all three MPNs so the create task deterministically
-      // exercises cache reuse and does not consume Yunhan's shared 1-call/minute batch allowance.
-      // Dedicated Yunhan goldens below this suite still exercise the real upload/search lanes.
-      const validUntil = new Date(Date.now() + 7 * 24 * 3600 * 1000)
-        .toISOString()
-        .slice(0, 10);
-      for (const mpn of ['RC0603FR-0710KL', 'STM32F103C8T6', 'GRM188R71C104KA01D']) {
-        await dynamicCreate(
-          page,
-          'qo_price_evidence_common',
-          {
-            qo_pe_part_no: mpn,
-            qo_pe_source: 'yunhan',
-            qo_pe_source_ref: 'golden:minimal-create-cache',
-            qo_pe_status: 'captured',
-            qo_pe_unit_price: 0.1234,
-            qo_pe_currency: 'CNY',
-            qo_pe_valid_until: validUntil,
-          },
-          created.rows,
-        );
-      }
+      // Supplier pricing remains exercised through this runtime's managed protocol mock.
+      // Unbound price evidence is not a sourcing cache and must not be seeded as one.
 
       const accountOptionsLoaded = page
         .waitForResponse(
@@ -500,6 +483,7 @@ test.describe('PCBA quote minimal create regression', () => {
         if (pid) created.rows.push({ model: 'qo_bom_import_common', pid });
       }
 
+      console.info('[quote-minimal-phase] list', Date.now());
       await navigateToDynamicPage(page, 'qo_quote_common');
       expect(await tableHeaders(page)).toEqual([
         '客户',
@@ -525,6 +509,7 @@ test.describe('PCBA quote minimal create regression', () => {
       await expect(page.locator('thead, [role="rowgroup"]').first()).not.toContainText('折扣%');
       await expect(page.locator('thead, [role="rowgroup"]').first()).not.toContainText('有效期至');
 
+      console.info('[quote-minimal-phase] detail', Date.now());
       await openQuoteDetailFromList(page, created);
       await expect(page.getByRole('tab', { name: /资料上传|Source Upload/ })).toBeVisible({
         timeout: 20_000,
@@ -551,8 +536,10 @@ test.describe('PCBA quote minimal create regression', () => {
       expect(fs.readFileSync(downloadedPath)).toEqual(fs.readFileSync(cplFixture));
       expect(page.url()).toBe(detailUrlBeforeDownload);
       expect(page.context().pages()).toHaveLength(openPagesBeforeDownload);
+      console.info('[quote-minimal-phase] download-complete', Date.now());
       await page.screenshot({ path: testInfo.outputPath('created-quote-upload-readback.png'), fullPage: true });
 
+      console.info('[quote-minimal-phase] price-tab', Date.now());
       await page.getByRole('tab', { name: /BOM价格计算|BOM Price/i }).click();
       const priceTable = page.getByTestId('table-block').filter({
         has: page.getByTestId(`table-row-${String(quoteLines[0].pid)}`),
@@ -577,6 +564,8 @@ test.describe('PCBA quote minimal create regression', () => {
       await expect(main).not.toContainText('PCBA RFQ');
       await expect(main).not.toContainText('PCBA数量');
     } finally {
+      // Keep the business deadline; fixture teardown receives its own bounded allowance.
+      testInfo.setTimeout(testInfo.timeout + 60_000);
       await cleanupRows(page, created);
     }
   });

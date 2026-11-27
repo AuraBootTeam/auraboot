@@ -120,9 +120,9 @@ export default function TaskGanttView({ projectId, onTaskClick, refreshKey }: Ta
       if (result.code === '0' && result.data) {
         setAllTasks(result.data.records ?? []);
       }
-    } catch {
+    } catch (error) {
       // silent
-    } finally {
+ console.warn('[TaskGanttView] previously-silent catch', error);    } finally {
       setLoading(false);
     }
   }, [projectId]);

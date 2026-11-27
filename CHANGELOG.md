@@ -13,8 +13,19 @@ each before upgrading.
 
 ## [Unreleased]
 
+> Catch-up note (2026-11-14): the "entries land in `[Unreleased]` as part of
+> the PR" convention lapsed after 1.0.0 — roughly 1.8k commits since
+> 2026-09-27 were not recorded here. The entries below summarize that period
+> by theme; per-commit history remains in git log. The convention is
+> reinstated from this point on.
+
 ### Added
-- (entries here are folded into the next release)
+- ✨ Permission model deepening: nested read/write/manage domain levels,
+  document projection authorization, bounded internal batch reads, and
+  business-root-bound native lifecycle transitions.
+- ✨ Focused BOM Quote core import profile.
+- ✨ Scoped installed-plugin listings and retained product-root projection
+  that preserves shared menu/lifecycle state.
 
 ### Changed
 - **BREAKING**: the platform authorization interceptor is now default-deny for un-annotated
@@ -33,6 +44,12 @@ each before upgrading.
 ### Removed
 
 ### Security
+- 🔒 Removed the remembered-password feature from the login page (the
+  password was stored base64-encoded in localStorage); remember-me now
+  persists only the email and legacy values are proactively cleared.
+- 🔒 Runtime DDL hardening: date/time default values are escaped, numeric
+  defaults strictly parsed, array/unknown defaults rejected, and DROP TABLE
+  identifiers validated (#2530).
 
 ---
 
@@ -218,10 +235,6 @@ release is about. Then the structured sections.
 ### Contributors
 First-time contributors this release: @user1, @user2. Thanks!
 
-[1.0.0]: https://github.com/AuraBootTeam/auraboot/releases/tag/v1.0.0
-[0.1.0-beta.3]: https://github.com/AuraBootTeam/auraboot/releases/tag/v0.1.0-beta.3
-[0.1.0-beta.2]: https://github.com/AuraBootTeam/auraboot/releases/tag/v0.1.0-beta.2
-[0.1.0-beta.1]: https://github.com/AuraBootTeam/auraboot/releases/tag/v0.1.0-beta.1
 -->
 
 ---
@@ -249,15 +262,13 @@ First-time contributors this release: @user1, @user2. Thanks!
   compatibility, minor versions may break with deprecation notice.
 - **1.0.0** — first stable; from then on, strict semver applies.
 
-**No fixed 1.0 date during beta.** The 1.0 cut depends on the API surface
-stabilizing (no `### Breaking changes` for ≥ 2 consecutive releases) and
-the first commercial customer cohort validating production fitness. We
-expect this around month 5–6 post-launch but won't promise it; "1.0
-shipped because the calendar said so" is how you ship a bad 1.0. We'll
-publish a target date once the conditions look met, then live with it.
-
 ## Release cadence
 
-The team commits to **at least one release per month** during beta. Two
-months without a release is the signal community treats as project death;
-we don't go there.
+Post-1.0, the team aims for **at least one release per month**. (The gap
+since the 2026-09-27 1.0.0 release is acknowledged; a catch-up release is
+due — see the `[Unreleased]` catch-up note above.)
+
+[1.0.0]: https://github.com/AuraBootTeam/auraboot/releases/tag/v1.0.0
+[0.1.0-beta.3]: https://github.com/AuraBootTeam/auraboot/releases/tag/v0.1.0-beta.3
+[0.1.0-beta.2]: https://github.com/AuraBootTeam/auraboot/releases/tag/v0.1.0-beta.2
+[0.1.0-beta.1]: https://github.com/AuraBootTeam/auraboot/releases/tag/v0.1.0-beta.1

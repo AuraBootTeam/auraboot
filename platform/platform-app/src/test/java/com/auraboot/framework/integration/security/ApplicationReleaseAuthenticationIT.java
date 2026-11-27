@@ -33,6 +33,11 @@ class ApplicationReleaseAuthenticationIT extends BaseIntegrationTest {
         }
     }
 
+    private com.auraboot.framework.integration.PlatformAdministrationFixture platformFixture;
+    @org.junit.jupiter.api.AfterEach void cleanupPlatformFixture() {
+        if (platformFixture != null) platformFixture.close();
+    }
+
     @Autowired WebApplicationContext web;
     @Autowired JwtAuthenticationFilter filter;
     @Autowired JwtUtil jwt;
@@ -60,7 +65,8 @@ class ApplicationReleaseAuthenticationIT extends BaseIntegrationTest {
                     .contentType("application/json").accept("application/json").content(payload))
                     .andExpect(jsonPath("$.code").value("409"));
             assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM ab_application WHERE code=?", Integer.class, code));
-            long roleId = AdminGuardTestSupport.grantPlatformAdmin(jdbc, testTenant.getId(), testUser.getId());
+            platformFixture = com.auraboot.framework.integration.PlatformAdministrationFixture.grant(jdbc, testUser.getId());
+            long roleId = platformFixture.roleId();
             roles.invalidateAll();
             clearIdentity();
             mvc.perform(post(uri).header("Authorization", "Bearer " + token)

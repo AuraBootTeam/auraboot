@@ -54,6 +54,58 @@ import static org.mockito.ArgumentCaptor.forClass;
 @ExtendWith(MockitoExtension.class)
 class FileServiceImplTest {
 
+    private com.auraboot.framework.file.security.BusinessArtifactAuthorization provenance() {
+        var target = new com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext.BusinessTargetAuthorization(
+                "orders:export", "orders", "01ARZ3NDEKTSV4RRFFQ69G5FAV", "update", 7L, 42L, 10L);
+        var view = new com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionPlan(target, null,
+                java.util.Map.of("orders", new com.auraboot.framework.meta.service.impl.CommandPublicOutputProjectionPlan.ModelFields(
+                        java.util.Set.of("export_file"), java.util.Set.of("export_file"), List.of(), List.of())));
+        return com.auraboot.framework.file.security.BusinessArtifactAuthorization.capture(view, "export_file");
+    }
+
+    @Test void artifact_persistence_stamps_and_retains_before_insert_without_creating_any_url() {
+        when(storageProvider.upload(anyString(), any(), eq(4L), eq("text/plain"))).thenReturn("stored");
+        when(fileMapper.insert(any(FileEntity.class))).thenReturn(1);
+        var result = fileService.persistBusinessArtifact(new MockMultipartFile("file", "report.txt", "text/plain", "data".getBytes()), 42L, provenance());
+        assertThat(result.getArtifactAuthorization()).isEqualTo(provenance().encode());
+        assertThat(result.getRetentionLocked()).isTrue();
+        assertThat(result.getTenantId()).isEqualTo(7L);
+        assertThat(result.getStatus()).isEqualTo("success");
+        verify(storageProvider, never()).getPresignedUrl(anyString(), any());
+        verify(fileMapper, never()).selectOne(any(QueryWrapper.class));
+        var callback = TransactionSynchronizationManager.getSynchronizations().get(0);
+        callback.afterCompletion(TransactionSynchronization.STATUS_COMMITTED);
+        verify(storageProvider, never()).delete(anyString());
+    }
+
+    @Test void artifact_persistence_cleans_partial_storage_on_rollback_even_if_upload_throws() {
+        when(storageProvider.upload(anyString(), any(), eq(4L), eq("text/plain"))).thenThrow(new IllegalStateException("partial upload"));
+        assertThatThrownBy(() -> fileService.persistBusinessArtifact(new MockMultipartFile("file", "report.txt", "text/plain", "data".getBytes()), 42L, provenance()))
+                .isInstanceOf(IllegalStateException.class).hasMessage("partial upload");
+        verify(fileMapper, never()).insert(any(FileEntity.class));
+        TransactionSynchronizationManager.getSynchronizations().get(0).afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK);
+        verify(storageProvider).delete(anyString());
+    }
+
+    @Test void artifact_persistence_rejects_a_foreign_actor_before_io() {
+        assertThatThrownBy(() -> fileService.persistBusinessArtifact(new MockMultipartFile("file", "report.txt", "text/plain", "data".getBytes()), 99L, provenance()))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        org.mockito.Mockito.verifyNoInteractions(storageProvider, fileMapper);
+    }
+
+    @Test
+    void stamped_cloud_artifact_always_uses_guarded_api_instead_of_cdn_or_signed_url() {
+        var artifact = new FileEntity(); artifact.setPid("artifact-pid"); artifact.setStorageType(StorageType.S3);
+        artifact.setFileName("cloud-key"); artifact.setArtifactAuthorization("host-owned-provenance");
+        when(fileMapper.selectOne(any(QueryWrapper.class))).thenReturn(artifact);
+        var guard = org.mockito.Mockito.mock(com.auraboot.framework.file.security.BusinessArtifactAccessGuard.class);
+        ReflectionTestUtils.setField(fileService,"artifactAccess",guard);
+        ReflectionTestUtils.setField(fileService,"cdnUrlRewriter",cdnUrlRewriter);
+        assertThat(fileService.getFileDownloadUrl("artifact-pid")).isEqualTo("http://localhost:8080/api/file/download/artifact-pid");
+        verify(guard).authorize(artifact);
+        org.mockito.Mockito.verifyNoInteractions(cdnUrlRewriter,storageProvider);
+    }
+
     @Mock
     private FileRelationMutationGuard relationMutationGuard;
 
@@ -358,6 +410,46 @@ class FileServiceImplTest {
         byte[] exe = withPrefix(new byte[]{0x4D, 0x5A, (byte) 0x90, 0x00}, "this-is-an-exe");
         MultipartFile bad = new MockMultipartFile(
                 "file", "photo.png", "image/png", exe);
+
+        assertThatThrownBy(() -> fileService.uploadFile(bad, 1L))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void uploadFile_mp4ContentMislabeledOctetStream_acceptedByContent() {
+        // A real MP4 carries a "ftyp" box at byte offset 4; the browser-reported
+        // MIME is irrelevant once the container signature is recognised.
+        byte[] mp4 = withPrefix(new byte[]{0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x6D, 0x70, 0x34}, "clip");
+        MultipartFile good = new MockMultipartFile(
+                "file", "blob.dat", "application/octet-stream", mp4);
+
+        when(storageProvider.upload(anyString(), any(), anyLong(), any()))
+                .thenReturn("/uploads/blob.dat");
+        when(storageProvider.type()).thenReturn(StorageType.LOCAL);
+
+        var resp = fileService.uploadFile(good, 42L);
+
+        assertThat(resp).isNotNull();
+        verify(fileMapper).insert(any(FileEntity.class));
+    }
+
+    @Test
+    void uploadFile_mp4ExtensionWithoutContainerSignature_rejected() {
+        // The ".mp4" extension alone does not whitelist anything: content without
+        // the ftyp container signature and without an allowed MIME stays rejected.
+        MultipartFile bad = new MockMultipartFile(
+                "file", "clip.mp4", "application/octet-stream", "not-a-real-container".getBytes());
+
+        assertThatThrownBy(() -> fileService.uploadFile(bad, 1L))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void uploadFile_executableDisguisedAsMp4_rejectedByContent() {
+        // An executable renamed to clip.mp4 and labelled video/mp4: the bytes win.
+        byte[] exe = withPrefix(new byte[]{0x4D, 0x5A, (byte) 0x90, 0x00}, "this-is-an-exe");
+        MultipartFile bad = new MockMultipartFile(
+                "file", "clip.mp4", "video/mp4", exe);
 
         assertThatThrownBy(() -> fileService.uploadFile(bad, 1L))
                 .isInstanceOf(BusinessException.class);

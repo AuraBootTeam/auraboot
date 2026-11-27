@@ -21,9 +21,9 @@ const KEY_PREFIX = 'semantic_explore:';
 export function saveExploration(saved: SavedExploration): void {
   try {
     localStorage.setItem(KEY_PREFIX + saved.modelCode, JSON.stringify(saved));
-  } catch {
+  } catch (error) {
     // localStorage unavailable (private mode/quota) — saving is best-effort.
-  }
+ console.warn('[explore-storage] previously-silent catch', error);  }
 }
 
 export function loadExploration(modelCode: string): SavedExploration | null {
@@ -47,9 +47,9 @@ export function loadExploration(modelCode: string): SavedExploration | null {
 export function clearExploration(modelCode: string): void {
   try {
     localStorage.removeItem(KEY_PREFIX + modelCode);
-  } catch {
+  } catch (error) {
     // best-effort
-  }
+ console.warn('[explore-storage] previously-silent catch', error);  }
 }
 
 /**

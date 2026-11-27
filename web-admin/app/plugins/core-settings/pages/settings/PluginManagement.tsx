@@ -229,9 +229,9 @@ function MarketplaceEmbedTab() {
           const url = json.data ?? json.value ?? null;
           setMarketplaceUrl(typeof url === 'string' && url.length > 0 ? url : null);
         }
-      } catch {
+      } catch (error) {
         // Config not available — marketplace not configured
-      } finally {
+ console.warn('[PluginManagement] previously-silent catch', error);      } finally {
         setLoading(false);
       }
     })();

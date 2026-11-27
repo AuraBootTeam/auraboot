@@ -12,8 +12,8 @@ import java.util.Map;
  * Joint sub-table save request DTO
  *
  * Supports saving master record along with multiple sub-tables in a single transaction.
- * This is used for master-detail forms where the main record and related child records
- * need to be saved atomically.
+ * Each source mutation uses a nested savepoint. Row failures are reported while successful
+ * rows are retained; this endpoint does not provide all-or-nothing master/detail saving.
  *
  * @author AuraBoot Team
  * @since 2.0.0

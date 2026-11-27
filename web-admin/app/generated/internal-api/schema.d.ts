@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: ec8704be15abb8ab80b71fe30e07a19261caeacca567ef74a0a5c820d2be1235
+ * Contract SHA-256: 04c697056b629380f72f6a0b698ede34f7d36a08cdda6277b18f571e594bf404
  */
 export interface paths {
     "/api/activities": {
@@ -429,6 +429,22 @@ export interface paths {
         get: operations["streamLlmChunks"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/bootstrap/platform-navigation/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reconcile"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1379,6 +1395,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/open-platform/installations/{installation}/event-sources/{source}/events/{event}/recovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["plan"];
+        put?: never;
+        post: operations["authorizeReceiptRecovery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/platform-releases/{platformCode}": {
         parameters: {
             query?: never;
@@ -2086,6 +2118,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["pipelineTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agent/definitions/{agentPid}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["activateAgent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4408,6 +4456,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/aps/gantt/{strategy}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["gantt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/aps/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["schedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/aps/schedule/{strategy}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["scheduleWithStrategy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/aps/strategies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["strategies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/async-tasks": {
         parameters: {
             query?: never;
@@ -5317,7 +5429,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["observe"];
+        post: operations["observe_1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6448,6 +6560,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/bitemporal/{entityType}/{entityId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["put"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bitemporal/{entityType}/{entityId}/asOf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAsOf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bitemporal/{entityType}/{entityId}/correct": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["correct"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bitemporal/{entityType}/{entityId}/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getCurrent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bitemporal/{entityType}/{entityId}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getHistory_4"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bitemporal/{entityType}/{entityId}/terminate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["terminate"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/bootstrap/progress": {
         parameters: {
             query?: never;
@@ -7474,54 +7682,6 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["ingest"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/dataquality/expectations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["createSuite"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/dataquality/expectations/{suitePid}/run": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["runValidation"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/dataquality/expectations/{suitePid}/runs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["listRuns_1"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -10036,6 +10196,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/exchange/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List recent data exchange and document jobs */
+        get: operations["recent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/exports/domain/{taskPid}": {
         parameters: {
             query?: never;
@@ -11646,6 +11823,54 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["runScheduleV2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/manufacturing/oee/equipment/{equipmentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["equipmentOee"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/manufacturing/oee/fleet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["fleetOee"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/manufacturing/oee/fleet/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["fleetSummary"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -13734,6 +13959,150 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["createSnapshot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meta/excel/document-import/{modelCode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["importDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meta/excel/document-template/{modelCode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["downloadDocumentTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meta/excel/import/{modelCode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["importExcel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meta/excel/import/{modelCode}/{taskId}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["streamProgress_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meta/excel/import/{modelCode}/cancel/{taskId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["cancelImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meta/excel/import/{modelCode}/error-report/{taskId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["downloadErrorReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meta/excel/import/{modelCode}/status/{taskId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getImportStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meta/excel/template/{modelCode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["downloadTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meta/excel/validate/{modelCode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["validateFile"];
         delete?: never;
         options?: never;
         head?: never;
@@ -16039,6 +16408,166 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/mrp/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["runMrp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/navigation/configuration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readNavigationConfiguration"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/navigation/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createNavigationEntry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/navigation/entries/{pid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readCurrentNavigationTarget"];
+        put: operations["updateNavigationEntry"];
+        post?: never;
+        delete: operations["removeNavigationEntry"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/navigation/entries/{pid}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["restoreNavigationEntry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/navigation/entries/{pid}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readNavigationEntryRoles"];
+        put: operations["saveNavigationEntryRoles"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/navigation/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["previewUserNavigation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/navigation/preview/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readNavigationPreviewOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/navigation/roles/{rolePid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readRoleNavigationSelection"];
+        put: operations["saveRoleNavigationSelection"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/navigation/roles/{rolePid}/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readRoleNavigationAudit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/notification-rules": {
         parameters: {
             query?: never;
@@ -16255,6 +16784,38 @@ export interface paths {
             cookie?: never;
         };
         get: operations["getUnreadCount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/wechat-subscription/observations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["observe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/wechat-subscription/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["templates"];
         put?: never;
         post?: never;
         delete?: never;
@@ -16703,6 +17264,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["listAudits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/open-platform/installations/{installationPid}/audits/{auditPid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["auditDetail"];
         put?: never;
         post?: never;
         delete?: never;
@@ -18175,6 +18752,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/permission/roles/{rolePid}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a consistent role authorization draft baseline */
+        get: operations["readRoleAuthorizationDraft"];
+        /** Atomically commit role duties and record scopes with conflict detection */
+        put: operations["applyRoleAuthorizationDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/permission/roles/{rolePid}/draft/migration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Inspect role bindings and explicit scope decisions before migration */
+        get: operations["inspectRoleBoundaryMigration"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/permission/roles/{rolePid}/draft/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview role duties and record scopes against an exact revision */
+        post: operations["previewRoleAuthorizationDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/permissions": {
         parameters: {
             query?: never;
@@ -18745,6 +19374,70 @@ export interface paths {
          * @description Get a preview of what will happen when uninstalling a plugin
          */
         get: operations["getUninstallPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/handovers/contracts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPluginHandoverPreviewContracts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/handovers/previews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createPluginHandoverPreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/handovers/previews/{batchPid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["findPluginHandoverPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/handovers/previews/by-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["findPluginHandoverPreviewByKey"];
         put?: never;
         post?: never;
         delete?: never;
@@ -19829,6 +20522,22 @@ export interface paths {
         get: operations["widget"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/integration-callbacks/{tenant}/{installation}/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["receive"];
         delete?: never;
         options?: never;
         head?: never;
@@ -23297,27 +24006,6 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        AbDataQualityValidationRun: {
-            datasetName?: string;
-            deletedFlag?: boolean;
-            /** Format: int32 */
-            failed?: number;
-            /** Format: date-time */
-            finishedAt?: string;
-            /** Format: int64 */
-            id?: number;
-            /** Format: int32 */
-            passed?: number;
-            pid?: string;
-            resultsJson?: string;
-            /** Format: date-time */
-            startedAt?: string;
-            suitePid?: string;
-            /** Format: int64 */
-            tenantId?: number;
-            /** Format: int32 */
-            totalExpectations?: number;
-        };
         AbSemanticPreagg: {
             /** Format: date-time */
             createdAt?: string;
@@ -23446,6 +24134,9 @@ export interface components {
             /** Format: int64 */
             expectedVersion?: number;
             operationId?: string;
+        };
+        ActivationRequest: {
+            providerCode: string;
         };
         ActiveSessionResponse: {
             /** Format: date-time */
@@ -24431,6 +25122,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseAsyncImportStatus: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["AsyncImportStatus"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseAsyncTaskDTO: {
             code?: string;
             context?: unknown;
@@ -24543,6 +25242,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseBiTemporalRecord: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["BiTemporalRecord"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseBoolean: {
             code?: string;
             context?: unknown;
@@ -24563,6 +25270,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["BootstrapStatusResponse"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseCallAuditDetail: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["CallAuditDetail"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -24603,6 +25318,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["CascadeDictResult"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseCatalog: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["Catalog"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25304,6 +26027,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseExcelImportResult: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["ExcelImportResult"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseExchangeRateResponse: {
             code?: string;
             context?: unknown;
@@ -25364,6 +26095,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["FileUploadResponseDTO"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseGanttData: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["GanttData"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -25785,6 +26524,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseListBiTemporalRecord: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["BiTemporalRecord"][] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseListCallAuditView: {
             code?: string;
             context?: unknown;
@@ -26189,6 +26936,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["ExchangeRateResponse"][] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseListExecutionJobDTO: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["ExecutionJobDTO"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -26637,6 +27392,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseListPluginHandoverContractSummary: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["PluginHandoverContractSummary"][] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseListPluginImportResult: {
             code?: string;
             context?: unknown;
@@ -26745,6 +27508,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["RoleMemberDTO"][] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseListRoleNavigationAudit: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["RoleNavigationAudit"][] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27280,6 +28051,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseMrpResult: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["MrpResult"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseNamedQueryBatchResult: {
             code?: string;
             context?: unknown;
@@ -27336,6 +28115,46 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseNavigationEntryRoles: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["NavigationEntryRoles"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseNavigationPreviewOptions: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["NavigationPreviewOptions"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseNavigationSnapshot: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["NavigationSnapshot"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseNavigationTarget: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["NavigationTarget"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseNavigationUserPreview: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["NavigationUserPreview"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseNewPageWorkspaceOptions: {
             code?: string;
             context?: unknown;
@@ -27372,6 +28191,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseOeeResult: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["OeeResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27792,6 +28619,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponsePlan: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["Plan"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponsePlatformAiScoreResult: {
             code?: string;
             context?: unknown;
@@ -27820,6 +28655,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["PluginGenerateResult"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponsePluginHandoverPreview: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["PluginHandoverPreview"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27968,6 +28811,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseRecorded: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["Recorded"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseRecordShareAccessResponse: {
             code?: string;
             context?: unknown;
@@ -28064,6 +28915,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseResult: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["Result"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseRetrievalOutcome: {
             code?: string;
             context?: unknown;
@@ -28104,10 +28963,42 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseRoleAuthorizationDraftPreview: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["RoleAuthorizationDraftPreview"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseRoleAuthorizationDraftSnapshot: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["RoleAuthorizationDraftSnapshot"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseRoleBoundaryMigrationPreview: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["RoleBoundaryMigrationPreview"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseRoleMemberTreeResponse: {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["RoleMemberTreeResponse"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseRoleNavigationSelection: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["RoleNavigationSelection"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -28164,6 +29055,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["ScheduledTask"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseScheduleResult: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["ScheduleResult"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -28520,6 +29419,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseValidationReport: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["ValidationReport"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseValidationResult: {
             code?: string;
             context?: unknown;
@@ -28710,6 +29617,18 @@ export interface components {
             /** Format: int32 */
             version?: number;
         };
+        Artifact: {
+            available?: boolean;
+            checksumSha256?: string;
+            downloadUrl?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            filename?: string;
+            format?: string;
+            kind?: string;
+            /** Format: int64 */
+            size?: number;
+        };
         Asset: {
             url?: string;
         };
@@ -28728,6 +29647,16 @@ export interface components {
             expiryDate?: string;
             memberPid?: string;
             rolePids?: string[];
+        };
+        AsyncImportStatus: {
+            modelCode?: string;
+            /** Format: int32 */
+            processedRows?: number;
+            result?: components["schemas"]["ExcelImportResult"];
+            status?: string;
+            taskId?: string;
+            /** Format: int32 */
+            totalRows?: number;
         };
         AsyncTaskDTO: {
             /** Format: local-date-time */
@@ -29320,6 +30249,39 @@ export interface components {
             /** Format: local-date-time */
             updatedAt?: string;
         };
+        BiTemporalRecord: {
+            /** Format: local-date-time */
+            createdAt?: string;
+            /** Format: int64 */
+            createdBy?: number;
+            deletedFlag?: boolean;
+            entityId?: string;
+            entityType?: string;
+            /** Format: int64 */
+            id?: number;
+            payload?: components["schemas"]["JsonNode"];
+            /** Format: int64 */
+            tenantId?: number;
+            /** Format: local-date-time */
+            txFrom?: string;
+            /** Format: local-date-time */
+            txTo?: string;
+            /** Format: local-date-time */
+            updatedAt?: string;
+            /** Format: local-date-time */
+            validFrom?: string;
+            /** Format: local-date-time */
+            validTo?: string;
+            /** Format: int32 */
+            versionNo?: number;
+        };
+        BiTemporalRequest: {
+            payload?: components["schemas"]["JsonNode"];
+            /** Format: local-date-time */
+            validFrom?: string;
+            /** Format: local-date-time */
+            validTo?: string;
+        };
         BootstrapProgressResponse: {
             /** Format: int32 */
             completedSteps?: number;
@@ -29381,9 +30343,34 @@ export interface components {
             /** Format: int64 */
             expireTime?: number;
         };
+        CalendarEntry: {
+            /** Format: date */
+            date?: string;
+            /** Format: time-local */
+            endTime?: string;
+            holiday?: boolean;
+            /** Format: time-local */
+            startTime?: string;
+        };
+        CallAuditDetail: {
+            auditPid?: string;
+            captureState?: string;
+            /** Format: int64 */
+            durationMs?: number;
+            httpDetails?: components["schemas"]["JsonNode"];
+            method?: string;
+            /** Format: date-time */
+            occurredAt?: string;
+            path?: string;
+            remoteAddress?: string;
+            requestId?: string;
+            /** Format: int32 */
+            status?: number;
+        };
         CallAuditView: {
             actorKind?: string;
             applicationPid?: string;
+            auditPid?: string;
             capability?: string;
             /** Format: int64 */
             durationMs?: number;
@@ -29604,6 +30591,9 @@ export interface components {
             label?: string;
             value?: string;
         };
+        Catalog: {
+            records?: components["schemas"]["Template"][];
+        };
         Category: {
             categoryType?: string;
             code?: string;
@@ -29814,6 +30804,10 @@ export interface components {
             order?: number | null;
             scope?: string | null;
             teamId?: string | null;
+        };
+        Choice: {
+            status: string;
+            templateId: string;
         };
         ClientConfig: {
             components?: components["schemas"]["ComponentConfig"][];
@@ -30255,9 +31249,14 @@ export interface components {
             toCurrency?: string;
             triangulated?: boolean;
         };
+        /** @description Provide exactly one target role identity; public PID is preferred. */
         CopyPermissionsRequest: {
-            /** Format: int64 */
-            targetRoleId: number;
+            /**
+             * Format: int64
+             * @deprecated
+             */
+            targetRoleId?: number | null;
+            targetRolePid?: string | null;
         };
         CopySavedViewToPersonalRequest: {
             name?: string | null;
@@ -30602,6 +31601,7 @@ export interface components {
             fieldCode?: string;
             /** Format: int64 */
             id?: number;
+            managedRolePid?: string;
             maskExpression?: string;
             maskType?: string;
             modelCode?: string;
@@ -31232,6 +32232,14 @@ export interface components {
             blockers?: components["schemas"]["DeleteBlocker"][];
             canDelete?: boolean;
         };
+        DemandEntry: {
+            /** Format: int64 */
+            materialId?: number;
+            materialName?: string;
+            /** Format: date */
+            needDate?: string;
+            quantity?: number;
+        };
         DepartmentTreeNode: {
             children: components["schemas"]["DepartmentTreeNode"][];
             /** Format: int32 */
@@ -31599,6 +32607,7 @@ export interface components {
         };
         /** @description Directory path and import options */
         DirectoryImportRequest: {
+            agentTemplateCodes?: string[];
             autoDeployProcesses?: boolean;
             autoPublishCommands?: boolean;
             autoPublishFields?: boolean;
@@ -31610,6 +32619,7 @@ export interface components {
             deferReferenceValidation?: boolean;
             identifierMappingPath?: string;
             path?: string;
+            targetTenantIds?: number[];
             validateReferences?: boolean;
         };
         DomainExportTaskDTO: {
@@ -32472,6 +33482,25 @@ export interface components {
             subjectId: string;
             subjectType: string;
         };
+        ExcelImportResult: {
+            asyncTask?: boolean;
+            /** Format: int32 */
+            createdCount?: number;
+            /** Format: int32 */
+            errorCount?: number;
+            errorReportExpired?: boolean;
+            errorReportFailed?: boolean;
+            errorReportUrl?: string;
+            errors?: components["schemas"]["ImportValidationError"][];
+            hasErrors?: boolean;
+            /** Format: int32 */
+            successCount?: number;
+            taskId?: string;
+            /** Format: int32 */
+            totalRows?: number;
+            /** Format: int32 */
+            updatedCount?: number;
+        };
         ExchangeRateRequest: {
             baseCurrency: string;
             /** Format: date */
@@ -32497,6 +33526,31 @@ export interface components {
             confirmed?: boolean;
             pendingTurnId?: string;
             toolId?: string;
+        };
+        ExecutionJobDTO: {
+            artifact?: components["schemas"]["Artifact"];
+            artifacts?: components["schemas"]["Artifact"][];
+            /** Format: date-time */
+            completedAt?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            definitionCode?: string;
+            downloadUrl?: string;
+            /** Format: int64 */
+            failedUnits?: number;
+            format?: string;
+            pid?: string;
+            /** Format: int64 */
+            processedUnits?: number;
+            /** Format: int32 */
+            progress?: number;
+            status?: string;
+            /** Format: int64 */
+            succeededUnits?: number;
+            summary?: string;
+            /** Format: int64 */
+            totalUnits?: number;
+            type?: string;
         };
         ExportTaskDTO: {
             /** Format: local-date-time */
@@ -33124,6 +34178,43 @@ export interface components {
             example?: string;
             name?: string;
         };
+        GanttData: {
+            conflicts?: components["schemas"]["ScheduleConflict"][];
+            milestones?: components["schemas"]["GanttMilestone"][];
+            resourceUtilization?: {
+                [key: string]: number;
+            };
+            rows?: components["schemas"]["GanttRow"][];
+            strategy?: string;
+            tasks?: components["schemas"]["GanttTask"][];
+        };
+        GanttMilestone: {
+            label?: string;
+            /** Format: local-date-time */
+            time?: string;
+        };
+        GanttRow: {
+            /** Format: int64 */
+            resourceId?: number;
+            resourceName?: string;
+        };
+        GanttTask: {
+            color?: string;
+            /** Format: local-date-time */
+            endTime?: string;
+            id?: string;
+            jobCode?: string;
+            operationName?: string;
+            /** Format: int32 */
+            processingTimeMin?: number;
+            productName?: string;
+            /** Format: int64 */
+            resourceId?: number;
+            /** Format: int32 */
+            setupTimeMin?: number;
+            /** Format: local-date-time */
+            startTime?: string;
+        };
         GenAiUsageSummary: {
             /** Format: int64 */
             callCount?: number;
@@ -33595,6 +34686,7 @@ export interface components {
             warnings?: string[];
         };
         ImportRequest: {
+            agentTemplateCodes?: string[];
             autoDeployProcesses?: boolean;
             autoPublishCommands?: boolean;
             autoPublishFields?: boolean;
@@ -33620,6 +34712,12 @@ export interface components {
             totalFiles?: number;
             /** Format: int32 */
             updated?: number;
+        };
+        ImportValidationError: {
+            fieldCode?: string;
+            message?: string;
+            /** Format: int32 */
+            rowNumber?: number;
         };
         InboxItemResponse: {
             /** Format: date-time */
@@ -34928,6 +36026,27 @@ export interface components {
             expectedRevision?: number;
             manifestChecksum: string;
         };
+        MrpExceptionMessage: {
+            description?: string;
+            /** Format: int64 */
+            materialId?: number;
+            materialName?: string;
+            severity?: string;
+            suggestedAction?: string;
+            type?: string;
+        };
+        MrpResult: {
+            exceptions?: components["schemas"]["MrpExceptionMessage"][];
+            plannedOrders?: components["schemas"]["PlannedOrderDto"][];
+        };
+        MrpRunRequest: {
+            demands?: components["schemas"]["DemandEntry"][];
+            /** Format: int32 */
+            horizonDays?: number;
+            materialIds?: number[];
+            orderIds?: number[];
+            scope?: string;
+        };
         NamedQueryBatchResult: {
             allFailure?: boolean;
             allSuccess?: boolean;
@@ -35441,6 +36560,95 @@ export interface components {
             /** Format: int32 */
             versionNo?: number;
         };
+        NavigationAudit: {
+            action: string;
+            actor: string;
+            createdAt: string;
+            menuPid: string;
+            name: string;
+            pid: string;
+        };
+        NavigationDefinition: {
+            authenticated: boolean;
+            enabled: boolean;
+            icon?: string | null;
+            kind: string;
+            name: string;
+            opening: string;
+            /** Format: int32 */
+            orderNo: number;
+            parentPid?: string | null;
+            permissionCode?: string | null;
+            target: string;
+            visible: boolean;
+        };
+        NavigationEntry: {
+            available: boolean;
+            customized: boolean;
+            definition: components["schemas"]["NavigationDefinition"];
+            pid: string;
+            source: string;
+        };
+        NavigationEntryRoles: {
+            menuPid: string;
+            revision: string;
+            roles: components["schemas"]["NavigationRoleOption"][];
+        };
+        NavigationEntryRolesWrite: {
+            expectedRevision: string;
+            rolePids: string[];
+        };
+        NavigationOption: {
+            label: string;
+            value: string;
+        };
+        NavigationPreviewMember: {
+            name: string;
+            pid: string;
+        };
+        NavigationPreviewOptions: {
+            members: components["schemas"]["NavigationPreviewMember"][];
+            roles: components["schemas"]["NavigationRoleOption"][];
+        };
+        NavigationPreviewRequest: {
+            draft?: components["schemas"]["RoleAuthorizationDraftRequest"];
+            draftRolePid?: string;
+            memberPid?: string;
+            rolePids?: string[];
+        };
+        NavigationRevision: {
+            expectedRevision: string;
+        };
+        NavigationRoleOption: {
+            enabled: boolean;
+            mode: string;
+            name: string;
+            pid: string;
+            selected: boolean;
+        };
+        NavigationSnapshot: {
+            audit: components["schemas"]["NavigationAudit"][];
+            entries: components["schemas"]["NavigationEntry"][];
+            pages: components["schemas"]["NavigationOption"][];
+            permissions: components["schemas"]["NavigationOption"][];
+            revision: string;
+        };
+        NavigationTarget: {
+            kind: string;
+            name: string;
+            opening: string;
+            pid: string;
+            target: string;
+        };
+        NavigationUserPreview: {
+            menus: components["schemas"]["RoleNavigationChoice"][];
+            rolePids: string[];
+            source: string;
+        };
+        NavigationWrite: {
+            definition: components["schemas"]["NavigationDefinition"];
+            expectedRevision: string;
+        };
         NbaSuggestion: {
             category?: string;
             description?: string;
@@ -35485,6 +36693,7 @@ export interface components {
             /** Format: int64 */
             id?: number;
             isRead?: boolean;
+            miniProgramPath?: string;
             priority?: string;
             /** Format: date-time */
             readAt?: string;
@@ -35507,6 +36716,7 @@ export interface components {
         NotificationQueryRequest: {
             category?: string;
             isRead?: boolean;
+            miniProgramPage?: string;
             /** Format: int32 */
             pageNum?: number;
             /** Format: int32 */
@@ -35605,6 +36815,14 @@ export interface components {
         });
         ObserveChangeSetRequest: {
             interactionContext?: components["schemas"]["JsonNode"];
+        };
+        OeeResult: {
+            availability?: number;
+            losses?: components["schemas"]["SixBigLosses"];
+            oee?: number;
+            performance?: number;
+            quality?: number;
+            teep?: number;
         };
         OnlineEvalSummary: {
             attribution?: components["schemas"]["AttributionSummary"];
@@ -37411,6 +38629,34 @@ export interface components {
             totalRecords?: number;
             valueField?: string;
         };
+        Plan: {
+            bindingSha256?: string;
+            commandSha256?: string;
+            envelopeSha256?: string;
+            /** Format: int32 */
+            expectedReplayCount?: number;
+            previousCommandSha256?: string;
+            previousProviderSha256?: string;
+            providerSha256?: string;
+            requestPid?: string;
+        };
+        PlannedOrderDto: {
+            /** Format: int32 */
+            leadTimeDays?: number;
+            lotSizingPolicy?: string;
+            /** Format: int64 */
+            materialId?: number;
+            materialName?: string;
+            /** Format: int64 */
+            mrpRunId?: number;
+            /** Format: date */
+            needDate?: string;
+            /** Format: date */
+            orderDate?: string;
+            orderQty?: number;
+            orderType?: string;
+            sourceDemandJson?: string;
+        };
         PlatformAiScoreRequest: {
             /** Format: int32 */
             batchSize?: number;
@@ -37521,6 +38767,46 @@ export interface components {
             pluginName?: string;
             summary?: string;
         };
+        PluginHandoverContractSummary: {
+            capabilities?: string[];
+            contractId?: string;
+            digest?: string;
+            /** Format: int32 */
+            revision?: number;
+            sourcePluginId?: string;
+            targetPluginIds?: string[];
+        };
+        PluginHandoverPreview: {
+            batchPid?: string;
+            contractDigest?: string;
+            contractId?: string;
+            createdAt?: string;
+            executionAvailable?: boolean;
+            expired?: boolean;
+            expiresAt?: string;
+            items?: components["schemas"]["PluginHandoverPreviewItem"][];
+            limits?: string[];
+            /** Format: int32 */
+            plannedMoves?: number;
+            previewDigest?: string;
+            sourcePluginPid?: string;
+            status?: string;
+        };
+        PluginHandoverPreviewItem: {
+            action?: string;
+            code?: string;
+            ownershipType?: string;
+            resourcePid?: string;
+            targetPluginPid?: string;
+            type?: string;
+            userModified?: boolean;
+        };
+        PluginHandoverPreviewRequest: {
+            contractDigest: string;
+            contractId: string;
+            idempotencyKey: string;
+            sourcePluginPid: string;
+        };
         PluginImportRequest: {
             menus?: {
                 [key: string]: unknown;
@@ -37573,6 +38859,7 @@ export interface components {
         };
         PluginManifestExtended: {
             agentDefinitions?: components["schemas"]["AgentDefinitionDTO"][];
+            agentTemplates?: components["schemas"]["AgentDefinitionDTO"][];
             applicationModules?: string[];
             author?: string;
             automations?: components["schemas"]["AutomationDefinitionDTO"][];
@@ -38243,6 +39530,10 @@ export interface components {
             recordState?: string;
             tabs?: components["schemas"]["TabCapability"][];
         };
+        Recorded: {
+            delivered?: boolean;
+            recorded?: boolean;
+        };
         RecordShareAccessResponse: {
             canRead?: boolean;
             canUpdate?: boolean;
@@ -38699,6 +39990,18 @@ export interface components {
             /** @enum {string} */
             type?: "MODEL" | "FIELD" | "MODEL_FIELD_BINDING" | "COMMAND" | "BINDING_RULE" | "PERMISSION" | "ROLE" | "ROLE_PERMISSION" | "MENU" | "PAGE" | "DASHBOARD" | "DICT" | "NAMED_QUERY" | "AGENT_DEFINITION" | "DICT_ITEM" | "SAVED_VIEW" | "NOTIFICATION_TEMPLATE" | "I18N" | "PUBLIC_RESOURCE" | "PUBLIC_QUERY";
         };
+        Result: {
+            eventId?: string;
+            reason?: string;
+            recoveryPid?: string;
+            /** Format: int32 */
+            replayCount?: number;
+            /** Format: date-time */
+            requestedAt?: string;
+            requestedBy?: string;
+            requestPid?: string;
+            status?: string;
+        };
         ResultContract: {
             actionability?: string;
             canContinueFrom?: boolean;
@@ -38889,6 +40192,140 @@ export interface components {
             /** Format: int64 */
             updatedBy?: number;
         };
+        RoleAuthorizationChange: {
+            after?: string;
+            before?: string;
+            kind: string;
+            target: string;
+        };
+        RoleAuthorizationDraftPreview: {
+            applyDefaultToCurrentGrants: boolean;
+            capabilities: components["schemas"]["CapabilitySelectionPreview"];
+            defaultScopeChanged: boolean;
+            defaultScopeType: string | null;
+            fieldAccessChanges?: components["schemas"]["RoleFieldAccessReviewed"][];
+            fieldPolicies?: components["schemas"]["RoleFieldPolicyPreview"];
+            grantFieldCandidates?: components["schemas"]["RoleGrantFieldsBinding"][];
+            grantFieldChanges?: components["schemas"]["RoleGrantFieldsReviewed"][];
+            navigation?: components["schemas"]["RoleNavigationSelection"];
+            revision: string;
+            scopeChanges: components["schemas"]["DataScopeUpdateRequest"][];
+        };
+        RoleAuthorizationDraftRequest: {
+            applyDefaultToCurrentGrants?: boolean;
+            defaultScopeChanged?: boolean;
+            defaultScopeType?: string | null;
+            expectedRevision: string;
+            fieldChanges?: components["schemas"]["RoleFieldAccessChange"][];
+            fieldPolicyPids?: string[];
+            grantFieldChanges?: components["schemas"]["RoleGrantFieldsChange"][];
+            menuPids?: string[];
+            revokedPartialCapabilityCodes?: string[];
+            scopeChanges?: components["schemas"]["DataScopeUpdateRequest"][];
+            selectedCapabilityCodes: string[];
+        };
+        RoleAuthorizationDraftSnapshot: {
+            defaultScopeType: string | null;
+            fieldAccess?: components["schemas"]["RoleFieldAccessModel"][];
+            fieldPolicies?: components["schemas"]["RoleFieldPolicyView"][];
+            grantFields?: components["schemas"]["RoleGrantFieldsBinding"][];
+            groups: components["schemas"]["CapabilityGroup"][];
+            matrix: components["schemas"]["PermissionMatrixDTO"];
+            navigation?: components["schemas"]["RoleNavigationSelection"];
+            revision: string;
+            rolePid: string;
+            scopes: components["schemas"]["DataScopeUpdateRequest"][];
+        };
+        RoleBoundaryMigrationBinding: {
+            bindingPid: string;
+            conditionAst?: components["schemas"]["JsonNode"] | null;
+            conditions?: components["schemas"]["JsonNode"] | null;
+            dataScopeAst?: components["schemas"]["JsonNode"] | null;
+            /** Format: date */
+            effectiveDate?: string | null;
+            /** Format: date */
+            expiryDate?: string | null;
+            fieldScope?: components["schemas"]["JsonNode"] | null;
+            grantType?: string | null;
+            permissionCode?: string | null;
+            permissionPid?: string | null;
+            /** Format: int32 */
+            priority?: number | null;
+            /**
+             * Format: int64
+             * @description Owning publish snapshot pointer; never migration authorization
+             */
+            snapshotId?: number | null;
+            /**
+             * @description Configuration owner classification, not effective access or migration eligibility
+             * @enum {string}
+             */
+            sourceOwnership: "DIRECT" | "DETACHED_COPY" | "PUBLISHED_SNAPSHOT" | "EXTERNAL_SOURCE";
+            sourceRef?: string | null;
+            status?: string | null;
+        };
+        RoleBoundaryMigrationBoundary: {
+            commandCode: string;
+            operations: components["schemas"]["RoleBoundaryMigrationOperation"][];
+            rootModel: string;
+            targetAction: string;
+        };
+        /** @description Current declared consumer, not effective access or whole-role equivalence */
+        RoleBoundaryMigrationConsumer: {
+            commandCode: string;
+            commandType: string;
+            modelCode?: string | null;
+            permissionCodes: string[];
+            publicationStatus?: string | null;
+            /** @enum {string} */
+            reviewStatus: "REGISTERED_BOUNDARY_REVIEW_REQUIRED" | "LEGACY_OR_UNREGISTERED_REVIEW_REQUIRED" | "ENTRY_DEFINITION_REQUIRES_REVIEW";
+        };
+        RoleBoundaryMigrationOperation: {
+            actionCode?: string | null;
+            bindingPids: string[];
+            currentScopeType?: string | null;
+            permissionCode: string;
+            permissionPid?: string | null;
+            resourceCode?: string | null;
+            scopeOrigin: string;
+            scopeStatus: string;
+        };
+        RoleBoundaryMigrationPolicy: {
+            conditionAst?: components["schemas"]["JsonNode"] | null;
+            enabled?: boolean | null;
+            fieldCode?: string | null;
+            maskExpression?: string | null;
+            maskType?: string | null;
+            modelCode?: string | null;
+            policyPid: string;
+            policyType?: string | null;
+            /** Format: int32 */
+            priority?: number | null;
+            scopeExpression?: string | null;
+            scopeType?: string | null;
+        };
+        RoleBoundaryMigrationPreview: {
+            bindings: components["schemas"]["RoleBoundaryMigrationBinding"][];
+            boundaries: components["schemas"]["RoleBoundaryMigrationBoundary"][];
+            boundPolicies: components["schemas"]["RoleBoundaryMigrationPolicy"][];
+            commandConsumers: components["schemas"]["RoleBoundaryMigrationConsumer"][];
+            defaultScopeType?: string | null;
+            equivalentMigrationProven: boolean;
+            fieldPolicies: components["schemas"]["RoleFieldPolicyView"][];
+            revision: string;
+            rolePid: string;
+            scopes: components["schemas"]["RoleBoundaryMigrationScope"][];
+            unmappedPermissionCodes: string[];
+            unresolvedBindingPids: string[];
+        };
+        RoleBoundaryMigrationScope: {
+            actionCode: string;
+            mergeStrategy?: string | null;
+            resourceCode: string;
+            scopeConfig?: components["schemas"]["JsonNode"] | null;
+            scopePid?: string | null;
+            scopeType?: string | null;
+        };
         RoleDataScopeDefinitionDTO: {
             mergeStrategy?: string;
             permissionCode?: string;
@@ -38928,6 +40365,75 @@ export interface components {
             name?: string;
             type?: string;
         };
+        RoleFieldAccessChange: {
+            access: string;
+            fieldCode: string;
+            modelCode: string;
+        };
+        RoleFieldAccessField: {
+            access: string;
+            additionalRestrictions: string[];
+            code: string;
+            label?: string | null;
+        };
+        RoleFieldAccessModel: {
+            code: string;
+            fields: components["schemas"]["RoleFieldAccessField"][];
+            label?: string | null;
+        };
+        RoleFieldAccessReviewed: {
+            access: string;
+            beforeAccess: string;
+            fieldCode: string;
+            fieldLabel: string;
+            modelCode: string;
+            modelLabel: string;
+        };
+        RoleFieldPolicyPreview: {
+            added?: components["schemas"]["RoleFieldPolicyView"][];
+            removed?: components["schemas"]["RoleFieldPolicyView"][];
+        };
+        RoleFieldPolicyView: {
+            enabled?: boolean;
+            fieldCode?: string;
+            maskType?: string;
+            modelCode?: string;
+            name?: string;
+            policyPid?: string;
+            policyType?: string;
+        };
+        RoleGrantFieldsBinding: {
+            bindingPid?: string | null;
+            configured?: boolean;
+            editable?: boolean;
+            fields?: components["schemas"]["RoleGrantFieldsField"][];
+            legacy?: boolean;
+            metadataRevision?: string;
+            modelCode?: string;
+            modelLabel?: string | null;
+            permissionCode?: string;
+            readFields?: string[];
+            writeFields?: string[];
+        };
+        /** @description Set exactly one of bindingPid (existing binding) or permissionCode (newly selected permission). New permissions require the candidate metadata revision. */
+        RoleGrantFieldsChange: {
+            bindingPid?: string | null;
+            expectedMetadataRevision?: string | null;
+            /** @description Business object; omitted requests retain the permission's canonical resource model. */
+            modelCode?: string | null;
+            permissionCode?: string | null;
+            readFields: string[];
+            writeFields: string[];
+        };
+        RoleGrantFieldsField: {
+            code?: string;
+            label?: string | null;
+        };
+        RoleGrantFieldsReviewed: {
+            before?: components["schemas"]["RoleGrantFieldsBinding"];
+            readFields?: string[];
+            writeFields?: string[];
+        };
         RoleMemberDTO: {
             /** Format: date-time */
             assignedAt: string | null;
@@ -38950,6 +40456,36 @@ export interface components {
             departments?: components["schemas"]["DeptUserTreeNode"][];
             ungrouped?: components["schemas"]["DeptUserNodeUser"][];
         };
+        RoleNavigationAudit: {
+            actor: string;
+            addedMenus: string[];
+            changes: components["schemas"]["RoleAuthorizationChange"][];
+            createdAt: string;
+            pid: string;
+            previousMode: string;
+            removedMenus: string[];
+        };
+        RoleNavigationChoice: {
+            businessAllowed: boolean;
+            directory: boolean;
+            enabled: boolean;
+            name: string;
+            parentPid?: string | null;
+            permissionCode?: string | null;
+            pid: string;
+            source: string;
+        };
+        RoleNavigationSelection: {
+            menus: components["schemas"]["RoleNavigationChoice"][];
+            mode: string;
+            revision: string;
+            rolePid: string;
+            selectedMenuPids: string[];
+        };
+        RoleNavigationWrite: {
+            expectedRevision: string;
+            selectedMenuPids: string[];
+        };
         RolePermissionPolicyDefinitionDTO: {
             conditions?: {
                 [key: string]: unknown;
@@ -38970,6 +40506,13 @@ export interface components {
             description: string | null;
             isDefault: boolean | null;
             isSystem: boolean | null;
+            /** @description Presentation group only, not management qualification */
+            managementRole?: boolean | null;
+            /**
+             * Format: int64
+             * @description Assigned tenant members, not effective access
+             */
+            memberCount?: number | null;
             name: string;
             pid: string;
             /** Format: int32 */
@@ -39068,6 +40611,19 @@ export interface components {
         RowConstraint: {
             field?: string;
             values?: string[];
+        };
+        RowError: {
+            fieldCode?: string;
+            message?: string;
+            /** Format: int32 */
+            rowNumber?: number;
+            value?: string;
+        };
+        RowWarning: {
+            fieldCode?: string;
+            message?: string;
+            /** Format: int32 */
+            rowNumber?: number;
         };
         Rule: {
             departmentPids?: string[];
@@ -39238,6 +40794,33 @@ export interface components {
             /** Format: int64 */
             expectedVersion: number;
         };
+        ScheduleConflict: {
+            /** Format: local-date-time */
+            achievableBy?: string;
+            /** Format: int64 */
+            jobId?: number;
+            reason?: string;
+            /** Format: local-date-time */
+            requestedBy?: string;
+        };
+        ScheduledOperation: {
+            /** Format: local-date-time */
+            endTime?: string;
+            jobCode?: string;
+            /** Format: int64 */
+            jobId?: number;
+            operationName?: string;
+            /** Format: int32 */
+            processingTimeMin?: number;
+            productName?: string;
+            /** Format: int64 */
+            resourceId?: number;
+            resourceName?: string;
+            /** Format: int32 */
+            setupTimeMin?: number;
+            /** Format: local-date-time */
+            startTime?: string;
+        };
         ScheduledTask: {
             blockStrategy?: string;
             /** Format: date-time */
@@ -39314,6 +40897,48 @@ export interface components {
             /** Format: int64 */
             tenantId?: number;
             triggerType?: string;
+        };
+        ScheduleJob: {
+            /** Format: local-date-time */
+            arrivalTime?: string;
+            code?: string;
+            /** Format: local-date-time */
+            dueDate?: string;
+            /** Format: int64 */
+            id?: number;
+            operationName?: string;
+            /** Format: int32 */
+            priority?: number;
+            /** Format: int32 */
+            processingTimeMin?: number;
+            /** Format: int64 */
+            productId?: number;
+            productName?: string;
+            /** Format: int64 */
+            requiredResourceId?: number;
+            requiredResourceType?: string;
+        };
+        ScheduleRequest: {
+            jobs?: components["schemas"]["ScheduleJob"][];
+            resourceCalendars?: {
+                [key: string]: components["schemas"]["CalendarEntry"][];
+            };
+            resources?: components["schemas"]["ResourceInfo"][];
+            /** Format: local-date-time */
+            scheduleStart?: string;
+            setupTimes?: {
+                [key: string]: number;
+            };
+        };
+        ScheduleResult: {
+            conflicts?: components["schemas"]["ScheduleConflict"][];
+            /** Format: local-date-time */
+            earliestCompletion?: string;
+            operations?: components["schemas"]["ScheduledOperation"][];
+            resourceUtilization?: {
+                [key: string]: number;
+            };
+            strategy?: string;
         };
         SchemaOperationResult: {
             affectedFields?: string[];
@@ -39556,6 +41181,14 @@ export interface components {
             code?: string;
             name?: string;
             pid?: string;
+        };
+        SixBigLosses: {
+            breakdownHours?: number;
+            minorStopHours?: number;
+            processDefectUnits?: number;
+            setupHours?: number;
+            speedLossUnits?: number;
+            startupDefectUnits?: number;
         };
         SkillMeta: {
             category?: string;
@@ -40197,6 +41830,11 @@ export interface components {
             name?: string;
             status?: string;
         };
+        Template: {
+            kind?: string;
+            templateId?: string;
+            type?: string;
+        };
         TemplateDef: {
             category?: string;
             description?: string;
@@ -40589,6 +42227,8 @@ export interface components {
             targetId?: string;
             targetLabel?: string;
             targetType?: string;
+            /** Format: date-time */
+            updatedAt?: string;
         };
         UserIdentity: {
             avatar?: string | null;
@@ -40755,6 +42395,18 @@ export interface components {
             messageKey?: string;
             propertyPath?: string;
             severity?: string;
+        };
+        ValidationReport: {
+            errorReportFailed?: boolean;
+            errorReportUrl?: string;
+            errors?: components["schemas"]["RowError"][];
+            taskId?: string;
+            /** Format: int32 */
+            totalRows?: number;
+            valid?: boolean;
+            /** Format: int32 */
+            validRows?: number;
+            warnings?: components["schemas"]["RowWarning"][];
         };
         ValidationResult: {
             error?: string;
@@ -41116,6 +42768,10 @@ export interface components {
             code?: string;
             displayName?: string;
             inviteCode?: string;
+        };
+        WechatSubscriptionObservationRequest: {
+            idempotencyKey: string;
+            results: components["schemas"]["Choice"][];
         };
         WindowMetrics: {
             baseline?: components["schemas"]["ArmMetrics"];
@@ -41819,6 +43475,26 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": components["schemas"]["SseEmitter"];
+                };
+            };
+        };
+    };
+    reconcile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseMapStringBoolean"];
                 };
             };
         };
@@ -43521,6 +45197,58 @@ export interface operations {
             };
         };
     };
+    plan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event: string;
+                installation: string;
+                source: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePlan"];
+                };
+            };
+        };
+    };
+    authorizeReceiptRecovery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event: string;
+                installation: string;
+                source: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Decision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseResult"];
+                };
+            };
+        };
+    };
     register_1: {
         parameters: {
             query?: never;
@@ -44599,6 +46327,32 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseMapStringObject"];
+                };
+            };
+        };
+    };
+    activateAgent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agentPid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePublishedRelease"];
                 };
             };
         };
@@ -48244,6 +49998,102 @@ export interface operations {
             };
         };
     };
+    gantt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseGanttData"];
+                };
+            };
+        };
+    };
+    schedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseScheduleResult"];
+                };
+            };
+        };
+    };
+    scheduleWithStrategy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseScheduleResult"];
+                };
+            };
+        };
+    };
+    strategies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseListString"];
+                };
+            };
+        };
+    };
     listTasks: {
         parameters: {
             query?: {
@@ -49602,7 +51452,7 @@ export interface operations {
             };
         };
     };
-    observe: {
+    observe_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -51258,6 +53108,157 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseUsageEvent"];
+                };
+            };
+        };
+    };
+    put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entityId: string;
+                entityType: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BiTemporalRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseBiTemporalRecord"];
+                };
+            };
+        };
+    };
+    getAsOf: {
+        parameters: {
+            query: {
+                txTime?: string;
+                validTime: string;
+            };
+            header?: never;
+            path: {
+                entityId: string;
+                entityType: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseBiTemporalRecord"];
+                };
+            };
+        };
+    };
+    correct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entityId: string;
+                entityType: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BiTemporalRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseBiTemporalRecord"];
+                };
+            };
+        };
+    };
+    getCurrent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entityId: string;
+                entityType: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseBiTemporalRecord"];
+                };
+            };
+        };
+    };
+    getHistory_4: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entityId: string;
+                entityType: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseListBiTemporalRecord"];
+                };
+            };
+        };
+    };
+    terminate: {
+        parameters: {
+            query: {
+                validTime: string;
+            };
+            header?: never;
+            path: {
+                entityId: string;
+                entityType: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseVoid"];
                 };
             };
         };
@@ -52923,80 +54924,6 @@ export interface operations {
                     "*/*": {
                         [key: string]: unknown;
                     };
-                };
-            };
-        };
-    };
-    createSuite: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-        };
-    };
-    runValidation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                suitePid: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-        };
-    };
-    listRuns_1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                suitePid: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["AbDataQualityValidationRun"][];
                 };
             };
         };
@@ -56959,6 +58886,28 @@ export interface operations {
             };
         };
     };
+    recent: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseListExecutionJobDTO"];
+                };
+            };
+        };
+    };
     status_1: {
         parameters: {
             query?: never;
@@ -59850,6 +61799,77 @@ export interface operations {
             query?: {
                 horizon?: number;
                 strategy?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseMapStringObject"];
+                };
+            };
+        };
+    };
+    equipmentOee: {
+        parameters: {
+            query: {
+                end: string;
+                start: string;
+            };
+            header?: never;
+            path: {
+                equipmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseOeeResult"];
+                };
+            };
+        };
+    };
+    fleetOee: {
+        parameters: {
+            query: {
+                end: string;
+                start: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseMapStringObject"];
+                };
+            };
+        };
+    };
+    fleetSummary: {
+        parameters: {
+            query: {
+                end: string;
+                start: string;
             };
             header?: never;
             path?: never;
@@ -64848,6 +66868,242 @@ export interface operations {
             };
         };
     };
+    importDocument: {
+        parameters: {
+            query?: {
+                dryRun?: boolean;
+                skipErrors?: boolean;
+            };
+            header?: never;
+            path: {
+                modelCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** Format: binary */
+                    file: Blob;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseExcelImportResult"];
+                };
+            };
+        };
+    };
+    downloadDocumentTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modelCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": Blob;
+                };
+            };
+        };
+    };
+    importExcel: {
+        parameters: {
+            query?: {
+                dryRun?: boolean;
+                matchKey?: string;
+                mode?: string;
+                skipErrors?: boolean;
+            };
+            header?: never;
+            path: {
+                modelCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** Format: binary */
+                    file: Blob;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseExcelImportResult"];
+                };
+            };
+        };
+    };
+    streamProgress_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modelCode: string;
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": components["schemas"]["SseEmitter"];
+                };
+            };
+        };
+    };
+    cancelImport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modelCode: string;
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAsyncImportStatus"];
+                };
+            };
+        };
+    };
+    downloadErrorReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modelCode: string;
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": Blob;
+                };
+            };
+        };
+    };
+    getImportStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                modelCode: string;
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseAsyncImportStatus"];
+                };
+            };
+        };
+    };
+    downloadTemplate: {
+        parameters: {
+            query?: {
+                mode?: string;
+            };
+            header?: never;
+            path: {
+                modelCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": Blob;
+                };
+            };
+        };
+    };
+    validateFile: {
+        parameters: {
+            query?: {
+                matchKey?: string;
+                mode?: string;
+            };
+            header?: never;
+            path: {
+                modelCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** Format: binary */
+                    file: Blob;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseValidationReport"];
+                };
+            };
+        };
+    };
     listFieldsBySemanticType: {
         parameters: {
             query?: never;
@@ -68334,6 +70590,336 @@ export interface operations {
             };
         };
     };
+    runMrp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MrpRunRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseMrpResult"];
+                };
+            };
+        };
+    };
+    readNavigationConfiguration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseNavigationSnapshot"];
+                };
+            };
+        };
+    };
+    createNavigationEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NavigationWrite"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseNavigationSnapshot"];
+                };
+            };
+        };
+    };
+    readCurrentNavigationTarget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseNavigationTarget"];
+                };
+            };
+        };
+    };
+    updateNavigationEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NavigationWrite"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseNavigationSnapshot"];
+                };
+            };
+        };
+    };
+    removeNavigationEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NavigationRevision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseNavigationSnapshot"];
+                };
+            };
+        };
+    };
+    restoreNavigationEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NavigationRevision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseNavigationSnapshot"];
+                };
+            };
+        };
+    };
+    readNavigationEntryRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseNavigationEntryRoles"];
+                };
+            };
+        };
+    };
+    saveNavigationEntryRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NavigationEntryRolesWrite"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseNavigationEntryRoles"];
+                };
+            };
+        };
+    };
+    previewUserNavigation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NavigationPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseNavigationUserPreview"];
+                };
+            };
+        };
+    };
+    readNavigationPreviewOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseNavigationPreviewOptions"];
+                };
+            };
+        };
+    };
+    readRoleNavigationSelection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rolePid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseRoleNavigationSelection"];
+                };
+            };
+        };
+    };
+    saveRoleNavigationSelection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rolePid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleNavigationWrite"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseRoleNavigationSelection"];
+                };
+            };
+        };
+    };
+    readRoleNavigationAudit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rolePid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseListRoleNavigationAudit"];
+                };
+            };
+        };
+    };
     list_11: {
         parameters: {
             query?: never;
@@ -68659,7 +71245,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseVoid"];
+                    "*/*": components["schemas"]["ApiResponseMapStringBoolean"];
                 };
             };
         };
@@ -68786,6 +71372,50 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseMapStringObject"];
+                };
+            };
+        };
+    };
+    observe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WechatSubscriptionObservationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseRecorded"];
+                };
+            };
+        };
+    };
+    templates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseCatalog"];
                 };
             };
         };
@@ -69486,9 +72116,14 @@ export interface operations {
     listAudits: {
         parameters: {
             query?: {
+                keyword?: string;
                 limit?: number;
+                method?: string;
+                offset?: number;
                 requestId?: string;
                 status?: number;
+                statusClass?: string;
+                windowHours?: number;
             };
             header?: never;
             path: {
@@ -69505,6 +72140,29 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseListCallAuditView"];
+                };
+            };
+        };
+    };
+    auditDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                auditPid: string;
+                installationPid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseCallAuditDetail"];
                 };
             };
         };
@@ -71987,6 +74645,102 @@ export interface operations {
             };
         };
     };
+    readRoleAuthorizationDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rolePid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseRoleAuthorizationDraftSnapshot"];
+                };
+            };
+        };
+    };
+    applyRoleAuthorizationDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rolePid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleAuthorizationDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseRoleAuthorizationDraftSnapshot"];
+                };
+            };
+        };
+    };
+    inspectRoleBoundaryMigration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rolePid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseRoleBoundaryMigrationPreview"];
+                };
+            };
+        };
+    };
+    previewRoleAuthorizationDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rolePid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleAuthorizationDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseRoleAuthorizationDraftPreview"];
+                };
+            };
+        };
+    };
     create_7: {
         parameters: {
             query?: never;
@@ -72842,6 +75596,94 @@ export interface operations {
             };
         };
     };
+    listPluginHandoverPreviewContracts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseListPluginHandoverContractSummary"];
+                };
+            };
+        };
+    };
+    createPluginHandoverPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginHandoverPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePluginHandoverPreview"];
+                };
+            };
+        };
+    };
+    findPluginHandoverPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batchPid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePluginHandoverPreview"];
+                };
+            };
+        };
+    };
+    findPluginHandoverPreviewByKey: {
+        parameters: {
+            query: {
+                idempotencyKey: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePluginHandoverPreview"];
+                };
+            };
+        };
+    };
     listPlugins_1: {
         parameters: {
             query?: never;
@@ -73269,6 +76111,7 @@ export interface operations {
     executeDirect: {
         parameters: {
             query?: {
+                agentTemplateCodes?: string[];
                 autoDeployProcesses?: boolean;
                 autoPublishCommands?: boolean;
                 autoPublishFields?: boolean;
@@ -74311,6 +77154,32 @@ export interface operations {
                 };
                 content: {
                     "application/javascript": string;
+                };
+            };
+        };
+    };
+    receive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+                installation: string;
+                tenant: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

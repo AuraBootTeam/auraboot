@@ -27,9 +27,9 @@ export function UploadedFilesPromptField({
   let parsed: ReturnType<typeof uploadedFilesConfig> | undefined;
   try {
     parsed = uploadedFilesConfig(config);
-  } catch {
+  } catch (error) {
     /* Render a blocking configuration state. */
-  }
+ console.warn('[UploadedFilesPromptField] previously-silent catch', error);  }
   const valid = Boolean(
     parsed &&
     (value === undefined ||

@@ -41,6 +41,22 @@ import static org.mockito.Mockito.when;
 
 class NamedQueryServiceImplTest {
 
+    @Test
+    void publicQueryReadsKeepRootAuthorizationAndRowsInOneRepeatableReadSnapshot() {
+        var expected = java.util.Set.of("testQuery", "executeQuery", "exportData");
+        var checked = new java.util.HashSet<String>();
+        for (var method : NamedQueryServiceImpl.class.getDeclaredMethods()) {
+            if (!expected.contains(method.getName())) continue;
+            var boundary = method.getAnnotation(org.springframework.transaction.annotation.Transactional.class);
+            assertThat(boundary).as(method.getName()).isNotNull();
+            assertThat(boundary.readOnly()).isTrue();
+            assertThat(boundary.isolation())
+                    .isEqualTo(org.springframework.transaction.annotation.Isolation.REPEATABLE_READ);
+            checked.add(method.getName());
+        }
+        assertThat(checked).isEqualTo(expected);
+    }
+
     private final NamedQueryMapper namedQueryMapper = mock(NamedQueryMapper.class);
     private final NamedQueryFieldMapper namedQueryFieldMapper = mock(NamedQueryFieldMapper.class);
     private final NamedQueryVersionMapper namedQueryVersionMapper = mock(NamedQueryVersionMapper.class);
@@ -70,9 +86,23 @@ class NamedQueryServiceImplTest {
             recordShareService,
             dynamicDataServiceProvider);
 
+
+    /** Wires a NamedQueryDefinitionStore (catalog + flags) behind the service facade. */
+    private void wireReleaseStore(com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog catalog,
+                                  boolean enabled, String appCode) {
+        NamedQueryDefinitionStore store = new NamedQueryDefinitionStore(
+                catalog, namedQueryMapper, namedQueryFieldMapper);
+        org.springframework.test.util.ReflectionTestUtils.setField(store, "applicationRuntimePrimaryEnabled", enabled);
+        org.springframework.test.util.ReflectionTestUtils.setField(store, "defaultApplicationCode", appCode);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "definitionStore", store);
+    }
+
     @org.junit.jupiter.api.BeforeEach
     void configureFieldProtection() {
         MetaContext.clear();
+        // Default definition store (release reads disabled) so every test resolves
+        // definitions through the mapper mocks; release-focused tests re-wire it.
+        wireReleaseStore(mock(com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.class), false, "");
         org.springframework.test.util.ReflectionTestUtils.setField(service, "fieldProtection", fieldProtection);
         when(fieldProtection.rewrite(any(), anyString())).thenAnswer(invocation -> invocation.getArgument(1));
         when(fieldProtection.apply(any(), org.mockito.ArgumentMatchers.anyList()))
@@ -94,9 +124,7 @@ class NamedQueryServiceImplTest {
     void boundQueryExecutionUsesReleaseWhitelistAndPreservesResourceAuthorization() {
         MetaContext.setContext(10L, 20L, "tester", "Tester");
         var catalog = mock(com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.class);
-        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimeDefinitionCatalog", catalog);
-        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimePrimaryEnabled", true);
-        org.springframework.test.util.ReflectionTestUtils.setField(service, "defaultApplicationCode", "aura-edu");
+        wireReleaseStore(catalog, true, "aura-edu");
         NamedQuery query = sqlQuery();
         query.setResourceCode("e2et_order");
         query.setActionCode("read");
@@ -128,8 +156,7 @@ class NamedQueryServiceImplTest {
     void boundReleaseBypassesResidualNamedQueryCacheAndObservesNextBinding() {
         MetaContext.setContext(10L, 20L, "tester", "Tester");
         var catalog = mock(com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.class);
-        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimeDefinitionCatalog", catalog);
-        org.springframework.test.util.ReflectionTestUtils.setField(service, "defaultApplicationCode", "aura-edu");
+        wireReleaseStore(catalog, false, "aura-edu");
         var caches = new org.springframework.cache.concurrent.ConcurrentMapCacheManager("namedQuery");
         var old = new com.auraboot.framework.meta.dto.NamedQueryDTO();
         old.setTitle("stale local query");
@@ -152,7 +179,8 @@ class NamedQueryServiceImplTest {
         factory.addAdvice(interceptor);
         var proxy = (com.auraboot.framework.meta.service.NamedQueryService) factory.getProxy();
         assertThat(proxy.findByCode("order_summary")).isSameAs(old);
-        org.springframework.test.util.ReflectionTestUtils.setField(service, "applicationRuntimePrimaryEnabled", true);
+        // enable release-primary reads (previously a service field, now inside the store)
+        wireReleaseStore(catalog, true, "aura-edu");
         assertThat(proxy.findByCode("order_summary").getTitle()).isEqualTo("first release");
         assertThat(proxy.findByCode("order_summary").getTitle()).isEqualTo("next release");
         org.mockito.Mockito.verifyNoInteractions(namedQueryMapper, namedQueryFieldMapper);

@@ -1,9 +1,10 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import InstalledTab from '../InstalledTab';
-vi.mock('~/contexts/I18nContext', () => ({ useI18n: () => ({ t: (key: string) => key, locale: 'zh-CN' }) }));
+const language = vi.hoisted(() => ({ locale: 'zh-CN' }));
+vi.mock('~/contexts/I18nContext', () => ({ useI18n: () => ({ t: (key: string) => key, locale: language.locale }) }));
 vi.mock('~/contexts/ToastContext', () => ({ useToastContext: () => ({ showErrorToast: vi.fn() }) }));
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); language.locale = 'zh-CN'; });
 describe('InstalledTab public lifecycle contract', () => {
   it('exposes stop for an active plugin and enable after stopping, without offering active uninstall', async () => {
     let status = 'active';
@@ -65,4 +66,18 @@ it('does not present count-only preserved pages as an unconditional update', asy
   fireEvent.click(screen.getByRole('button', { name: 'plugin.import.confirmUpgrade' }));
   expect(await screen.findByText('部分资源已保留，请核对说明')).toBeInTheDocument();
   expect(screen.getByText('已保留配置：2')).toBeInTheDocument();
+});
+
+it.each([
+  ['zh-CN', '兼容', '与当前平台版本兼容'],
+  ['en-US', 'Compatible', 'Compatible with this platform version'],
+])('localizes the existing compatibility badge and tooltip in %s', async (locale, label, hint) => {
+  language.locale = locale;
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ code: '0', data: [{
+    pid: 'compatible-one', pluginId: 'com.customer.delivery', displayName: 'Customer delivery',
+    namespace: 'cde', version: '1.0.0', status: 'active', installedAt: '2026-10-20T00:00:00Z',
+    minPlatformVersion: '1.0.0', compatibilityStatus: 'COMPATIBLE',
+  }] }) })));
+  render(<InstalledTab />);
+  expect(await screen.findByText(label, { exact: true })).toHaveAttribute('title', hint);
 });

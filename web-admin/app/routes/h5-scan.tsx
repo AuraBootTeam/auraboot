@@ -259,9 +259,9 @@ export default function H5ScanPage() {
       if (code) {
         handleQrCodeDetected(code.data);
       }
-    } catch {
+    } catch (error) {
       // QR parsing error - silently continue scanning
-    }
+ console.warn('[h5-scan] previously-silent catch', error);    }
   };
 
   const scanQRCode = useCallback(() => {
@@ -315,7 +315,7 @@ export default function H5ScanPage() {
         }
       } catch (urlError) {
         // 不是有效的URL
-      }
+        console.warn('[h5-scan] previously-silent catch', error);      }
 
       return null;
     }

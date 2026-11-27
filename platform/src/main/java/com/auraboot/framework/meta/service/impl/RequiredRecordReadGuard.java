@@ -112,6 +112,7 @@ public class RequiredRecordReadGuard {
         Integer previous = REFERENCE_READ_DEPTH.get();
         REFERENCE_READ_DEPTH.set(previous == null ? 1 : previous + 1);
         try {
+            if (BusinessResourceReadScope.active()) return BusinessResourceReadScope.read(reference.model(), reference.pid());
             return MetaContext.runWithoutCommandPermit(() -> data.getById(reference.model(),reference.pid()));
         } finally {
             if (previous == null) REFERENCE_READ_DEPTH.remove();
@@ -119,7 +120,7 @@ public class RequiredRecordReadGuard {
         }
     }
     private record Actor(Long tenant, Long user, Long member,
-                         com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal machine,Object machineScope) {
+                         com.auraboot.framework.application.security.ExternalMachineAuthenticator.MachinePrincipal machine,Object authorityScope) {
         Actor(Long tenant,Long user,Long member) {this(tenant,user,member,null,null);}
     }
     private static final class Traversal {
@@ -185,14 +186,15 @@ public class RequiredRecordReadGuard {
                     MachineDataAccessContext.Decision referenceDecision=null;
                     if(actor.machine()!=null) {
                         referenceDecision=MachineDataAccessContext.requireDecision(reference.model());referenceDecision.requireAction("read");
-                    } else if(!permissions.canAction(actor.member(),reference.model(),"read")) throw denied();
+                    } else if(!BusinessResourceReadScope.active()
+                            && !permissions.canAction(actor.member(),reference.model(),"read")) throw denied();
                     // Only leaf nodes have no omitted descendant work/depth. Mutable or virtual
                     // records and every nonterminal still use the ordinary read on every edge.
                     boolean terminal=immutablePhysicalTerminal(reference);
                     if(terminal && traversal.terminals.contains(reference)) continue;
                     // Remove only the outer row permit. Identity and the exact writer/version plan are restored by Core.
                     var loaded=readReference(reference);
-                    if(loaded==null) throw denied();
+                    if(loaded==null || !actor.equals(actor())) throw denied();
                     if(actor.machine()!=null && (!actor.equals(actor()) || !reference.pid().equals(loaded.get("pid"))
                             || !actor.tenant().toString().equals(String.valueOf(loaded.get("tenant_id")))
                             || !referenceDecision.permits(loaded)))throw denied();
@@ -281,7 +283,8 @@ public class RequiredRecordReadGuard {
                     || !Long.valueOf(0L).equals(MetaContext.getCurrentUserId()) || MetaContext.getCurrentMemberId()!=null)throw denied();
             return new Actor(principal.tenantId(),0L,null,principal,scope);
         }
-        var actor=new Actor(MetaContext.getCurrentTenantId(),MetaContext.getCurrentUserId(),MetaContext.getCurrentMemberId());
+        var actor=new Actor(MetaContext.getCurrentTenantId(),MetaContext.getCurrentUserId(),MetaContext.getCurrentMemberId(),
+                null, BusinessResourceReadScope.identity());
         if(actor.tenant()==null || actor.tenant()<=0 || actor.user()==null || actor.user()<=0 || actor.member()==null || actor.member()<=0) throw denied();
         return actor;
     }

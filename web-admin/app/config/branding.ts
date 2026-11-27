@@ -125,7 +125,7 @@ export const COMMUNITY_BRANDING: Readonly<BrandingConfig> = Object.freeze({
   supportUrl: 'https://auraboot.com/contact',
   sourceUrl: 'https://github.com/AuraBootTeam/auraboot',
   commercialContactUrl: 'https://auraboot.com/contact',
-  licenseName: 'AuraBoot License Agreement 1.3',
+  licenseName: 'AuraBoot Community License 3.0 (1.0 distribution)',
   licenseUrl: 'https://github.com/AuraBootTeam/auraboot/blob/main/LICENSE.txt',
   copyrightHolder: 'The AuraBoot Project and its contributors',
   aurabootCopyrightHolder: 'The AuraBoot Project and its contributors',
@@ -218,9 +218,9 @@ function safeUrl(value: unknown, field: keyof DeploymentBrandingDocument): strin
   try {
     const parsed = new URL(url);
     if (parsed.protocol === 'https:' && parsed.hostname) return url;
-  } catch {
+  } catch (error) {
     // Fall through to the stable configuration error below.
-  }
+ console.warn('[branding] previously-silent catch', error);  }
   throw new Error(
     `Deployment branding field "${field}" must be a same-origin path or an HTTPS URL.`,
   );
@@ -239,7 +239,7 @@ function printableAsciiText(value: unknown, field: keyof DeploymentBrandingDocum
 }
 
 export function isCommercialEdition(edition: string | undefined): boolean {
-  return ['standard', 'professional', 'enterprise'].includes(edition?.trim().toLowerCase() ?? '');
+  return ['standard', 'business', 'professional', 'enterprise'].includes(edition?.trim().toLowerCase() ?? '');
 }
 
 /**

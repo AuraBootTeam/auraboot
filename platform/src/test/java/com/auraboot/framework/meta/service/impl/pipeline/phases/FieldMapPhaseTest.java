@@ -42,6 +42,17 @@ import static org.mockito.Mockito.verifyNoInteractions;
 @ExtendWith(MockitoExtension.class)
 class FieldMapPhaseTest {
 
+    @Test void productionPhasePassesTheCapturedInputKeysToImplicitPersistence() {
+        var command = new CommandDefinition(); command.setCode("test:origin"); command.setModelCode("test_model");
+        var request = new CommandExecuteRequest(); request.setOperationType("create");
+        var context = CommandPipelineContext.builder().commandCode(command.getCode()).command(command).request(request)
+                .tenantId(1L).execConfig(Map.of("type","create")).payload(new HashMap<>(Map.of("name","original"))).build();
+        context.captureSubmittedInput(context.getPayload()); context.getPayload().put("derived_status","approved");
+        phase().execute(context);
+        verify(fieldMapExecutor).executeImplicitFieldMapPhase(context.getExecConfig(),context.getPayload(),1L,request,command,
+                java.util.Set.of("name"));
+    }
+
     @Mock
     private CommandFieldMapExecutor fieldMapExecutor;
 
@@ -77,6 +88,37 @@ class FieldMapPhaseTest {
         verifyNoInteractions(fieldMapExecutor, cascadeDeleteExecutor);
         assertThat(ctx.getFieldMapResults()).isEmpty();
         assertThat(ctx.isHandlerOwnedMutation()).isTrue();
+    }
+
+    @Test
+    void aQueryReadByTheExecutorRunsNoFieldMapEvenWithDeclaredInputs() {
+        var command = new CommandDefinition(); command.setCode("test:list_origin"); command.setModelCode("test_model");
+        var request = new CommandExecuteRequest(); request.setOperationType("EXECUTE");
+        var context = CommandPipelineContext.builder().commandCode(command.getCode()).command(command).request(request)
+                .tenantId(1L).execConfig(Map.of("type", "query", "inputFields", List.of("name")))
+                .payload(new HashMap<>(Map.of("name", "filter"))).build();
+
+        phase().execute(context);
+
+        verifyNoInteractions(fieldMapExecutor, cascadeDeleteExecutor, applicationContext);
+        assertThat(context.getFieldMapResults()).isEmpty();
+        assertThat(context.isHandlerOwnedMutation()).isFalse();
+    }
+
+    @Test
+    void aQueryWithAPluginHandlerIsLeftToThatHandlersContract() {
+        var command = new CommandDefinition(); command.setCode("test:domain_query"); command.setModelCode("test_model");
+        var request = new CommandExecuteRequest(); request.setOperationType("EXECUTE");
+        var context = CommandPipelineContext.builder().commandCode(command.getCode()).command(command).request(request)
+                .tenantId(1L).execConfig(Map.of("type", "query", "inputFields", List.of("name")))
+                .payload(new HashMap<>(Map.of("name", "filter"))).build();
+        when(extensionRegistry.getCommandHandler("test:domain_query")).thenReturn(Optional.of(pluginHandler));
+        when(pluginHandler.requiresDslPersistence("test:domain_query", context.getExecConfig(), request)).thenReturn(true);
+
+        phase().execute(context);
+
+        verify(fieldMapExecutor).executeImplicitFieldMapPhase(
+                context.getExecConfig(), context.getPayload(), 1L, request, command);
     }
 
     @Test

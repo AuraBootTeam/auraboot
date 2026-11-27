@@ -137,6 +137,7 @@ public class CacheConfig {
                 .recordStats());
         cacheManager.setCacheNames(Arrays.asList(
                 "dataScopeCondition",
+                "conditionGuards",
                 "permission-catalog",
                 "user-role-snapshots",
                 "role-permission-snapshots",

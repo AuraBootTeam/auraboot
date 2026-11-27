@@ -1,11 +1,12 @@
 // web-admin/app/smart/automation/components/AutomationEditor.tsx
 import React, { useCallback, useState, useEffect, useMemo, useRef } from 'react';
+import { useHydrated } from '~/hooks/useHydrated';
 import {
   FlowDesigner,
   useFlowValidation,
   type FlowData,
   type NodeStatusMap,
-} from '~/plugins/core-designer/components/flow-designer-sdk';
+} from '~/framework/smart/flows/sdk';
 import { automationNodes, automationCategoryOrder } from '../nodes';
 import { applyActionCatalogAvailabilityToAutomationNodes } from '../nodes/actionCatalogMapping';
 import { useSmartText } from '~/utils/i18n';
@@ -15,7 +16,7 @@ import { AutomationDebugger, useDebugSession } from '../debug';
 import { DesignerToolbar } from '~/shared/designer/DesignerToolbar';
 import type { ActionResult, AutomationLog } from '../services/automationService';
 import { ACTION_TYPE_I18N_KEYS } from './automationTypeLabels';
-import { humanizeType } from '~/plugins/core-designer/components/flow-designer-sdk/utils';
+import { humanizeType } from '~/framework/smart/flows/sdk/utils';
 import { useAutomationNodeStatuses } from './useAutomationNodeStatuses';
 import { getApiService } from '~/shared/services/ApiService';
 import {
@@ -413,6 +414,7 @@ export function AutomationEditor({
   initialRunLog,
 }: AutomationEditorProps) {
   const st = useSmartText();
+  const hydrated = useHydrated();
   const { showSuccessToast, showErrorToast } = useToastContext();
   const [name, setName] = useState(initialData?.name || '');
   const [description, setDescription] = useState(initialData?.description || '');
@@ -644,7 +646,11 @@ export function AutomationEditor({
     : st('$i18n:automation.editor.create') || 'Create Automation';
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col">
+    <div
+      className="relative flex min-h-0 flex-1 flex-col"
+      data-testid="automation-editor"
+      data-hydrated={hydrated}
+    >
       {/* Header toolbar */}
       {!readOnly && (
         <DesignerToolbar
@@ -654,6 +660,7 @@ export function AutomationEditor({
               <input
                 type="text"
                 value={name}
+                disabled={!hydrated}
                 onChange={(e) => handleNameChange(e.target.value)}
                 placeholder={st('$i18n:automation.editor.namePlaceholder') || 'Automation name'}
                 data-testid="automation-editor-name-input"
@@ -662,6 +669,7 @@ export function AutomationEditor({
               <input
                 type="text"
                 value={description}
+                disabled={!hydrated}
                 onChange={(e) => handleDescriptionChange(e.target.value)}
                 placeholder={
                   st('$i18n:automation.editor.descriptionPlaceholder') || 'Description (optional)'

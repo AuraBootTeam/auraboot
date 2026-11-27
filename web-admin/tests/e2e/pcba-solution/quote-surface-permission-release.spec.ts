@@ -74,30 +74,30 @@ const EXPECTED_SURFACES: Record<
   { visibleTabs: string[]; hiddenTabs: string[]; probes: SurfaceProbe[] }
 > = {
   sales: {
-    visibleTabs: [TAB_LABELS.materials, TAB_LABELS.bomPrice],
-    hiddenTabs: [TAB_LABELS.processFee, TAB_LABELS.output],
-    probes: [
-      { queryCode: 'qo_quote_bom_price_metrics', expectedStatus: 200 },
-      { queryCode: 'qo_quote_process_fee_metrics', expectedStatus: 403 },
-      { queryCode: 'qo_quote_output_readiness', expectedStatus: 403 },
-      { queryCode: 'qo_quote_output_documents', expectedStatus: 403 },
-    ],
-  },
-  procurement: {
-    visibleTabs: [TAB_LABELS.materials, TAB_LABELS.bomPrice, TAB_LABELS.processFee],
-    hiddenTabs: [TAB_LABELS.output],
+    visibleTabs: [TAB_LABELS.materials, TAB_LABELS.bomPrice, TAB_LABELS.processFee, TAB_LABELS.output],
+    hiddenTabs: [],
     probes: [
       { queryCode: 'qo_quote_bom_price_metrics', expectedStatus: 200 },
       { queryCode: 'qo_quote_process_fee_metrics', expectedStatus: 200 },
-      { queryCode: 'qo_quote_output_readiness', expectedStatus: 403 },
-      { queryCode: 'qo_quote_output_documents', expectedStatus: 403 },
+      { queryCode: 'qo_quote_output_readiness', expectedStatus: 200 },
+      { queryCode: 'qo_quote_output_documents', expectedStatus: 200 },
+    ],
+  },
+  procurement: {
+    visibleTabs: [TAB_LABELS.materials, TAB_LABELS.bomPrice, TAB_LABELS.processFee, TAB_LABELS.output],
+    hiddenTabs: [],
+    probes: [
+      { queryCode: 'qo_quote_bom_price_metrics', expectedStatus: 200 },
+      { queryCode: 'qo_quote_process_fee_metrics', expectedStatus: 200 },
+      { queryCode: 'qo_quote_output_readiness', expectedStatus: 200 },
+      { queryCode: 'qo_quote_output_documents', expectedStatus: 200 },
     ],
   },
   approver: {
-    visibleTabs: [TAB_LABELS.materials, TAB_LABELS.processFee, TAB_LABELS.output],
-    hiddenTabs: [TAB_LABELS.bomPrice],
+    visibleTabs: [TAB_LABELS.materials, TAB_LABELS.bomPrice, TAB_LABELS.processFee, TAB_LABELS.output],
+    hiddenTabs: [],
     probes: [
-      { queryCode: 'qo_quote_bom_price_metrics', expectedStatus: 403 },
+      { queryCode: 'qo_quote_bom_price_metrics', expectedStatus: 200 },
       { queryCode: 'qo_quote_process_fee_metrics', expectedStatus: 200 },
       { queryCode: 'qo_quote_output_readiness', expectedStatus: 200 },
       { queryCode: 'qo_quote_output_documents', expectedStatus: 200 },
@@ -381,7 +381,20 @@ test('formal approval center: menu, approve with audit fields, reject, search an
   expect(decodeURIComponent(response.url())).toContain('qo_quote_formal_version');
   await expect(ui.getByRole('heading',{name:'正式报价版本审批',exact:true})).toBeVisible();
   const search=ui.getByTestId('list-search-input').first();
+  const filteredList=ui.waitForResponse(r=>
+    r.url().includes('/api/dynamic/qo_quote_common/list') &&
+    r.request().method()==='GET' && new URL(r.url()).searchParams.get('keyword')===marker);
   await search.fill(marker);await search.press('Enter');
+  const filteredResponse=await filteredList;
+  expect(filteredResponse.status()).toBe(200);
+  const filteredBody=await filteredResponse.json();
+  expect(String(filteredBody.code)).toBe('0');
+  expect(filteredBody.data.records.map((record:{pid:unknown})=>String(record.pid)).sort())
+    .toEqual(fixtures.map(quote=>String(quote.pid)).sort());
+  // Search synchronizes the route asynchronously. A later route commit correctly
+  // cancels route-scoped forms, so finish that navigation before opening one.
+  await expect(ui).toHaveURL(url=>url.searchParams.get('keyword')===marker);
+  await expect(ui.getByTestId('dynamic-list')).toHaveAttribute('data-ready','true');
   const approveRow=ui.getByRole('row').filter({hasText:String(fixtures[0].qo_quote_code)});
   await expect(approveRow).toContainText('待审批');
   await approveRow.getByTestId('row-action-more').click();
@@ -582,7 +595,9 @@ test('formal invalid predecessor: missing quote is rejected without creating a f
     const illegalBody=await illegalResponse.json();
     expect(illegalResponse.status()).toBe(400);
     expect(String(illegalBody.code)).not.toBe('0');
-    expect(JSON.stringify(illegalBody)).toContain('previous_quote_id must reference a formal Quote Version');
+    expect(JSON.stringify(illegalBody)).toContain('请选择正式报价版本作为上一版本，不能选择普通报价。');
+    await expect(page.getByText('请选择正式报价版本作为上一版本，不能选择普通报价。', {exact:true}).first()).toBeVisible();
+    await expect(page.locator('main')).not.toContainText('previous_quote_id');
     expect(await queryDynamicRecords(page,'qo_quote_common',[{fieldName:'qo_quote_cost_scenario_id',operator:'EQ',value:scenarioId}])).toHaveLength(0);
     await info.attach('illegal-previous-rejection',{body:JSON.stringify({status:illegalResponse.status(),body:illegalBody}),contentType:'application/json'});
     await info.attach('illegal-previous-browser',{body:await page.screenshot({fullPage:true}),contentType:'image/png'});

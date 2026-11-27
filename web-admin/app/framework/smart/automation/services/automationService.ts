@@ -6,7 +6,7 @@
  */
 
 import { get, post, put, del, ErrorCodes } from '~/shared/services/http-client';
-import type { FlowData } from '~/plugins/core-designer/components/flow-designer-sdk';
+import type { FlowData } from '~/framework/smart/flows/sdk';
 
 // ==================== Types ====================
 

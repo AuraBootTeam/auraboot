@@ -1,4 +1,4 @@
-import { comparisonStatusLabel } from './ReviewDrawerEvidence';
+import { comparisonStatusLabel, EvidenceSummary } from './ReviewDrawerEvidence';
 import type React from 'react';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -12,7 +12,6 @@ import {
   CandidateFieldTable,
   CandidateSelectionSummary,
 } from './ReviewDrawerCandidateTable';
-import { EvidenceSummary } from './ReviewDrawerEvidence';
 import { FieldGroups, FieldRows } from './ReviewDrawerFields';
 import { PriceComparison, PriceLadder } from './ReviewDrawerPrices';
 import {

@@ -42,15 +42,14 @@ export function getRecentVisits(limit = 10): RecentVisit[] {
  * Returns the API data mapped to RecentVisit[].
  */
 export async function fetchRecentVisits(limit = 10): Promise<RecentVisit[]> {
-  const engagements = await listRecentVisits(limit);
-  const visits = engagements.map(mapEngagementToVisit);
+  const visits = dedupeVisits((await listRecentVisits(limit)).map(mapEngagementToVisit));
 
   // Update localStorage cache with API data
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(visits));
-  } catch {
+  } catch (error) {
     // localStorage unavailable — ignore
-  }
+ console.warn('[useRecentVisits] previously-silent catch', error);  }
 
   return visits;
 }
@@ -69,9 +68,9 @@ export function recordVisit(visit: Omit<RecentVisit, 'visitedAt'>) {
       ...filtered,
     ].slice(0, MAX_ITEMS);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch {
+  } catch (error) {
     // localStorage unavailable — ignore
-  }
+ console.warn('[useRecentVisits] previously-silent catch', error);  }
 
   // Fire-and-forget API call
   recordRecentVisit({
@@ -84,12 +83,27 @@ export function recordVisit(visit: Omit<RecentVisit, 'visitedAt'>) {
   });
 }
 
+/**
+ * One row per page, the first occurrence winning (the list comes most recently visited first).
+ * The backend keeps one record per page, but a list shown to a reader must not depend on that:
+ * two records for one page used to show as the same line twice.
+ */
+export function dedupeVisits(visits: RecentVisit[]): RecentVisit[] {
+  const seen = new Set<string>();
+  return visits.filter((visit) => {
+    if (seen.has(visit.path)) return false;
+    seen.add(visit.path);
+    return true;
+  });
+}
+
 function mapEngagementToVisit(e: UserEngagement): RecentVisit {
   return {
     title: e.targetLabel,
     path: e.targetContext?.path || e.targetId,
     modelCode: e.targetContext?.modelCode,
     icon: e.targetContext?.icon,
-    visitedAt: e.createdAt || new Date().toISOString(),
+    // the latest visit; createdAt would be the first time the page was ever opened
+    visitedAt: e.updatedAt || e.createdAt || new Date().toISOString(),
   };
 }

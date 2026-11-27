@@ -21,6 +21,74 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AuthForwardedIpSecurityTest {
 
     @Test
+    void smsIdentifierBudgetUsesMobileAcrossRotatingPeersAndDecoyEmails() throws Exception {
+        AuthService auth = mock(AuthService.class);
+        when(auth.authenticateByChannel(any())).thenReturn(
+                new AuthenticationResponse("fixture-jwt", 1L, "fixture-user", "fixture"));
+        var controller = new AuthController(auth, mock(UserInfoService.class), mock(PasswordManagementService.class),
+                new LoginRateLimiter(), mock(SessionRenewalService.class), mock(WechatMiniIdentityService.class),
+                mock(WechatInvitationJoinService.class));
+        var mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(new ObjectMapper())).build();
+        for (int i = 0; i <= 10; i++) {
+            final int attempt = i;
+            mvc.perform(post("/api/auth/login/sms").contentType("application/json")
+                            .with(request -> { request.setRemoteAddr("198.51.100." + attempt); return request; })
+                            .content("{\"mobile\":\"13800138000\",\"code\":\"fixture-code\","
+                                    + "\"email\":\"decoy-" + i + "@example.invalid\","
+                                    + "\"identifier\":\"decoy-" + i + "\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(i < 10 ? "0" : ResponseCode.BadParam.getCode()));
+        }
+        verify(auth, times(10)).authenticateByChannel(any());
+    }
+
+    @Test
+    void emailCodeIdentifierBudgetNormalizesCaseAndWhitespaceAcrossPeers() throws Exception {
+        AuthService auth = mock(AuthService.class);
+        when(auth.authenticateByChannel(any())).thenReturn(
+                new AuthenticationResponse("fixture-jwt", 1L, "fixture-user", "fixture"));
+        var controller = new AuthController(auth, mock(UserInfoService.class), mock(PasswordManagementService.class),
+                new LoginRateLimiter(), mock(SessionRenewalService.class), mock(WechatMiniIdentityService.class),
+                mock(WechatInvitationJoinService.class));
+        var mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(new ObjectMapper())).build();
+        for (int i = 0; i <= 10; i++) {
+            final int attempt = i;
+            String email = i % 2 == 0 ? "  USER@example.invalid  " : "user@EXAMPLE.invalid";
+            mvc.perform(post("/api/auth/login/email-code").contentType("application/json")
+                            .with(request -> { request.setRemoteAddr("198.51.100." + attempt); return request; })
+                            .content("{\"email\":\"" + email + "\",\"code\":\"fixture-code\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(i < 10 ? "0" : ResponseCode.BadParam.getCode()));
+        }
+        verify(auth, times(10)).authenticateByChannel(any());
+    }
+
+    @Test
+    void smsClientBudgetRejectsRotatingMobilesAndForgedForwardedAddresses() throws Exception {
+        AuthService auth = mock(AuthService.class);
+        when(auth.authenticateByChannel(any())).thenReturn(
+                new AuthenticationResponse("fixture-jwt", 1L, "fixture-user", "fixture"));
+        var controller = new AuthController(auth, mock(UserInfoService.class), mock(PasswordManagementService.class),
+                new LoginRateLimiter(), mock(SessionRenewalService.class), mock(WechatMiniIdentityService.class),
+                mock(WechatInvitationJoinService.class));
+        var mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(new ObjectMapper())).build();
+        for (int i = 0; i <= 60; i++) {
+            mvc.perform(post("/api/auth/login/sms").contentType("application/json")
+                            .with(request -> { request.setRemoteAddr("198.51.100.9"); return request; })
+                            .header("X-Forwarded-For", "203.0.113." + i)
+                            .header("X-Real-IP", "203.0.113." + i)
+                            .content("{\"mobile\":\"1380013" + String.format("%04d", i)
+                                    + "\",\"code\":\"fixture-code\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(i < 60 ? "0" : ResponseCode.BadParam.getCode()));
+        }
+        verify(auth, times(60)).authenticateByChannel(any());
+    }
+
+    @Test
     void changingUntrustedForwardedHeadersCannotEscapeTheLoginClientBudget() throws Exception {
         AuthService auth = mock(AuthService.class);
         when(auth.authenticate(any())).thenReturn(new AuthenticationResponse("fixture-jwt", 1L, "fixture-user", "fixture"));

@@ -8,7 +8,7 @@ import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { useHierarchyLayout } from '../useHierarchyLayout';
 import type { CanvasSchema } from '~/plugins/core-designer/components/studio/workbench/canvas/types';
-import { DEFAULT_HIERARCHY } from '~/plugins/core-designer/components/studio/domain/schema/layout-hierarchy';
+import { DEFAULT_HIERARCHY } from '~/framework/smart/schema/layout-hierarchy';
 
 // ---------------------------------------------------------------------------
 // Helpers

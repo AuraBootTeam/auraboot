@@ -1,4 +1,5 @@
 import { BlockRenderer } from '@auraboot/runtime-kernel';
+import { LayoutRenderer } from '~/framework/meta/rendering/layout';
 import React from 'react';
 import type { ColumnConfig } from '~/framework/meta/schemas/types';
 import { getLegacyCompatibleRecordPid } from '~/framework/meta/utils/publicRecordId';
@@ -9,6 +10,7 @@ import { ListPagination } from './ListPagination';
 import { resolveListReferenceFilterLabel } from './listReferenceDisplay';
 import { ListTable } from './ListTable';
 import { ListToolbar } from './ListToolbar';
+import { renderInlineListFilters } from './ListPageFilters';
 import { SelectAllMatchingBanner } from './SelectAllMatchingBanner';
 import { ViewAnalysisDrawer } from './ViewAnalysisDrawer';
 
@@ -36,6 +38,9 @@ export function renderListPageResults(
     | 'filterFormVisible'
     | 'setFilterFormVisible'
     | 'filterBlock'
+    | 'renderSmartField'
+    | 'handleSearch'
+    | 'handleReset'
     | 'quickFilterChips'
     | 'activeQuickFilter'
     | 'currentView'
@@ -243,8 +248,18 @@ export function renderListPageResults(
       {skipListData ? (
         miscListBlocks.length > 0 &&
         runtime && (
-          <div className="flex flex-col gap-4 p-4" data-testid="list-misc-blocks">
-            {miscListBlocks.map((block: any, idx: number) => (
+          <div className={schema.extension?.resultsSurface === 'canvas'
+            ? (schema.layout?.type === 'grid' ? '' : 'flex flex-col gap-4')
+            : (schema.layout?.type === 'grid' ? 'p-4' : 'flex flex-col gap-4 p-4')} data-testid="list-misc-blocks">
+            {schema.layout?.type === 'grid' ? (
+              <LayoutRenderer
+                layout={schema.layout}
+                blocks={miscListBlocks}
+                renderBlock={(block) => (
+                  <BlockRenderer block={block} runtime={runtime} areaId="list-misc" />
+                )}
+              />
+            ) : miscListBlocks.map((block: any, idx: number) => (
               <BlockRenderer
                 key={block.id || `misc-list-${idx}`}
                 block={block}
@@ -276,6 +291,7 @@ export function renderListPageResults(
           {!schemaExtension.hideListToolbar && (
             <ListToolbar
               workspace={workspace}
+              inlineFilters={renderInlineListFilters(model)}
               keyword={keyword}
               searchPlaceholder={tableSearchPlaceholder}
               onKeywordChange={setKeyword}
@@ -302,7 +318,7 @@ export function renderListPageResults(
               filterFormVisible={filterFormVisible}
               onFilterFormToggle={() => setFilterFormVisible((prev) => !prev)}
               hasFilterBlock={
-                !!(filterBlock && filterBlock.fields && filterBlock.fields.length > 0)
+                schemaExtension.filterLayout !== 'inline' && !!(filterBlock && filterBlock.fields && filterBlock.fields.length > 0)
               }
               chips={quickFilterChips}
               activeQuickFilter={activeQuickFilter}
@@ -495,6 +511,7 @@ export function renderListPageResults(
             showSummaryRow={summaryRowEnabled}
             locale={locale}
             treeConfig={treeConfig}
+            rowExpansion={tableBlock?.table?.rowExpansion}
           />
 
           {/* G7 — misc blocks (chart / description / rich-text / divider /

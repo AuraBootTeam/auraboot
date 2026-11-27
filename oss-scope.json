@@ -1,7 +1,7 @@
 {
   "version": "1.3",
   "last_updated": "2026-10-01",
-  "_scope_note": "plugins[] lists publishable packages in this repository, not the core-only runtime. core_plugins[] are platform-owned; example_plugins[] are optional public examples; internal_test_plugins[] never ship. CRM, BPM, EDU, and other applications are composed from independent repositories.",
+  "_scope_note": "plugins[] lists publishable packages in this repository, not the core-only runtime. core_plugins[] are platform-owned; example_plugins[] are optional public examples; internal_test_plugins[] never ship. CRM, BPM, EDU, and other applications are composed from independent repositories. Reconciled 2026-11-14: six tracked core-* config plugins classified as core; gamma-conformance, customer-delivery-extension and project-delivery-verification classified as internal test/delivery plugins (not shipped). The aps/mrp/oee manufacturing engines are currently compiled into the core (pending planned extraction into plugins) and are listed in platform_modules so this file keeps describing reality.",
   "description": "Single source of truth for AuraBoot source-available scope. Defines which backend modules, plugins, and tests belong to the community distribution. Adjust this file when moving features between OSS and enterprise.",
   "platform_modules": [
     "application",
@@ -28,7 +28,10 @@
     "formula",
     "versioning",
     "export",
-    "observability"
+    "observability",
+    "aps",
+    "mrp",
+    "oee"
   ],
   "plugins": [
     "agent-control-plane",
@@ -43,7 +46,13 @@
     "platform-admin",
     "project-management",
     "showcase",
-    "simple-inventory"
+    "simple-inventory",
+    "core-dashboard",
+    "core-data-exchange",
+    "core-decisionops",
+    "core-faq-loop",
+    "core-site-key",
+    "core-ownership"
   ],
   "core_plugins": [
     "agent-control-plane",
@@ -52,7 +61,13 @@
     "core-meta",
     "org-management",
     "page-manager",
-    "platform-admin"
+    "platform-admin",
+    "core-dashboard",
+    "core-data-exchange",
+    "core-decisionops",
+    "core-faq-loop",
+    "core-site-key",
+    "core-ownership"
   ],
   "example_plugins": [
     "asset-management",
@@ -68,7 +83,10 @@
     "aura-edu"
   ],
   "internal_test_plugins": [
-    "test-fixtures"
+    "test-fixtures",
+    "gamma-conformance",
+    "customer-delivery-extension",
+    "project-delivery-verification"
   ],
   "tooling_dirs": [
     "acp-showcase",

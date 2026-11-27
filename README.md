@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  <a href="LICENSE.txt"><img src="https://img.shields.io/badge/License-Apache_2.0_with_AuraBoot_supplements-blue.svg" alt="License"></a>
+  <a href="LICENSE.txt"><img src="https://img.shields.io/badge/License-Source_available_1.0-blue.svg" alt="License"></a>
   <a href="#"><img src="https://img.shields.io/badge/Java-21-orange.svg" alt="Java 21"></a>
   <a href="#"><img src="https://img.shields.io/badge/Spring_Boot-4.1-green.svg" alt="Spring Boot 4.1"></a>
   <a href="#"><img src="https://img.shields.io/badge/React-19-blue.svg" alt="React 19"></a>
@@ -62,7 +62,7 @@ Full positioning rationale: [auraboot.com/docs/positioning](https://auraboot.com
 
 - **Website walkthrough:** [auraboot.com/demo](https://auraboot.com/demo) shows the core model -> page -> command loop.
 - **PCBA Pilot package:** the PCBA manufacturing package is available for scoped design-partner pilots. It is not GA and should not be described as a full ERP replacement.
-- **Trust posture:** [auraboot.com/trust](https://auraboot.com/trust) documents the Apache-2.0 community license, trademark boundary, security contact, and SOC 2 readiness position. AuraBoot does not claim SOC 2 Type I or Type II certification today.
+- **Trust posture:** [auraboot.com/trust](https://auraboot.com/trust) documents published release licensing, trademark boundaries, security contact, and SOC 2 readiness position. AuraBoot does not claim SOC 2 Type I or Type II certification today.
 
 ## Key Features
 
@@ -104,24 +104,34 @@ Multi-channel notifications (email, in-app, webhook), event bus for cross-module
 
 > **Mainland-China users:** Gitee and Tencent TCR distribution are deferred; no working mainland mirror is promised. The source-build path below requires access to GitHub, container registries, Gradle and Maven dependencies. Check that connectivity first. For pull-only deployment, use a release tag whose images and first-boot procedure have been verified; see [DEPLOY.md](DEPLOY.md#pull-only-deployment-no-source-checkout-no-build).
 
+For a reproducible first trial, use the exact source revision and scope in the
+[public beta candidate guide](https://auraboot.com/docs/release-notes/candidate)
+and [project-delivery tutorial](https://auraboot.com/docs/getting-started/project-delivery).
+The current candidate is unpublished: historical beta assets, floating images and
+moving `main` are not interchangeable. The commands below are the general source
+workflow; pin the selected revision before preparing `.env` when qualifying a trial.
+No public candidate download or all-platform installation guarantee is implied.
+
 ### Docker (recommended)
+
+Host prerequisites: Git, curl, Python 3.8+ and Docker Compose v2. The public initialization uses Python and HTTP; host Node.js is not required. Prepare a new local evaluation once; keep its private configuration and data on later starts.
 
 ```bash
 git clone https://github.com/AuraBootTeam/auraboot.git
 cd auraboot
-test -f .env || cp .env.example .env
-chmod 600 .env
-# Prepare once; preserve existing installation keys across restarts.
-python3 scripts/prepare-quickstart-env.py --file .env
+# New empty local evaluation only; refuses existing configuration or data.
+python3 scripts/prepare-quickstart-env.py --file .env --new-local-evaluation
 docker compose --profile full up --build -d
 ./scripts/quickstart.sh                       # creates the admin, imports the plugins
 ```
 
+Source Compose runs the Core kernel. Agent-required plugins use the separately verified full application assembly; they are not imported into this Core first-use route.
+
 The `full` profile starts PostgreSQL + the Spring Boot backend + the Node BFF/SSR frontend. Wait for the backend to be healthy before initialization. Download/build time depends on your machine and network; the 120s health-check start period is not an installation-time guarantee.
 
-**`scripts/quickstart.sh` is not optional.** `docker compose up` starts the services and nothing else: it creates no admin user and imports no plugins. Without this step the login below fails with *"Invalid username or password"*, and even past it the platform has zero models and zero menus. The script is idempotent — run it again any time.
+**`scripts/quickstart.sh` is not optional.** `docker compose up` starts the services and nothing else: it creates no admin user and imports no plugins. Without this step the login below fails with *"Invalid username or password"*, and even past it the platform has zero models and zero menus. It preserves an existing administrator password, but reimports configuration using `OVERWRITE`. Run it only on your own evaluation instance, not as a general upgrade or business-data repair command.
 
-> **Windows:** the runtime is fully supported through **Docker Desktop**, which runs the whole stack in its WSL2 backend — `docker compose --profile full up` works exactly as above. The only caveat is that `quickstart.sh` (and every other `scripts/*.sh`) is a bash script, so run it from a **WSL** shell or **Git Bash**, not PowerShell/cmd. It needs `bash`, `curl` and `python3` and talks to the published port, so `./scripts/quickstart.sh` works unchanged. Native, non-Docker Windows-host deployment is **not** supported: the reset/init/build tooling is bash-only and there is no `gradlew.bat`.
+> **Windows:** use Docker Desktop with its WSL2 backend and run the bash commands in WSL Ubuntu. Check `git`, `curl` and `python3` first; do not paste bash scripts into PowerShell/cmd. The current candidate qualification targets Linux amd64, so these Windows instructions are not an independently verified Windows installation claim. Native Windows-host deployment is not supported by the bash lifecycle tooling.
 
 Then open [http://localhost:3000](http://localhost:3000) and log in:
 
@@ -303,7 +313,7 @@ for the instrumentation contract and reproducible measurements. A high-level sys
 | Application Composition Contract | ✓ | ✓ |
 | Plugin System + CLI | ✓ | ✓ |
 | Multi-Tenant RBAC | ✓ | ✓ |
-| Agent Orchestration (ACP) | — | ✓ |
+| Agent Orchestration (ACP) | ✓ (core orchestration, `agent-control-plane` plugin) | ✓ (advanced governance) |
 | IM (Real-time Messaging) | — | ✓ |
 | CRM / ERP application suite | — | ✓ |
 | Mobile Apps (iOS + Android) | — | ✓ |
@@ -328,22 +338,34 @@ To report a security vulnerability, please email [security@auraboot.com](mailto:
 
 ## License
 
-The community edition is open source under [Apache License 2.0, with AuraBoot trademark and commercial-contact supplements](LICENSE.txt) (v2.0). The supplements do not restrict the rights granted by Apache-2.0.
+This branch prepares **AuraBoot 1.0 (v1.0.0)** under the custom,
+source-available [Community License 3.0](LICENSE.txt). It is not an OSI
+open-source license. A review branch is not a published stable release.
+The published [RC11](https://github.com/AuraBootTeam/auraboot/releases/tag/v1.0.0-rc.11)
+retains its original Apache terms and assets.
 
-- **Commercial use and private modifications** — Self-host, deliver customer projects, modify the code, and keep your modifications and business code private.
-- **Own-brand SaaS and OEM** — Build business apps or a low-code/AI platform service under your own brand, including multi-tenant hosting, without a paid community-code license.
-- **White-label freedom** — Replace or remove the product name, logo, footer, and other UI branding. Preserve copyright, license, NOTICE, and modification notices as required by Apache-2.0.
-- **Separate commercial boundaries** — Proprietary enterprise code, official support, and use of the AuraBoot trademark follow their separate agreements. Community-code permission does not grant trademark rights.
+- **Free business customization** — Commercial use, internal development,
+  customer delivery, multi-tenant industry SaaS and private business code
+  are permitted while retaining the official platform branding.
+- **Branding** — Community retains the platform logo, name, platform brand
+  theme and attribution. Business page titles, models, layout, field colors
+  and built-in light/dark mode remain configurable.
+- **Standard** — Perpetual internal-use white-label for a named using entity;
+  no per-application, node or environment charge and no mandatory renewal.
+- **Business** — Customer delivery and industry-product operation in the
+  agreed scope. Annual acquisition-period expiry does not cancel rights
+  already formed for delivered customers or launched products. Same-product
+  subscriber growth has no incremental white-label fee.
+- **Extensions** — Internal builders, domain configuration and original
+  extensions are permitted. Using restricted platform code to operate a
+  competing generic development platform for third parties is not.
+- **Preserved licenses** — Independent packages, third-party components and
+  previously granted Apache rights keep their terms. See [scope](LICENSE-SCOPE.md)
+  and [NOTICE](NOTICE); white-label does not remove legal notices.
 
-📖 **See the [License FAQ (中文)](LICENSE-FAQ.md) / [License FAQ (English)](LICENSE-FAQ-en.md)** for common questions about commercial use, modification, redistribution, and SaaS boundaries.
-
-For proprietary enterprise capabilities, official support, or AuraBoot trademark permission, use the [AuraBoot contact form](https://auraboot.com/contact).
-
----
+Read the [中文 FAQ](LICENSE-FAQ.md) / [English FAQ](LICENSE-FAQ-en.md).
+Implementation, integration, training, hosting and support are separately
+agreed services. [Contact](https://auraboot.com/contact) for a named order;
+website promotion prices are not signed contracts.
 
 <p align="center">Built with care by the <a href="https://github.com/AuraBootTeam">AuraBoot Team</a></p>
-
-
-### Proposed future commercial licensing
-
-A new-version Community License v3 proposal is available in [LICENSE-COMMUNITY-3.0-DRAFT.txt](LICENSE-COMMUNITY-3.0-DRAFT.txt). It proposes attributed business applications and industry SaaS, paid UI white-label permission, end-customer ISV authorization, product-scoped white-label OEM operation, and restrictions on competing general-purpose development platforms. The commercial offer is Standard at RMB 999/year or RMB 3,000 perpetual without mandatory renewal; proprietary modules and services are separately identified. See the [capability and delivery guide](https://auraboot.com/docs/core-concepts/community-capabilities). This custom source-available draft does not replace the current LICENSE.txt; formal adoption identifies the licensor and covered release.

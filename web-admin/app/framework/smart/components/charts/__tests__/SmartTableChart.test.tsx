@@ -24,6 +24,7 @@ vi.mock('~/shared/services/http-client', () => ({
 // LocalizedText resolution assertions below.
 
 import { SmartTableChart } from '../SmartTableChart';
+import { __resetDimensionLabelCaches } from '~/framework/smart/hooks/useDimensionLabels';
 
 describe('SmartTableChart - widget config columns + i18n', () => {
   beforeEach(() => {
@@ -209,6 +210,115 @@ describe('SmartTableChart - widget config columns + i18n', () => {
       { field: 'purchase_pid', operator: 'eq', value: 'PUR-001' },
     ]);
   });
+
+  it('a click passes the record field the target page names, not the first column', () => {
+    // A model table reports its columns as dimensions, and the first column is a display field.
+    // Measured on the Orbit dashboards: the click went to /p/orb_deployment_run/view/ with no pid.
+    mockUseChartData.mockReturnValue({
+      data: {
+        rows: [{ pid: 'RUN-1', orb_drun_release_display: 'chain A v1', orb_drun_status: 'succeeded' }],
+        summary: {},
+        meta: { dimensions: ['orb_drun_release_display', 'orb_drun_status'], metrics: [] },
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    const onDrillDown = vi.fn();
+
+    render(
+      <SmartTableChart
+        dataSource={query}
+        table={{
+          columns: [
+            { field: 'orb_drun_release_display', label: 'Release' },
+            { field: 'orb_drun_status', label: 'Status' },
+          ],
+        }}
+        drillDown={{
+          enabled: true,
+          action: 'navigate',
+          targetPage: '/p/orb_deployment_run/view/{pid}',
+          paramMapping: { pid: 'pid' },
+        }}
+        onDrillDown={onDrillDown}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('chain A v1').closest('tr')!);
+    expect(onDrillDown).toHaveBeenCalledWith([{ field: 'pid', operator: 'eq', value: 'RUN-1' }]);
+  });
+
+  it('a click still passes the first dimension when the target page names no record field', () => {
+    mockUseChartData.mockReturnValue({
+      data: {
+        rows: [{ status: 'succeeded', count: 3 }],
+        summary: {},
+        meta: { dimensions: ['status'], metrics: ['count'] },
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    const onDrillDown = vi.fn();
+
+    render(
+      <SmartTableChart
+        dataSource={query}
+        table={{ columns: [{ field: 'status', label: 'Status' }] }}
+        drillDown={{ enabled: true, action: 'navigate', targetPage: '/p/orb_deployment_run', paramMapping: { status: 'status' } }}
+        onDrillDown={onDrillDown}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('succeeded').closest('tr')!);
+    expect(onDrillDown).toHaveBeenCalledWith([{ field: 'status', operator: 'eq', value: 'succeeded' }]);
+  });
+
+  const mockOneRow = () => {
+    mockUseChartData.mockReturnValue({
+      data: {
+        rows: [{ provider: 'local_test' }],
+        summary: {},
+        meta: { dimensions: [], metrics: ['provider'] },
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+  };
+  const query = { type: 'namedQuery', queryCode: 'recent_events' } as const;
+  const table = { columns: [{ field: 'provider', label: 'Provider' }] };
+
+  // A pointer on a row promises that clicking it does something. In a dashboard table without a
+  // drill-down it did nothing, and the Orbit walkthrough filed exactly that as a defect.
+  it('rows do not look clickable when the table has neither a drill-down nor a linkage to emit', () => {
+    mockOneRow();
+    render(<SmartTableChart dataSource={query} table={table} />);
+
+    expect(screen.getByText('local_test').closest('tr')!.className).not.toMatch(/cursor-pointer|hover:bg-blue-50/);
+  });
+
+  it('rows look clickable when a drill-down takes them somewhere', () => {
+    mockOneRow();
+    render(
+      <SmartTableChart
+        dataSource={query}
+        table={table}
+        drillDown={{ enabled: true, action: 'navigate', targetPage: '/p/provider_event', paramMapping: { provider: 'provider' } }}
+        onDrillDown={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('local_test').closest('tr')!.className).toMatch(/cursor-pointer/);
+  });
+
+  it('rows look clickable when they emit a linkage filter', () => {
+    mockOneRow();
+    render(<SmartTableChart dataSource={query} table={table} linkage={{ enabled: true, emitFilter: true }} onLinkageEmit={vi.fn()} />);
+
+    expect(screen.getByText('local_test').closest('tr')!.className).toMatch(/cursor-pointer/);
+  });
 });
 
 describe('API enum and unavailable value presentation', () => {
@@ -262,5 +372,24 @@ describe('API enum and unavailable value presentation', () => {
       />,
     );
     await waitFor(() => expect(screen.getByText('打开分析看板后观察再次使用')).toBeInTheDocument());
+  });
+});
+
+
+describe('projected tables never read the page model as a fallback', () => {
+  beforeEach(() => {
+    __resetDimensionLabelCaches();
+    mockFetchResult.mockReset();mockUseChartData.mockReset();
+    mockFetchResult.mockResolvedValue({ code: '0', data: { records: [{ name: 'Projected item' }] } });
+    mockUseChartData.mockReturnValue({ data: { rows: [{ name: 'Projected item' }], summary: {}, meta: { dimensions: ['name'], metrics: [] } }, loading: false, error: null, refetch: vi.fn() });
+  });
+
+  it.each(['api', 'static'] as const)('keeps a %s projection independent of protected model reads', async (type) => {
+    render(<SmartTableChart modelCode="protected_projection_owner"
+      dataSource={type === 'api' ? { type: 'api', url: '/api/owned-projection' } : { type: 'static', staticData: [{ name: 'Projected item' }] }}
+      table={{ columns: [{ field: 'name', label: 'Item' }] }} />);
+    await waitFor(() => expect(screen.getByText('Projected item')).toBeInTheDocument());
+    expect(mockFetchResult.mock.calls.some(([url]) => String(url).startsWith('/api/dynamic/'))).toBe(false);
+    if (type === 'api') expect(mockFetchResult.mock.calls.map(([url]) => url)).toEqual(['/api/owned-projection']);
   });
 });

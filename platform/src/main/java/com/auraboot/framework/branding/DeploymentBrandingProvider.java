@@ -24,7 +24,7 @@ import java.util.Set;
 public class DeploymentBrandingProvider implements BrandingProvider {
 
     private static final Set<String> COMMERCIAL_EDITIONS = Set.of(
-            "standard", "professional", "enterprise");
+            "standard", "business", "professional", "enterprise");
     private static final Set<String> ALLOWED_FIELDS = Set.of(
             "schemaVersion",
             "orderReference",

@@ -41,9 +41,9 @@ function isOnboardingComplete(): boolean {
 function markOnboardingComplete() {
   try {
     localStorage.setItem(STORAGE_KEY, 'true');
-  } catch {
+  } catch (error) {
     // noop – storage unavailable
-  }
+ console.warn('[OnboardingWizard] previously-silent catch', error);  }
 }
 
 // ---------------------------------------------------------------------------

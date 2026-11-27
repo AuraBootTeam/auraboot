@@ -30,9 +30,9 @@ export function InboxBadge({ onClick, isOpen, pollInterval = 30_000, className }
     try {
       const c = await getPendingCount();
       if (scopeRef.current === scope) setCount(c);
-    } catch {
+    } catch (error) {
       // Non-critical
-    }
+ console.warn('[InboxBadge] previously-silent catch', error);    }
   }, [scope]);
 
   useEffect(() => {

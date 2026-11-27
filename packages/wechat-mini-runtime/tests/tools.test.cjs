@@ -5,6 +5,51 @@ const os = require("node:os");
 const path = require("node:path");
 const { EventEmitter } = require("node:events");
 const tools = require("../tools/index.cjs");
+test("live port probe accepts TCP reachability without attempting a bind or sending data", async () => {
+  let socket, destroyed = 0;
+  const busy = await tools.portBusy(9467, { connect: (options) => {
+    assert.deepEqual(options, { host: "127.0.0.1", port: 9467 });
+    socket = new EventEmitter();
+    socket.setTimeout = () => {};
+    socket.destroy = () => destroyed++;
+    socket.write = () => assert.fail("Port detection must not send protocol or business data");
+    queueMicrotask(() => socket.emit("connect"));
+    return socket;
+  } });
+  assert.equal(busy, true);
+  assert.equal(destroyed, 1);
+});
+test("only refused TCP connections are absent; permission, unexpected and timed out probes reject", async () => {
+  for (const code of ["ECONNREFUSED", "EACCES", "ECONNRESET", "timeout"]) {
+    let destroyed = 0;
+    const probe = tools.portBusy(9467, { timeoutMs: 10, connect: () => {
+      const socket = new EventEmitter();
+      socket.destroy = () => destroyed++;
+      socket.setTimeout = (ms, callback) => {
+        assert.equal(ms, 10);
+        if (code === "timeout") queueMicrotask(callback);
+      };
+      if (code !== "timeout") queueMicrotask(() => socket.emit("error", Object.assign(new Error(code), { code })));
+      return socket;
+    } });
+    if (code === "ECONNREFUSED") assert.equal(await probe, false);
+    else await assert.rejects(probe, code === "timeout" ? /probe timed out/ : { code });
+    assert.equal(destroyed, 1);
+  }
+});
+test("default DevTools startup reuses an actual live loopback listener and still verifies bridge identity", async (t) => {
+  const net = require("node:net");
+  const server = net.createServer((socket) => socket.destroy());
+  await new Promise((resolve, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", resolve); });
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const f = fixture(t), manifest = tools.prepareProject(f), calls = [];
+  const mp = bridge(manifest.config);
+  const driver = await tools.openDevTools({ project: f.out, port: server.address().port, cli: "fixture", mode: "fixture",
+    execute: (_, args) => { calls.push(args[0]); return '{"login":true}'; }, automator: { connect: async () => mp } });
+  assert.deepEqual(calls, ["islogin"]);
+  await driver.close();
+  assert.equal(mp.disconnected, true);
+});
 function bridge(config) {
   const mp = new EventEmitter();
   mp.evaluate = async () => config;
@@ -53,6 +98,29 @@ test("generated project is separate, excludes dependencies and records explicit 
     /fixture-test/,
   );
   tools.prepareProject(f);
+});
+test("explicit DevTools settings preserve source and bind generated identity", (t) => {
+  const f = fixture(t);
+  fs.writeFileSync(path.join(f.source, "project.config.json"), JSON.stringify({ appid: "touristappid", setting: { es6: true } }));
+  const baseline = tools.prepareProject(f);
+  const settings = { appid: "wx0123456789abcdef", projectname: "owned-local-test" };
+  const manifest = tools.prepareProject({ ...f, projectSettings: settings });
+  assert.notEqual(manifest.identity.sha256, baseline.identity.sha256);
+  assert.deepEqual(manifest.projectSettings, settings);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.out, "project.config.json"))), { ...settings, setting: { es6: true } });
+  assert.equal(JSON.parse(fs.readFileSync(path.join(f.source, "project.config.json"))).appid, "touristappid");
+  assert.equal(tools.readProject(f.out).projectSettings.appid, settings.appid);
+  const repeated = tools.prepareProject({ ...f, projectSettings: { projectname: settings.projectname, appid: settings.appid } });
+  assert.equal(repeated.identity.sha256, manifest.identity.sha256);
+  fs.writeFileSync(path.join(f.out, "project.config.json"), JSON.stringify({ ...settings, appid: "wx1111111111111111" }));
+  assert.throws(() => tools.readProject(f.out), /project setting mismatch: appid/);
+});
+test("invalid DevTools overrides reject before creating output", (t) => {
+  const f = fixture(t);
+  for (const projectSettings of [null, [], { appid: "touristappid" }, { appid: 1 }, { projectname: " " }, { setting: { urlCheck: false } }]) {
+    assert.throws(() => tools.prepareProject({ ...f, projectSettings }), /Invalid explicit DevTools/);
+    assert.equal(fs.existsSync(f.out), false);
+  }
 });
 test("generator rejects foreign output, source overlap and production targets", (t) => {
   const f = fixture(t);

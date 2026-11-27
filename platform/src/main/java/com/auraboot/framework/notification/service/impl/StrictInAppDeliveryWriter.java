@@ -41,6 +41,7 @@ public class StrictInAppDeliveryWriter {
         row.setTitle(plan.title()); row.setContent(plan.content());
         row.setCategory("business"); row.setPriority("normal"); row.setIsRead(false);
         row.setSourceType(plan.sourceType()); row.setSourceId(plan.sourceId());
+        row.setMiniProgramPath(plan.miniProgramPath());
         if (mapper.insert(row) != 1 || row.getId() == null)
             throw new IllegalStateException("NOTIFICATION_PERSISTENCE_FAILED");
         MetaContext.Snapshot snapshot = MetaContext.snapshot();

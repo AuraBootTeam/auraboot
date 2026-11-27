@@ -261,8 +261,8 @@ export function RecordComments({
           {l('comment.loading', '正在加载评论…', 'Loading comments…')}
         </div>
       ) : comments.length === 0 ? (
-        <div className="px-6 py-12 text-center" data-testid="comment-empty">
-          <MessageSquareText className="text-text-3 mx-auto h-8 w-8" aria-hidden="true" />
+        <div className="px-6 py-6 text-center" data-testid="comment-empty">
+          <MessageSquareText className="text-text-3 mx-auto h-5 w-5" aria-hidden="true" />
           <p className="text-text-2 mt-3 text-sm font-medium">
             {l('comment.emptyTitle', '还没有跟进评论', 'No comments yet')}
           </p>

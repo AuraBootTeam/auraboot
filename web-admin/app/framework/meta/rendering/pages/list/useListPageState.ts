@@ -193,12 +193,15 @@ export function useListPageState(
   // Debounced auto-search: triggers loadData 300ms after the user stops typing,
   // so results update without requiring Enter. Reduces API calls by ~60-80%
   // compared to firing on every keystroke.
-  const { debouncedSearch, commitSearch, rememberSubmittedFilters, getSubmittedFilters } = useListKeywordSearch(
-    (params) => { void late.loadData(params); },
-    Boolean(schema),
-    pagination.pageSize,
-    urlFilters,
-  );
+  const { debouncedSearch, commitSearch, rememberSubmittedFilters, getSubmittedFilters } =
+    useListKeywordSearch(
+      (params) => {
+        void late.loadData(params);
+      },
+      Boolean(schema),
+      pagination.pageSize,
+      urlFilters,
+    );
   const {
     read: readApiRequest,
     getFailedRequest: getFailedApiRequest,
@@ -315,6 +318,8 @@ export function useListPageState(
     }));
   }, []);
 
+  const pendingUrlPaginationRef = useRef<{ current: number; pageSize: number } | null>(null);
+
   const shouldPersistPaginationToUrlRef = useRef(
     urlPageNum != null ||
       urlPageSize != null ||
@@ -414,9 +419,12 @@ export function useListPageState(
   useEffect(() => {
     if (urlPageNum == null && urlPageSize == null) return;
     shouldPersistPaginationToUrlRef.current = true;
+    const nextCurrent = urlPageNum ?? pagination.current;
+    const nextPageSize = urlPageSize ?? pagination.pageSize;
+    // The reverse effect runs in this same commit with the previous local page.
+    // Keep the incoming URL authoritative until that page reaches local state.
+    pendingUrlPaginationRef.current = { current: nextCurrent, pageSize: nextPageSize };
     setPageState((prev) => {
-      const nextCurrent = urlPageNum ?? prev.pagination.current;
-      const nextPageSize = urlPageSize ?? prev.pagination.pageSize;
       if (nextCurrent === prev.pagination.current && nextPageSize === prev.pagination.pageSize) {
         return prev;
       }
@@ -461,17 +469,29 @@ export function useListPageState(
   // Sync local pagination state -> URL query params (preserve existing filter_* params).
   useEffect(() => {
     if (!shouldPersistPaginationToUrlRef.current) return;
+    const pendingUrlPagination = pendingUrlPaginationRef.current;
+    if (pendingUrlPagination) {
+      if (
+        pagination.current !== pendingUrlPagination.current ||
+        pagination.pageSize !== pendingUrlPagination.pageSize
+      )
+        return;
+      pendingUrlPaginationRef.current = null;
+    }
     const currentUrlPageNum = Number(searchParams.get('pageNum'));
     const currentUrlPageSize = Number(searchParams.get('pageSize'));
     const needsUpdate =
       currentUrlPageNum !== pagination.current || currentUrlPageSize !== pagination.pageSize;
     if (!needsUpdate) return;
-    setSearchParams((previous) => {
-      const nextParams = new URLSearchParams(previous);
-      nextParams.set('pageNum', String(pagination.current));
-      nextParams.set('pageSize', String(pagination.pageSize));
-      return nextParams;
-    }, { replace: true });
+    setSearchParams(
+      (previous) => {
+        const nextParams = new URLSearchParams(previous);
+        nextParams.set('pageNum', String(pagination.current));
+        nextParams.set('pageSize', String(pagination.pageSize));
+        return nextParams;
+      },
+      { replace: true },
+    );
   }, [pagination.current, pagination.pageSize, searchParams, setSearchParams]);
 
   return {

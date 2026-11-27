@@ -12,6 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
@@ -43,11 +44,14 @@ class RecordShareServiceImplTest {
     @Mock
     private UserRoleService userRoleService;
 
-    @InjectMocks
+
     private RecordShareServiceImpl service;
 
     @BeforeEach
     void setUpMetaContext() {
+        MockitoAnnotations.openMocks(this);
+        service = new RecordShareServiceImpl(
+                recordShareMapper, userRoleService, new RecordSharePresenceCache(recordShareMapper));
         MetaContext.setContext(100L, 99L, "user-pid", "tester");
         // Existing cases exercise the original subject/action authorization branches.
         lenient().when(recordShareMapper.hasActiveSharesByRecordPid(any(), any(), any(), any()))
@@ -179,7 +183,7 @@ class RecordShareServiceImplTest {
     }
 
     @Test
-    void newGrantIsObservedOnTheNextIndependentCallWithoutNegativeCaching() {
+    void aFreshGrantIsObservedImmediatelyBecauseTheGrantEvictsThePresenceMemo() {
         when(recordShareMapper.hasActiveSharesByRecordPid(eq(100L), eq("model.user"), eq("rec_10"), any()))
                 .thenReturn(false, true);
         lenient().when(recordShareMapper.countByRecordPidAndSubjectPid(
@@ -187,6 +191,9 @@ class RecordShareServiceImplTest {
                 .thenReturn(1);
 
         assertThat(service.isSharedByPid(100L, "model.user", "rec_10", 5L, "mem_5", "read")).isFalse();
+        // The grant path itself (shareRecordByPid) evicts the presence memo, so the very
+        // next independent check observes the fresh grant without waiting out the TTL.
+        service.shareRecordByPid(100L, "model.user", "rec_10", "member", 5L, "mem_5", "read", null);
         assertThat(service.isSharedByPid(100L, "model.user", "rec_10", 5L, "mem_5", "read")).isTrue();
         verify(recordShareMapper, times(2)).hasActiveSharesByRecordPid(eq(100L), eq("model.user"), eq("rec_10"), any());
         verify(recordShareMapper).countByRecordPidAndSubjectPid(
@@ -253,8 +260,9 @@ class RecordShareServiceImplTest {
         when(userRoleService.getRoleIdsByMemberIdAndTenantId(5L, 100L)).thenReturn(List.of());
 
         assertThat(service.isSharedByPid(100L, "model.user", "rec_10", 5L, "mem_5", "read")).isTrue();
+        // The presence memo may still answer "has shares", but the per-subject queries stay
+        // uncached — a revoked share denies on the very next check regardless of the memo.
         assertThat(service.isSharedByPid(100L, "model.user", "rec_10", 5L, "mem_5", "read")).isFalse();
-        verify(recordShareMapper, times(2)).hasActiveSharesByRecordPid(eq(100L), eq("model.user"), eq("rec_10"), any());
     }
 
     @Test

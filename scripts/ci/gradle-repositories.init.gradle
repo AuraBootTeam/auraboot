@@ -3,16 +3,32 @@ import org.gradle.api.initialization.resolve.RepositoriesMode
 
 // Image builders select a network policy explicitly; dependency versions and locks stay in the project.
 def policy = System.getenv('AURA_GRADLE_REPOSITORY_POLICY') ?: 'project'
-if (!(policy in ['project', 'central'])) {
-    throw new GradleException('AURA_GRADLE_REPOSITORY_POLICY must be project or central')
+if (!(policy in ['project', 'central', 'mirror'])) {
+    throw new GradleException('AURA_GRADLE_REPOSITORY_POLICY must be project, central or mirror')
 }
 
-if (policy == 'central') {
+def mirror = null
+if (policy == 'mirror') {
+    try {
+        mirror = new java.net.URI(System.getenv('AURA_GRADLE_MIRROR_URL') ?: '')
+    } catch (java.net.URISyntaxException ignored) {
+        // CATCH: reject invalid configuration without echoing possible credentials.
+        throw new GradleException('AURA_GRADLE_MIRROR_URL must be a valid HTTPS repository URL')
+    }
+    if (!'https'.equalsIgnoreCase(mirror.scheme) || !mirror.host || mirror.rawUserInfo != null || mirror.rawQuery != null || mirror.rawFragment != null) {
+        throw new GradleException('AURA_GRADLE_MIRROR_URL requires HTTPS without credentials, query or fragment')
+    }
+}
+
+if (policy in ['central', 'mirror']) {
     settingsEvaluated { settings ->
         settings.dependencyResolutionManagement {
             repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
             repositories {
                 mavenLocal()
+                if (mirror != null) {
+                    maven { url = mirror }
+                }
                 mavenCentral()
             }
         }

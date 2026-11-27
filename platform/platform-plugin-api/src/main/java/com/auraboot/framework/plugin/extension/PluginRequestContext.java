@@ -30,4 +30,7 @@ public interface PluginRequestContext {
      * without touching host internals. Backed by the platform DynamicDataService.
      */
     DataAccessor dataAccessor();
+
+    /** Resolve display identity only within this authenticated request's active tenant membership. */
+    default IdentityDirectoryAccessor.UserIdentity findActiveTenantUser(String userPid) { return null; }
 }

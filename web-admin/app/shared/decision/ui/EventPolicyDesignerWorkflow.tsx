@@ -628,9 +628,9 @@ export function EventPolicyDesignerWorkflow({
       const payload = parsePayload(action.payloadJson);
       const next = writeActionFieldValue(action.target, payload, field, value);
       updateAction(idx, { target: next.target ?? '', payloadJson: payloadToJson(next.payload) });
-    } catch {
+    } catch (error) {
       // Keep the previous structured payload until the JSON field becomes valid again.
-    }
+ console.warn('[EventPolicyDesignerWorkflow] previously-silent catch', error);    }
   };
 
   const createDraft = async () => {

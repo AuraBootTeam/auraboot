@@ -16,6 +16,34 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MetaModelServiceImplCacheContractTest {
 
     @Test
+    void currentPolicyExtensionReadsStayFreshWithoutLoadingFieldStatistics() {
+        var models = org.mockito.Mockito.mock(com.auraboot.framework.meta.mapper.MetaModelMapper.class);
+        var bindings = org.mockito.Mockito.mock(com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper.class);
+        var service = new MetaModelServiceImpl(models, null, null, bindings, null, null, null, null);
+        var before = new com.auraboot.framework.meta.entity.Model();
+        before.setId(1L);
+        before.setCode("policy_model");
+        var extension = new com.auraboot.framework.meta.entity.payload.ExtensionBean();
+        extension.setExtension(java.util.Map.of("dataScope", java.util.Map.of("ownerField", "nested_owner")));
+        extension.setDynamicProperty("dataScope", java.util.Map.of("ownerField", "current_owner"));
+        before.setExtension(extension);
+        var after = new com.auraboot.framework.meta.entity.Model();
+        after.setId(1L);
+        after.setCode("policy_model");
+        var updated = new com.auraboot.framework.meta.entity.payload.ExtensionBean();
+        updated.setExtension(java.util.Map.of("dataScope", java.util.Map.of("ownerField", "new_owner")));
+        after.setExtension(updated);
+        org.mockito.Mockito.when(models.findCurrentByCode("policy_model")).thenReturn(before, after);
+
+        assertThat(service.findExtensionByCode("policy_model"))
+                .containsEntry("dataScope", java.util.Map.of("ownerField", "current_owner"));
+        assertThat(service.findExtensionByCode("policy_model"))
+                .containsEntry("dataScope", java.util.Map.of("ownerField", "new_owner"));
+        org.mockito.Mockito.verify(models, org.mockito.Mockito.times(2)).findCurrentByCode("policy_model");
+        org.mockito.Mockito.verifyNoInteractions(bindings);
+    }
+
+    @Test
     @DisplayName("model definition cache uses Spring Optional-unwrapped null guard")
     void modelDefinitionCacheUsesSpringOptionalUnwrappedNullGuard() throws Exception {
         Cacheable cacheable = MetaDefinitionCacheService.class

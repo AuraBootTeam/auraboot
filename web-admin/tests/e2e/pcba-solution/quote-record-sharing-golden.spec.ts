@@ -3,7 +3,7 @@ import { createWriteStream, readFileSync, statSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { test, expect } from '../../fixtures';
 import { ensureQuoteRoleUser, makeQuoteRoleUser, openQuoteRolePage, openQuoteDetailFromList,
-  seedBomPriceManualReviewQuote, seedDownloadableQuote, type QuoteRoleUser } from './quote-e2e-helpers';
+  seedBomPriceManualReviewQuote, seedQuoteForCorrectedBomUpload, seedDownloadableQuote, openPgClient, type QuoteRoleUser } from './quote-e2e-helpers';
 import { saveWorkbookDownload } from './workbook-download-evidence';
 import { validateQuoteWorkbook } from './quote-workbook-assertions';
 
@@ -89,6 +89,13 @@ test('quote sharing release gate: multiple members, role access and revocation t
   const probe = async (index: number, allowed: boolean) => {
     const client = viewers[index].page;
     expect((await client.request.get(root)).status()).toBe(allowed ? 200 : 403);
+    if (!allowed) {
+      const beforeDeniedWrite = (await (await page.request.get(root)).json()).data;
+      const deniedWrite = await client.request.put(root, {data:{qo_quote_customer:'Denied unshared update'}});
+      expect(deniedWrite.status()).toBe(403);
+      const afterDeniedWrite = (await (await page.request.get(root)).json()).data;
+      expect(afterDeniedWrite.qo_quote_customer).toBe(beforeDeniedWrite.qo_quote_customer);
+    }
     for (const query of ['qo_quote_bom_price_metrics', 'qo_quote_process_fee_unassigned_facts']) {
       const response = await client.request.post(`/api/meta/named-queries/${query}/execute`, {
         data: { parameters: { quoteId: quote.quoteId } },
@@ -161,7 +168,13 @@ test('quote sharing release gate: multiple members, role access and revocation t
   await expect(viewers[0].page.locator('main')).not.toContainText(/加载中\.\.\.|Loading\.\.\./);
   await expect(viewers[0].page.getByTestId('metric-strip-item-customer_code').locator('span').last()).toHaveText('-');
   await viewers[0].page.screenshot({path:testInfo.outputPath('quote-collaborator-all-tabs.png'), fullPage:true});
-  expect((await viewers[0].page.request.put(root,{data:{qo_quote_customer:'Denied shared edit'}})).status()).toBe(403);
+  // Domain write plus the existing shared update audience permits ordinary editable fields.
+  const beforeEdit0 = (await (await page.request.get(root)).json()).data;
+  const edit0 = await viewers[0].page.request.put(root,{data:{qo_quote_customer:'Shared writer customer'}});
+  expect(edit0.status()).toBe(200); expect(String((await edit0.json()).code)).toBe('0');
+  const afterEdit0 = (await (await page.request.get(root)).json()).data;
+  expect(afterEdit0.qo_quote_customer).toBe('Shared writer customer');
+  expect(Number(afterEdit0.row_version)).toBe(Number(beforeEdit0.row_version)+1);
   const reader = viewers[0].page;
   await reader.getByRole('button',{name:/修改套数/}).click();
   await reader.getByTestId('form-dialog-field-qo_quote_set_count').fill('2');
@@ -213,8 +226,14 @@ test('quote sharing release gate: multiple members, role access and revocation t
   for (const tabName of ['资料上传','BOM价格计算','加工点数','Gerber校验','报价Excel']) {
     await expect(viewers[2].page.getByRole('tab',{name:tabName,exact:true})).toBeVisible();
   }
-  // Sharing does not grant absent model-level CRUD privileges.
-  expect((await viewers[2].page.request.put(root,{data:{qo_quote_customer:'Denied generic edit'}})).status()).toBe(403);
+  // Sharing grants only the record audience; the domain duty and field policy still apply.
+  // Domain write plus the existing shared update audience permits ordinary editable fields.
+  const beforeEdit2 = (await (await page.request.get(root)).json()).data;
+  const edit2 = await viewers[2].page.request.put(root,{data:{qo_quote_customer:'Role-shared writer customer'}});
+  expect(edit2.status()).toBe(200); expect(String((await edit2.json()).code)).toBe('0');
+  const afterEdit2 = (await (await page.request.get(root)).json()).data;
+  expect(afterEdit2.qo_quote_customer).toBe('Role-shared writer customer');
+  expect(Number(afterEdit2.row_version)).toBe(Number(beforeEdit2.row_version)+1);
   const collaborator = viewers[2].page;
   await collaborator.goto(`/p/qo_quote_common/view/${quote.quoteId}#bom_price`);
   await collaborator.getByRole('button',{name:/修改套数/}).click();
@@ -276,13 +295,15 @@ test('quote sharing release gate: multiple members, role access and revocation t
     const quoteRoot = process.env.AURA_QUOTE_ROOT;
     expect(quoteRoot, 'The gate must provide its manifest-bound AURA_QUOTE_ROOT').toBeTruthy();
     expect(path.isAbsolute(quoteRoot!)).toBe(true);
+    const coreRoot = process.env.AURA_CORE_PROJECT_ROOT;
     const crmRoot = process.env.AURA_CRM_ROOT;
     const pluginsRoot = process.env.AURA_PLUGINS_PROJECT_ROOT;
-    for (const sourceRoot of [crmRoot, pluginsRoot]) {
+    for (const sourceRoot of [coreRoot, crmRoot, pluginsRoot]) {
       expect(sourceRoot, 'The gate must provide each manifest-bound dependency root').toBeTruthy();
       expect(path.isAbsolute(sourceRoot!)).toBe(true);
     }
     const dependencies = [
+      [path.join(coreRoot!, 'plugins', 'core-data-exchange'), 'com.auraboot.core-data-exchange'],
       [path.join(crmRoot!, 'plugin-aura', 'crm'), 'com.auraboot.crm'],
       [path.join(pluginsRoot!, 'pcba-crm'), 'com.auraboot.pcba-crm'],
       [path.join(pluginsRoot!, 'customer-pcba-integration'), 'com.auraboot.customer-pcba-integration'],
@@ -307,32 +328,13 @@ test('quote sharing release gate: multiple members, role access and revocation t
       expect(imported.status(), pluginId).toBe(200);
       expect((await imported.json()).success, pluginId).toBe(true);
     }
-    // A newly imported tenant has no product command entitlement yet. Use the
-    // original runtime-scoped product initialization, keeping entitlement and
-    // tenant isolation enforcement enabled for the own-record positive control.
-    const entitlementLogPath = testInfo.outputPath('foreign-product-initialization.log');
-    const entitlementLog = createWriteStream(entitlementLogPath);
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const child = spawn('bash', [path.join(quoteRoot!, 'scripts/quote-bom-env.sh'),
-          'start', process.env.AURA_RUNTIME_NAME!, '--no-reset', '--phase=import'], {
-          cwd: quoteRoot!, env: process.env, stdio: ['ignore', 'pipe', 'pipe'],
-        });
-        child.stdout.pipe(entitlementLog, { end: false });
-        child.stderr.pipe(entitlementLog, { end: false });
-        child.once('error', reject);
-        child.once('close', code => code === 0 ? resolve() : reject(new Error(
-          `Foreign product initialization failed (${code}); evidence: ${entitlementLogPath}`)));
-      });
-    } finally { entitlementLog.end(); }
-    await testInfo.attach('foreign-product-initialization', {
-      path: entitlementLogPath, contentType: 'text/plain',
-    });
+    // Product resources were imported with the foreign session above. Never run a
+    // runtime-wide initializer here: its minimal-plugin pruning mutates other tenants.
     const foreignSchema = await foreign.page.request.get('/api/pages/key/qo_quote_common_detail');
     expect(foreignSchema.status()).toBe(200);
     expect(String((await foreignSchema.json()).code)).toBe('0');
     // Registration does not grant newly imported actions. Give the foreign fixture
-    // only the declared read surfaces needed to reach the tenant record boundary.
+    // the current domain levels needed to create its own record and reach the tenant boundary.
     const foreignRoles = await foreign.page.request.get('/api/roles?keyword=tenant_admin&pageNum=1&pageSize=50');
     expect(foreignRoles.status()).toBe(200);
     const foreignAdminRole = (await foreignRoles.json()).data.records.find((role: { code: string }) => role.code === 'tenant_admin');
@@ -342,17 +344,58 @@ test('quote sharing release gate: multiple members, role access and revocation t
     expect(foreignCapabilities.status()).toBe(200);
     const declared = (await foreignCapabilities.json()).data.flatMap((group: { capabilities: Array<{ code: string; granted: boolean; conventionDerived: boolean }> }) => group.capabilities)
       .filter((capability: { conventionDerived: boolean }) => !capability.conventionDerived);
-    const readSurfaces = ['qo.cap.quote_view', 'qo.cap.surface_bom_price', 'qo.cap.surface_process_fee'];
-    for (const code of readSurfaces) expect(declared.some((capability: { code: string }) => capability.code === code), code).toBe(true);
-    const explicitRead = await foreign.page.request.put(capabilityUrl, { data: [...new Set([
-      ...declared.filter((capability: { granted: boolean }) => capability.granted).map((capability: { code: string }) => capability.code),
-      ...readSurfaces,
-    ])] });
+    const fixtureLevels = ['crm.cap.account', 'bom.cap.read', 'bom.cap.write', 'qo.cap.read', 'qo.cap.write'];
+    for (const code of fixtureLevels) expect(declared.some((capability: { code: string }) => capability.code === code), code).toBe(true);
+    // Configure only the CRM/BOM/Quote duties used to create this fixture's own
+    // quote and linked project. Replaying wildcard-derived
+    // capabilities from unrelated products may reference uninstalled definitions.
+    const explicitRead = await foreign.page.request.put(capabilityUrl, { data: fixtureLevels });
     expect(explicitRead.status()).toBe(200);
     expect(String((await explicitRead.json()).code)).toBe('0');
+    // This identity is created after the runtime's entitlement bootstrap. Import
+    // alone does not license it. Reuse only existing golden-runtime plans for
+    // this independently seeded fixture tenant, keeping enforcement enabled.
+    const { client } = await openPgClient();
+    let licensedPlugins: string[] = [];
+    try {
+      const licensed = await client.query(`
+        INSERT INTO ab_tenant_entitlement (
+          pid, tenant_id, plugin_id, plan_pid, entitlement_source, status,
+          issued_at, activated_at, created_at, updated_at
+        )
+        SELECT substr(md5('quote-bom-golden:' || $1::text || ':' || plan.plugin_id), 1, 26),
+               $1::bigint, plan.plugin_id, plan.pid, 'admin_grant', 'active',
+               CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+          FROM ab_plugin_plan plan
+         WHERE plan.plan_code = 'golden-runtime' AND plan.plugin_id = ANY($2::text[])
+           AND $1::bigint <> $3::bigint
+           AND EXISTS (
+             SELECT 1 FROM ab_tenant_member member JOIN ab_user actor ON actor.id = member.user_id
+              WHERE member.tenant_id = $1::bigint AND actor.email = $4
+           )
+        ON CONFLICT (tenant_id, plugin_id, entitlement_source, plan_pid) DO UPDATE SET
+          status = 'active', expires_at = NULL, grace_until = NULL,
+          disabled_at = NULL, disabled_reason = NULL, updated_at = CURRENT_TIMESTAMP
+        RETURNING plugin_id`, [String(foreignMe.user.tenantId), dependencies.map(([, id]) => id),
+        String(ownerMe.user.tenantId), 'e2e@test.local']);
+      licensedPlugins = licensed.rows.map((row: { plugin_id: string }) => row.plugin_id);
+    } finally { await client.end(); }
+    expect(licensedPlugins).toEqual(expect.arrayContaining([
+      'com.auraboot.crm', 'com.auraboot.bom-standardization', 'com.auraboot.quote-core',
+    ]));
+    const entitlements = await foreign.page.request.get('/api/entitlements');
+    expect(entitlements.status()).toBe(200);
+    const entitlementSnapshot = (await entitlements.json()).data;
+    expect(entitlementSnapshot.enabled).toBe(true);
+    expect(entitlementSnapshot.entitlements
+      .filter((item: { status: string; planCode: string }) => item.status === 'active' && item.planCode === 'golden-runtime')
+      .map((item: { pluginId: string }) => item.pluginId)).toEqual(expect.arrayContaining(licensedPlugins));
+    await testInfo.attach('foreign-fixture-entitlements', { body: JSON.stringify({
+      tenantId: foreignMe.user.tenantId, licensedPlugins, snapshot: entitlementSnapshot,
+    }), contentType: 'application/json' });
     // A valid own-record read prevents an uninitialized foreign product or a
     // blanket-deny session from masquerading as tenant isolation.
-    const foreignOwned = await seedBomPriceManualReviewQuote(foreign.page);
+    const foreignOwned = await seedQuoteForCorrectedBomUpload(foreign.page);
     const ownRead = await foreign.page.request.get(`/api/dynamic/qo_quote_common/${foreignOwned.quoteId}`);
     expect(ownRead.status()).toBe(200);
     expect((await ownRead.json()).data.qo_quote_code).toBe(foreignOwned.quoteCode);

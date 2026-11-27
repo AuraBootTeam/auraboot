@@ -1,0 +1,231 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+import java.security.MessageDigest
+import java.util.zip.ZipFile
+
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'com.gradleup.shadow' version '9.2.2'
+}
+
+group = 'com.auraboot'
+base { archivesName = 'mybatis-compat' }
+
+repositories { mavenCentral() }
+
+configurations {
+    originalMybatis { transitive = false }
+    relocatedInputs
+}
+dependencies {
+    originalMybatis 'org.mybatis:mybatis:3.5.19'
+    relocatedInputs 'ognl:ognl:3.4.17'
+    relocatedInputs 'org.javassist:javassist:3.33.0-GA'
+    testImplementation platform('org.junit:junit-bom:6.0.3')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+def reviewedInputs = {
+    def lock = new JsonSlurper().parse(file('upstream-inputs.json'))
+    def records = (configurations.originalMybatis.resolvedConfiguration.resolvedArtifacts +
+        configurations.relocatedInputs.resolvedConfiguration.resolvedArtifacts).collect { artifact ->
+        [coordinate: artifact.moduleVersion.id.toString(),
+         sha256: MessageDigest.getInstance('SHA-256').digest(artifact.file.bytes).encodeHex().toString()]
+    }.sort { it.coordinate }
+    if (records != lock.inputs) throw new GradleException('Carrier upstream input digest differs from reviewed source lock')
+    lock.licenses.each { license ->
+        def source = file("licenses/${license.path}")
+        if (MessageDigest.getInstance('SHA-256').digest(source.bytes).encodeHex().toString() != license.sha256) {
+            throw new GradleException('Carrier upstream license differs from reviewed source lock')
+        }
+    }
+    [lock: lock, records: records]
+}
+
+def verifiedInputs = tasks.register('verifyCarrierInputs') {
+    inputs.files(configurations.originalMybatis, configurations.relocatedInputs)
+    inputs.file('upstream-inputs.json')
+    inputs.dir('licenses')
+    // Run before any archive relocation, manifest reading or license extraction.
+    doLast { reviewedInputs() }
+}
+
+def relocated = tasks.register('relocateDependencies', ShadowJar) {
+    dependsOn verifiedInputs
+    archiveClassifier = 'relocated-inputs'
+    configurations = [project.configurations.relocatedInputs]
+    relocate 'ognl', 'org.apache.ibatis.ognl'
+    relocate 'javassist', 'org.apache.ibatis.javassist'
+    exclude 'module-info.class', 'META-INF/versions/**/module-info.class'
+    exclude 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA'
+    mergeServiceFiles()
+}
+
+def provenance = tasks.register('generateCarrierProvenance') {
+    dependsOn verifiedInputs
+    inputs.property('carrierVersion', project.version.toString())
+    inputs.files(configurations.originalMybatis, configurations.relocatedInputs)
+    inputs.file('upstream-inputs.json')
+    inputs.dir('licenses')
+    def destination = layout.buildDirectory.dir('carrier-provenance')
+    outputs.dir(destination)
+    doLast {
+        def reviewed = reviewedInputs()
+        def lock = reviewed.lock
+        def records = reviewed.records
+        def dir = destination.get().asFile
+        delete dir
+        dir.mkdirs()
+        new ZipFile(configurations.originalMybatis.singleFile).withCloseable { zip ->
+            def upstream = new java.util.jar.Manifest(zip.getInputStream(zip.getEntry('META-INF/MANIFEST.MF')))
+            def retained = new java.util.jar.Manifest()
+            retained.mainAttributes.putAll(upstream.mainAttributes)
+            ['Implementation-Title', 'Implementation-Version', 'Implementation-Vendor', 'Git-Revision', 'Bundle-Version'].each {
+                retained.mainAttributes.remove(new java.util.jar.Attributes.Name(it))
+            }
+            new File(dir, 'source-manifest.mf').withOutputStream { retained.write(it) }
+        }
+        (configurations.originalMybatis.resolvedConfiguration.resolvedArtifacts +
+            configurations.relocatedInputs.resolvedConfiguration.resolvedArtifacts).each { artifact ->
+            new ZipFile(artifact.file).withCloseable { zip ->
+                zip.entries().each { entry ->
+                    if (!entry.directory && entry.name.tokenize('/').last() ==~ /(?i)(LICENSE|NOTICE|COPYING).*/) {
+                        def base = new File(dir, "licenses/${artifact.name}-${artifact.moduleVersion.id.version}")
+                            .toPath().toAbsolutePath().normalize()
+                        def targetPath = base.resolve(entry.name).normalize()
+                        if (entry.name.contains('\\') || entry.name.startsWith('/')
+                                || entry.name ==~ /^[A-Za-z]:.*/ || !targetPath.startsWith(base)) {
+                            throw new GradleException('Carrier license entry escapes its reviewed input directory')
+                        }
+                        def target = targetPath.toFile()
+                        target.parentFile.mkdirs()
+                        target.bytes = zip.getInputStream(entry).bytes
+                    }
+                }
+            }
+        }
+        lock.licenses.each { license ->
+            def source = file("licenses/${license.path}")
+            def target = new File(dir, "licenses/${license.path}")
+            target.parentFile.mkdirs()
+            target.bytes = source.bytes
+        }
+        new File(dir, 'inputs.json').text = JsonOutput.prettyPrint(JsonOutput.toJson([
+            carrier: "com.auraboot:mybatis-compat:${project.version}",
+            backport: 'mybatis-3.5.19-ognl-3.4.17-auraboot.1',
+            original: 'org.mybatis:mybatis:3.5.19',
+            policy: 'Unmodified MyBatis classes; replaced relocated OGNL and Javassist; AuraBoot vendor build, not an upstream release',
+            inputs: records,
+        ])) + '\n'
+        new File(dir, 'pom.properties').text = "groupId=com.auraboot\nartifactId=mybatis-compat\nversion=${project.version}\n"
+        new File(dir, 'sbom.cdx.json').text = JsonOutput.prettyPrint(JsonOutput.toJson([
+            bomFormat: 'CycloneDX', specVersion: '1.6', version: 1,
+            metadata: [component: [type: 'library', group: 'com.auraboot', name: 'mybatis-compat', version: project.version.toString(),
+                pedigree: [ancestors: [[type: 'library', group: 'org.mybatis', name: 'mybatis', version: '3.5.19']]]]],
+            components: records.findAll { !it.coordinate.startsWith('org.mybatis:') }.collect { item ->
+                def parts = item.coordinate.split(':')
+                [type: 'library', group: parts[0], name: parts[1], version: parts[2],
+                 hashes: [[alg: 'SHA-256', content: item.sha256]]]
+            },
+        ])) + '\n'
+    }
+}
+
+tasks.named('jar', Jar) {
+    // Build inputs may be materialized under a private CI umask; archive identity must not inherit it.
+    filePermissions { unix('rw-r--r--') }
+    dirPermissions { unix('rwxr-xr-x') }
+    dependsOn relocated, provenance
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+    from({ zipTree(configurations.originalMybatis.singleFile) }) {
+        exclude 'org/apache/ibatis/ognl/**', 'org/apache/ibatis/javassist/**'
+        exclude 'META-INF/maven/ognl/**', 'META-INF/maven/org.javassist/**'
+        exclude 'META-INF/maven/org.mybatis/mybatis/**', 'META-INF/MANIFEST.MF'
+        exclude 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA'
+    }
+    from({ zipTree(relocated.get().archiveFile.get().asFile) }) {
+        exclude 'META-INF/MANIFEST.MF'
+        // Keep every bundled license under its own input-specific path below.
+        exclude 'META-INF/LICENSE*', 'META-INF/NOTICE*', 'LICENSE*', 'NOTICE*'
+    }
+    from(provenance) {
+        include 'inputs.json', 'sbom.cdx.json'
+        into 'META-INF/auraboot/mybatis-compat'
+    }
+    from(provenance) {
+        include 'pom.properties'
+        into 'META-INF/maven/com.auraboot/mybatis-compat'
+    }
+    from('NOTICE.auraboot') { into 'META-INF/auraboot/mybatis-compat' }
+    from(provenance) {
+        include 'licenses/**'
+        into 'META-INF/auraboot/mybatis-compat'
+    }
+    manifest {
+        from { layout.buildDirectory.file('carrier-provenance/source-manifest.mf').get().asFile }
+        attributes 'Automatic-Module-Name': 'org.mybatis',
+            'Implementation-Title': 'AuraBoot compatible MyBatis OGNL security carrier',
+            'Implementation-Version': project.version,
+            'Implementation-Vendor': 'AuraBoot',
+            'Bundle-Version': '3.5.19.auraboot1',
+            'MyBatis-Original-Version': '3.5.19',
+            'MyBatis-Backport-Version': '3.5.19-auraboot.1',
+            'OGNL-Version': '3.4.17'
+    }
+}
+
+tasks.named('shadowJar') { enabled = false }
+afterEvaluate {
+    components.java.withVariantsFromConfiguration(configurations.shadowRuntimeElements) { skip() }
+    // The implementation comes from reviewed JAR inputs, not an empty classes directory.
+    [configurations.apiElements, configurations.runtimeElements].each { variant ->
+        variant.outgoing.variants.removeAll { it.name in ['classes', 'resources'] }
+    }
+}
+
+def inputSecurity = tasks.register('verifyCarrierBuildInputSecurity', Exec) {
+    dependsOn tasks.named('jar')
+    def script = rootProject.file('../scripts/ci/verify-carrier-build-inputs.py')
+    def conventions = rootProject.file('gradle/java-conventions.gradle')
+    def output = layout.buildDirectory.dir('input-security-verification')
+    inputs.files(script, conventions, 'build.gradle', 'gradle.lockfile', 'NOTICE.auraboot', 'upstream-inputs.json')
+    inputs.dir('licenses')
+    inputs.property('carrierVersion', project.version.toString())
+    inputs.file(tasks.named('jar').flatMap { it.archiveFile })
+    outputs.file(output.map { it.file('result.json') })
+    doFirst {
+        commandLine(System.getenv('AURA_TEST_PYTHON') ?: 'python3', script.absolutePath,
+            '--module', projectDir.absolutePath, '--conventions', conventions.absolutePath,
+            '--gradle', new File(gradle.gradleHomeDir, 'bin/gradle').absolutePath,
+            '--gradle-home', gradle.gradleUserHomeDir.absolutePath, '--version', project.version.toString(),
+            '--expected-jar', tasks.named('jar').get().archiveFile.get().asFile.absolutePath,
+            '--output', output.get().asFile.absolutePath)
+    }
+}
+
+tasks.named('test', Test) {
+    dependsOn inputSecurity
+    dependsOn tasks.named('jar')
+    doFirst {
+        systemProperty 'carrier.original', configurations.originalMybatis.singleFile.absolutePath
+        systemProperty 'carrier.patched', tasks.named('jar').get().archiveFile.get().asFile.absolutePath
+        systemProperty 'carrier.version', project.version
+    }
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifactId = 'mybatis-compat'
+            pom {
+                name = 'AuraBoot compatible MyBatis security carrier'
+                description = 'Vendor-qualified MyBatis 3.5.19 with relocated OGNL 3.4.17; not an official MyBatis release'
+                licenses { license { name = 'Apache License, Version 2.0'; url = 'https://www.apache.org/licenses/LICENSE-2.0.txt' } }
+            }
+        }
+    }
+}

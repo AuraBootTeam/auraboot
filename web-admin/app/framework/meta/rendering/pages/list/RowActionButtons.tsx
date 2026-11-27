@@ -26,6 +26,7 @@ function DropdownMenu({
   resolveButtonLabel,
   handleAction,
   setOpen,
+  isDisabled,
 }: {
   menuRef: React.RefObject<HTMLDivElement | null>;
   menuId: string;
@@ -34,6 +35,7 @@ function DropdownMenu({
   resolveButtonLabel: (button: ButtonConfig) => string;
   handleAction: (button: ButtonConfig, record?: any) => void;
   setOpen: (v: boolean) => void;
+  isDisabled: (button: ButtonConfig) => boolean;
 }) {
   // Compute initial position synchronously from the trigger so the menu
   // never paints at (0,0) — that flash placed the menu off-screen / off
@@ -84,13 +86,14 @@ function DropdownMenu({
           key={btn.code}
           data-testid={`row-action-${btn.code}`}
           role="menuitem"
+          disabled={isDisabled(btn)}
           data-authoring-node-id={(btn as any).id || btn.code}
           onClick={(e) => {
             e.stopPropagation();
             setOpen(false);
             handleAction(btn, record);
           }}
-          className={`block w-full px-3 py-1.5 text-left text-sm transition-colors ${
+          className={`block w-full px-3 py-1.5 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
             btn.danger ? 'text-status-red hover:bg-status-red-bg' : 'text-text-2 hover:bg-hover'
           }`}
         >
@@ -149,6 +152,11 @@ export function RowActionButtons({
   // Same split the column-width estimator uses, so the column is always sized
   // for the layout we actually render.
   const { inline: inlineButtons, overflow: moreButtons } = partitionRowActions(visibleButtons);
+  const isDisabled = (button: ButtonConfig) => Boolean(
+    button.disabled ||
+    (button.disableWhen && evaluateVisibleWhen(button.disableWhen, record)) ||
+    (button.enableWhen && !evaluateVisibleWhen(button.enableWhen, record)),
+  );
 
   return (
     <div className="inline-flex items-center justify-start gap-1">
@@ -161,6 +169,7 @@ export function RowActionButtons({
             data-testid={`row-action-${btn.code}`}
             data-authoring-node-id={(btn as any).id || btn.code}
             title={label}
+            disabled={isDisabled(btn)}
             onClick={(e) => {
               e.stopPropagation();
               handleAction(btn, record);
@@ -168,7 +177,7 @@ export function RowActionButtons({
             // `truncate` (which implies whitespace-nowrap) + `min-w-0` make label
             // wrapping impossible: a label too wide for the column degrades to an
             // ellipsis instead of folding onto a second line and inflating the row.
-            className={`rounded-control min-w-0 truncate px-2 py-1 text-sm font-medium transition-colors ${
+            className={`rounded-control min-w-0 truncate px-2 py-1 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
               btn.danger
                 ? 'text-status-red hover:bg-status-red-bg hover:text-red-800'
                 : 'text-accent hover:bg-accent-weak hover:text-blue-800'
@@ -228,6 +237,7 @@ export function RowActionButtons({
                 resolveButtonLabel={resolveButtonLabel}
                 handleAction={handleAction}
                 setOpen={setOpen}
+          isDisabled={isDisabled}
               />,
               document.body,
             )}

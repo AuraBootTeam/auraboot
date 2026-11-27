@@ -41,10 +41,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *   <li>{@code /api/admin/cloud-config} — CloudConfigController (list)</li>
  * </ul>
  *
- * <p>Test T3 and T4 seed a {@code platform_admin} role row via JDBC using the
- * same schema shape as the tenant_admin seeding helpers. The interceptor checks
- * role codes from the {@code ab_role} table, so no special schema migration is
- * required beyond inserting a row with {@code code='platform_admin'}.
+ * <p>T3/T4 use an owned System-tenant global platform grant while the request remains scoped
+ * to an ordinary business tenant. Business membership and platform qualification are separate.
  */
 @Commit
 @Transactional(propagation = Propagation.NEVER)
@@ -59,6 +57,11 @@ class AdminRoleInterceptorPathScopeIntegrationTest extends BaseIntegrationTest {
 
     /** A GET that hits CloudConfigController (platform_admin required path, cloud-config subtree). */
     private static final String CLOUD_URL = "/api/admin/cloud-config";
+
+    private com.auraboot.framework.integration.PlatformAdministrationFixture platformFixture;
+    @org.junit.jupiter.api.AfterEach void cleanupPlatformFixture() {
+        if (platformFixture != null) platformFixture.close();
+    }
 
     @Autowired private WebApplicationContext webApplicationContext;
     @Autowired private JdbcTemplate jdbc;
@@ -127,7 +130,8 @@ class AdminRoleInterceptorPathScopeIntegrationTest extends BaseIntegrationTest {
     @DisplayName("T3: platform_admin passes through on /api/admin/infrastructure/**")
     void platformAdmin_canAccess_infrastructureEndpoint() throws Exception {
         tenantId = TestIdGenerator.uniqueTenantId();
-        AdminGuardTestSupport.grantPlatformAdmin(jdbc, tenantId, testUser.getId());
+        AdminGuardTestSupport.grantRole(jdbc, tenantId, testUser.getId(), "platform_context_viewer");
+        platformFixture = com.auraboot.framework.integration.PlatformAdministrationFixture.grant(jdbc, testUser.getId());
 
         // The interceptor allows; InfrastructureController.status() always returns code "0".
         mockMvc().perform(get(INFRA_URL).contentType(MediaType.APPLICATION_JSON))
@@ -143,7 +147,8 @@ class AdminRoleInterceptorPathScopeIntegrationTest extends BaseIntegrationTest {
     @DisplayName("T4: platform_admin can use authenticated-only user picker search")
     void platformAdmin_canUseUserPickerSearch() throws Exception {
         tenantId = TestIdGenerator.uniqueTenantId();
-        AdminGuardTestSupport.grantPlatformAdmin(jdbc, tenantId, testUser.getId());
+        AdminGuardTestSupport.grantRole(jdbc, tenantId, testUser.getId(), "platform_context_viewer");
+        platformFixture = com.auraboot.framework.integration.PlatformAdministrationFixture.grant(jdbc, testUser.getId());
 
         mockMvc().perform(get(USERS_URL).contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())

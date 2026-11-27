@@ -1,8 +1,8 @@
 /**
- * List ViewModel ↔ PageSchema.blocks mapper
+ * List ViewModel ↔ UnifiedPageSchema.blocks mapper
  *
  * Per design §3.3 principle 8: `ListConfigPanel` is a deterministic projection
- * of `PageSchema.blocks`. Round-trip `blocksToViewModel(viewModelToBlocks(vm))`
+ * of `UnifiedPageSchema.blocks`. Round-trip `blocksToViewModel(viewModelToBlocks(vm))`
  * must be identity for any valid VM.
  *
  * VM is an ergonomic editor shape (columns / filters / toolbar / behavior);

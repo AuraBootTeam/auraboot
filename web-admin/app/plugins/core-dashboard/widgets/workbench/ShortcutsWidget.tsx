@@ -5,7 +5,7 @@
  * Falls back to visible menu entries when no favorites are configured.
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import {
   listFavorites,
@@ -14,6 +14,7 @@ import {
   type UserEngagement,
 } from '~/shared/services/engagementService';
 import { AddFavoriteModal } from '~/plugins/core-dashboard/widgets/workbench/AddFavoriteModal';
+import { useFittingRows } from '~/plugins/core-dashboard/widgets/workbench/useFittingRows';
 import { useRootLoaderData } from '~/root-data';
 import { resolveIcon } from '~/utils/icon-resolver';
 
@@ -41,6 +42,8 @@ const I18N_KEYS = {
   edit: 'workbench.shortcuts.edit',
   done: 'workbench.shortcuts.done',
   customize: 'workbench.shortcuts.customize',
+  more: 'workbench.shortcuts.more',
+  collapse: 'workbench.shortcuts.collapse',
   addShortcut: 'workbench.shortcuts.add',
   newLead: 'workbench.shortcuts.newLead',
   newAccount: 'workbench.shortcuts.newAccount',
@@ -208,6 +211,19 @@ export function ShortcutsWidget({
     setDropIndex(null);
   }, []);
 
+  // The list shows whole rows only: as many as fit in the card are shown and the rest sit behind a
+  // "More" control.
+  const listRef = useRef<HTMLUListElement>(null);
+  const fittingRows = useFittingRows(listRef, [items.length, loading]);
+  const [expanded, setExpanded] = useState(false);
+
+  // Until the list has been measured (and wherever it cannot be, as in tests without layout) every row is shown.
+  const visibleItems =
+    !expanded && !editing && fittingRows !== null && items.length > fittingRows
+      ? items.slice(0, fittingRows)
+      : items;
+  const hiddenCount = items.length - visibleItems.length;
+
   const cardClass = `rounded-[10px] bg-white border border-[#e3e8ee] dark:bg-gray-900 dark:border-gray-700 flex h-full flex-col ${className}`;
 
   if (loading) {
@@ -236,20 +252,35 @@ export function ShortcutsWidget({
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-3 pb-2">
         <h2 className="text-sm font-medium text-gray-700 dark:text-gray-200">{displayTitle}</h2>
-        {isFromFavorites && (
-          <button
-            type="button"
-            onClick={toggleEditing}
-            className="text-xs text-gray-400 transition-colors hover:text-blue-500"
-          >
-            {editing ? t(I18N_KEYS.done, undefined, '完成') : t(I18N_KEYS.edit, undefined, '编辑')}
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {(hiddenCount > 0 || (expanded && !editing)) && (
+            <button
+              type="button"
+              onClick={() => setExpanded((prev) => !prev)}
+              aria-expanded={expanded}
+              className="text-xs text-gray-400 transition-colors hover:text-blue-500"
+              data-testid="shortcuts-more-button"
+            >
+              {expanded
+                ? t(I18N_KEYS.collapse, undefined, '收起')
+                : `${t(I18N_KEYS.more, undefined, '更多')} (${hiddenCount})`}
+            </button>
+          )}
+          {isFromFavorites && (
+            <button
+              type="button"
+              onClick={toggleEditing}
+              className="text-xs text-gray-400 transition-colors hover:text-blue-500"
+            >
+              {editing ? t(I18N_KEYS.done, undefined, '完成') : t(I18N_KEYS.edit, undefined, '编辑')}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Vertical list */}
-      <ul data-testid="shortcuts-list" className="flex-1 overflow-y-auto px-2 pb-2">
-        {items.map((item, index) => {
+      <ul ref={listRef} data-testid="shortcuts-list" className="flex-1 overflow-y-auto px-2 pb-2">
+        {visibleItems.map((item, index) => {
           const isDragging = dragIndex === index;
           const isDropTarget =
             dropIndex === index && dragIndex !== null && dragIndex !== index;

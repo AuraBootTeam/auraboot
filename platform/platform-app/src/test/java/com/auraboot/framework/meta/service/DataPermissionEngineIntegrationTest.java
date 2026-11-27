@@ -2,8 +2,6 @@ package com.auraboot.framework.meta.service;
 
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.dto.PermissionCreateRequest;
-import com.auraboot.framework.permission.constants.MetaPermission;
-import com.auraboot.framework.dataquality.ge.mapper.AbDataQualityValidationRunMapper;
 import org.springframework.web.context.WebApplicationContext;
 import jakarta.servlet.Filter;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
@@ -105,9 +103,8 @@ class DataPermissionEngineIntegrationTest {
     @Autowired private MetaFieldService metaFieldService;
     @Autowired private DataScopeService dataScopeService;
     @Autowired private PermissionService permissionService;
-    @Autowired private PermissionMapper qualityPermissionMapper;
-    @Autowired private AbDataQualityValidationRunMapper qualityRuns;
-    @Autowired private WebApplicationContext qualityWebContext;
+    @Autowired private PermissionMapper queryPermissionMapper;
+    @Autowired private WebApplicationContext queryWebContext;
 
     @Autowired private QueryBuilderReadProtection scoringReadProtection;
     @Autowired private com.auraboot.framework.permission.engine.PermissionEvaluator scoringPermissions;
@@ -130,9 +127,6 @@ class DataPermissionEngineIntegrationTest {
         localUser = ensureTestUser();
         localTenant = ensureTestTenant();
         localTenantMember = ensureTestTenantMember();
-        localRole = createFreshRole();
-        ensureUserRoleBinding();
-        
         MetaContext.setContext(
             localTenant.getId(),
             localUser.getId(),
@@ -140,6 +134,8 @@ class DataPermissionEngineIntegrationTest {
             localUser.getUserName()
         );
         MetaContext.setMemberId(localTenantMember.getId());
+        localRole = createFreshRole();
+        ensureUserRoleBinding();
     }
     
     private User ensureTestUser() {
@@ -495,138 +491,15 @@ class DataPermissionEngineIntegrationTest {
     }
 
     @Test
-    void dataQualityHttpProtectsSourceCountsFieldsAndRevokedHistory() throws Exception {
-        String marker = Long.toUnsignedString(System.nanoTime());
-        String modelCode = "quality_scope_" + marker;
-        String fieldCode = "quality_value_" + marker;
-        String tableName = "mt_" + modelCode;
-        Long tenantId = localTenant.getId();
-        MetaModelCreateRequest modelRequest = new MetaModelCreateRequest();
-        modelRequest.setCode(modelCode);
-        modelRequest.setDisplayName("Quality source scope fixture");
-        modelRequest.setModelCategory("entity");
-        modelRequest.setTableName(tableName);
-        var model = metaModelService.create(modelRequest);
-        MetaFieldCreateRequest fieldRequest = new MetaFieldCreateRequest();
-        fieldRequest.setCode(fieldCode);
-        fieldRequest.setDataType("string");
-        fieldRequest.setAutoPublish(true);
-        var field = metaFieldService.create(fieldRequest);
-        metaModelService.bindFieldToModel(model.getId(), field.getId(), 1,
-                false, true, false, null, null, null, null);
-        metaModelService.publish(model.getPid(), "Quality source integration fixture");
-        assertEquals(tableName, metaModelService.getModelDefinitionFromDb(modelCode).orElseThrow().getTableName());
-        Long readId = permissionService.findByCode("model." + modelCode + ".read").getId();
-        Long createId = permissionService.findByCode("model." + modelCode + ".create").getId();
-        String qualityAction = MetaPermission.META_CHATBI_USE;
-        var qualityPermission = qualityPermissionMapper.findByCode(qualityAction);
-        Long qualityId;
-        if (qualityPermission == null) {
-            var request = new PermissionCreateRequest();
-            request.setCode(qualityAction);
-            request.setName("Quality fixture runtime action");
-            request.setResourceType("meta");
-            request.setResourceCode("chatbi");
-            request.setAction("use");
-            qualityId = permissionService.create(request).getId();
-        } else {
-            qualityId = qualityPermission.getId();
-        }
-        List<Long> grants = List.of(readId, createId, qualityId);
-        assertTrue(roleService.assignPermissions(localRole.getId(), grants));
-        dataScopeService.setScope(tenantId, localRole.getId(), modelCode, "create", "all", "MAX");
-        dataScopeService.setScope(tenantId, localRole.getId(), modelCode, "read", "self", "MAX");
-        User actor = userService.signUp("quality-actor-" + marker + "@auraboot.com", "test-password-123");
-        User other = userService.signUp("quality-other-" + marker + "@auraboot.com", "test-password-123");
-        TenantMember actorMember = tenantMemberService.addMember(actor.getId(), tenantId, "active");
-        TenantMember otherMember = tenantMemberService.addMember(other.getId(), tenantId, "active");
-        for (TenantMember member : List.of(actorMember, otherMember)) {
-            assertTrue(userRoleService.assignRolesToMember(member.getId(), List.of(localRole.getId()),
-                    tenantId, localUser.getId()));
-            assertEquals(Set.of(localRole.getId()), userRoleService.findByMemberIdAndTenantId(member.getId(), tenantId)
-                    .stream().map(UserRole::getRoleId).collect(java.util.stream.Collectors.toSet()));
-        }
-        try {
-            applyScopeActor(actor, actorMember);
-            String ownPid = String.valueOf(dynamicDataService.create(modelCode, Map.of(fieldCode, "OK")).get("pid"));
-            applyScopeActor(other, otherMember);
-            String otherPid = String.valueOf(dynamicDataService.create(modelCode, Map.of(fieldCode, "BAD")).get("pid"));
-            assertNotEquals(ownPid, otherPid);
-            assertEquals(2L, jdbcTemplate.queryForObject("SELECT count(*) FROM " + tableName
-                    + " WHERE tenant_id = ?", Long.class, tenantId));
-            applyScopeActor(actor, actorMember);
-            Filter principalFilter = (request, response, chain) -> {
-                applyScopeActor(actor, actorMember);
-                var principal = new CustomUserDetails(
-                        actor.getUserName(), "test-password", actor.getId(), actor.getPid(),
-                        AuthorityUtils.NO_AUTHORITIES,
-                        true, true, true, true);
-                SecurityContextHolder.getContext().setAuthentication(
-                        new UsernamePasswordAuthenticationToken(
-                                principal, null, principal.getAuthorities()));
-                try {
-                    chain.doFilter(request, response);
-                } finally {
-                    SecurityContextHolder.clearContext();
-                    applyScopeActor(actor, actorMember);
-                }
-            };
-            var mvc = MockMvcBuilders.webAppContextSetup(qualityWebContext)
-                    .addFilter(principalFilter, "/*").build();
-            String expectations = objectMapper.writeValueAsString(List.of(
-                    Map.of("expectation_type", "expect_table_row_count_to_be_between",
-                            "kwargs", Map.of("min_value", 1, "max_value", 1)),
-                    Map.of("expectation_type", "expect_column_values_to_not_be_null",
-                            "kwargs", Map.of("column", fieldCode)),
-                    Map.of("expectation_type", "expect_column_values_to_be_in_set",
-                            "kwargs", Map.of("column", fieldCode, "value_set", List.of("OK")))));
-            String body = objectMapper.writeValueAsString(Map.of("suiteName", "quality-" + marker,
-                    "datasetName", tableName, "expectationsJson", expectations));
-            var created = mvc.perform(MockMvcRequestBuilders
-                            .post("/api/dataquality/expectations").contentType("application/json").content(body))
-                    .andReturn();
-            assertNull(created.getResolvedException(), "Suite creation must complete without a handled exception");
-            assertEquals(200, created.getResponse().getStatus());
-            String response = created.getResponse().getContentAsString();
-            assertTrue(objectMapper.readTree(response).required("ok").asBoolean());
-            String suitePid = objectMapper.readTree(response).required("suitePid").asText();
-            assertFalse(suitePid.isBlank());
-            assertQualityRun(mvc, suitePid, 3, 0, List.of(1L, 0L, 0L));
-            assertEquals(1, qualityRuns.listBySuite(tenantId, suitePid).size());
-
-            assertTrue(roleService.removePermissions(localRole.getId(), List.of(readId)));
-            assertQualityDeniedWithoutRun(mvc, suitePid, body, tenantId, 1);
-            assertTrue(roleService.assignPermissions(localRole.getId(), grants));
-            for (String mask : List.of("hide", "partial")) {
-                DataPermissionPolicyCreateRequest request = new DataPermissionPolicyCreateRequest();
-                request.setName("Quality protected input " + mask + marker);
-                request.setModelCode(modelCode);
-                request.setPolicyType("column");
-                request.setFieldCode(fieldCode);
-                request.setMaskType(mask);
-                var policy = policyService.create(request);
-                policyService.bindToRole(policy.getPid(), localRole.getPid());
-                assertQualityDeniedWithoutRun(mvc, suitePid, body, tenantId, 1);
-                policyService.disable(policy.getPid());
-            }
-            dataScopeService.setScope(tenantId, localRole.getId(), modelCode, "read", "all", "MAX");
-            assertQualityRun(mvc, suitePid, 1, 2, List.of(2L, 0L, 1L));
-            dataScopeService.setScope(tenantId, localRole.getId(), modelCode, "read", "none", "MAX");
-            assertQualityRun(mvc, suitePid, 2, 1, List.of(0L, 0L, 0L));
-            dataScopeService.setScope(tenantId, localRole.getId(), modelCode, "read", "self", "MAX");
-            assertQualityRun(mvc, suitePid, 3, 0, List.of(1L, 0L, 0L));
-            assertEquals(4, qualityRuns.listBySuite(tenantId, suitePid).size());
-            mvc.perform(MockMvcRequestBuilders
-                            .get("/api/dataquality/expectations/" + suitePid + "/runs"))
-                    .andExpect(MockMvcResultMatchers.status().isOk())
-                    .andExpect(MockMvcResultMatchers.jsonPath("$.length()").value(4));
-            assertTrue(roleService.removePermissions(localRole.getId(), List.of(qualityId)));
-            assertQualityDeniedWithoutRun(mvc, suitePid, body, tenantId, 4);
-            assertEquals(1L, jdbcTemplate.queryForObject("SELECT count(*) FROM ab_dataquality_expectation_suite"
-                    + " WHERE tenant_id = ? AND dataset_name = ?", Long.class, tenantId, tableName));
-        } finally {
-            applyScopeActor(localUser, localTenantMember);
-        }
+    void retiredDataQualityRoutesAreAbsentWhileSharedCapabilitiesRemain() {
+        var mappings = queryWebContext.getBean("requestMappingHandlerMapping",
+                org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping.class);
+        Set<String> paths = mappings.getHandlerMethods().keySet().stream()
+                .flatMap(mapping -> mapping.getPatternValues().stream())
+                .collect(java.util.stream.Collectors.toSet());
+        assertFalse(paths.stream().anyMatch(path -> path.startsWith("/api/dataquality/expectations")));
+        assertTrue(paths.contains("/api/dataquality/dbt/ingest"));
+        assertTrue(paths.contains("/api/query-builder/execute"));
     }
 
     @Test
@@ -664,7 +537,7 @@ class DataPermissionEngineIntegrationTest {
         assertNotEquals(hidden, hiddenColumn);
         Long readId = permissionService.findByCode("model." + modelCode + ".read").getId();
         Long createId = permissionService.findByCode("model." + modelCode + ".create").getId();
-        var queryPermission = qualityPermissionMapper.findByCode("query_builder");
+        var queryPermission = queryPermissionMapper.findByCode("query_builder");
         Long queryId;
         if (queryPermission == null) {
             var action = new PermissionCreateRequest(); action.setCode("query_builder");
@@ -703,7 +576,7 @@ class DataPermissionEngineIntegrationTest {
                 try { chain.doFilter(request, response); }
                 finally { SecurityContextHolder.clearContext(); applyScopeActor(actor, actorMember); }
             };
-            var mvc = MockMvcBuilders.webAppContextSetup(qualityWebContext).addFilter(principalFilter, "/*").build();
+            var mvc = MockMvcBuilders.webAppContextSetup(queryWebContext).addFilter(principalFilter, "/*").build();
             Map<String, Object> projection = Map.of("modelCode", modelCode,
                     "fields", List.of("pid", visible, secret));
             var result = queryFixtureResult(mvc, projection, 200);
@@ -751,8 +624,8 @@ class DataPermissionEngineIntegrationTest {
             policyRequest.setName("Structured query partial " + marker);
             policyRequest.setModelCode(modelCode); policyRequest.setPolicyType("column");
             policyRequest.setFieldCode(secret); policyRequest.setMaskType("partial");
-            var policy = policyService.create(policyRequest);
-            policyService.bindToRole(policy.getPid(), localRole.getPid());
+            var policy = asPolicyAuthor(() -> policyService.create(policyRequest));
+            asPolicyAuthor(() -> { policyService.bindToRole(policy.getPid(), localRole.getPid()); return null; });
             var masked = queryFixtureResult(mvc, projection, 200);
             assertEquals(1, masked.size());
             assertEquals(ownPid, masked.get(0).get("pid").asText());
@@ -769,8 +642,13 @@ class DataPermissionEngineIntegrationTest {
                 var dto = new com.auraboot.framework.meta.dto.QueryBuilderDTO(); dto.setModelCode(modelCode);
                 use.accept(dto); queryFixtureResult(mvc, dto, 403);
             }
-            policyService.disable(policy.getPid());
+            asPolicyAuthor(() -> { policyService.disable(policy.getPid()); return null; });
+            var countRequest = new com.auraboot.framework.meta.dto.QueryBuilderDTO();
+            countRequest.setModelCode(modelCode);
+            queryFixtureUses(secret).get(4).accept(countRequest);
+            assertEquals(1L, queryFixtureResult(mvc, countRequest, 200).get(0).get("field_count").asLong());
             dataScopeService.setScope(tenantId, localRole.getId(), modelCode, "read", "all", "MAX");
+            assertEquals(2L, queryFixtureResult(mvc, countRequest, 200).get(0).get("field_count").asLong());
             var all = queryFixtureResult(mvc, projection, 200);
             assertEquals(Set.of(ownPid, otherPid), java.util.stream.StreamSupport.stream(all.spliterator(), false)
                     .map(row -> row.get("pid").asText()).collect(java.util.stream.Collectors.toSet()));
@@ -783,6 +661,7 @@ class DataPermissionEngineIntegrationTest {
             assertTrue(roleService.assignPermissions(localRole.getId(), List.of(readId, createId, queryId)));
             dataScopeService.setScope(tenantId, localRole.getId(), modelCode, "read", "none", "MAX");
             assertEquals(0, queryFixtureResult(mvc, projection, 200).size());
+            assertEquals(0L, queryFixtureResult(mvc, countRequest, 200).get(0).get("field_count").asLong());
             List<Map<String, Object>> stored = jdbcTemplate.queryForList("SELECT pid, " + visible + ", "
                     + secretColumn + " FROM " + table + " WHERE tenant_id = ?", tenantId);
             assertEquals(2, stored.size());
@@ -790,6 +669,35 @@ class DataPermissionEngineIntegrationTest {
             for (var row : stored) persisted.put(String.valueOf(row.get("pid")), String.valueOf(row.get(secretColumn)));
             assertEquals(Map.of(ownPid, "12345678901", otherPid, "98765432109"), persisted);
         } finally { applyScopeActor(localUser, localTenantMember); }
+    }
+
+    private <T> T asPolicyAuthor(java.util.function.Supplier<T> action) {
+        var previous = MetaContext.snapshot();
+        try {
+            applyScopeActor(localUser, localTenantMember);
+            var author = userService.signUp("policy-author-" + System.nanoTime() + "@auraboot.com", "test-password-123");
+            var member = tenantMemberService.addMember(author.getId(), localTenant.getId(), "active");
+            var admin = roleService.findByTenantId(localTenant.getId()).stream()
+                    .filter(role -> "tenant_admin".equals(role.getCode())).findFirst().orElseGet(() -> {
+                        Role role = new Role();
+                        org.springframework.beans.BeanUtils.copyProperties(localRole, role, "id", "pid", "code", "name");
+                        role.setPid(UniqueIdGenerator.generate()); role.setCode("tenant_admin");
+                        role.setName("Policy author"); return roleService.createRole(role);
+                    });
+            var permission = queryPermissionMapper.findByCode("meta.permission.update");
+            Long permissionId;
+            if (permission == null) {
+                var request = new PermissionCreateRequest(); request.setCode("meta.permission.update");
+                request.setName("Policy management"); request.setResourceType("meta");
+                request.setResourceCode("permission"); request.setAction("update");
+                permissionId = permissionService.create(request).getId();
+            } else { permissionId = permission.getId(); }
+            assertTrue(roleService.assignPermissions(admin.getId(), List.of(permissionId)));
+            assertTrue(userRoleService.assignRolesToMember(member.getId(), List.of(admin.getId()),
+                    localTenant.getId(), localUser.getId()));
+            applyScopeActor(author, member);
+            return action.get();
+        } finally { MetaContext.restore(previous); }
     }
 
     private com.fasterxml.jackson.databind.JsonNode queryFixtureResult(MockMvc mvc, Object request, int status) throws Exception {
@@ -1030,46 +938,6 @@ class DataPermissionEngineIntegrationTest {
             scores.put(String.valueOf(row.get("pid")), ((Number) row.get(scoreField)).intValue());
         }
         assertEquals(Map.of(ownPid, ownScore, otherPid, otherScore), scores);
-    }
-
-    private void assertQualityRun(MockMvc mvc, String suitePid,
-                                  int passed, int failed, List<Long> values) throws Exception {
-        String response = mvc.perform(MockMvcRequestBuilders
-                        .post("/api/dataquality/expectations/" + suitePid + "/run"))
-                .andExpect(MockMvcResultMatchers.status().isOk())
-                .andExpect(MockMvcResultMatchers.jsonPath("$.ok").value(true))
-                .andExpect(MockMvcResultMatchers.jsonPath("$.totalExpectations").value(3))
-                .andExpect(MockMvcResultMatchers.jsonPath("$.passed").value(passed))
-                .andExpect(MockMvcResultMatchers.jsonPath("$.failed").value(failed))
-                .andReturn().getResponse().getContentAsString();
-        String pid = objectMapper.readTree(response).required("runPid").asText();
-        var matches = qualityRuns.listBySuite(localTenant.getId(), suitePid).stream()
-                .filter(run -> pid.equals(run.getPid())).toList();
-        assertEquals(1, matches.size());
-        var run = matches.getFirst();
-        assertEquals(3, run.getTotalExpectations());
-        assertEquals(passed, run.getPassed());
-        assertEquals(failed, run.getFailed());
-        var results = objectMapper.readTree(run.getResultsJson());
-        assertEquals(3, results.size());
-        for (int i = 0; i < values.size(); i++) {
-            assertEquals(values.get(i).longValue(), results.get(i).required("actual_value").asLong());
-        }
-    }
-
-    private void assertQualityDeniedWithoutRun(MockMvc mvc,
-                                               String suitePid, String body, Long tenantId,
-                                               int previousRuns) throws Exception {
-        mvc.perform(MockMvcRequestBuilders
-                        .post("/api/dataquality/expectations").contentType("application/json").content(body))
-                .andExpect(MockMvcResultMatchers.status().isForbidden());
-        mvc.perform(MockMvcRequestBuilders
-                        .post("/api/dataquality/expectations/" + suitePid + "/run"))
-                .andExpect(MockMvcResultMatchers.status().isForbidden());
-        mvc.perform(MockMvcRequestBuilders
-                        .get("/api/dataquality/expectations/" + suitePid + "/runs"))
-                .andExpect(MockMvcResultMatchers.status().isForbidden());
-        assertEquals(previousRuns, qualityRuns.listBySuite(tenantId, suitePid).size());
     }
 
     private void applyScopeActor(User user, TenantMember member) {

@@ -12,14 +12,17 @@ import com.auraboot.framework.infrastructure.storage.StorageProvider;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelDefinition;
+import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.entity.BindingRule;
 import com.auraboot.framework.meta.entity.CommandDefinition;
+import com.auraboot.framework.meta.exception.MetaRecordNotFoundException;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.CommandHandler;
 import com.auraboot.framework.meta.service.CommandHandlerContext;
 import com.auraboot.framework.meta.service.DryRunSafe;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.service.QueryCommandParams;
 import com.auraboot.framework.meta.dto.AsyncTaskDTO;
 import com.auraboot.framework.meta.dto.AsyncTaskSubmitRequest;
 import com.auraboot.framework.meta.service.DataDomainService;
@@ -27,6 +30,7 @@ import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.meta.service.impl.AsyncTaskServiceImpl;
 import com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutor;
 import com.auraboot.framework.meta.service.impl.CommandExecutorUtils;
+import com.auraboot.framework.meta.service.impl.ExecutorReadQuery;
 import com.auraboot.framework.meta.service.impl.ModelMutationGuard;
 import com.auraboot.framework.meta.service.impl.FieldWriterGuard;
 import com.auraboot.framework.meta.service.impl.RecordCommandWriterGuard;
@@ -79,12 +83,20 @@ public class HandlerPhase implements CommandPhase {
     @Autowired(required = false)
     private com.auraboot.framework.integration.InventoryReceiptEnqueueProvenance inventoryReceiptProvenance;
 
+    @Autowired(required = false)
+    private com.auraboot.framework.plugin.pf4j.BusinessCommandDataAccessorFactory businessResources;
+
+    @Autowired(required = false)
+    private com.auraboot.framework.plugin.pf4j.CommandHandlerTransactionGuard handlerTransactions;
+
     private final ApplicationContext applicationContext;
     private final ExtensionRegistry extensionRegistry;
     private final ObjectMapper objectMapper;
     private final DynamicDataService dynamicDataService;
     private final DynamicDataMapper dynamicDataMapper;
     private final MetaModelService metaModelService;
+    @Autowired(required=false) private com.auraboot.framework.meta.service.CommandService nativeCodeCommands;
+    @Autowired(required=false) private com.auraboot.framework.meta.service.impl.CommandAutoSetExecutor nativeCodeGenerator;
     private final RecordSnapshotReader snapshotReader;
     private final DataPermissionEngine dataPermissionEngine;
     private final DataDomainService dataDomainService;
@@ -112,6 +124,9 @@ public class HandlerPhase implements CommandPhase {
 
     @Autowired(required = false)
     private FileService fileService;
+
+    @Autowired(required = false)
+    private com.auraboot.framework.meta.service.impl.DocumentArtifactProjectionService documentArtifacts;
 
     @Autowired(required = false)
     private com.auraboot.framework.plugin.pf4j.CommandTargetFileAccessorFactory commandTargetFiles;
@@ -147,6 +162,8 @@ public class HandlerPhase implements CommandPhase {
     @Autowired private com.auraboot.framework.plugin.extension.CommandMembershipLockAccessor commandMembershipLockAccessor;
     @Autowired(required = false)
     private com.auraboot.framework.plugin.pf4j.CommandRecordActionScopeAccessorFactory recordScopeFactory;
+    @Autowired(required=false)
+    private com.auraboot.framework.permission.service.BusinessCommandRecordAuthorization documentAuthorization;
     @Autowired private IdentityDirectoryAccessorImpl identityDirectoryAccessor;
     @Autowired private RoleMapper roleMapper;
     @Autowired private UserRoleService userRoleService;
@@ -158,18 +175,28 @@ public class HandlerPhase implements CommandPhase {
     @Override
     public void execute(CommandPipelineContext ctx) {
         var handlerRules = ctx.getRulesByType().getOrDefault("handler", Collections.emptyList());
-        Map<String, Object> handlerResults = withCommandAggregate(ctx, () ->
+        Map<String, Object> handlerResults = withHandlerReadProjection(ctx, () -> withCommandAggregate(ctx, () ->
                 withCommandAuthority(ctx, () -> executeHandlerPhase(
                         handlerRules, ctx.getCommand(), ctx.getPayload(), ctx.getFieldMapResults(),
                         ctx.getTenantId(), ctx.getUserId(), ctx.getRequest(), ctx.getExecConfig(),
                         Boolean.TRUE.equals(ctx.getTargetRecordReadable())
                             && ctx.getPermitPlan() != null && ctx.getPermitPlan().isPermitted()
-                            && ctx.getAuthorizationVerdict() != null && ctx.getAuthorizationVerdict().isAuthorized(), ctx)));
+                            && ctx.getAuthorizationVerdict() != null && ctx.getAuthorizationVerdict().isAuthorized(), ctx))));
         ctx.setHandlerResults(handlerResults);
-        if (!ctx.isHandlerOwnedMutation()) {
+        // A query read by the executor answers with records. They are the response, never
+        // field values to copy onto the record the request named.
+        if (!ctx.isHandlerOwnedMutation() && !ExecutorReadQuery.isReadByExecutor(ctx, extensionRegistry)) {
             persistHandlerResults(ctx.getCommand().getModelCode(), ctx.getPayload(),
                     handlerResults, ctx.getTenantId(), ctx.getRequest(), ctx.getFieldMapResults());
         }
+    }
+
+    <T> T withHandlerReadProjection(CommandPipelineContext context, java.util.function.Supplier<T> execution) {
+        if(documentAuthorization!=null && context.getBusinessTargetAuthorization()!=null && context.getCommand()!=null
+                && com.auraboot.framework.meta.security.DocumentArtifactContract.from(
+                        context.getExecConfig(),context.getCommand().getModelCode())!=null)
+            return documentAuthorization.withReadProjectionSnapshot(execution);
+        return execution.get();
     }
 
     // ==================== Inlined delegate methods ====================
@@ -184,6 +211,7 @@ public class HandlerPhase implements CommandPhase {
                                                      CommandPipelineContext pipelineContext) {
         Map<String, Object> handlerResults = new HashMap<>();
         boolean dryRun = request.isDryRun();
+        boolean springHandlerExecuted = false;
 
         // 1. Execute Spring Bean handlers from binding rules.
         //    Under dry-run (PR-56) we SKIP every handler whose implementation
@@ -219,6 +247,7 @@ public class HandlerPhase implements CommandPhase {
                         .build();
 
                 Map<String, Object> result = handler.execute(context);
+                springHandlerExecuted = true;
                 if (result != null) {
                     handlerResults.putAll(result);
                 }
@@ -234,17 +263,52 @@ public class HandlerPhase implements CommandPhase {
             }
         }
 
-        // 2. Execute plugin command handlers from ExtensionRegistry
+        // 2. A query that declares no handler of its own is read here. A binding-rule handler
+        //    that ran defines the command's own reading; a plugin handler excludes the read.
+        if (!springHandlerExecuted && ExecutorReadQuery.isReadByExecutor(pipelineContext, extensionRegistry)) {
+            handlerResults.putAll(readQuery(command.getModelCode(), request, payload));
+        }
+
+        // 3. Execute plugin command handlers from ExtensionRegistry
         executePluginCommandHandler(command.getCode(), command.getModelCode(), payload, tenantId, userId, request,
                 fieldMapResults, handlerResults, execConfig, relatedUpdateBoundaryAuthorized, pipelineContext);
 
-        // 3. Declarative BPM trigger — skipped under dry-run since BPM
+        // 4. Declarative BPM trigger — skipped under dry-run since BPM
         // process state lives outside the command's transaction envelope.
         if (!request.isDryRun()) {
             executeBpmTrigger(execConfig, command, payload, request, handlerResults);
         }
 
         return handlerResults;
+    }
+
+    /**
+     * The executor's own read for a query command: the record the request names, or a page.
+     * The data service holds every returned record to the caller's READ authority. The
+     * request's parameters are taken strictly: one that is not part of the query contract is
+     * refused, because it was never a filter.
+     */
+    private Map<String, Object> readQuery(String modelCode, CommandExecuteRequest request,
+                                         Map<String, Object> payload) {
+        String recordId = StringUtils.hasText(request.getTargetRecordId()) ? request.getTargetRecordId()
+                : QueryCommandParams.recordPid(payload);
+        Map<String, Object> result = new HashMap<>();
+        if (StringUtils.hasText(recordId)) {
+            Map<String, Object> record = dynamicDataService.getById(modelCode, recordId);
+            if (record == null) {
+                throw new MetaRecordNotFoundException(modelCode, recordId);
+            }
+            result.put("record", record);
+            return result;
+        }
+        PaginationResult<Map<String, Object>> page = dynamicDataService.list(modelCode,
+                QueryCommandParams.toRequest(objectMapper, payload, true));
+        if (page == null) {
+            throw new IllegalStateException("The data service returned no page for a query command on " + modelCode);
+        }
+        result.put("total", page.getTotal());
+        result.put("records", page.getRecords() != null ? page.getRecords() : List.of());
+        return result;
     }
 
     private CommandHandler resolveCommandHandler(String handlerClass) {
@@ -572,7 +636,7 @@ public class HandlerPhase implements CommandPhase {
             return;
         }
 
-        String handlerCode = resolvePluginHandlerCode(commandCode, execConfig);
+        String handlerCode = CommandExecutorUtils.resolvePluginHandlerCode(commandCode, execConfig);
         Optional<CommandHandlerExtension> pluginHandler = extensionRegistry.getCommandHandler(handlerCode);
         // Opt-in secondaries chain AFTER the primary (same transaction + context). Empty for every
         // command with no opt-in secondaries, i.e. every command today — so this is a no-op now.
@@ -616,11 +680,22 @@ public class HandlerPhase implements CommandPhase {
                 && (isAsyncHandler(asyncHandlerParams) || !secondaryHandlers.isEmpty())) {
             throw new AccessDeniedException("Command-created models require one synchronous handler");
         }
-        if (Boolean.TRUE.equals(asyncHandlerParams.get(
-                com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.OPT_IN))
-                && isAsyncHandler(asyncHandlerParams)) {
+        if ((Boolean.TRUE.equals(asyncHandlerParams.get(com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.OPT_IN))
+                || Boolean.TRUE.equals(asyncHandlerParams.get(com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.CREATE_OPT_IN)))
+                && (isAsyncHandler(asyncHandlerParams) || !secondaryHandlers.isEmpty())) {
             throw new AccessDeniedException("Related updates cannot execute asynchronously");
         }
+
+        var transactionOwners = new ArrayList<CommandHandlerExtension>(secondaryHandlers);
+        if (handler != null) transactionOwners.add(handler);
+        for (var transactionOwner : transactionOwners) {
+            var isolation = transactionOwner.commandReadIsolation();
+            if (isolation == null) continue;
+            if (handlerTransactions == null || isAsyncHandler(asyncHandlerParams))
+                throw new AccessDeniedException("Command owner requires a verified synchronous transaction");
+            handlerTransactions.require(isolation);
+        }
+        validateBusinessResources(pipelineContext,handler,secondaryHandlers);
 
         // Opt-in async dispatch: commands declaring handlerParams.async run off the
         // request thread via AsyncTaskService, so long-running handlers (e.g. bulk
@@ -662,10 +737,17 @@ public class HandlerPhase implements CommandPhase {
                     : commandTargetFiles.forCommand(pipelineContext, commandCreates);
             try (fileScope;
                  var sealedContentScope = sealedContentFactory == null ? null : sealedContentFactory.forCommand(pipelineContext);
-                 var subjectScope = subjectAcknowledgements == null ? null : subjectAcknowledgements.forCommand(pipelineContext)) {
+                 var subjectScope = subjectAcknowledgements == null ? null : subjectAcknowledgements.forCommand(pipelineContext);
+                 var businessScope = openBusinessResources(pipelineContext,handler,secondaryHandlers)) {
                 String namespace = handlerCode.contains(":") ? handlerCode.split(":")[0] : null;
                 Map<String, Object> pluginSettings = new HashMap<>();
                 pluginSettings.putAll(resolveHandlerParams(execConfig));
+
+                if(com.auraboot.framework.meta.security.DocumentArtifactContract.from(execConfig,modelCode)!=null) {
+                    if(documentArtifacts==null)throw new AccessDeniedException("Document source projection is unavailable");
+                    pluginSettings.put(com.auraboot.framework.plugin.extension.DocumentOutputAccessor.SETTINGS_KEY,
+                            documentArtifacts.accessor(pipelineContext));
+                }
                 pluginSettings.put("__commandCode", commandCode);
                 pluginSettings.put("__handlerCode", handlerCode);
                 // Authenticated actor identity is a server-owned setting, never a client payload
@@ -691,6 +773,8 @@ public class HandlerPhase implements CommandPhase {
                         commandCode, tenantId, pluginSettings);
                 com.auraboot.framework.plugin.pf4j.DocumentCurrencyAccessorImpl.install(
                         pluginSettings, tenantId, currencyConversionService);
+                com.auraboot.framework.plugin.pf4j.NativeBusinessCodeAccessorImpl.install(pluginSettings,
+                        tenantId,MetaContext.exists()?MetaContext.getCurrentUserPid():null,commandCode,nativeCodeCommands,metaModelService,nativeCodeGenerator,objectMapper);
                 com.auraboot.framework.plugin.pf4j.TenantSecretAccessorImpl.install(
                         pluginSettings, tenantId, cloudConfigService, objectMapper);
                 com.auraboot.framework.plugin.pf4j.VerifiedPhoneGrantAccessorImpl.install(
@@ -718,18 +802,19 @@ public class HandlerPhase implements CommandPhase {
                                 instanceof TenantProjectionAccessor projection)) {
                         throw new AccessDeniedException("Related delete authorization requires a target handler and projection");
                     }
-                    pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,
+                    if (!Boolean.TRUE.equals(pluginSettings.get(
+                            com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.OPT_IN))) {
+                        pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,
                             new com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor(dynamicDataService,
                                     tenantId,commandCode,modelCode,effectiveRecordId,
                                     MetaContext.getCurrentUserPid(),handler,projection));
+                    }
                 }
                 if (Boolean.TRUE.equals(pluginSettings.get(
                         com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.OPT_IN))) {
                     if (handler == null || !relatedUpdateBoundaryAuthorized
                             || !StringUtils.hasText(effectiveRecordId)
                             || com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.active()
-                            || Boolean.TRUE.equals(pluginSettings.get(
-                                com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor.OPT_IN))
                             || !(pluginSettings.get(CommandHandlerExtension.TENANT_PROJECTION_ACCESSOR_KEY)
                                 instanceof TenantProjectionAccessor projection)) {
                         throw new AccessDeniedException("Related update requires an authorized readable target and projection");
@@ -737,8 +822,20 @@ public class HandlerPhase implements CommandPhase {
                     pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,
                             new com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor(dynamicDataService,
                                     tenantId,commandCode,modelCode,effectiveRecordId,
-                                    MetaContext.getCurrentUserPid(),handler,projection));
+                                    MetaContext.getCurrentUserPid(),handler,projection,
+                                    Boolean.TRUE.equals(pluginSettings.get(
+                                        com.auraboot.framework.plugin.pf4j.RelatedCommandDataAccessor.OPT_IN)),
+                                    Boolean.TRUE.equals(pluginSettings.get(
+                                        com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.CREATE_OPT_IN)),
+                                    Boolean.TRUE.equals(pluginSettings.get(
+                                        com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.ROOT_UPDATE_OPT_IN))));
                 }
+                if(Boolean.TRUE.equals(pluginSettings.get(com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.CREATE_OPT_IN))
+                        && !Boolean.TRUE.equals(pluginSettings.get(com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.OPT_IN)))
+                    throw new AccessDeniedException("Related create requires the exact related command boundary");
+                if(Boolean.TRUE.equals(pluginSettings.get(com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.ROOT_UPDATE_OPT_IN))
+                        && !Boolean.TRUE.equals(pluginSettings.get(com.auraboot.framework.plugin.pf4j.RelatedUpdateCommandDataAccessor.OPT_IN)))
+                    throw new AccessDeniedException("Root update requires the exact related command boundary");
                 com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.installRelatedWriter(
                         pluginSettings,dynamicDataService,handler,modelCode,effectiveRecordId);
                 pluginSettings.put(TenantRoleAssignmentAccessor.SETTINGS_KEY,
@@ -791,6 +888,24 @@ public class HandlerPhase implements CommandPhase {
                             sealedContentScope.accessor());
                 }
                 com.auraboot.framework.openplatform.service.InstalledIntegrationExecution.finishSettings(pluginSettings);
+                if (businessScope != null) {
+                    // Only the constrained resource capability and authenticated invocation facts
+                    // enter business handlers; other host capabilities require their own contract.
+                    Set<String> controls=new java.util.HashSet<>(Set.of("__commandCode","__handlerCode","__currentUser",
+                            CommandHandlerExtension.CURRENT_USER_PID_KEY,CommandHandlerExtension.CLIENT_REQUEST_ID_KEY,
+                            CommandHandlerExtension.EXPECTED_VERSION_KEY,CommandHandlerExtension.DATA_ACCESSOR_KEY));
+                    if(com.auraboot.framework.meta.security.DocumentArtifactContract.from(execConfig,modelCode)!=null) {
+                        controls.add(com.auraboot.framework.plugin.extension.FileAccessor.SETTINGS_KEY);
+                        controls.add(com.auraboot.framework.plugin.extension.DocumentOutputAccessor.SETTINGS_KEY);
+                    }
+                    var tenantSecrets=businessScope.tenantSecretAccessor(pluginSettings);
+                    if(tenantSecrets!=null) {
+                        controls.add(com.auraboot.framework.plugin.extension.TenantSecretAccessor.SETTINGS_KEY);
+                        pluginSettings.put(com.auraboot.framework.plugin.extension.TenantSecretAccessor.SETTINGS_KEY,tenantSecrets);
+                    }
+                    pluginSettings.keySet().removeIf(key->key.startsWith("__") && !controls.contains(key));
+                    pluginSettings.put(CommandHandlerExtension.DATA_ACCESSOR_KEY,businessScope.accessor());
+                }
                 CommandHandlerExtension.CommandContext pluginContext = CommandHandlerExtension.CommandContext.builder()
                         .tenantId(tenantId)
                         .namespace(namespace)
@@ -810,8 +925,15 @@ public class HandlerPhase implements CommandPhase {
                         log.info("Dry-run: skipping primary handler {} for command {} (supportsDryRun()=false)",
                                 handler.getClass().getName(), handlerCode);
                     } else {
-                        Object result = inventoryReceiptProvenance == null ? handler.execute(pluginContext)
-                                : inventoryReceiptProvenance.route(handler, pluginContext);
+                        CommandHandlerExtension selectedHandler = handler;
+                        Object result = com.auraboot.framework.meta.security.DocumentArtifactCommandScope.within(pipelineContext,
+                                () -> {
+                                    if(documentArtifacts==null)throw new AccessDeniedException("Document source projection is unavailable");
+                                    return documentArtifacts.prepare(pipelineContext);
+                                },
+                                () -> inventoryReceiptProvenance == null ? selectedHandler.execute(pluginContext)
+                                        : inventoryReceiptProvenance.route(selectedHandler, pluginContext));
+                        if(businessScope!=null)result=businessScope.projectResult(result);
                         if (result instanceof Map) {
                             @SuppressWarnings("unchecked")
                             Map<String, Object> resultMap = (Map<String, Object>) result;
@@ -891,6 +1013,9 @@ public class HandlerPhase implements CommandPhase {
                     throw new com.auraboot.framework.exception.ConflictException(e.getMessage(), e);
                 }
                 // Classification is a public SPI contract, independent of diagnostic text or locale.
+                if (e instanceof com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension.RequestValidationException invalid) {
+                    throw new BusinessException(ResponseCode.BadParam, "Integration business request validation failed", invalid);
+                }
                 if (e instanceof PluginCommandRejectionException rejection) {
                     ResponseCode responseCode = switch (rejection.code()) {
                         case INVALID_ARGUMENT, BUSINESS_RULE_BLOCKED -> ResponseCode.BadParam;
@@ -902,14 +1027,27 @@ public class HandlerPhase implements CommandPhase {
         }
     }
 
-    private String resolvePluginHandlerCode(String commandCode, Map<String, Object> execConfig) {
-        if (execConfig != null) {
-            Object handler = execConfig.get("handler");
-            if (handler instanceof String handlerCode && StringUtils.hasText(handlerCode)) {
-                return handlerCode.trim();
-            }
-        }
-        return commandCode;
+
+    private boolean validateBusinessResources(CommandPipelineContext context,CommandHandlerExtension handler,
+            List<CommandHandlerExtension> secondaryHandlers) {
+        Object raw=context.getExecConfig()==null?null:context.getExecConfig().get("handlerParams");
+        var canonical=extensionRegistry.getBusinessResourceOwner(context.getCommandCode()).orElse(null);
+        boolean business=raw instanceof Map<?,?> values && "business".equals(values.get("targetRecordAuthorization"));
+        if((canonical!=null && canonical!=handler) || ((canonical!=null || handler instanceof com.auraboot.framework.plugin.extension.BusinessResourceAuthorization) && !business))
+            throw new AccessDeniedException("The business owner contract cannot be disabled or replaced");
+        if(!(raw instanceof Map<?,?> params) || !"business".equals(params.get("targetRecordAuthorization")))return false;
+        if(businessResources==null || !(handler instanceof com.auraboot.framework.plugin.extension.BusinessResourceAuthorization)
+                || !secondaryHandlers.isEmpty() || !Boolean.FALSE.equals(params.get("dslPersistence"))
+                || params.containsKey("async") || params.containsKey("commandCreatedModels")
+                || params.containsKey("relatedUpdateAuthorization") || params.containsKey("relatedDeleteAuthorization")
+                || params.containsKey("relatedCreateAuthorization") || params.containsKey("rootUpdateAuthorization"))
+            throw new AccessDeniedException("A synchronous business command requires one complete resource owner");
+        return true;
+    }
+
+    private com.auraboot.framework.plugin.pf4j.BusinessCommandDataAccessorFactory.Scope openBusinessResources(
+            CommandPipelineContext context,CommandHandlerExtension handler,List<CommandHandlerExtension> secondaryHandlers) {
+        return validateBusinessResources(context,handler,secondaryHandlers)?businessResources.open(context,handler):null;
     }
 
     private boolean isAsyncHandler(Map<String, Object> handlerParams) {

@@ -30,6 +30,12 @@ import java.util.Set;
  */
 public interface CommandHandlerExtension extends ExtensionPoint {
 
+    /** Server-owned transaction requirement; metadata and callers cannot relax it. */
+    default BusinessResourceAuthorization.ReadIsolation commandReadIsolation() { return null; }
+
+
+
+
     /** Well-known key for DataAccessor in the settings map. */
     String DATA_ACCESSOR_KEY = "__dataAccessor";
 
@@ -90,6 +96,12 @@ public interface CommandHandlerExtension extends ExtensionPoint {
     /** Trusted current records and the exact intended update; no authorization facts from payloads. */
     record RelatedUpdateAuthorizationContext(TargetAuthorizationContext root,
             String modelCode, String recordId, Map<String,Object> record, Map<String,Object> changes) {}
+
+    /** Opt-in creation of command-owned related records; existing handlers deny by default. */
+    default boolean authorizeRelatedCreate(RelatedCreateAuthorizationContext context) { return false; }
+
+    record RelatedCreateAuthorizationContext(TargetAuthorizationContext root,
+            String modelCode, Map<String,Object> input) {}
 
     /** Explicit per-related-record delete decision; older handlers cannot grant it. */
     default boolean authorizeRelatedDelete(RelatedDeleteAuthorizationContext context) {

@@ -155,7 +155,7 @@ springdoc:
     operations-sorter: alpha
     try-it-out-enabled: true
     filter: true
-  packages-to-scan: com.auraboot.framework
+  packages-to-scan: com.auraboot.framework,com.auraboot.module
   group-configs:
     - group: meta
       paths-to-match: /api/meta/**

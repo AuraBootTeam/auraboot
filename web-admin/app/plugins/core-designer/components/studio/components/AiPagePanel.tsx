@@ -17,7 +17,7 @@ import {
   type MergeMode,
 } from './ai-page-prompt';
 import { AiQuickCommands } from './AiQuickCommands';
-import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type { UnifiedPageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
 // ============================================================================
 // Types
@@ -41,9 +41,9 @@ export interface AiPagePanelProps {
   onToggle: () => void;
   /** Called when AI generates page DSL */
   onGenerated: (dsl: {
-    kind: PageSchema['kind'];
-    blocks: PageSchema['blocks'];
-    layout: PageSchema['layout'];
+    kind: UnifiedPageSchema['kind'];
+    blocks: UnifiedPageSchema['blocks'];
+    layout: UnifiedPageSchema['layout'];
     schemaVersion: 2;
     mergeMode: MergeMode;
   }) => void;
@@ -174,9 +174,9 @@ export const AiPagePanel: React.FC<AiPagePanelProps> = ({
         try {
           const dsl = parsePageDslResponse(data.content);
           onGenerated(dsl);
-        } catch {
+        } catch (error) {
           // Not valid DSL — leave it as a conversational reply, no canvas change.
-        }
+ console.warn('[AiPagePanel] previously-silent catch', error);        }
       } catch (err) {
         setAssistant({ content: err instanceof Error ? err.message : 'AI 生成失败', streaming: false, error: true });
         setIsStreaming(false);

@@ -97,9 +97,9 @@ export default function ReportTemplateListPage() {
       if (ResultHelper.isSuccess(resp) && resp.data) {
         setCategories(resp.data);
       }
-    } catch {
+    } catch (error) {
       // ignore
-    }
+ console.warn('[report-templates] previously-silent catch', error);    }
   }, []);
 
   useEffect(() => {

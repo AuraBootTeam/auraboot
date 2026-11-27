@@ -44,10 +44,12 @@ class PluginRolePermissionFailClosedTest {
     private final RoleMapper roleMapper = mock(RoleMapper.class);
     private final MetaModelMapper metaModels = mock(MetaModelMapper.class);
     private final PluginRecordMapper pluginRecords = mock(PluginRecordMapper.class);
+    private final com.auraboot.framework.plugin.mapper.PluginResourceMapper imported = mock(com.auraboot.framework.plugin.mapper.PluginResourceMapper.class);
     private final MenuMapper menus = mock(MenuMapper.class);
     private final MenuService menuService = mock(MenuService.class);
 
     PluginRolePermissionFailClosedTest() {
+        ReflectionTestUtils.setField(service, "pluginResourceMapper", imported);
         ReflectionTestUtils.setField(service, "permissionService", permissions);
         ReflectionTestUtils.setField(service, "rolePermissionService", rolePermissions);
         ReflectionTestUtils.setField(service, "rolePermissionMapper", bindings);
@@ -74,6 +76,11 @@ class PluginRolePermissionFailClosedTest {
 
     private void stubRoleResolvable(long roleId) {
         when(roleMapper.findIdByCode(7L, "operator")).thenReturn(roleId);
+        when(roleMapper.findPidByCode(7L, "operator")).thenReturn("new-role");
+        when(imported.findByTenantPluginAndResource(7L, "plugin", "role", "operator"))
+                .thenReturn(com.auraboot.framework.plugin.service.PluginResourceRecords.createResourceRecord(
+                    "plugin", "import", 7L, com.auraboot.framework.plugin.dto.imports.ResourceType.ROLE,
+                    "new-role", roleId, "operator", "Operator", com.auraboot.framework.plugin.dto.imports.ResourceAction.CREATE, null, null));
         when(bindings.findPermissionIdsByRole(roleId)).thenReturn(java.util.Set.of());
         when(bindings.countByRoleAndPermission(eq(roleId), anyLong(), eq(7L))).thenReturn(0);
     }
@@ -114,8 +121,9 @@ class PluginRolePermissionFailClosedTest {
     @Test void strictReconcileBindsResolvedCodes() {
         stubRoleResolvable(3L);
         when(permissions.findByCode("model.work_order.read")).thenReturn(registered(9L, "model.work_order.read"));
+        when(bindings.countByRoleAndPermission(3L, 9L, 7L)).thenReturn(0, 1);
         when(rolePermissions.assignPermissionsToRole(3L, List.of(9L))).thenReturn(true);
-        assertThatCode(() -> service.reconcileRolePermissions(role("operator", "model.work_order.read"), 7L))
+        assertThatCode(() -> service.reconcileImportedRolePermissions(role("operator", "model.work_order.read"), 7L, "plugin", "import"))
                 .doesNotThrowAnyException();
         verify(rolePermissions).assignPermissionsToRole(3L, List.of(9L));
     }
@@ -124,7 +132,7 @@ class PluginRolePermissionFailClosedTest {
         stubRoleResolvable(3L);
         when(permissions.findByCode("model.work_order.read")).thenReturn(registered(9L, "model.work_order.read"));
         when(rolePermissions.assignPermissionsToRole(3L, List.of(9L))).thenThrow(new IllegalStateException("db down"));
-        assertThatThrownBy(() -> service.reconcileRolePermissions(role("operator", "model.work_order.read"), 7L))
+        assertThatThrownBy(() -> service.reconcileImportedRolePermissions(role("operator", "model.work_order.read"), 7L, "plugin", "import"))
                 .isInstanceOf(PluginException.class)
                 .hasMessageContaining("model.work_order.read")
                 .hasMessageContaining("operator")
@@ -146,9 +154,10 @@ class PluginRolePermissionFailClosedTest {
         when(permissions.findByCode("meta.command.execute")).thenReturn(registered(11L, "meta.command.execute"));
         when(permissions.findByCode("dashboard.read")).thenReturn(registered(12L, "dashboard.read"));
         when(permissions.findByCode("model.inv_daily_stock.read")).thenReturn(registered(13L, "model.inv_daily_stock.read"));
+        for (long id : List.of(11L, 12L, 13L)) when(bindings.countByRoleAndPermission(3L, id, 7L)).thenReturn(0, 1);
         when(rolePermissions.assignPermissionsToRole(anyLong(), any())).thenReturn(true);
-        assertThatCode(() -> service.reconcileRolePermissions(
-                role("operator", "meta.command.execute", "dashboard.read", "model.inv_daily_stock.read"), 7L))
+        assertThatCode(() -> service.reconcileImportedRolePermissions(
+                role("operator", "meta.command.execute", "dashboard.read", "model.inv_daily_stock.read"), 7L, "plugin", "import"))
                 .doesNotThrowAnyException();
         verify(rolePermissions).assignPermissionsToRole(3L, List.of(11L));
         verify(rolePermissions).assignPermissionsToRole(3L, List.of(12L));

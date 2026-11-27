@@ -2,13 +2,13 @@
  * usePageSchemaHistory Hook
  *
  * Manages DSL undo/redo history as JSON snapshots.
- * Independent from the Zustand designer store — operates on PageSchema directly.
+ * Independent from the Zustand designer store — operates on UnifiedPageSchema directly.
  *
  * @since 4.0.0
  */
 
 import { useState, useCallback, useRef } from 'react';
-import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type { UnifiedPageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
 const MAX_HISTORY = 50;
 
@@ -19,17 +19,17 @@ export interface DslHistoryState {
 
 export interface DslHistoryActions {
   /** Record current DSL state as a new snapshot (truncates redo stack) */
-  pushState: (dsl: PageSchema) => void;
+  pushState: (dsl: UnifiedPageSchema) => void;
   /** Undo — returns previous DSL state or null if nothing to undo */
-  undo: () => PageSchema | null;
+  undo: () => UnifiedPageSchema | null;
   /** Redo — returns next DSL state or null if nothing to redo */
-  redo: () => PageSchema | null;
+  redo: () => UnifiedPageSchema | null;
   /**
    * Reset history to a clean initial state with the given DSL.
    * Clears past and future stacks so the user cannot undo past this point.
    * Use after loading a saved page to prevent undoing back to the placeholder.
    */
-  resetHistory: (initial: PageSchema) => void;
+  resetHistory: (initial: UnifiedPageSchema) => void;
 }
 
 /**
@@ -37,7 +37,7 @@ export interface DslHistoryActions {
  *
  * @param initialDsl - The initial DSL to seed history with
  */
-export function usePageSchemaHistory(initialDsl: PageSchema): DslHistoryState & DslHistoryActions {
+export function usePageSchemaHistory(initialDsl: UnifiedPageSchema): DslHistoryState & DslHistoryActions {
   // Use refs for the history stack to avoid re-renders on every push
   const historyRef = useRef<string[]>([JSON.stringify(initialDsl)]);
   const indexRef = useRef(0);
@@ -52,7 +52,7 @@ export function usePageSchemaHistory(initialDsl: PageSchema): DslHistoryState & 
   }, []);
 
   const pushState = useCallback(
-    (dsl: PageSchema) => {
+    (dsl: UnifiedPageSchema) => {
       const serialized = JSON.stringify(dsl);
       const history = historyRef.current;
       const currentIndex = indexRef.current;
@@ -75,14 +75,14 @@ export function usePageSchemaHistory(initialDsl: PageSchema): DslHistoryState & 
     [syncFlags],
   );
 
-  const undo = useCallback((): PageSchema | null => {
+  const undo = useCallback((): UnifiedPageSchema | null => {
     if (indexRef.current <= 0) return null;
     indexRef.current -= 1;
     syncFlags();
     return JSON.parse(historyRef.current[indexRef.current]);
   }, [syncFlags]);
 
-  const redo = useCallback((): PageSchema | null => {
+  const redo = useCallback((): UnifiedPageSchema | null => {
     if (indexRef.current >= historyRef.current.length - 1) return null;
     indexRef.current += 1;
     syncFlags();
@@ -90,7 +90,7 @@ export function usePageSchemaHistory(initialDsl: PageSchema): DslHistoryState & 
   }, [syncFlags]);
 
   const resetHistory = useCallback(
-    (initial: PageSchema) => {
+    (initial: UnifiedPageSchema) => {
       historyRef.current = [JSON.stringify(initial)];
       indexRef.current = 0;
       syncFlags();

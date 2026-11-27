@@ -871,3 +871,45 @@ describe('workbenchBlockUtils readPath', () => {
     ).toBe(48);
   });
 });
+
+it('never substitutes a root record identifier when the configured file reference is absent', async () => {
+  const runtime = makeRuntime() as any;
+  fetchResultMock.mockResolvedValue({
+    code: '0',
+    data: { recordPid: 'TASK-1', id: 'TASK-1', pid: 'TASK-1' },
+  });
+  const downloadFetch = vi.fn();
+  vi.stubGlobal('fetch', downloadFetch);
+  await expect(
+    executeSimpleWorkbenchAction(runtime, {
+      action: 'command.execute',
+      args: {
+        command: 'bom:download_raw',
+        targetRecordPid: 'TASK-1',
+        download: { fileIdField: 'fileId' },
+      },
+    }),
+  ).rejects.toThrow('The record does not provide an accessible file');
+  expect(downloadFetch).not.toHaveBeenCalled();
+});
+
+it('propagates a denied file response and never reports command download success', async () => {
+  const toast = vi.fn();
+  const runtime = makeRuntime({ getShowToast: () => toast }) as any;
+  fetchResultMock.mockResolvedValue({ code: '0', data: { fileId: 'protected-file' } });
+  const denied = vi.fn().mockResolvedValue({ ok: false, status: 403, statusText: 'Forbidden' });
+  vi.stubGlobal('fetch', denied);
+  await expect(
+    executeSimpleWorkbenchAction(runtime, {
+      action: 'command.execute',
+      args: {
+        command: 'bom:download_raw',
+        targetRecordPid: 'TASK-1',
+        download: { fileIdField: 'fileId' },
+        feedback: { successMessage: 'Downloaded' },
+      },
+    }),
+  ).rejects.toThrow('403');
+  expect(denied).toHaveBeenCalledTimes(1);
+  expect(toast.mock.calls.some((call) => call[1] === 'success')).toBe(false);
+});

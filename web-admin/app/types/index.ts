@@ -60,7 +60,7 @@ export type { UserProfile, UpdateUserProfileRequest } from '~/types/profile';
 export type {
   FormSchema as DynamicFormSchema,
   ListSchema as DynamicListSchema,
-  PageSchema as DynamicPageSchema,
+  UnifiedPageSchema as DynamicPageSchema,
   ColumnDefinition,
   ActionDefinition,
   FieldDefinition as DynamicFieldDefinition,

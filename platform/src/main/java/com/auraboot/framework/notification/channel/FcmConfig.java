@@ -32,7 +32,11 @@ public class FcmConfig {
         if (FirebaseApp.getApps().isEmpty()) {
             GoogleCredentials credentials;
             if (credentialsPath != null && !credentialsPath.isBlank()) {
-                credentials = GoogleCredentials.fromStream(new FileInputStream(credentialsPath));
+                // GoogleCredentials.fromStream does not close the stream; a leaked
+                // FileInputStream at startup pins the credential file descriptor.
+                try (FileInputStream in = new FileInputStream(credentialsPath)) {
+                    credentials = GoogleCredentials.fromStream(in);
+                }
                 log.info("FCM initialized with service account credentials from: {}", credentialsPath);
             } else {
                 credentials = GoogleCredentials.getApplicationDefault();

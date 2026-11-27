@@ -131,7 +131,7 @@ function hasRecursiveKindRoot(blocks: unknown[], kind: unknown): blocks is DslBl
 /**
  * Translate a Studio document edit into server-declared property patches.
  * Structural, identity and undeclared changes fail closed and never fall back
- * to the legacy PageSchema save API.
+ * to the legacy UnifiedPageSchema save API.
  */
 export function planStudioAuthoringPatches(
   baseline: PageSchemaV3,

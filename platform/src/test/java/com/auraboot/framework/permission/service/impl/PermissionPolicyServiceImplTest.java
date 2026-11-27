@@ -44,6 +44,17 @@ import static org.mockito.Mockito.when;
  */
 @ExtendWith(MockitoExtension.class)
 class PermissionPolicyServiceImplTest {
+    @org.mockito.Mock
+    private com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
+    @Test
+    void conditionGuardsCacheKeyEmbedsTenantMemberPermissionAndTheDataAccessEpoch() throws NoSuchMethodException {
+        var key = PermissionPolicyServiceImpl.class
+                .getMethod("getConditionGuards", Long.class, String.class)
+                .getAnnotation(org.springframework.cache.annotation.Cacheable.class)
+                .key();
+        assertThat(key).contains("DataAccessCacheEpoch").contains("getCurrentTenantId").contains("#memberId").contains("#permissionCode");
+    }
+
 
     @Mock
     private RolePermissionMapper rolePermissionMapper;
@@ -187,6 +198,8 @@ class PermissionPolicyServiceImplTest {
 
         assertThat(guards).hasSize(1);
         assertThat(guards.get(0).conditionsJson()).contains("dynamicAbac");
+        assertThat(service.loadedConditionGuard(perm,row.getId(),row.getConditionAstJson(),row.getConditionsJson()))
+                .isEqualTo(guards.get(0));
     }
 
     @Test
@@ -517,6 +530,8 @@ class PermissionPolicyServiceImplTest {
         assertThat(guards.get(0).validationError())
                 .contains("masked")
                 .contains("record.data.salary");
+        assertThat(service.loadedConditionGuard(perm,row.getId(),row.getConditionAstJson(),row.getConditionsJson()))
+                .isEqualTo(guards.get(0));
     }
 
     @Test

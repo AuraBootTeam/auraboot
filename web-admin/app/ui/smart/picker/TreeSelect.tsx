@@ -5,6 +5,7 @@ import { useSmartFieldContract } from '~/plugins/core-designer/components/studio
 import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';
 import { useSmartText } from '~/utils/i18n';
 import { FieldBase } from '~/ui/ui/field-base';
+import { fieldInputHeightStyles, fieldSizeStyles } from '~/ui/ui/field-styles';
 import { useDictTree } from './useDictTree';
 
 export type TreeSelectSize = 'small' | 'medium' | 'large';
@@ -72,12 +73,12 @@ interface TreeSelectProps {
 }
 
 const baseStyles =
-  'rounded-card border transition-all focus:outline-none focus-visible:shadow-focus disabled:opacity-50 disabled:cursor-not-allowed';
+  'border transition-all focus:outline-none focus-visible:shadow-focus disabled:opacity-50 disabled:cursor-not-allowed';
 
 const sizeStyles = {
-  small: 'px-2 py-1 text-sm min-h-[2rem]',
-  medium: 'px-3 py-2 text-base min-h-[2.5rem]',
-  large: 'px-4 py-3 text-lg min-h-[3rem]',
+  small: 'rounded-card px-2 py-1 text-sm min-h-[2rem]',
+  medium: `rounded-control ${fieldSizeStyles.medium} ${fieldInputHeightStyles.medium}`,
+  large: 'rounded-card px-4 py-3 text-lg min-h-[3rem]',
 };
 
 const variantStyles = {

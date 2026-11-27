@@ -230,6 +230,11 @@ test.describe('BOM workbench list filter + line detail golden (B13-01/B09-04/B20
           String(firstBackend.bom_std_material_code),
         );
       }
+      await expect(page.getByTestId(`review-drawer-candidate-${created!.primaryEvidenceId}`))
+        .toBeVisible();
+      await test.info().attach('line-detail-source', {
+        body: await page.screenshot({ fullPage: true }), contentType: 'image/png',
+      });
       const exportHistory = page.getByTestId('review-drawer-tab-export');
       await expect(exportHistory).toBeVisible();
       await expect(exportHistory.locator('summary')).toContainText(
@@ -239,6 +244,14 @@ test.describe('BOM workbench list filter + line detail golden (B13-01/B09-04/B20
       const revision = await readDynamicRecord(page, 'bom_export_revision', created!.exportRevisionId);
       expect(revision.bom_er_filename, 'controlled export revision has a filename').toBeTruthy();
       await expect(exportHistory).toContainText(String(revision.bom_er_filename));
+      const exportFilename = exportHistory.getByText(String(revision.bom_er_filename), { exact: true });
+      await exportFilename.scrollIntoViewIfNeeded();
+      await expect(exportFilename).toBeVisible();
+      expect(await exportFilename.evaluate(element => element.scrollWidth <= element.clientWidth),
+        'export filename fits the evidence rail without horizontal overflow').toBe(true);
+      await test.info().attach('line-detail-export-audit', {
+        body: await page.screenshot({ fullPage: true }), contentType: 'image/png',
+      });
       await expect(page.getByTestId(`review-drawer-candidate-${created!.primaryEvidenceId}`))
         .toContainText(created!.candidateCode);
       await expect(page.getByTestId(`review-drawer-candidate-${created!.secondaryEvidenceId}`))

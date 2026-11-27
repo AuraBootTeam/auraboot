@@ -89,8 +89,7 @@ test('generated capabilities preserve menu preview apply reload and revoke with 
     page.waitForResponse(
       (response) =>
         new URL(response.url()).pathname ===
-          `/api/permission/capabilities${preview ? '/preview' : ''}` &&
-        new URL(response.url()).searchParams.get('rolePid') === rolePid &&
+          `/api/permission/roles/${rolePid}/draft${preview ? '/preview' : ''}` &&
         response.request().method() === method,
     );
   async function selectedRole() {
@@ -98,7 +97,8 @@ test('generated capabilities preserve menu preview apply reload and revoke with 
     await page.getByTestId('role-search-input').fill(roleCode);
     const loaded = responseFor('GET');
     await page.getByTestId(`role-item-${roleCode}`).click();
-    const groups = await checked(await loaded, 'get', '/api/permission/capabilities');
+    const snapshot = await checked(await loaded, 'get', '/api/permission/roles/{rolePid}/draft');
+    const groups = snapshot.groups;
     const capability = groups
       .flatMap(
         (group: { capabilities: Array<{ code: string; includes: string[] }> }) =>
@@ -141,9 +141,16 @@ test('generated capabilities preserve menu preview apply reload and revoke with 
     await page.getByTestId('capability-save').click();
     const response = await previewed;
     const body = response.request().postDataJSON();
-    expect(body).toEqual(selected);
-    writes.push({ method: 'post', path: '/api/permission/capabilities/preview', body });
-    const plan = await checked(response, 'post', '/api/permission/capabilities/preview');
+    expect(body.selectedCapabilityCodes).toEqual(selected);
+    expect(body.expectedRevision).toMatch(/^[a-f0-9]{64}$/);
+    writes.push({ method: 'post', path: '/api/permission/roles/{rolePid}/draft/preview', body });
+    const preview = await checked(
+      response,
+      'post',
+      '/api/permission/roles/{rolePid}/draft/preview',
+    );
+    const plan = preview.capabilities;
+    const reviewedBody = body;
     expect(plan.grantedCodes.slice().sort()).toEqual(expectedGrant);
     expect(plan.revokedCodes.slice().sort()).toEqual(expectedRevoke);
     expect(plan.preservedCodes).toEqual([]);
@@ -155,9 +162,9 @@ test('generated capabilities preserve menu preview apply reload and revoke with 
       await page.getByTestId('confirm-ok').click();
       const response = await applied;
       const body = response.request().postDataJSON();
-      expect(body).toEqual(selected);
-      writes.push({ method: 'put', path: '/api/permission/capabilities', body });
-      await checked(response, 'put', '/api/permission/capabilities');
+      expect(body).toEqual(reviewedBody);
+      writes.push({ method: 'put', path: '/api/permission/roles/{rolePid}/draft', body });
+      await checked(response, 'put', '/api/permission/roles/{rolePid}/draft');
       await expect(page.getByTestId('confirm-dialog')).not.toBeVisible();
       await expect(page.getByTestId('capability-save')).toBeDisabled();
     };
@@ -211,11 +218,15 @@ test('generated capabilities preserve menu preview apply reload and revoke with 
     ] as const) {
       for (const [method, suffix, data] of [
         ['get', '', undefined],
-        ['post', '/preview', [fixture.code]],
-        ['put', '', [fixture.code]],
+        [
+          'post',
+          '/preview',
+          { expectedRevision: 'a'.repeat(64), selectedCapabilityCodes: [fixture.code] },
+        ],
+        ['put', '', { expectedRevision: 'a'.repeat(64), selectedCapabilityCodes: [fixture.code] }],
       ] as const) {
         const response = await client.request.fetch(
-          `/api/permission/capabilities${suffix}?rolePid=${encodeURIComponent(rolePid!)}`,
+          `/api/permission/roles/${encodeURIComponent(rolePid!)}/draft${suffix}`,
           { method, data, headers },
         );
         denials.push({ actor, method, suffix, status: response.status() });

@@ -1,3 +1,4 @@
+import { assignRoleNavigation } from '../../helpers/role-navigation';
 import { loginDeliveryMember } from '../../helpers/delivery-session';
 import { completeDeliveryApproval } from '../../helpers/delivery-approval';
 import { requireRuntimeUrl } from '../../helpers/environments';
@@ -173,6 +174,7 @@ test('a least privilege viewer cannot forge verification results or execute the 
   const collect=(nodes:any[])=>nodes.forEach(n=>{ids.set(n.code,n.id);collect(n.children||[]);});collect(tree);
   const grants=['tdv.check.read','model.tdv_check.read','tpm.acceptance.read','model.tpm_acceptance.read'];
   await data(await page.request.put(`/api/permissions/matrix/${role.pid}/batch`,{data:grants.map(code=>{expect(ids.has(code),code).toBe(true);return{permissionId:ids.get(code),granted:true};})}));
+  await assignRoleNavigation(page, role.pid, ['tdv_checks']);
   const email=`${code}@e2e.local`;await data(await page.request.post('/api/admin/users',{data:{email,displayName:'交付核验只读成员',initialPassword:process.env.ADMIN_PASSWORD,roleCodes:[code],sendInviteEmail:false}}));
   const context=await browser.newContext({baseURL:requireRuntimeUrl('base'),storageState:{cookies:[],origins:[]},locale:'zh-CN',viewport:{width:1440,height:1000}});
   try {

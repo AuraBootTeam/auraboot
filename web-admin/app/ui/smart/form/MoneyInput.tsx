@@ -18,7 +18,7 @@
  */
 
 import React, { useRef, useCallback, useMemo, useState, useEffect } from 'react';
-import type { FormFieldProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+import type { FormFieldProps } from '~/framework/smart/schema/smart-components';
 import { useSmartField } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartComponent';
 import { useSmartFieldContract } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldContract';
 import { useSmartFieldMeta } from '~/plugins/core-designer/components/studio/hooks/runtime/useSmartFieldMeta';
@@ -47,7 +47,7 @@ export interface MoneyInputProps extends FormFieldProps {
 
 const SIZE_CONFIG = {
   small: { height: 'h-8', text: 'text-sm', pill: 'px-2 py-0.5 text-xs', input: 'px-2' },
-  medium: { height: 'h-10', text: 'text-sm', pill: 'px-2.5 py-1 text-sm', input: 'px-3' },
+  medium: { height: 'h-[var(--ds-control-field)]', text: 'text-sm', pill: 'px-2.5 py-1 text-sm', input: 'px-3' },
   large: { height: 'h-12', text: 'text-base', pill: 'px-3 py-1.5 text-base', input: 'px-4' },
 } as const;
 

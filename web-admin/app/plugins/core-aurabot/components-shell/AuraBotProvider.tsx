@@ -16,12 +16,14 @@ import React, {
   useReducer,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
 } from 'react';
 import { useLocation, useParams } from 'react-router';
 import { useI18n } from '~/contexts/I18nContext';
 import type { FormFillTarget, FormFillField, FormFillResult, FormFillReview } from '~/framework/meta/rendering/formFill';
 import { isExplicitFormFillRequest } from '~/framework/meta/rendering/formFillIntent';
+import { bindFormFillRegister } from '../formFillBackend';
 import type { PageContext } from '../hooks/usePageContext';
 import {
   auraBotApi,
@@ -492,6 +494,16 @@ export const AuraBotCtx = createContext<AuraBotContextValue | null>(null);
 // Route-based PageContext derivation
 // ============================================================================
 
+/**
+ * /p/:pageKey routes carry the PAGE key ({model_code}_list on lists); scene
+ * tables key by bare model code. Keep in lockstep with usePageContext.ts's
+ * deriveContextFromRoute — two derivation sites exist (provider + hook); a
+ * consolidation is platform debt.
+ */
+function toModelCode(pageKey: string): string {
+  return pageKey.replace(/_(list|form|detail)$/, '');
+}
+
 function derivePageContextFromRoute(
   pathname: string,
   params: Record<string, string | undefined>,
@@ -508,49 +520,49 @@ function derivePageContextFromRoute(
   }
 
   // /p/:pageKey/view/:recordPid → detail
-  if (pathname.match(/^\/p\/[^/]+\/view\/[^/]+/)) {
+  if (pathname.match(/^\/p\/(?:c\/)?[^/]+\/view\/[^/]+/)) {
     const pageKey = params.pageKey || '';
     const recordPid = params.recordPid ?? params.recordId;
     return {
       pageType: 'detail',
       pageKey,
-      modelCode: pageKey,
+      modelCode: toModelCode(pageKey),
       recordPid,
       breadcrumb: [pageKey],
     };
   }
 
   // /p/:pageKey/edit/:recordPid → form (edit)
-  if (pathname.match(/^\/p\/[^/]+\/edit\/[^/]+/)) {
+  if (pathname.match(/^\/p\/(?:c\/)?[^/]+\/edit\/[^/]+/)) {
     const pageKey = params.pageKey || '';
     const recordPid = params.recordPid ?? params.recordId;
     return {
       pageType: 'form',
       pageKey,
-      modelCode: pageKey,
+      modelCode: toModelCode(pageKey),
       recordPid,
       breadcrumb: [pageKey],
     };
   }
 
   // /p/:pageKey/new → form (create)
-  if (pathname.match(/^\/p\/[^/]+\/new/)) {
+  if (pathname.match(/^\/p\/(?:c\/)?[^/]+\/new/)) {
     const pageKey = params.pageKey || '';
     return {
       pageType: 'form',
       pageKey,
-      modelCode: pageKey,
+      modelCode: toModelCode(pageKey),
       breadcrumb: [pageKey],
     };
   }
 
   // /p/:pageKey → list
-  if (pathname.match(/^\/p\/[^/]+$/)) {
+  if (pathname.match(/^\/p\/(?:c\/)?[^/]+$/)) {
     const pageKey = params.pageKey || '';
     return {
       pageType: 'list',
       pageKey,
-      modelCode: pageKey,
+      modelCode: toModelCode(pageKey),
       breadcrumb: [pageKey],
     };
   }
@@ -689,9 +701,9 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
           });
         }
       }
-    } catch {
+    } catch (error) {
       // Conversation history unavailable — keep in-memory state only
-    }
+ console.warn('[AuraBotProvider] previously-silent catch', error);    }
     // Restoration reads live state so callers can keep a stable action identity.
   }, []);
 
@@ -814,9 +826,9 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
             docCount: kb.docCount || 0,
           }));
         dispatch({ type: 'set_knowledge_bases', payload: kbs });
-      } catch {
+      } catch (error) {
         // KB list unavailable — no-op
-      }
+ console.warn('[AuraBotProvider] previously-silent catch', error);      }
     };
     loadKbs();
   }, [state.panelState, agent]);
@@ -1412,6 +1424,13 @@ export function AuraBotProvider({ children }: AuraBotProviderProps) {
       setFormFillNotice('');
     };
   }, []);
+
+  // Bind the live form-fill register into the module-level backend adapter.
+  // Bound during render (idempotent) so child DslFormFillProvider effects —
+  // which run before this component's effects — already see the register;
+  // before the provider mounts the adapter's registerTarget stays undefined,
+  // mirroring the previous useAuraBotSafe-null behavior.
+  useMemo(() => bindFormFillRegister(registerFormFillTarget), [registerFormFillTarget]);
 
   const value: AuraBotContextValue = {
     hasActiveForm: Boolean(activeFormTarget),

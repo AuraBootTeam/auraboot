@@ -39,6 +39,45 @@ function renderListTable(overrides: Partial<ListTableProps> = {}) {
   return render(<ListTable {...props} />);
 }
 
+describe('ListTable keyboard row navigation', () => {
+  it.each(['flat', 'tree'] as const)('activates the %s data row with Enter and Space', (mode) => {
+    const onRowClick = vi.fn();
+    renderListTable({
+      onRowClick,
+      ...(mode === 'tree' ? { treeConfig: { parentField: 'parent_id' } } : {}),
+    });
+    const row = screen.getByTestId('table-row-0');
+    expect(row).toHaveAttribute('tabindex', '0');
+    row.focus();
+    expect(row).toHaveFocus();
+    fireEvent.keyDown(row, { key: 'Enter' });
+    fireEvent.keyDown(row, { key: ' ' });
+    expect(onRowClick).toHaveBeenCalledTimes(2);
+    expect(onRowClick).toHaveBeenNthCalledWith(1, { pid: 'row-1', name: 'Mission Control', kind: '列表' });
+    expect(onRowClick).toHaveBeenNthCalledWith(2, { pid: 'row-1', name: 'Mission Control', kind: '列表' });
+  });
+
+  it('does not hijack nested inputs or buttons, modifier shortcuts, or held keys', () => {
+    const onRowClick = vi.fn();
+    renderListTable({
+      onRowClick,
+      renderCellContent: (_record, column) => column.field === 'name'
+        ? <input aria-label="Inline name" defaultValue="Mission Control" />
+        : <button type="button">Expand details</button>,
+    });
+    for (const control of [screen.getByRole('textbox'), screen.getByRole('button', { name: 'Expand details' })]) {
+      fireEvent.keyDown(control, { key: 'Enter' });
+      fireEvent.keyDown(control, { key: ' ' });
+    }
+    const row = screen.getByTestId('table-row-0');
+    for (const properties of [{ ctrlKey: true }, { altKey: true }, { metaKey: true }, { shiftKey: true }, { repeat: true }]) {
+      fireEvent.keyDown(row, { key: 'Enter', ...properties });
+    }
+    fireEvent.keyDown(row, { key: 'ArrowDown' });
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+});
+
 describe('ListTable selection column layout', () => {
   it('fills spare viewport space without expanding personalized column widths', () => {
     const viewport = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
@@ -488,18 +527,29 @@ describe('ListTable expandable tree rows (T10)', () => {
   });
 });
 
-
 it('uses the same compact widths and spacing for headers, rows and aggregates', async () => {
   const descriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
-  Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => 480 });
+  Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+    configurable: true,
+    get: () => 480,
+  });
   try {
-    const { container } = renderListTable({ columns: [
-      { field: 'name', label: 'Project', presentation: { kind: 'object' } },
-      { field: 'amount', label: 'Budget', valueType: 'currency', aggregate: 'sum' },
-      { field: 'status', label: 'Status', valueType: 'tag' },
-    ], data: [{ pid: 'one', name: 'Delivery', amount: 680000, status: 'Active' }] });
-    await waitFor(() => expect(Number.parseFloat(container.querySelector('table')!.style.width)).toBeLessThanOrEqual(480));
-    const widths = Array.from(container.querySelectorAll('col')).map(col => Number.parseFloat((col as HTMLTableColElement).style.width));
+    const { container } = renderListTable({
+      columns: [
+        { field: 'name', label: 'Project', presentation: { kind: 'object' } },
+        { field: 'amount', label: 'Budget', valueType: 'currency', aggregate: 'sum' },
+        { field: 'status', label: 'Status', valueType: 'tag' },
+      ],
+      data: [{ pid: 'one', name: 'Delivery', amount: 680000, status: 'Active' }],
+    });
+    await waitFor(() =>
+      expect(Number.parseFloat(container.querySelector('table')!.style.width)).toBeLessThanOrEqual(
+        480,
+      ),
+    );
+    const widths = Array.from(container.querySelectorAll('col')).map((col) =>
+      Number.parseFloat((col as HTMLTableColElement).style.width),
+    );
     expect(widths.reduce((sum, width) => sum + width, 0)).toBeLessThanOrEqual(480);
     for (const field of ['name', 'amount', 'status']) {
       expect(screen.getByTestId(`table-header-${field}`)).toHaveClass('px-3');
@@ -509,5 +559,47 @@ it('uses the same compact widths and spacing for headers, rows and aggregates', 
   } finally {
     if (descriptor) Object.defineProperty(HTMLElement.prototype, 'clientWidth', descriptor);
     else delete (HTMLElement.prototype as any).clientWidth;
+  }
+});
+
+describe('list header label overflow contract', () => {
+  it('wraps a full label when the authored column explicitly disables ellipsis', () => {
+    renderListTable({
+      columns: [
+        {
+          field: 'submitted',
+          label: 'Cumulative submitted shipment quantity',
+          width: 130,
+          ellipsis: false,
+        },
+      ],
+    });
+    expect(screen.getByText('Cumulative submitted shipment quantity')).toHaveClass(
+      'whitespace-normal',
+    );
+    expect(screen.getByText('Cumulative submitted shipment quantity')).not.toHaveClass('truncate');
+  });
+
+  it('retains default compact labels for columns without an overflow override', () => {
+    renderListTable({ columns: [{ field: 'submitted', label: 'Submitted quantity', width: 130 }] });
+    expect(screen.getByText('Submitted quantity')).toHaveClass('truncate');
+  });
+});
+
+it('keeps narrow authored headers, business values and summaries on compact padding', () => {
+  renderListTable({
+    columns: [
+      { field: 'status', label: 'Status', width: 110 },
+      { field: 'quantity', label: 'Quantity', width: 80, aggregate: 'sum' },
+      { field: 'released', label: 'Released at', width: 180 },
+    ],
+    data: [
+      { pid: 'released-hold', status: 'Released', quantity: 2, released: '2026-11-23 00:00:00' },
+    ],
+  });
+  for (const field of ['status', 'quantity', 'released']) {
+    expect(screen.getByTestId(`table-header-${field}`)).toHaveClass('px-3');
+    expect(screen.getByTestId(`table-cell-0-${field}`)).toHaveClass('px-3');
+    expect(screen.getByTestId(`summary-cell-${field}`)).toHaveClass('px-3');
   }
 });

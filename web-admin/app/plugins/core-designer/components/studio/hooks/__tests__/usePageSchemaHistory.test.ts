@@ -7,9 +7,9 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { usePageSchemaHistory } from '../usePageSchemaHistory';
-import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type { UnifiedPageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
-function makeSchema(id: string, blockCount = 0): PageSchema {
+function makeSchema(id: string, blockCount = 0): UnifiedPageSchema {
   return {
     schemaVersion: 2 as const,
     id,
@@ -69,7 +69,7 @@ describe('usePageSchemaHistory', () => {
       });
 
       expect(prev).not.toBeNull();
-      expect((prev as PageSchema).id).toBe('s0');
+      expect((prev as UnifiedPageSchema).id).toBe('s0');
       expect(result.current.canUndo).toBe(false);
       expect(result.current.canRedo).toBe(true);
     });
@@ -90,7 +90,7 @@ describe('usePageSchemaHistory', () => {
       });
 
       expect(next).not.toBeNull();
-      expect((next as PageSchema).id).toBe('s1');
+      expect((next as UnifiedPageSchema).id).toBe('s1');
       expect(result.current.canRedo).toBe(false);
     });
 
@@ -159,8 +159,8 @@ describe('usePageSchemaHistory', () => {
         prev = result.current.undo();
       });
       expect(prev).not.toBeNull();
-      expect((prev as PageSchema).id).toBe('new-initial');
-      expect((prev as PageSchema).blocks.length).toBe(5);
+      expect((prev as UnifiedPageSchema).id).toBe('new-initial');
+      expect((prev as UnifiedPageSchema).blocks.length).toBe(5);
     });
 
     it('undo after reset with subsequent edits cannot go beyond newInitial', () => {
@@ -188,8 +188,8 @@ describe('usePageSchemaHistory', () => {
       });
       expect(result.current.canUndo).toBe(false);
       expect(prev).not.toBeNull();
-      expect((prev as PageSchema).id).toBe('loaded');
-      expect((prev as PageSchema).blocks.length).toBe(3);
+      expect((prev as UnifiedPageSchema).id).toBe('loaded');
+      expect((prev as UnifiedPageSchema).blocks.length).toBe(3);
     });
   });
 });

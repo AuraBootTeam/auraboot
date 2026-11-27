@@ -33,6 +33,14 @@ final class RegisteredSourceProgressTest {
         assertTrue(adapter.shouldReportProgress(progress,start));assertFalse(adapter.shouldReportProgress(progress,start+1));
         assertTrue(adapter.shouldReportProgress(progress,start+TimeUnit.MINUTES.toNanos(1)));
     }
+    @Test void partialChannelSummariesShareTheSameBoundedRateAndRejectEmptyTicks() {
+        var adapter=adapter();long minute=TimeUnit.MINUTES.toNanos(1);
+        assertFalse(adapter.shouldReportProgress(result(RegisteredSourcePollingAdapter.Status.PARTIAL,0),0));
+        assertTrue(adapter.shouldReportProgress(result(RegisteredSourcePollingAdapter.Status.PARTIAL,1),0));
+        assertFalse(adapter.shouldReportProgress(result(RegisteredSourcePollingAdapter.Status.PARTIAL,1),minute-1));
+        assertFalse(adapter.shouldReportProgress(result(RegisteredSourcePollingAdapter.Status.SUCCEEDED,1),minute-1));
+        assertTrue(adapter.shouldReportProgress(result(RegisteredSourcePollingAdapter.Status.SUCCEEDED,1),minute));
+    }
     @Test void concurrentObservationsProduceOneSummary() throws Exception {
         var adapter=adapter();var progress=result(RegisteredSourcePollingAdapter.Status.SUCCEEDED,1);
         try(var executor=Executors.newFixedThreadPool(8)) {

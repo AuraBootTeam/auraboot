@@ -1,8 +1,15 @@
 # ============================================================
-# Docker Compose — Microservice mode
+# Docker Compose — Microservice mode (EXPERIMENTAL)
 # ============================================================
 # Each bounded context runs in its own container, communicating
 # via Redis Streams for events and direct HTTP for sync calls.
+#
+# STATUS (2026-11-14): experimental. The `aura.modules.*` service
+# split this topology implies has no runtime consumer yet — every
+# container below boots the same full monolith image, so scaling
+# it out multiplies the full controller/scheduler surface instead
+# of isolating bounded contexts. Use docker-compose.yml (monolith)
+# or docker-compose.prod.yml for supported deployments.
 #
 # Usage: docker compose -f docker-compose.microservice.yml up -d
 # ============================================================

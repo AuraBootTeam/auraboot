@@ -93,9 +93,9 @@ export function useSSE({
           resetHeartbeat();
           try {
             handler(JSON.parse(ev.data));
-          } catch {
+          } catch (error) {
             // ignore parse errors
-          }
+ console.warn('[useSSE] previously-silent catch', error);          }
         });
       }
 

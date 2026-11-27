@@ -9,6 +9,7 @@ import com.auraboot.framework.agent.provider.ToolProviderRegistry;
 import com.auraboot.framework.agent.service.AgentDefinitionService;
 import com.auraboot.framework.agent.service.AgentEventDispatchService;
 import com.auraboot.framework.agent.service.AgentLifecycleService;
+import com.auraboot.framework.agent.service.AgentActivationService;
 import com.auraboot.framework.agent.service.AgentOrganizationService;
 import com.auraboot.framework.agent.service.AgentReleaseDeploymentService;
 import com.auraboot.framework.agent.service.McpServerConfigService;
@@ -40,6 +41,7 @@ public class CoreAgentController {
     private final AgentOrganizationService agentOrganizationService;
     private final AgentDefinitionService agentDefinitionService;
     private final AgentLifecycleService agentLifecycleService;
+    private final AgentActivationService agentActivationService;
     private final AgentReleaseDeploymentService releaseDeploymentService;
     private final ToolProviderRegistry toolProviderRegistry;
 
@@ -419,6 +421,19 @@ public class CoreAgentController {
         String reason = body == null ? null : (String) body.get("reason");
         return lifecycle(() -> agentLifecycleService.suspend(
                 agentPid, MetaContext.exists() ? MetaContext.getCurrentUserId() : null, reason));
+    }
+
+    public record ActivationRequest(
+            @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 128)
+            String providerCode) {}
+
+    /** Activate a disabled template and publish its first immutable deployment atomically. */
+    @PostMapping("/definitions/{agentPid}/activate")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
+    public ResponseEntity<ApiResponse<AgentReleaseDeploymentService.PublishedRelease>> activateAgent(
+            @PathVariable String agentPid, @jakarta.validation.Valid @RequestBody ActivationRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(agentActivationService.activate(
+                MetaContext.getCurrentTenantId(), agentPid, request.providerCode(), MetaContext.getCurrentUserId())));
     }
 
     /** Let a suspended agent run again. */

@@ -38,6 +38,10 @@ public interface RolePermissionService {
      */
     boolean assignPermissionsToRole(Long roleId, List<Long> permissionIds);
 
+    /** Read-only duty-plan guard; protects managed sources and separate negative constraints. */
+    void validateCapabilityChanges(Long roleId, List<Long> addedPermissionIds, List<Long> removedPermissionIds);
+
+
     /**
      * Materialize the role's default data scope for already-bound permissions.
      *

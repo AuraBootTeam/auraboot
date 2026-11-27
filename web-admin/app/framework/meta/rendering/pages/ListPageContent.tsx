@@ -9,6 +9,7 @@ import { useListMemberInvite } from './list/useListMemberInvite';
 import { useListMetadata } from './list/useListMetadata';
 import { useListPageRuntime } from './list/useListPageRuntime';
 import { useListSelectionBinding } from './list/useListSelectionBinding';
+import { useListStatusPolling } from './list/useListStatusPolling';
 import { useListPageState } from './list/useListPageState';
 import { useListQueryActions } from './list/useListQueryActions';
 import { useListQuickFilters } from './list/useListQuickFilters';
@@ -101,7 +102,11 @@ function ListPageContentInner(props: PageContentProps) {
       },
     },
   );
-  const dataLoader = useListDataLoader({ ...pageRuntime, ...state, ...metadata, ...savedViews });
+  const dataLoader = useListDataLoader(
+    { ...pageRuntime, ...state, ...metadata, ...savedViews },
+    { get filterBlock() { return columns.filterBlock; } },
+  );
+  useListStatusPolling({ ...state, loadDataRef: pageRuntime.loadDataRef });
   const queryActions = useListQueryActions(
     { ...pageRuntime, ...state, ...dataLoader, ...metadata, ...savedViews },
     {
@@ -163,9 +168,18 @@ function ListPageContentInner(props: PageContentProps) {
 
 /** Page-level async-task context is shared by every action handler. */
 export function ListPageContent(props: PageContentProps) {
+  // Generic DSL list pages honor a schema-declared reload channel so page-level
+  // custom blocks can request a data refresh without a host page behind them.
+  // Host pages pass richer listExtensions explicitly; a schema extension must
+  // not require a host to be useful (the reload listener already exists in
+  // useListQueryActions — only this plumbing was missing).
+  const schemaReloadEventName = props.schema.extension?.reloadEventName;
+  const listExtensions =
+    props.listExtensions ??
+    (schemaReloadEventName ? { reloadEventName: schemaReloadEventName } : undefined);
   return (
     <AsyncTaskModalProvider>
-      <ListPageContentInner {...props} />
+      <ListPageContentInner {...props} listExtensions={listExtensions} />
     </AsyncTaskModalProvider>
   );
 }

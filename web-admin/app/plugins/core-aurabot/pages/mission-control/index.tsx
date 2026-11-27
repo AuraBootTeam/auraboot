@@ -320,7 +320,7 @@ function DashboardView({
   const [loading, setLoading] = useState(true);
 
   const loadSchedules = useCallback(() => {
-    get<{ records: ScheduleItem[] }>('/api/dynamic/agent-schedule/list', {
+    get<{ records: ScheduleItem[] }>('/api/dynamic/agent_schedule_list/list', {
       pageSize: '10',
       filters: JSON.stringify([{ fieldName: 'schedule_status', operator: 'EQ', value: 'active' }]),
     }).then((res) => {
@@ -905,9 +905,9 @@ function ObservationRow({
     if (parsedDetail.startsWith('{') || parsedDetail.startsWith('[')) {
       parsedDetail = JSON.stringify(JSON.parse(parsedDetail), null, 2);
     }
-  } catch {
+  } catch (error) {
     /* use raw */
-  }
+ console.warn('[index] previously-silent catch', error);  }
 
   return (
     <>

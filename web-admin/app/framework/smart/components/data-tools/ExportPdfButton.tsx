@@ -7,6 +7,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { cn } from '~/utils/cn';
+import { measurePdfCapture, preparePdfCapture } from './pdfCapture';
 import { useToastContext } from '~/contexts/ToastContext';
 
 export interface ExportPdfButtonProps {
@@ -40,15 +41,18 @@ export const ExportPdfButton: React.FC<ExportPdfButtonProps> = ({
       const html2canvas = (await import('html2canvas')).default;
       const { jsPDF } = await import('jspdf');
 
-      const canvas = await html2canvas(targetRef.current, {
+      const target = targetRef.current;
+      await target.ownerDocument.fonts?.ready;
+      const { width, height } = measurePdfCapture(target);
+      const canvas = await html2canvas(target, {
+        width,
+        height,
         scale: 2,
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
         onclone: (clonedDocument, clonedTarget) => {
-          injectPdfColorFallbackStyle(clonedDocument);
-          sanitizeUnsupportedPdfColors(clonedDocument.documentElement);
-          sanitizeUnsupportedPdfColors(clonedTarget as HTMLElement);
+          preparePdfCapture(clonedDocument, clonedTarget as HTMLElement, width, height);
         },
       });
 
@@ -167,82 +171,6 @@ function normalizeExportText(value: string): string {
     .filter(Boolean)
     .join('\n')
     .slice(0, 8000);
-}
-
-function injectPdfColorFallbackStyle(clonedDocument: Document): void {
-  const style = clonedDocument.createElement('style');
-  style.textContent = `
-    *, *::before, *::after {
-      color: #111827 !important;
-      background-color: #ffffff !important;
-      border-color: #d1d5db !important;
-      outline-color: #2563eb !important;
-      text-decoration-color: #111827 !important;
-      caret-color: #111827 !important;
-      box-shadow: none !important;
-      text-shadow: none !important;
-      background-image: none !important;
-      --tw-ring-color: rgba(37, 99, 235, 0.45) !important;
-      --tw-shadow-color: transparent !important;
-    }
-    svg, svg * {
-      color: #111827 !important;
-      fill: #111827 !important;
-      stroke: #111827 !important;
-    }
-  `;
-  clonedDocument.head.appendChild(style);
-}
-
-function sanitizeUnsupportedPdfColors(root: HTMLElement): void {
-  const view = root.ownerDocument.defaultView;
-  if (!view) return;
-  const nodes = [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))];
-  for (const node of nodes) {
-    const style = view.getComputedStyle(node);
-    forceColor(node, 'color', '#111827');
-    forceColor(node, 'background-color', '#ffffff');
-    forceColor(node, 'border-top-color', '#d1d5db');
-    forceColor(node, 'border-right-color', '#d1d5db');
-    forceColor(node, 'border-bottom-color', '#d1d5db');
-    forceColor(node, 'border-left-color', '#d1d5db');
-    forceColor(node, 'outline-color', '#2563eb');
-    forceColor(node, 'text-decoration-color', '#111827');
-    forceColor(node, 'caret-color', '#111827');
-    forceColor(node, 'fill', '#111827');
-    forceColor(node, 'stroke', '#111827');
-    if (node instanceof view.SVGElement) {
-      node.setAttribute('color', '#111827');
-      node.setAttribute('fill', '#111827');
-      node.setAttribute('stroke', '#111827');
-    }
-    sanitizeComplexColor(node, style, 'box-shadow', 'none');
-    sanitizeComplexColor(node, style, 'text-shadow', 'none');
-    sanitizeComplexColor(node, style, 'background-image', 'none');
-  }
-}
-
-function forceColor(
-  node: HTMLElement,
-  property: string,
-  fallback: string,
-): void {
-  node.style.setProperty(property, fallback, 'important');
-}
-
-function sanitizeComplexColor(
-  node: HTMLElement,
-  style: CSSStyleDeclaration,
-  property: string,
-  fallback: string,
-): void {
-  const value = style.getPropertyValue(property);
-  if (!usesUnsupportedColor(value)) return;
-  node.style.setProperty(property, fallback, 'important');
-}
-
-function usesUnsupportedColor(value: string | null | undefined): boolean {
-  return Boolean(value?.toLowerCase().includes('oklch('));
 }
 
 export default ExportPdfButton;

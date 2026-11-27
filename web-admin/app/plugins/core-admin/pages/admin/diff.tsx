@@ -188,9 +188,9 @@ export default function DiffViewer() {
           if (!cancelled && result.success && Array.isArray(result.data)) {
             next[`${target.type}:${target.code}`] = result.data;
           }
-        } catch {
+        } catch (error) {
           // Soft-fail per target — don't block the whole sidebar on a single error
-        }
+ console.warn('[diff] previously-silent catch', error);        }
       }
       if (!cancelled) {
         setImpactByTarget(next);

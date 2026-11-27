@@ -12,6 +12,7 @@ import { type QuickFilterPresetKey } from './quickFilterPresets';
 import { encodeSorts } from './useListUrlState';
 
 export interface ListLoadDataParams {
+  background?: boolean;
   page?: number;
   size?: number;
   filters?: Record<string, any>;

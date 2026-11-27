@@ -5,7 +5,7 @@ import {
   type DecisionConditionTextKey,
 } from './decisionConditionText';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Layers, Plus, Play, X as CloseIcon } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Layers, Plus, Play, X as CloseIcon, Database, Search, UserRound, X } from 'lucide-react';
 import {
   compatibleFields,
   modelKey,
@@ -18,7 +18,6 @@ import {
 import { ConditionServerTrial } from './ConditionServerTrial';
 import type { ConditionTrace } from '../api/decisionApi';
 import './condition-expression.css';
-import { Database, Search, UserRound, X } from 'lucide-react';
 import {
   type ConditionNode,
   type GroupNode,

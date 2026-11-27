@@ -410,6 +410,12 @@ public interface MetaModelService {
      */
     MetaModelDTO findByCode(String code);
 
+    /** Current model extensions without presentation-only field statistics. */
+    default java.util.Map<String, Object> findExtensionByCode(String code) {
+        var model = findByCode(code);
+        return model == null ? null : model.getExtension();
+    }
+
     /**
      * Lookup the current version of a model by code, throwing when missing.
      *

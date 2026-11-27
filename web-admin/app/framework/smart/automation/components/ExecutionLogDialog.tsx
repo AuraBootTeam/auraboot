@@ -10,7 +10,7 @@ import {
 import { cn } from '~/utils/cn';
 import { useSmartText } from '~/utils/i18n';
 import { ACTION_TYPE_I18N_KEYS, TRIGGER_TYPE_I18N_KEYS } from './automationTypeLabels';
-import { humanizeType } from '~/plugins/core-designer/components/flow-designer-sdk/utils';
+import { humanizeType } from '~/framework/smart/flows/sdk/utils';
 import type { AutomationLog, ActionResult } from '../services/automationService';
 
 const BASE_URL = '/api/automations';
@@ -32,10 +32,18 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 };
 
 function StatusBadge({ status }: { status: string }) {
-  const config = statusConfig[status] || statusConfig.PENDING;
+  const st = useSmartText();
+  const config = statusConfig[status] || statusConfig.pending;
+  const labels: Record<string, { zh: string; en: string }> = {
+    success: { zh: '成功', en: 'Succeeded' },
+    failed: { zh: '失败', en: 'Failed' },
+    running: { zh: '运行中', en: 'Running' },
+    pending: { zh: '等待执行', en: 'Pending' },
+    skipped: { zh: '已跳过', en: 'Skipped' },
+  };
   return (
     <span className={cn('rounded px-2 py-0.5 text-xs font-medium', config.className)}>
-      {config.label}
+      {st(labels[status] || { zh: '未知状态', en: 'Unknown status' })}
     </span>
   );
 }

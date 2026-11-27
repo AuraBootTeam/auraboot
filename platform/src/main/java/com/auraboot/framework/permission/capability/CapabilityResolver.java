@@ -54,6 +54,7 @@ public class CapabilityResolver {
         Set<String> granted = grantedCodes == null ? Set.of() : grantedCodes;
         Map<String, String> names = permissionNames == null ? Map.of() : permissionNames;
         Map<String, Map<String, Object>> extensions = permissionExtensions == null ? Map.of() : permissionExtensions;
+        Set<String> domainLevels = DomainCapabilityLevels.levelCodes(decls);
 
         // group name -> capabilities (preserve first-seen order: declared groups before derived)
         LinkedHashMap<String, List<Capability>> byGroup = new LinkedHashMap<>();
@@ -71,14 +72,16 @@ public class CapabilityResolver {
                     DisplayMeta displayMeta = displayMeta(d.getIncludes(), extensions, d.getGroup(), d.getOrder(), d.getDisplayGroupOrder());
                     Capability cap = Capability.builder()
                             .code(d.getCode())
-                            .group(displayMeta.group())
+                            .group(domainLevels.contains(d.getCode()) && d.getGroup() != null
+                                    ? d.getGroup() : displayMeta.group())
                             .label(label(d))
                             .localizedLabels(localizedLabels(d))
                             .description(d.getDescription())
                             .localizedDescriptions(localizedDescriptions(d))
                             .sensitive(Boolean.TRUE.equals(d.getSensitive()) || displayMeta.sensitive())
                             .tier(d.getTier())
-                            .displayGroupOrder(displayMeta.groupOrder())
+                            .displayGroupOrder(domainLevels.contains(d.getCode()) && d.getDisplayGroupOrder() != null
+                                    ? d.getDisplayGroupOrder() : displayMeta.groupOrder())
                             .displayOrder(displayMeta.order())
                             .includes(d.getIncludes())
                             .granted(granted.containsAll(d.getIncludes()))

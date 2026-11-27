@@ -407,6 +407,19 @@ class TenantMemberApplicationServiceImplTest {
     }
 
     @Test
+    @DisplayName("suspension bumps the user security version so old tokens fail closed")
+    void suspensionBumpsSecurityVersion() {
+        TenantMember m = member(1L, 99L, 5L, StatusConstants.ACTIVE);
+        when(tenantMemberService.findByPid("p")).thenReturn(m);
+        metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
+        when(tenantMemberService.suspendMember(1L, "r")).thenReturn(true);
+
+        assertTrue(service.updateMemberStatus("p", StatusConstants.SUSPENDED, "r", 7L));
+
+        verify(passwordManagementService).incrementSecurityVersion(5L);
+    }
+
+    @Test
     @DisplayName("updateMemberStatus invalid status throws")
     void updateMemberStatusInvalid() {
         TenantMember m = member(1L, 99L, 5L, StatusConstants.ACTIVE);

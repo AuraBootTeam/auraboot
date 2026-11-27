@@ -153,9 +153,9 @@ export function EventPolicyDesignerBlock({ block, runtime }: EventPolicyDesigner
           setCatalogFields(factFields);
           return;
         }
-      } catch {
+      } catch (error) {
         // Old runtimes may not expose the unified fact catalog yet; keep the legacy field index as fallback.
-      }
+ console.warn('[EventPolicyDesignerBlock] previously-silent catch', error);      }
       try {
         const rows = await api.getModelFields();
         if (cancelled) return;

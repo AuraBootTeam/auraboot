@@ -31,7 +31,7 @@ vi.mock('~/shared/services/resourceSelectService', () => ({
   fetchFieldDictOptions: fetchFieldDictOptionsMock,
 }));
 
-vi.mock('~/plugins/core-designer/components/flow-designer-sdk/store', () => ({
+vi.mock('~/framework/smart/flows/sdk/store', () => ({
   useFlowStore: useFlowStoreMock,
 }));
 

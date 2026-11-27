@@ -1,3 +1,4 @@
+import LoginCapabilities from './LoginCapabilities';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useI18n } from '~/contexts/I18nContext';
 import { useTheme } from '~/contexts/ThemeContext';
@@ -22,16 +23,17 @@ export default function AuthAppearanceShell({ branding, appearance, children, di
   const dark = previewTheme ? previewTheme === 'dark' : appearance.theme?.mode === 'dark' || (appearance.theme?.mode !== 'light' && isDark);
   const content = appearance.content;
   const copy = (key: 'badge' | 'headline' | 'headlineEm' | 'lead' | 'mobileLead', fallback: string) => resolveAuthContent(content?.[key], locale, appearance.defaultLocale, fallback);
-  const badge = copy('badge', branding.loginBadge ?? t('auth.badge', undefined, zh ? 'AI 原生 · 企业应用运行时' : 'AI-native enterprise application runtime'));
-  const headline = copy('headline', branding.loginHeadline ?? t('auth.headline.pre', undefined, zh ? '配置即应用,' : 'Configure your application,'));
-  const emphasis = copy('headlineEm', branding.loginHeadlineEm ?? t('auth.headline.em', undefined, zh ? 'AI 即战力' : 'put AI to work'));
-  const lead = copy('lead', branding.loginLead ?? t('auth.lead', undefined, zh ? '把每个业务能力沉淀为命令——人能点、AI 能调、全端可交付。' : 'Turn business capabilities into commands that teams and AI can use across every client.'));
+  const badge = copy('badge', branding.loginBadge ?? t('auth.badge', undefined, zh ? '企业应用平台' : 'Business application platform'));
+  const headline = copy('headline', branding.loginHeadline ?? t('auth.headline.pre', undefined, zh ? '内置成体系，' : 'Built-in essentials,'));
+  const emphasis = copy('headlineEm', branding.loginHeadlineEm ?? t('auth.headline.em', undefined, zh ? '定制有空间' : 'room to customize'));
+  const lead = copy('lead', branding.loginLead ?? t('auth.lead', undefined, zh ? '把工程经验做进底座，让人和 AI 专注业务。' : 'Engineering experience, built into the foundation. Let people and AI focus on the business.'));
   const mobileLead = copy('mobileLead', '');
   const features = resolveAuthContent(content?.features, locale, appearance.defaultLocale, branding.loginFeatures ?? [
-    t('auth.feature.designer', undefined, '拖拽即页面'),
-    t('auth.feature.dataModel', undefined, '建模即数据'),
-    t('auth.feature.workflow', undefined, '画布即流程'),
+    t('auth.feature.designer', undefined, '业务页面'),
+    t('auth.feature.dataModel', undefined, '数据模型'),
+    t('auth.feature.workflow', undefined, '规则与审批'),
   ]);
+  const showDefaultCapabilities = !branding.loginFeatures && (!content?.features || content.features.mode === 'default');
   const images = appearance.images;
   const logo = (dark ? images?.darkLogoUrl : undefined) ?? images?.logoUrl ?? branding.logoUrl;
   const hero = (dark ? images?.darkHeroUrl : undefined) ?? images?.heroUrl;
@@ -64,7 +66,7 @@ export default function AuthAppearanceShell({ branding, appearance, children, di
           {(headline || emphasis) && <h1 className="auth-brand-headline">{headline && <HighlightedHeadline text={headline} />}{emphasis && <span>{emphasis}</span>}</h1>}
           {lead && <p className="auth-brand-lead">{lead}</p>}
           {images?.mode === 'illustration' && hero && <DecorativeImage className="auth-brand-hero" src={hero} />}
-          {features && <ul className="auth-brand-features">{features.map(feature => <li key={feature}>{feature}</li>)}</ul>}
+          {showDefaultCapabilities ? <LoginCapabilities /> : features && <ul className="auth-brand-features">{features.map(feature => <li key={feature}>{feature}</li>)}</ul>}
         </section>}
         <section className="auth-form-region">
           <div className="auth-card">

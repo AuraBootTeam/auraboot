@@ -1,7 +1,18 @@
 import {describe,it,expect} from 'vitest';
-import {collectDesignerSchemas,flattenFields} from '../designer-schema-inventory';
+import {collectDesignerSchemas,flattenFields,collectPropertyEditorDeclarations} from '../designer-schema-inventory';
 
 describe('native designer schema denominator',()=>{
+  it('recognizes explicit owned declarations without treating missing owners or other registries as registered', () => {
+    const declarations = collectPropertyEditorDeclarations(`
+      propertyEditorRegistry.register('extension.editor', Editor);
+      propertyEditorRegistry.registerOwned('builtin.editor', Editor, owner);
+      propertyEditorRegistry.registerOwned('missing.owner', Editor);
+      anotherRegistry.register('other.registry', Editor);
+      propertyEditorRegistry.resolve('lookup.only');
+      propertyEditorRegistry.register(dynamicKey, Editor);
+    `);
+    expect([...declarations]).toEqual(['extension.editor', 'builtin.editor']);
+  });
   it('preserves zero limits and nested dependency metadata without claiming execution',()=>{
     const fields=flattenFields([{key:'columns',type:'array',itemSchema:[{key:'width',type:'number',min:0,max:100,dependsOn:{field:'mode',anyOf:['fixed']}}]}]);
     expect(fields[1]).toMatchObject({path:'columns[].width',min:0,max:100,dependsOn:{field:'mode',anyOf:['fixed']},execution:'did_not_run',registeredAssertions:[]});

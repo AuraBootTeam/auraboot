@@ -141,9 +141,9 @@ export default function TraceListPage() {
       if (!res.ok) return;
       const data = await res.json();
       setStats(data);
-    } catch {
+    } catch (error) {
       /* ignore */
-    }
+ console.warn('[index] previously-silent catch', error);    }
   }, []);
 
   useEffect(() => {

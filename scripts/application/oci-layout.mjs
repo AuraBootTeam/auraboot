@@ -3,7 +3,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } f
 import { dirname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
-const LINUX_JRE_BASE = 'eclipse-temurin:21-jre-noble@sha256:0eda5830ed7b669abc246a8dc520ea8a23cab06f9a8d4b6964109e2f2394e46f';
+const LINUX_JRE_BASE = 'eclipse-temurin:21-jre-alpine@sha256:b6ea71e690a72ba240b3d1b5c477410014862f9ea2cc73ab40e41ff21b03ba1c';
 
 function commandExists(command) {
   return spawnSync('which', [command], { stdio: 'ignore' }).status === 0;
@@ -27,6 +27,10 @@ function createRunnableLayout({ output, rootfs, labels, entrypoint }) {
     cpSync(rootfs, contextRootfs, { recursive: true });
     writeFileSync(resolve(context, 'Dockerfile'), [
       `FROM ${LINUX_JRE_BASE}`,
+      // Use the same supported musl JRE family as the public Compose runtime.
+      // Repair the zlib, OpenSSL and GnuTLS advisories found by the release scan.
+      // Keep signed package verification and fail if the exact repair is absent.
+      'RUN apk add --no-cache zlib=1.4-r0 openssl=3.5.9-r1 libssl3=3.5.9-r1 libcrypto3=3.5.9-r1 gnutls=3.8.14-r0 && apk info -v zlib openssl libssl3 libcrypto3 gnutls',
       'COPY rootfs/ /',
       `ENTRYPOINT ${JSON.stringify(entrypoint)}`,
       '',

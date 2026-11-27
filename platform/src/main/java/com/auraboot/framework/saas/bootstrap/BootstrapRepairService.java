@@ -3,9 +3,6 @@ package com.auraboot.framework.saas.bootstrap;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.billing.account.service.BillingAccountIdentityService;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
-import com.auraboot.framework.menu.entity.Menu;
-import com.auraboot.framework.menu.mapper.MenuMapper;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.auraboot.framework.plugin.service.BuiltinPluginImportService;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.entity.UserRole;
@@ -99,7 +96,7 @@ public class BootstrapRepairService {
     private final RoleService roleService;
     private final RoleMapper roleMapper;
     private final UserRoleMapper userRoleMapper;
-    private final MenuMapper menuMapper;
+    private final PlatformConsoleMenuBootstrap platformConsoleMenus;
     private final TenantBootstrapService tenantBootstrapService;
     private final BillingAccountIdentityService billingAccountIdentityService;
     private final JdbcTemplate jdbcTemplate;
@@ -189,9 +186,8 @@ public class BootstrapRepairService {
 
     /**
      * Invariant 3: {@code platform_admin} role exists in System Tenant. Also seeds the
-     * System Tenant's Platform Console menus on first creation (these menus belong with
-     * the {@code platform_admin} bootstrap; not factored into a separate invariant since
-     * they are display-only and re-import-safe).
+     * System Tenant's distribution-owned console menus. Existing roles also reconcile
+     * obsolete bootstrap entries; Community no longer creates the enterprise console directory.
      */
     public RepairStepResult repairPlatformAdminRole(RepairOptions opts) {
         try {
@@ -202,6 +198,7 @@ public class BootstrapRepairService {
             }
             Long systemTenantId = systemTenant.getId();
             if (roleMapper.existsByCode(systemTenantId, "platform_admin")) {
+                platformConsoleMenus.reconcile(systemTenantId, 0L);
                 ensureApplicationBindingActivationPermission(systemTenantId);
                 return RepairStepResult.present(STEP_PLATFORM_ADMIN_ROLE,
                         "platform_admin role already present in System Tenant");
@@ -234,7 +231,7 @@ public class BootstrapRepairService {
             }
             try {
                 roleService.createRole(platformAdmin);
-                createPlatformMenus(systemTenantId, createdBy);
+                platformConsoleMenus.reconcile(systemTenantId, createdBy);
                 ensureApplicationBindingActivationPermission(systemTenantId);
             } finally {
                 if (clearMeta) {
@@ -691,50 +688,6 @@ public class BootstrapRepairService {
     // ────────────────────────────────────────────────────────────────────
     // Internal helpers (lifted from BootstrapEngineService)
     // ────────────────────────────────────────────────────────────────────
-
-    private void createPlatformMenus(Long tenantId, Long adminUserId) {
-        createMenu(tenantId, null, "platform_overview", "Overview", "/platform/overview", 1, 10, "ChartBarIcon", adminUserId);
-        createMenu(tenantId, null, "platform_tenants", "Tenants", "/platform/tenants", 1, 20, "BuildingOfficeIcon", adminUserId);
-
-        Menu commerce = createMenu(tenantId, null, "platform_commerce", "Commerce", null, 0, 30, null, adminUserId);
-        createMenu(tenantId, commerce.getId(), "platform_marketplace", "Marketplace", "/platform/marketplace", 1, 31, "ShoppingBagIcon", adminUserId);
-        createMenu(tenantId, commerce.getId(), "platform_licenses", "Licenses", "/platform/licenses", 1, 32, "KeyIcon", adminUserId);
-
-        Menu infra = createMenu(tenantId, null, "platform_infra", "Platform", null, 0, 40, null, adminUserId);
-        createMenu(tenantId, infra.getId(), "platform_cloud_config", "Cloud Config", "/platform/cloud-config", 1, 41, "CloudIcon", adminUserId);
-        createMenu(tenantId, infra.getId(), "platform_templates", "Templates", "/platform/templates", 1, 42, "DocumentDuplicateIcon", adminUserId);
-        createMenu(tenantId, infra.getId(), "platform_plugins", "Plugins", "/platform/plugins", 1, 43, "PuzzlePieceIcon", adminUserId);
-
-        Menu system = createMenu(tenantId, null, "platform_system", "System", null, 0, 50, null, adminUserId);
-        createMenu(tenantId, system.getId(), "platform_audit_logs", "Audit Log", "/platform/audit-logs", 1, 51, "ClipboardDocumentListIcon", adminUserId);
-        createMenu(tenantId, system.getId(), "platform_settings", "Settings", "/platform/system-preferences", 1, 52, "Cog6ToothIcon", adminUserId);
-    }
-
-    private Menu createMenu(Long tenantId, Long parentId, String code, String name, String path,
-                            int type, int orderNo, String icon, Long adminUserId) {
-        // Idempotent: skip if menu with same (tenant_id, code) already exists.
-        QueryWrapper<Menu> qw = new QueryWrapper<>();
-        qw.eq("tenant_id", tenantId).eq("code", code);
-        Menu existing = menuMapper.selectOne(qw);
-        if (existing != null) {
-            return existing;
-        }
-        Menu menu = new Menu();
-        menu.setTenantId(tenantId);
-        menu.setParentId(parentId);
-        menu.setPid(UniqueIdGenerator.generate());
-        menu.setCode(code);
-        menu.setName(name);
-        menu.setPath(path);
-        menu.setType(type);
-        menu.setOrderNo(orderNo);
-        menu.setIcon(icon);
-        menu.setVisible(true);
-        menu.setCreatedBy(adminUserId);
-        menu.setUpdatedBy(adminUserId);
-        menuMapper.insert(menu);
-        return menu;
-    }
 
     // ────────────────────────────────────────────────────────────────────
     // Options DTO

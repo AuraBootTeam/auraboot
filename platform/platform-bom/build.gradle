@@ -18,7 +18,7 @@ if (alignedModules.empty) throw new GradleException('Application runtime lock is
 dependencies {
     constraints {
         alignedModules.each { coordinate -> api coordinate }
-        ['auraboot-core', 'auraboot-agent', 'auraboot-app', 'platform-plugin-api',
+        ['auraboot-core', 'auraboot-agent', 'auraboot-app', 'platform-plugin-api', 'mybatis-compat',
          'platform-mq-kafka', 'platform-storage-minio', 'platform-storage-s3',
          'platform-storage-oss', 'platform-storage-cos'].each { artifact ->
             api "com.auraboot:${artifact}:${project.version}"

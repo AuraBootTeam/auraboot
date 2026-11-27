@@ -123,9 +123,9 @@ export default function TaskListView({
       if (result.code === '0' && result.data) {
         setTasks(result.data.records ?? []);
       }
-    } catch {
+    } catch (error) {
       // silent
-    } finally {
+ console.warn('[TaskListView] previously-silent catch', error);    } finally {
       setLoading(false);
     }
   }, [projectId]);

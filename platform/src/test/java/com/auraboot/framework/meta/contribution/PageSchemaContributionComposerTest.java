@@ -16,6 +16,41 @@ class PageSchemaContributionComposerTest {
     private final PageSchemaContributionComposer composer = new PageSchemaContributionComposer();
 
     @Test
+    @SuppressWarnings("unchecked")
+    void declaredTableRowActionsPreserveBaseAndPermissionMetadata() {
+        PageSchemaDTO base = new PageSchemaDTO();
+        base.setExtension(Map.of("contributionSlots", List.of(slot(
+                "member-actions", "action", "table-row-actions", "members", null))));
+        base.setBlocks(List.of(new LinkedHashMap<>(Map.of("id", "members", "blockType", "table",
+                "rowActions", List.of(Map.of("code", "suspend", "permissionCode", "members.suspend"))))));
+        var payload = Map.<String, Object>of("code", "extend", "permissionCode", "extension.manage",
+                "visibleWhen", "row.status === 'active'", "action", Map.of("type", "flow", "steps", List.of()));
+        var composed = composer.compose(base, List.of(contribution(
+                "member-extension", "extension-plugin", "member-actions", PageSchemaContributionKind.ACTION, 0, payload)));
+        var actions = (List<Map<String, Object>>) ((Map<?, ?>) composed.getBlocks().getFirst()).get("rowActions");
+        assertThat(actions).extracting(row -> row.get("code")).containsExactly("suspend", "extend");
+        assertThat(actions.getLast()).containsEntry("permissionCode", "extension.manage")
+                .containsEntry("visibleWhen", "row.status === 'active'");
+        assertThat((List<?>) ((Map<?, ?>) base.getBlocks().getFirst()).get("rowActions")).hasSize(1);
+    }
+
+    @Test
+    void tableRowActionsRejectAnotherBlockTypeAndDuplicateActions() {
+        PageSchemaDTO base = new PageSchemaDTO();
+        base.setExtension(Map.of("contributionSlots", List.of(slot(
+                "member-actions", "action", "table-row-actions", "members", null))));
+        base.setBlocks(List.of(new LinkedHashMap<>(Map.of("id", "members", "blockType", "text"))));
+        var action = contribution("member-extension", "extension-plugin", "member-actions",
+                PageSchemaContributionKind.ACTION, 0, Map.of("code", "extend"));
+        assertThatThrownBy(() -> composer.compose(base, List.of(action)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("must be a table");
+        base.setBlocks(List.of(new LinkedHashMap<>(Map.of("id", "members", "blockType", "table",
+                "rowActions", List.of(Map.of("code", "extend"))))));
+        assertThatThrownBy(() -> composer.compose(base, List.of(action)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("duplicate");
+    }
+
+    @Test
     void emptyContributionsAreAStrictNoOp() {
         PageSchemaDTO base = new PageSchemaDTO();
         base.setExtension(Map.of("malformed-but-inactive", true));

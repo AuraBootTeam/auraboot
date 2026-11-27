@@ -3,10 +3,11 @@
  * Data source: backend engagement API with localStorage as instant cache.
  */
 
-import React, { useMemo, useState, useEffect } from 'react';
-import { getRecentVisits, fetchRecentVisits, type RecentVisit } from './useRecentVisits';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { dedupeVisits, getRecentVisits, fetchRecentVisits, type RecentVisit } from './useRecentVisits';
 import { useI18n } from '~/contexts/I18nContext';
 import { useRootLoaderData } from '~/root-data';
+import { useFittingRows } from './useFittingRows';
 
 interface RecentWidgetProps {
   title?: string;
@@ -58,6 +59,50 @@ function prettifyPath(path: string): string {
 
 function isRawVisitTitle(title: string, path: string): boolean {
   return !title || title === path || title.startsWith('/') || /^[a-z0-9/_-]+$/i.test(title);
+}
+
+type Translate = (key: string, params?: unknown, fallback?: string) => string;
+
+/** What a sub-page of a menu entry is called on the row's second line. */
+const SUBPAGE_LABELS: Array<[segment: string, key: string, fallback: string]> = [
+  ['new', 'workbench.recent.subpage.new', '新建'],
+  ['edit', 'workbench.recent.subpage.edit', '编辑'],
+  ['view', 'workbench.recent.subpage.view', '详情'],
+];
+
+/** The page a visit points at, without its query string or hash: `/p/x?page=2` is the page `/p/x`. */
+function pathnameOf(path: string): string {
+  return path.split(/[?#]/)[0];
+}
+
+/**
+ * The menu entry a visit sits under: the entry itself, or the longest path it is a sub-page of.
+ * Pages do not set a document title, so this is where the row's name comes from.
+ */
+function resolveMenuEntry(
+  visit: RecentVisit,
+  menuTitleMap: Map<string, string | undefined>,
+): { title: string; menuPath: string } | null {
+  const pathname = pathnameOf(visit.path);
+  const exact = menuTitleMap.get(pathname);
+  if (exact) return { title: exact, menuPath: pathname };
+  const parent = [...menuTitleMap.keys()]
+    .filter((menuPath) => pathname.startsWith(`${menuPath}/`))
+    .sort((a, b) => b.length - a.length)[0];
+  return parent ? { title: menuTitleMap.get(parent) || parent, menuPath: parent } : null;
+}
+
+/**
+ * A page under a menu entry is not that entry: its "new" form, a record's detail, an edit page.
+ * Left unnamed, the list, its create form and a record all read as the same line.
+ */
+function subpageLabel(path: string, menuPath: string, t: Translate): string | null {
+  const rest = path.split(/[?#]/)[0].slice(menuPath.replace(/\/$/, '').length + 1);
+  const segment = rest.split('/')[0];
+  if (!segment) return null;
+  const known = SUBPAGE_LABELS.find(([name]) => name === segment);
+  if (known) return t(known[1], undefined, known[2]);
+  return humanizeSegment(segment) || null;
 }
 
 export function RecentWidget({
@@ -112,31 +157,46 @@ export function RecentWidget({
   };
 
   const resolveVisitTitle = (visit: RecentVisit) => {
-    const exactMenuTitle = menuTitleMap.get(visit.path);
-    if (exactMenuTitle) return exactMenuTitle;
-
-    const bestPrefixMatch = [...menuTitleMap.entries()]
-      .filter(([path]) => visit.path === path || visit.path.startsWith(`${path}/`))
-      .sort((a, b) => b[0].length - a[0].length)[0]?.[1];
-    if (bestPrefixMatch) return bestPrefixMatch;
+    const entry = resolveMenuEntry(visit, menuTitleMap);
+    if (entry) return entry.title;
 
     if (!isRawVisitTitle(visit.title, visit.path)) return visit.title;
     return prettifyPath(visit.path) || visit.path;
   };
 
-  const resolveVisitSubtitle = (visit: RecentVisit, primaryTitle: string) => {
+  /** The row's second line names the record when the visit carries its title, else the kind of
+   * sub-page (新建 / 编辑 / 详情). A title that is only the path, a code or the site's name says
+   * nothing the menu-derived first line has not said. */
+  const resolveVisitSubtitle = (visit: RecentVisit, primaryTitle: string): string | null => {
     if (!isRawVisitTitle(visit.title, visit.path) && visit.title !== primaryTitle) {
       return visit.title;
     }
-    return visit.path;
+    const entry = resolveMenuEntry(visit, menuTitleMap);
+    // the entry's own page has nothing after its path, so it gets no second line
+    return entry ? subpageLabel(visit.path, entry.menuPath, t as Translate) : null;
   };
 
-  const visibleVisits = useMemo(() => {
-    if (visibleMenuPaths.size === 0) return visits;
-    return visits.filter((visit) =>
-      [...visibleMenuPaths].some((menuPath) => pathMatchesMenu(visit.path, menuPath)),
-    );
-  }, [visibleMenuPaths, visits]);
+  const visibleVisits = useMemo(
+    () =>
+      dedupeVisits(
+        visibleMenuPaths.size === 0
+          ? visits
+          : visits.filter((visit) =>
+              [...visibleMenuPaths].some((menuPath) => pathMatchesMenu(visit.path, menuPath)),
+            ),
+      ),
+    [visibleMenuPaths, visits],
+  );
+
+  // Whole rows only: the rows that fit in the card are shown and the rest sit behind a "More" control.
+  const listRef = useRef<HTMLDivElement>(null);
+  const fittingRows = useFittingRows(listRef, [visibleVisits.length]);
+  const [expanded, setExpanded] = useState(false);
+  const shownVisits =
+    !expanded && fittingRows !== null && visibleVisits.length > fittingRows
+      ? visibleVisits.slice(0, fittingRows)
+      : visibleVisits;
+  const hiddenCount = visibleVisits.length - shownVisits.length;
 
   if (visibleVisits.length === 0) {
     return (
@@ -165,16 +225,31 @@ export function RecentWidget({
     <div className={`flex h-full flex-col ${className}`}>
       <div className="mb-3 flex items-center justify-between px-3 pt-3">
         <span className="text-sm font-semibold text-gray-900">{resolvedTitle}</span>
-        <span className="text-gray-400">
-          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-            <circle cx="4" cy="10" r="1.5" />
-            <circle cx="10" cy="10" r="1.5" />
-            <circle cx="16" cy="10" r="1.5" />
-          </svg>
-        </span>
+        <div className="flex items-center gap-3">
+          {(hiddenCount > 0 || expanded) && (
+            <button
+              type="button"
+              onClick={() => setExpanded((prev) => !prev)}
+              aria-expanded={expanded}
+              className="text-xs text-gray-400 transition-colors hover:text-blue-500"
+              data-testid="recent-more-button"
+            >
+              {expanded
+                ? t('workbench.recent.collapse', undefined, '收起')
+                : `${t('workbench.recent.more', undefined, '更多')} (${hiddenCount})`}
+            </button>
+          )}
+          <span className="text-gray-400">
+            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+              <circle cx="4" cy="10" r="1.5" />
+              <circle cx="10" cy="10" r="1.5" />
+              <circle cx="16" cy="10" r="1.5" />
+            </svg>
+          </span>
+        </div>
       </div>
-      <div className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-3">
-        {visibleVisits.map((visit, idx) => {
+      <div ref={listRef} data-testid="recent-list" className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-3">
+        {shownVisits.map((visit, idx) => {
           const icon = visit.icon || (visit.modelCode && MODEL_ICONS[visit.modelCode]) || '📄';
           const bgColor = (visit.modelCode && MODEL_BG_COLORS[visit.modelCode]) || 'bg-gray-100';
           const primaryTitle = resolveVisitTitle(visit);
@@ -194,7 +269,9 @@ export function RecentWidget({
                 <span className="block truncate text-sm font-medium text-gray-800 transition-colors group-hover:text-gray-900">
                   {primaryTitle}
                 </span>
-                <span className="block truncate text-[11px] text-gray-400">{secondaryTitle}</span>
+                {secondaryTitle ? (
+                  <span className="block truncate text-[11px] text-gray-400">{secondaryTitle}</span>
+                ) : null}
               </div>
               <span className="flex-shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-500">
                 {formatTime(visit.visitedAt)}

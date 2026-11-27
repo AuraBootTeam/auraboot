@@ -1,7 +1,7 @@
 import React, { forwardRef } from 'react';
 import { useActionData } from 'react-router';
 import clsx from 'clsx';
-import type { RadioProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+import type { RadioProps } from '~/framework/smart/schema/smart-components';
 import {
   useDataSource,
   useSmartField,

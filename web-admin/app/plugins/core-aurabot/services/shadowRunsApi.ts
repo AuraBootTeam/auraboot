@@ -13,6 +13,24 @@
 import { get } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 
+// Contract anchoring (2026-11-14 pilot): fetch generics use the generated
+// OpenAPI contract; the handwritten view interfaces stay as this module's
+// public surface. AssertContractKeys fails the build if a promised field
+// disappears upstream.
+import type { components as InternalApi } from '~/generated/internal-api/schema';
+
+type ContractAggregation = InternalApi['schemas']['ShadowRunAggregation'];
+type ContractListItem = InternalApi['schemas']['ShadowRunListItem'];
+type AssertContractKeys<T, K extends keyof T & string> = K;
+type _AggregationFields = AssertContractKeys<ContractAggregation,
+  'draftId' | 'draftSkillCode' | 'draftStatus' | 'runCount' | 'fidelitySamples'
+  | 'outputSamples' | 'fidelityMatchRate' | 'outputMatchRate' | 'costDelta' | 'latestAt'>;
+type _ListItemFields = AssertContractKeys<ContractListItem,
+  'pid' | 'draftId' | 'originalRunId' | 'shadowStatus' | 'shadowDurationMs'
+  | 'shadowCostUsd' | 'shadowTokens' | 'shadowOutputHash' | 'originalStatus'
+  | 'originalDurationMs' | 'originalCostUsd' | 'originalOutputHash' | 'outputMatch'
+  | 'fidelityMatch' | 'outputDiff' | 'createdAt'>;
+
 export interface ShadowRunAggregation {
   draftId: string;
   draftSkillCode: string | null;
@@ -46,7 +64,7 @@ export interface ShadowRunListItem {
 }
 
 export async function listShadowRunAggregations(): Promise<ShadowRunAggregation[]> {
-  const r = await get('/api/admin/shadow-runs/aggregations');
+  const r = await get<ContractAggregation[]>('/api/admin/shadow-runs/aggregations');
   if (!ResultHelper.isSuccess(r)) {
     throw new Error(
       (r as { message?: string }).message ?? 'Failed to load shadow run aggregations',
@@ -64,7 +82,7 @@ export async function listShadowRunsForDraft(
   sp.set('draftId', draftId);
   sp.set('pageNum', String(pageNum));
   sp.set('pageSize', String(pageSize));
-  const r = await get(`/api/admin/shadow-runs?${sp.toString()}`);
+  const r = await get<ContractListItem[]>(`/api/admin/shadow-runs?${sp.toString()}`);
   if (!ResultHelper.isSuccess(r)) {
     throw new Error(
       (r as { message?: string }).message ?? 'Failed to load shadow runs',
@@ -74,7 +92,7 @@ export async function listShadowRunsForDraft(
 }
 
 export async function getShadowRunDetail(shadowRunPid: string): Promise<ShadowRunListItem> {
-  const r = await get(`/api/admin/shadow-runs/${encodeURIComponent(shadowRunPid)}`);
+  const r = await get<ContractListItem>(`/api/admin/shadow-runs/${encodeURIComponent(shadowRunPid)}`);
   if (!ResultHelper.isSuccess(r)) {
     throw new Error(
       (r as { message?: string }).message ?? 'Failed to load shadow run detail',

@@ -127,6 +127,14 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
 
     // ==================== Model & Command Setup Helpers ====================
 
+    // A record the command creates as a declared side effect or post action is an ordinary write
+    // outside the command's permit scope: the native field authorization decides it against the
+    // actor's complete grant for that model.
+    private void allowCreateAsEffect(String modelCode) {
+        grantCommittedPermissionToTestRole("model." + modelCode + ".create", "model", modelCode, "create",
+                "Create records as a declared command effect " + modelCode);
+    }
+
     private String createModel(String suffix, String... fieldDefs) {
         String modelCode = "dsl_t_" + suffix;
         String tableName = "mt_" + modelCode.toLowerCase();
@@ -849,6 +857,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
                 "rect_issue_id_" + suffix + ":STRING",
                 "rect_title_" + suffix + ":STRING",
                 "rect_status_" + suffix + ":STRING");
+        allowCreateAsEffect(rectModel);
 
         // Insert issue record
         String issueId = insertRecord(issueModel, Map.of(
@@ -989,6 +998,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
                 "plan_id_" + suffix + ":STRING",
                 "month_" + suffix + ":INTEGER",
                 "amount_" + suffix + ":DECIMAL");
+        allowCreateAsEffect(childModel);
 
         // Insert parent record
         String parentId = insertRecord(parentModel, Map.of(
@@ -1048,6 +1058,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         String childModel = createModel("sub_" + suffix,
                 "parent_id_" + suffix + ":STRING",
                 "seq_" + suffix + ":INTEGER");
+        allowCreateAsEffect(childModel);
 
         String parentId = insertRecord(parentModel, Map.of(
                 "name_" + suffix, "Test Plan"
@@ -1108,6 +1119,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         String childModel = createModel("line3_" + suffix,
                 "parent_id_" + suffix + ":STRING",
                 "sku_" + suffix + ":STRING");
+        allowCreateAsEffect(childModel);
         String parentId = insertRecord(parentModel, Map.of("name_" + suffix, "Aggregate plan"));
 
         String execConfig = """
@@ -1196,6 +1208,7 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
         String rectModel = createModel("comb_rect_" + suffix,
                 "issue_id_" + suffix + ":STRING",
                 "rect_status_" + suffix + ":STRING");
+        allowCreateAsEffect(rectModel);
 
         // Insert issue
         String issueId = insertRecord(issueModel, Map.of(

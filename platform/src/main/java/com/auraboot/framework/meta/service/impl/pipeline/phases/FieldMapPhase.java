@@ -6,6 +6,7 @@ import com.auraboot.framework.meta.entity.BindingRule;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.CommandHandler;
 import com.auraboot.framework.meta.service.impl.CommandCascadeDeleteExecutor;
+import com.auraboot.framework.meta.service.impl.CommandExecutorUtils;
 import com.auraboot.framework.meta.service.impl.CommandFieldMapExecutor;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
@@ -37,6 +38,9 @@ public class FieldMapPhase implements CommandPhase {
     private final MetaModelService metaModelService;
     private final ApplicationContext applicationContext;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.auraboot.framework.meta.service.impl.NativeBusinessCreateBoundary nativeCreation;
+
     @Override
     public String name() {
         return "field_map";
@@ -53,7 +57,12 @@ public class FieldMapPhase implements CommandPhase {
 
         // Field map
         Map<String, Object> fieldMapResults;
-        if (isPluginHandledWithoutDslPersistence(ctx) || isSpringHandledWithoutDslPersistence(ctx)) {
+        if (com.auraboot.framework.meta.service.impl.ExecutorReadQuery.isReadByExecutor(ctx, extensionRegistry)) {
+            // A query read by the executor selects records with its inputs. Left here, a declared
+            // input field took the implicit path, whose fall-through is INSERT.
+            fieldMapResults = new HashMap<>();
+            log.debug("Skipping FIELD_MAP for a query read by the executor: {}", ctx.getCommand().getCode());
+        } else if (isPluginHandledWithoutDslPersistence(ctx) || isSpringHandledWithoutDslPersistence(ctx)) {
             ctx.setHandlerOwnedMutation(true);
             fieldMapResults = new HashMap<>();
             log.info("Skipping FIELD_MAP for handler-owned mutation: {}", ctx.getCommand().getCode());
@@ -88,11 +97,21 @@ public class FieldMapPhase implements CommandPhase {
             boolean isCreateOrUpdate = "create".equalsIgnoreCase(cmdType) || "update".equalsIgnoreCase(cmdType);
 
             if (noBindingRules && (hasInputFields || hasAutoSetFields || isDeleteOp || isStateTransition || isCreateOrUpdate)) {
-                fieldMapResults = fieldMapExecutor.executeImplicitFieldMapPhase(
-                        ec, ctx.getPayload(), ctx.getTenantId(), ctx.getRequest(), ctx.getCommand());
+                if (com.auraboot.framework.meta.security.NativeBusinessCommandContract.declaresCreation(ctx)) {
+                    if (nativeCreation == null || ctx.getNativeCreationContract() == null)
+                        throw new org.springframework.security.access.AccessDeniedException("Native creation boundary is unavailable");
+                    fieldMapResults = fieldMapExecutor.executeImplicitFieldMapPhase(ec, ctx.getPayload(), ctx.getTenantId(),
+                            ctx.getRequest(), ctx.getCommand(), ctx.submittedInputKeys(), pid -> nativeCreation.authorizeRecord(ctx, pid));
+                } else fieldMapResults = ctx.submittedInputKeys() == null
+                        ? fieldMapExecutor.executeImplicitFieldMapPhase(
+                                ec, ctx.getPayload(), ctx.getTenantId(), ctx.getRequest(), ctx.getCommand())
+                        : fieldMapExecutor.executeImplicitFieldMapPhase(
+                                ec, ctx.getPayload(), ctx.getTenantId(), ctx.getRequest(), ctx.getCommand(), ctx.submittedInputKeys());
             } else {
-                fieldMapResults = fieldMapExecutor.executeFieldMapPhase(
-                        fieldMapRules, ctx.getPayload(), ctx.getTenantId(), ctx.getRequest());
+                fieldMapResults = ctx.submittedInputKeys() == null
+                        ? fieldMapExecutor.executeFieldMapPhase(fieldMapRules, ctx.getPayload(), ctx.getTenantId(), ctx.getRequest())
+                        : fieldMapExecutor.executeFieldMapPhase(fieldMapRules, ctx.getPayload(), ctx.getTenantId(), ctx.getRequest(),
+                                ctx.submittedInputKeys(), ctx.getCommandCode());
             }
         }
         ctx.setFieldMapResults(fieldMapResults);
@@ -131,7 +150,7 @@ public class FieldMapPhase implements CommandPhase {
         if (extensionRegistry == null || ctx.getCommand() == null) {
             return false;
         }
-        String handlerCode = resolvePluginHandlerCode(ctx.getCommand().getCode(), ctx.getExecConfig());
+        String handlerCode = CommandExecutorUtils.resolvePluginHandlerCode(ctx.getCommand().getCode(), ctx.getExecConfig());
         return extensionRegistry.getCommandHandler(handlerCode)
                 .map(handler -> {
                     boolean requiresPersistence = handler.requiresDslPersistence(
@@ -164,13 +183,4 @@ public class FieldMapPhase implements CommandPhase {
         return false;
     }
 
-    private String resolvePluginHandlerCode(String commandCode, Map<String, Object> execConfig) {
-        if (execConfig != null) {
-            Object handler = execConfig.get("handler");
-            if (handler instanceof String handlerCode && StringUtils.hasText(handlerCode)) {
-                return handlerCode.trim();
-            }
-        }
-        return commandCode;
-    }
 }

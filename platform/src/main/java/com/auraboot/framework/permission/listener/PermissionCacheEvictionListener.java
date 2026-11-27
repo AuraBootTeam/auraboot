@@ -5,6 +5,8 @@ import com.auraboot.framework.permission.event.PermissionDefinitionChangedEvent;
 import com.auraboot.framework.permission.event.RolePermissionChangedEvent;
 import com.auraboot.framework.permission.event.UserRoleChangedEvent;
 import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.permission.service.impl.PermissionSnapshotCache;
+import com.auraboot.framework.plugin.event.PluginImportCompletedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.event.TransactionPhase;
@@ -42,6 +44,7 @@ import org.springframework.stereotype.Component;
 public class PermissionCacheEvictionListener {
 
     private final UserPermissionService userPermissionService;
+    private final PermissionSnapshotCache permissionSnapshotCache;
 
     /**
      * Handle Role-Permission binding changed event
@@ -79,6 +82,30 @@ public class PermissionCacheEvictionListener {
         } else {
             userPermissionService.evictRoleUsers(roleId);
         }
+    }
+
+    /**
+     * Handle plugin import completed event.
+     *
+     * <p>Plugin imports (import-directory-sync, import APIs) write role definitions and
+     * role-permission bindings directly at the mapper/entity layer without going through
+     * the RolePermissionService event path, so none of the per-role eviction handlers
+     * above fire. A stale snapshot then keeps serving the OLD permission set for the full
+     * TTL — newly imported grants stay invisible and the feature appears "broken" until
+     * a restart (observed live: score-import roles imported, homeroom teacher kept 403).
+     *
+     * <p>An import is rare and the sweep is cheap compared to a restart: clear every
+     * permission-cache region for all tenants and bump the epoch so epoch-keyed caches
+     * (dataScopeCondition, condition guards, aggregate queries) orphan their entries too.
+     * The import transaction has already committed by the time this runs (AFTER_COMMIT).
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void onPluginImportCompleted(PluginImportCompletedEvent event) {
+        log.info("Plugin import completed, clearing permission caches: tenantId={}, plugin={}",
+            event.getTenantId(), event.getPluginCode());
+
+        DataAccessCacheEpoch.bump();
+        permissionSnapshotCache.clearAll();
     }
 
     /**

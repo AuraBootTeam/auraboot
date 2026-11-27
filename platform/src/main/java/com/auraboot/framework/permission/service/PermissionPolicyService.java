@@ -80,6 +80,11 @@ public interface PermissionPolicyService {
      */
     List<ConditionGuard> getConditionGuards(Long memberId, String permissionCode);
 
+    /** Validate condition metadata already selected with the exact active binding in this snapshot. */
+    ConditionGuard loadedConditionGuard(com.auraboot.framework.permission.entity.Permission permission,
+                                       Long bindingId, String conditionAstJson, String conditionsJson);
+
+
     /**
      * Get effective policy for a member on a specific permission, merged across all roles.
      *

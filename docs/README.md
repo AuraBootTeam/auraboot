@@ -16,16 +16,17 @@ This directory holds engineering-facing material that ships with the repository.
 
 ## Feature requirements and target contracts
 
-- [插件定制保护与字段删除准入](system-reference/plugin-customization-and-field-deletion.md)：Page/Dashboard 安全覆盖、旧标记迁移及普通字段删除的数据/引用保护。
+- [插件定制保护与字段删除准入](system-reference/plugin-customization-and-field-deletion.md)：Page/Dashboard 安全覆盖、菜单/Agent接管恢复、退役包装保留式接管与可选模板、旧标记迁移及普通字段删除保护。
 
 | Topic | Reference | Status |
 | --- | --- | --- |
 | Announcement management | [Requirements, UX, permissions, BPM composition and implementation status](./system-reference/announcement-management.md) | S1–S8 merged; preview readiness and 60-second BPM graceful stop validated; current Core17/BPM4 regression and 8 reviewed originals, with the premature historical capture excluded; contracts, identities and limits in §18.30 and the [acceptance record](./system-reference/2026-10-25-announcement-s2-s8-testing-gate-acceptance-report.md). Related PRs merged; no production release. [Historical S1 evidence](./system-reference/2026-10-24-announcement-s1-testing-gate-acceptance-report.md) |
-Release tooling reference: [Core Web component inputs and explicit reuse](./system-reference/core-web-component-reuse.md).
 
 ## Conventions
 
+- User engagement: [concurrent visits, tenant ownership and persistence semantics](./system-reference/user-engagement.md).
 - Command form metadata: [dynamic input sources and dispatcher boundaries](./system-reference/command-input-form-sources.md).
+- Release tooling reference: [Core Web component inputs and explicit reuse](./system-reference/core-web-component-reuse.md).
 
 - Scheduled command delegation: [deployment bindings and execution boundaries](./system-reference/scheduled-command-bindings.md).
 - Notification source delivery: [deployment descriptors and configuration boundaries](./system-reference/notification-source-bindings.md).
@@ -39,10 +40,14 @@ Release tooling reference: [Core Web component inputs and explicit reuse](./syst
 - Architecture overview: start at [ARCHITECTURE.md](../ARCHITECTURE.md) (repo root), then dive into `system-reference/` for operational detail.
 - Internal process documents (session handovers, plans, retrospectives) are intentionally **not tracked in this public repository** — `scripts/check-oss-no-internal-docs.sh` enforces this; they live in the team's private documentation repos.
 - Documentation changes are gated by `docs.yml` / `docs-quality.yml` (markdown lint, link check, frontmatter governance via `scripts/check-docs-governance.mjs`).
+- **Language policy:** API references and READMEs are English-first. Historical engineering-contract documents under `system-reference/` may be Chinese; when a contract becomes externally visible, provide an English version or summary. New externally-visible documentation should be English.
 
 ## Shared web identity primitives
 
-[WeChat code exchange and trusted client addresses](system-reference/wechat-code-exchange-and-client-address.md) documents the server-only contracts and caller-owned state, business authorization and ingress obligations.
-CRUD runtime reference: [Generated CRUD default presentation](./system-reference/crud-default-presentation.md).
+- [WeChat code exchange and trusted client addresses](system-reference/wechat-code-exchange-and-client-address.md) — server-only contracts and caller-owned state, business authorization and ingress obligations.
+- CRUD runtime reference: [Generated CRUD default presentation](./system-reference/crud-default-presentation.md).
+- Focused browser regression: [Default CRUD regression](./system-reference/crud-regression.md), including responsive lists and the real Page Designer save/publish/runtime roundtrip.
 
-Focused browser regression: [Default CRUD regression](./system-reference/crud-regression.md), including responsive lists and the real Page Designer save/publish/runtime roundtrip.
+- Open Platform HTTP audit: [capture, redaction, navigation and authorization](system-reference/open-platform-http-audit.md).
+
+- [Platform console navigation ownership](system-reference/platform-console-navigation.md)

@@ -36,6 +36,11 @@ public class RoleResponse {
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
     private Instant updatedAt;
 
+    @Schema(nullable = true, description = "Assigned tenant members, not effective access")
+    private Long memberCount;
+    @Schema(nullable = true, description = "Presentation group only, not management qualification")
+    private Boolean managementRole;
+
     public static RoleResponse from(Role role) {
         if (role == null) {
             return null;

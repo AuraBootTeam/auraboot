@@ -6,6 +6,8 @@ import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
+import com.auraboot.framework.meta.mapper.MetaModelMapper;
+import com.auraboot.framework.meta.entity.Model;
 import com.auraboot.framework.plugin.entity.PluginRecord;
 import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,7 @@ public class EntitlementPhase implements CommandPhase {
 
     private final EntitlementChecker entitlementChecker;
     private final PluginRecordMapper pluginRecordMapper;
+    private final MetaModelMapper metaModelMapper;
 
     /** The plugin owning the command's namespace is not active for this tenant. */
     static final String REASON_PLUGIN_ENTITLEMENT_REQUIRED = "plugin_entitlement_required";
@@ -50,6 +53,19 @@ public class EntitlementPhase implements CommandPhase {
         }
 
         String entitlementPluginId = resolveEntitlementPluginId(ctx, modelCode);
+        String requiredFeature = ctx.getCommand().getRequiredFeature();
+        if (entitlementPluginId == null) {
+            // Tenant-authored native models have no plugin license. This gate
+            // abstains; command, model, record and field authorization still apply.
+            if (requiredFeature != null && !requiredFeature.isEmpty()) {
+                ctx.recordPhaseDecision(
+                        CommandPermitPlan.PhaseDecision.deny(REASON_FEATURE_ENTITLEMENT_REQUIRED, name()));
+                throw new BusinessException(ResponseCode.FORBIDDEN,
+                        "Feature entitlement requires a plugin owner: " + requiredFeature);
+            }
+            ctx.recordPhaseDecision(CommandPermitPlan.PhaseDecision.abstain(name()));
+            return;
+        }
 
         if (!entitlementChecker.isPluginActive(entitlementPluginId)) {
             // A gate: entitlement can refuse, but never grants. Record the refusal for the permit
@@ -60,7 +76,6 @@ public class EntitlementPhase implements CommandPhase {
                     "Plugin entitlement required for command: " + ctx.getCommandCode());
         }
 
-        String requiredFeature = ctx.getCommand().getRequiredFeature();
         if (requiredFeature != null && !requiredFeature.isEmpty()) {
             if (!entitlementChecker.hasFeature(entitlementPluginId, requiredFeature)) {
                 ctx.recordPhaseDecision(
@@ -76,6 +91,18 @@ public class EntitlementPhase implements CommandPhase {
 
     private String resolveEntitlementPluginId(CommandPipelineContext ctx, String modelCode) {
         String pluginPid = ctx.getCommand().getPluginPid();
+        if (!StringUtils.hasText(pluginPid)) {
+            // Synthesized dynamic writes have no imported command owner. Their
+            // entitlement belongs to the published model, never its code prefix.
+            Model model = metaModelMapper.findCurrentByCodeForTenant(ctx.getTenantId(), modelCode);
+            if (model != null) {
+                pluginPid = model.getPluginPid();
+                if (!StringUtils.hasText(pluginPid) && ctx.getTenantId() != null
+                        && java.util.Objects.equals(ctx.getTenantId(), model.getTenantId())) {
+                    return null;
+                }
+            }
+        }
         if (StringUtils.hasText(pluginPid)) {
             PluginRecord owner = pluginRecordMapper.findByPid(pluginPid);
             if (owner != null && StringUtils.hasText(owner.getPluginId())) {

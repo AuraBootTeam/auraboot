@@ -83,6 +83,40 @@ public interface CommandDefinitionMapper extends BaseMapper<CommandDefinition> {
     @Select("SELECT * FROM ab_command_definition WHERE is_current = TRUE AND deleted_flag = false ORDER BY model_code, code")
     List<CommandDefinition> findAllCurrent();
 
+    /** Current owner entry definitions, including withdrawn publication, for review fingerprints. */
+    @Select("""
+        <script>
+        SELECT * FROM ab_command_definition
+        WHERE is_current = TRUE AND deleted_flag = FALSE AND code IN
+        <foreach item="code" collection="codes" open="(" separator="," close=")">#{code}</foreach>
+        ORDER BY code, id
+        </script>
+        """)
+    List<CommandDefinition> findCurrentDefinitionsByCodes(@Param("codes") List<String> codes);
+
+    /** Include unpublished consumers in migration review; publication is not a grant primitive. */
+    @Select("""
+        <script>
+        SELECT * FROM ab_command_definition
+        WHERE is_current = TRUE AND deleted_flag = FALSE
+          AND (#{allPermissions} OR jsonb_exists_any(execution_config-&gt;'permissions',
+            ARRAY[<foreach item="code" collection="codes" separator=",">#{code}</foreach>]::text[]))
+        ORDER BY code, id
+        </script>
+        """)
+    List<CommandDefinition> findCurrentPermissionConsumers(@Param("codes") List<String> codes,
+                                                          @Param("allPermissions") boolean allPermissions);
+
+    /** TenantLineInnerInterceptor restricts the published database definitions used by the native writer. */
+    @Select("""
+        SELECT * FROM ab_command_definition
+        WHERE is_current = TRUE AND deleted_flag = FALSE AND status = 'published'
+          AND jsonb_extract_path_text(execution_config, 'type') IN ('create', 'update', 'delete', 'state_transition')
+          AND jsonb_extract_path_text(execution_config, 'handlerParams', 'targetRecordAuthorization') = 'business'
+        ORDER BY code
+        """)
+    List<CommandDefinition> findCurrentNativeBusinessDefinitions();
+
     // Note: tenant_id condition is automatically added by TenantLineInnerInterceptor
     @Update("UPDATE ab_command_definition SET is_current = FALSE WHERE code = #{code}")
     int markAsNotCurrent(@Param("code") String code);

@@ -6,11 +6,16 @@
  * All components are lazy-loaded for code splitting.
  */
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useSyncExternalStore } from 'react';
 import type { Widget } from '../types';
 import { widgetAppearanceProps, widgetPresentationProps } from '../utils/widgetAppearance';
 import type { DrillDownConfig, FilterConfig } from '~/framework/smart/types/chart';
-import { getChartComponent, normalizeChartType } from '~/framework/smart/charts/SharedChartFactory';
+import {
+  getChartComponent,
+  getChartRegistryVersion,
+  normalizeChartType,
+  subscribeChartRegistry,
+} from '~/framework/smart/charts/SharedChartFactory';
 import { useI18n } from '~/contexts/I18nContext';
 import {
   getLocalizedText,
@@ -105,6 +110,9 @@ function RenderedWidget({
 }: WidgetRenderProps): React.ReactElement {
   const { locale, t } = useI18n();
   const chartType = normalizeChartType(widget.type);
+  // A plugin registers its widgets from its entry module, which the async plugin
+  // boot can evaluate after this widget's first render: render again once it does.
+  useSyncExternalStore(subscribeChartRegistry, getChartRegistryVersion, getChartRegistryVersion);
   const Component = getChartComponent(chartType);
 
   if (!Component) {

@@ -1,0 +1,42 @@
+{
+  "tenant_admin": {
+    "name": {
+      "zh-CN": "管理员",
+      "en-US": "Administrator"
+    },
+    "description": {
+      "zh-CN": "租户管理员角色，拥有该租户的所有权限",
+      "en-US": "Tenant administrator with all permissions for this tenant."
+    }
+  },
+  "qo_sales": {
+    "name": {
+      "zh-CN": "销售",
+      "en-US": "Sales"
+    },
+    "description": {
+      "zh-CN": "销售岗位：创建和维护报价草稿、上传客户原始资料，并生成面向客户的报价文档。",
+      "en-US": "Customer-facing role: create and maintain quote drafts, upload customer source materials, and generate customer-facing quote documents."
+    }
+  },
+  "qo_procurement": {
+    "name": {
+      "zh-CN": "采购",
+      "en-US": "Procurement"
+    },
+    "description": {
+      "zh-CN": "采购岗位：维护寻源、手工价格、成本、证据、工艺点及报价所需的修正 BOM 导入。",
+      "en-US": "Procurement role: maintain sourcing, manual prices, costs, evidence, process points, and corrected BOM imports for QuoteOps."
+    }
+  },
+  "bom_engineering": {
+    "name": {
+      "zh-CN": "工程",
+      "en-US": "Engineering"
+    },
+    "description": {
+      "zh-CN": "工程岗:运行 BOM 标准化与转换、查看物料库与规则、上传资料与导入 BOM,并只读查看客户(用于项目客户引用列解析)。数据范围 self(只看自己的 BOM 项目);共享物料库全员可见。",
+      "en-US": "Engineering role: standardize and convert BOMs, view materials and rules, upload files and import BOMs, and view customer references. BOM projects are limited to owned records; the shared material library remains visible to all members."
+    }
+  }
+}

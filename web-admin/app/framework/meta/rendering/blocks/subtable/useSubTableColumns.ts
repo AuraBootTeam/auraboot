@@ -1,16 +1,33 @@
 import { useCallback, useMemo } from 'react';
 import type { ColumnConfig } from '~/framework/meta/schemas/types';
+import { resolveTemporalType } from '~/shared/services/dateTimeFormatService';
 import { useDictCache } from '~/framework/meta/rendering/pages/hooks/useDictCache';
-import type { DataSourceConfig as SelectDataSourceConfig } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
+import type { DataSourceConfig as SelectDataSourceConfig } from '~/framework/smart/schema/smart-components';
 import type { EnrichedColumnConfig, ResolvedSubTableViewerProps } from './subTableTypes';
 import {
   getFieldMetaExtension,
+  isNumericField,
   resolveChildFieldDisplayName,
   shouldReplaceGeneratedLabel,
   collectSubTableReferenceDisplayConfigs,
 } from './subTableValues';
 
 import type { useSubTableState } from './useSubTableState';
+
+const numericTypes = new Set(['integer', 'bigint', 'long', 'double', 'number', 'decimal', 'float', 'currency', 'percent']);
+
+function withColumnPresentation(col: EnrichedColumnConfig): EnrichedColumnConfig {
+  const kind = (col.valueType || col.dataType || '').toLowerCase();
+  const numeric = numericTypes.has(kind) || col.format === 'percent' || isNumericField(col);
+  const temporal = resolveTemporalType(col.field, kind, undefined);
+  if (!numeric && !temporal) return col;
+
+  return {
+    ...col,
+    align: col.align ?? (numeric && !col.dictCode ? 'right' : undefined),
+    width: col.width ?? (temporal === 'datetime' ? 176 : temporal ? 120 : 112),
+  };
+}
 
 type UseSubTableColumnsArgs = Pick<ResolvedSubTableViewerProps, 'isEditable' | 'config' | 'token'> &
   Pick<ReturnType<typeof useSubTableState>, 'childFieldMap'>;
@@ -39,11 +56,9 @@ export function useSubTableColumns({
   );
 
   const effectiveColumns = useMemo<EnrichedColumnConfig[]>(() => {
-    if (childFieldMap.size === 0) return config.columns as EnrichedColumnConfig[];
-
     return config.columns.map((col) => {
       const meta = childFieldMap.get(col.field);
-      if (!meta) return col as EnrichedColumnConfig;
+      if (!meta) return withColumnPresentation(col);
 
       const anyCol = col as EnrichedColumnConfig;
       const metaExtension = getFieldMetaExtension(meta);
@@ -93,7 +108,7 @@ export function useSubTableColumns({
         enriched.required = true;
       }
 
-      return enriched;
+      return withColumnPresentation(enriched);
     });
   }, [childFieldMap, config.columns]);
 

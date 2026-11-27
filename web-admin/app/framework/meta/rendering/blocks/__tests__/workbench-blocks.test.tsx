@@ -23,6 +23,10 @@ import { useRuntimeStateSubscription } from '../workbenchBlockUtils';
 import { fetchResult } from '~/shared/services/http-client';
 import { registerConfirmDialog, unregisterConfirmDialog } from '~/utils/confirmDialog';
 import * as timezoneContext from '~/contexts/TimezoneContext';
+import { useDictWithExtras } from '~/framework/smart/hooks/useDictWithExtras';
+vi.mock('~/framework/smart/hooks/useDictWithExtras', () => ({
+  useDictWithExtras: vi.fn(() => ({ items: [], loading: false })),
+}));
 
 vi.mock('~/shared/services/http-client', () => ({
   fetchResult: vi.fn(() => Promise.resolve({ code: '0', data: {} })),
@@ -3755,6 +3759,30 @@ describe('ArtifactTimelineBlockRenderer', () => {
     render(<ArtifactTimelineBlockRenderer block={block} runtime={runtime} />);
 
     expect(screen.getByTestId('artifact-timeline-empty')).toHaveTextContent('No artifacts');
+  });
+
+  it('uses configured dictionary labels, timezone formatting and localized downloads', () => {
+    const zone = vi.spyOn(timezoneContext, 'useTimezone').mockReturnValue({
+      timezone: 'Asia/Shanghai', formats: { datetime: 'YYYY/MM/DD HH:mm' },
+    } as any);
+    vi.mocked(useDictWithExtras).mockReturnValueOnce({
+      items: [{ value: 'generated', label: '已生成' }], loading: false,
+    });
+    const runtime = makeRuntime({ data: { exports: [{ pid: 'localized-export',
+      filename: 'standard-bom.xlsx', status: 'generated', generatedAt: '2026-06-06T00:00:00Z', fileId: 'file-1' }] } });
+    runtime.getContext().locale = 'zh-CN';
+    try {
+      render(<ArtifactTimelineBlockRenderer runtime={runtime} block={{ id: 'exports',
+        blockType: 'artifact-timeline', dataSource: 'exports', item: {
+          titleField: 'filename', subtitleField: 'generatedAt', subtitleType: 'datetime',
+          statusField: 'status', statusDictCode: 'bom_export_status', fileIdField: 'fileId',
+        } } as any} />);
+      const artifact = screen.getByTestId('artifact-timeline-item-localized-export');
+      expect(artifact).toHaveTextContent('已生成');
+      expect(artifact).toHaveTextContent('2026/06/06 08:00');
+      expect(artifact).not.toHaveTextContent('generated');
+      expect(screen.getByRole('link', { name: '下载' })).toHaveAttribute('href', '/api/file/download/file-1');
+    } finally { zone.mockRestore(); }
   });
 
   it('renders artifact rows with status, hash and download link', () => {

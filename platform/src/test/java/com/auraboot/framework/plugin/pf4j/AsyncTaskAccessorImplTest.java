@@ -26,6 +26,8 @@ class AsyncTaskAccessorImplTest {
         verify(service, times(2)).submitTask(request.capture(), eq(10L), eq(20L));
         assertThat(request.getAllValues().get(0).getInputParams().has("resumeOnRestart")).isFalse();
         assertThat(request.getAllValues().get(1).getInputParams().path("resumeOnRestart").asBoolean()).isTrue();
+        assertThat(request.getAllValues().get(0).getInputParams().has("dispatchThroughPipeline")).isFalse();
+        assertThat(request.getAllValues().get(1).getInputParams().path("dispatchThroughPipeline").asBoolean()).isTrue();
     }
 
     @Test void same_model_followup_preserves_server_authorization_and_identity() {

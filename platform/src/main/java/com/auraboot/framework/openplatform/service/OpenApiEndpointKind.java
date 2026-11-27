@@ -10,7 +10,8 @@ public enum OpenApiEndpointKind {
     RESOURCE_UPDATE("resource.update", "PATCH", true, "update"),
     RESOURCE_DELETE("resource.delete", "DELETE", true, "delete"),
     ACTION("action.execute", "POST", false, "execute"),
-    QUERY("query.execute", "POST", false, "execute");
+    QUERY("query.execute", "POST", false, "execute"),
+    INTEGRATION("integration.execute", "POST", false, "execute");
 
     private final String code;
     private final String method;
@@ -23,7 +24,7 @@ public enum OpenApiEndpointKind {
     public String method() { return method; }
     public boolean target() { return target; }
     public String operation() { return operation; }
-    public boolean resource() { return this != ACTION && this != QUERY; }
+    public boolean resource() { return this != ACTION && this != QUERY && this != INTEGRATION; }
     public boolean write() { return Set.of(RESOURCE_CREATE, RESOURCE_UPDATE, RESOURCE_DELETE).contains(this); }
     public static OpenApiEndpointKind fromCode(String code) {
         for (var kind : values()) if (kind.code.equals(code)) return kind;

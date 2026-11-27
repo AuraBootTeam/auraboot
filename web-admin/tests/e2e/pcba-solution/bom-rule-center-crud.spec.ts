@@ -18,22 +18,199 @@ import {
   cleanupRows,
   fixtureJournal,
   cleanupTrackedFixtureRows,
+  fetchRoleSnapshot,
 } from './quote-e2e-helpers';
 
 test.use({ locale: 'zh-CN' });
+
+test('engineering maintains header aliases and exact MPN alternatives with a configurable display limit', async ({ page: admin, browser }, info) => {
+  test.setTimeout(180_000);
+  const marker = `ALIASMPN${Date.now()}`;
+  const mpn = 'CC0603KRX7R9BB104';
+  const header = `供应商型号 ${marker}`;
+  await admin.goto('/home', { waitUntil: 'domcontentloaded' });
+  const engineer = makeQuoteRoleUser('alias-mpn-engineer', marker.toLowerCase(), ['bom_engineering']);
+  await ensureQuoteRoleUser(admin, engineer);
+  for (let index = 0; index < 7; index++) {
+    const part = index === 0 ? mpn : `GRM188R71H104KA${index}3D`;
+    await createRecallableMaterial(admin, `${marker}-${index}`, 'capacitor',
+      `${part} 100nF ±10% 50V X7R 0603`, '0603', index === 0 ? 'YAGEO' : 'Murata', part);
+  }
+  const actor = await openQuoteRolePage(browser, engineer);
+  const page = actor.page;
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const field = (name: string) => page.getByTestId(`form-field-${name}`);
+  const aliasRows = () => queryDynamicRecords(page, 'bom_header_alias', [
+    { fieldName: 'bom_ha_alias', operator: 'EQ', value: header },
+  ]);
+  async function menu(model: string) {
+    await page.goto('/home', { waitUntil: 'domcontentloaded' });
+    await ensureSidebarExpanded(page);
+    const sidebar = page.getByTestId('sidebar');
+    const link = sidebar.locator(`a[href="/p/${model}"]`);
+    if (!(await link.isVisible())) {
+      const center = sidebar.getByRole('button', { name: '规则中心', exact: true });
+      if (!(await center.isVisible())) await sidebar.getByRole('button', { name: 'BOM转化工具', exact: true }).click();
+      await center.click();
+    }
+    await link.click();
+    await expect(page.locator('main')).not.toContainText(/Page Unavailable|Access forbidden/);
+  }
+  async function save(command: string) {
+    const payload = await submit(page, command);
+    expect(payload).toBeTruthy();
+  }
+  try {
+    const identity = await fetchRoleSnapshot(page);
+    expect(identity.roleCodes).toContain('bom_engineering');
+    expect(identity.roleCodes).not.toContain('tenant_admin');
+    expect(identity.permissionCodes).toContain('bom.cap.manage');
+    await menu('bom_header_alias');
+    await expect(page.locator('main').getByRole('button', { name: '新建', exact: true })).toBeVisible();
+    await expect(page.locator('[data-testid^="table-row-"]').first()).toBeVisible();
+    await page.screenshot({ path: info.outputPath('alias-engineering-list.png'), fullPage: true });
+    await page.locator('main').getByRole('button', { name: '新建', exact: true }).click();
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await expect(field('bom_ha_alias')).toContainText(/必填|不能为空|请输入|请填写|required/i);
+    await field('bom_ha_alias').getByRole('textbox').fill(header);
+    await field('bom_ha_system_field').getByRole('combobox').first().click();
+    await page.getByRole('option', { name: 'MPN/原料号', exact: true }).click();
+    const enabled = field('bom_ha_enabled').getByRole('switch');
+    if ((await enabled.getAttribute('aria-checked')) !== 'true') await enabled.click();
+    await save('bom:create_header_alias');
+    await expect.poll(async () => (await aliasRows()).length).toBe(1);
+    await searchBusinessList(page, '/p/bom_header_alias', header);
+    const aliasRow = page.getByRole('row').filter({ hasText: header });
+    await expect(aliasRow).toHaveCount(1);
+    await page.screenshot({ path: info.outputPath('alias-created.png'), fullPage: true });
+    await clickRowActionByLocator(page, aliasRow, 'edit', '编辑');
+    await field('bom_ha_remark').getByRole('textbox').fill('Supplier column contains manufacturer MPN');
+    await save('bom:update_header_alias');
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    expect((await aliasRows())[0].bom_ha_remark).toBe('Supplier column contains manufacturer MPN');
+    await searchBusinessList(page, '/p/bom_header_alias', header);
+    await expect(page.getByRole('row').filter({ hasText: header })).toContainText('Supplier column contains manufacturer MPN');
+    await page.screenshot({ path: info.outputPath('alias-updated.png'), fullPage: true });
+
+    const account = await executeCommand(page, 'crm:create_account', { crm_acc_name: marker }, undefined, 'create');
+    const customerId = String(account.recordId ?? account.pid ?? account.id ?? '');
+    expect(customerId).toBeTruthy();
+    const project = await executeCommand(page, 'bom:create_project', {
+      bom_project_name: marker, bom_project_customer_id: customerId, bom_pcba_code: marker,
+      bom_project_quality_level: 'industrial',
+    }, undefined, 'create');
+    const projectId = String(project.recordId ?? project.pid ?? project.projectId ?? '');
+    expect(projectId).toBeTruthy();
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+      ['物料名称', '规格', '位号', '数量', header],
+      ['贴片电容', '100nF ±10% 50V X7R 0603', 'C1', 1, mpn],
+    ]), 'BOM');
+    const file = info.outputPath('supplier-mpn.xlsx');
+    fs.writeFileSync(file, XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }));
+    const taskIds: string[] = [];
+    async function convert(limit: number) {
+      await page.goto('/home', { waitUntil: 'domcontentloaded' });
+      await ensureSidebarExpanded(page);
+      await page.getByTestId('sidebar').locator('a[href="/p/bom_conversion_task_pcba_workbench"]').click();
+      await page.getByTestId('toolbar-btn-upload_bom').click();
+      for (const [name, id] of [['bom_task_customer_id', customerId], ['bom_task_project_id', projectId]]) {
+        await page.getByTestId(`select-trigger-${name}`).click();
+        await page.locator(`[role="option"][data-value="${id}"]`).first().click();
+      }
+      const uploaded = page.waitForResponse(r => r.url().includes('/api/file/upload') && r.request().method() === 'POST');
+      await field('bom_task_raw_file_id').locator('input[type="file"]').first().setInputFiles(file);
+      expect((await uploaded).ok()).toBe(true);
+      const admission = page.waitForResponse(r => decodeURIComponent(r.url()).includes('/api/meta/commands/execute/bom:start_conversion') && r.request().method() === 'POST');
+      await page.getByTestId('form-btn-start_conversion').click();
+      const response = await admission;
+      expect(new URL(response.url()).origin).toBe(new URL(page.url()).origin);
+      const admitted = await response.json();
+      expect(String(admitted.code)).toBe('0');
+      const asyncTaskCode = String(admitted.data?.data?.taskCode ?? '');
+      expect(asyncTaskCode).not.toBe('');
+      await page.waitForURL(/\/p\/bom_conversion_task_pcba_workbench\/view\/[^/?#]+/);
+      const taskId = new URL(page.url()).pathname.split('/').at(-1)!;
+      taskIds.push(taskId);
+      await expect.poll(async () => {
+        const job = await page.request.get(`/api/async-tasks/${asyncTaskCode}`);
+        expect(job.ok()).toBe(true);
+        const state = (await job.json()).data;
+        if (String(state.status).toLowerCase() === 'failed') throw new Error(`BOM worker failed: ${state.errorMessage ?? state.message ?? 'see async task evidence'}`);
+        return (await readDynamicRecord(page, 'bom_conversion_task_pcba', taskId)).bom_task_status;
+      },
+        { timeout: 90_000, intervals: [1000, 2000] }).toBe('completed');
+      await expect.poll(async () => {
+        const job = await page.request.get(`/api/async-tasks/${asyncTaskCode}`);
+        expect(job.ok()).toBe(true);
+        return String((await job.json()).data.status).toLowerCase();
+      }, { timeout: 15_000 }).toBe('completed');
+      const raw = await queryDynamicRecords(page, 'bom_raw_line_pcba', [{ fieldName: 'bom_raw_task_id', operator: 'EQ', value: taskId }]);
+      expect(raw).toHaveLength(1);
+      expect(raw[0].bom_raw_mpn).toBe(mpn);
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await expect(page.locator('main')).toContainText('BOM 匹配已完成');
+      await page.getByRole('row').filter({ hasText: 'C1' }).click();
+      const drawer = page.getByTestId('review-drawer');
+      const candidates = drawer.getByTestId('review-drawer-candidate-list')
+        .locator('button[data-testid^="review-drawer-candidate-"]');
+      await expect(candidates).toHaveCount(limit);
+      await expect(candidates.first()).toContainText(`${marker}-0`);
+      await expect(candidates.nth(1)).not.toContainText(`${marker}-0`);
+      await page.screenshot({ path: info.outputPath(`mpn-exact-alternatives-${limit}.png`), fullPage: true });
+      fs.writeFileSync(info.outputPath('engineering-alias-mpn-evidence.json'), JSON.stringify({ marker, header, taskIds, raw, limit }, null, 2));
+      await page.getByRole('button', { name: /关闭复核浮层|Close Review/i }).click();
+    }
+    await convert(5);
+    const settings = await queryDynamicRecords(page, 'bom_setting', [{ fieldName: 'bom_setting_key', operator: 'EQ', value: 'matcher_v2_policy_json' }]);
+    expect(settings).toHaveLength(1);
+    const initialPolicy = String(settings[0].bom_setting_value);
+    async function configure(raw: string) {
+      await menu('bom_setting');
+      await searchBusinessList(page, '/p/bom_setting', 'matcher_v2_policy_json');
+      await clickRowActionByLocator(page, page.getByRole('row').filter({ hasText: 'matcher_v2_policy_json' }), 'edit', '编辑');
+      await field('bom_setting_value').getByRole('textbox').fill(raw);
+      await save('bom:update_setting');
+      const saved = await readDynamicRecord(page, 'bom_setting', String(settings[0].pid));
+      expect(saved.bom_setting_value).toBe(raw);
+    }
+    try {
+      await configure(JSON.stringify({ ...JSON.parse(initialPolicy), candidateDisplayLimit: 3 }));
+      await convert(3);
+    } finally {
+      await configure(initialPolicy);
+    }
+    await menu('bom_header_alias');
+    await searchBusinessList(page, '/p/bom_header_alias', header);
+    await clickRowActionByLocator(page, page.getByRole('row').filter({ hasText: header }), 'delete', '删除');
+    await expect(page.getByTestId('confirm-dialog')).toBeVisible();
+    await page.screenshot({ path: info.outputPath('alias-delete-confirm.png'), fullPage: true });
+    await page.getByTestId('confirm-cancel').click();
+    expect(await aliasRows()).toHaveLength(1);
+    await clickRowActionByLocator(page, page.getByRole('row').filter({ hasText: header }), 'delete', '删除');
+    await page.getByTestId('confirm-ok').click();
+    await expect.poll(async () => (await aliasRows()).length).toBe(0);
+  } catch (error) {
+    await page.screenshot({ path: info.outputPath('engineering-failure.png'), fullPage: true });
+    throw error;
+  } finally {
+    await actor.context.close();
+  }
+});
 
 test.afterEach(async ({ page }) => {
   await cleanupTrackedFixtureRows(page);
 });
 
 /** Creates an independent, recallable fixture through the production material writer. */
-async function createRecallableMaterial(page: Page, code: string, category: string, spec: string, packageCode: string, brand = '') {
+async function createRecallableMaterial(page: Page, code: string, category: string, spec: string, packageCode: string, brand = '', mpn = '') {
   const journal = fixtureJournal(page);
   const result = await executeCommand(page, 'bom:create_material', {
     bom_mm_material_code: code,
     bom_mm_material_name: category === 'resistor' ? '贴片电阻' : '贴片电容',
     bom_mm_spec_model: spec, bom_mm_category: category, bom_mm_package: packageCode,
     bom_mm_unit: 'PCS', bom_mm_brand: brand, bom_mm_enabled: true,
+    ...(mpn ? { bom_mm_mpn: mpn } : {}),
   });
   expect(result.success).toBe(true);
   const rows = await queryDynamicRecords(page, 'bom_material_master', [
@@ -44,6 +221,17 @@ async function createRecallableMaterial(page: Page, code: string, category: stri
   expect(String(rows[0].bom_mm_norm_text ?? '')).not.toBe('');
   expect(JSON.parse(String(rows[0].bom_mm_attributes_json))).toEqual(expect.objectContaining({ package: packageCode }));
   return rows[0];
+}
+
+async function chooseMappedCustomer(page: Page, name: string, pid: string) {
+  const input = page.getByTestId('select-trigger-bom_cpm_customer_id');
+  await input.click();
+  await input.fill(name);
+  const option = page.locator(`[role="option"][data-value="${pid}"]`);
+  await expect(option).toHaveText(name);
+  await option.click();
+  await expect(input).toHaveValue(name);
+  await expect(page.locator('input[type="hidden"][name="bom_cpm_customer_id"]')).toHaveValue(pid);
 }
 
 type Choice = { field: string; label: string; value: string };
@@ -203,7 +391,8 @@ for (const c of cases) {
     expect(await records(), 'invalid form must not write a record').toEqual([]);
     await info.attach('rule-required-browser', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     await info.attach('rule-required-persistence', { body: JSON.stringify({ model: c.model, marker, createRequests, records: [] }), contentType: 'application/json' });
-    await field(c.key).getByRole('textbox').fill(keyValue);
+    if (customerPid) await chooseMappedCustomer(page, marker, customerPid);
+    else await field(c.key).getByRole('textbox').fill(keyValue);
     for (const value of [c.text, ...(c.extraTexts || [])].filter(Boolean))
       await field(value!.field).getByRole('textbox').fill(fixtureText(value!.value));
     for (const choice of [c.select, c.extraSelect, ...(c.choices || [])].filter(Boolean)) {
@@ -222,7 +411,8 @@ for (const c of cases) {
     if (c.enabled) expect(payload.payload[c.enabled]).toBe(false);
     await expect.poll(async () => (await records()).length).toBe(1);
     const saved = (await records())[0];
-    fixtureJournal(page).track({ model: c.model, pid: String(saved.pid) });
+    // A retained setting has no public deletion contract; its retention is asserted below.
+    if (c.allowDelete !== false) fixtureJournal(page).track({ model: c.model, pid: String(saved.pid) });
     if (c.enabled) expect(saved[c.enabled]).toBe(false);
     for (const choice of [c.select, c.extraSelect, ...(c.choices || [])].filter(Boolean))
       expect(saved[choice!.field]).toBe(choice!.value);
@@ -236,7 +426,7 @@ for (const c of cases) {
       // Customer identity is a scope, not a one-record-per-customer limit.
       await searchBusinessList(page, `/p/${c.model}`, marker);
       await page.locator('main').getByRole('button', { name: '新建', exact: true }).click();
-      await field(c.key).getByRole('textbox').fill(keyValue);
+      await chooseMappedCustomer(page, marker, customerPid);
       for (const value of c.extraTexts || [])
         await field(value.field).getByRole('textbox').fill(`${fixtureText(value.value)}-SECOND`);
       await field(c.select!.field).getByRole('combobox').first().click();
@@ -250,6 +440,8 @@ for (const c of cases) {
       await searchBusinessList(page, `/p/${c.model}`, marker);
       const secondRow = page.getByRole('row').filter({ hasText: 'GATE-PN-RAW-SECOND' });
       await expect(secondRow).toHaveCount(1);
+      await expect(secondRow).toContainText(marker);
+      await expect(secondRow).not.toContainText(customerPid);
       await page.screenshot({ path: info.outputPath('multiple-parts.png') });
       await clickRowActionByLocator(page, secondRow, 'delete', '删除');
       await page.getByTestId('confirm-ok').click();
@@ -291,10 +483,16 @@ for (const c of cases) {
       await expect(denied.page).toHaveURL(new RegExp(`/p/${c.model}/view/${saved.pid}$`));
       const readerKey = denied.page.getByTestId(`form-field-${c.key}`);
       await expect(readerKey).toBeVisible();
-      await expect.poll(() => readerKey.evaluate(element => [
-        element.textContent,
-        ...Array.from(element.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea')).map(input => input.value),
-      ].join(' '))).toMatch(new RegExp(`${marker}|${keyValue}`));
+      if (customerPid) {
+        // This reader has BOM rule access, but no CRM customer read permission.
+        await expect(readerKey).toContainText('无权读取来源');
+        await expect(readerKey).not.toContainText(customerPid);
+      } else {
+        await expect.poll(() => readerKey.evaluate(element => [
+          element.textContent,
+          ...Array.from(element.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea')).map(input => input.value),
+        ].join(' '))).toMatch(new RegExp(`${marker}|${keyValue}`));
+      }
       await expect(denied.page.getByTestId('toolbar-btn-edit')).toHaveCount(0);
       await expect(denied.page.getByTestId('toolbar-btn-delete')).toHaveCount(0);
       await expect(denied.page.locator('main input:not([readonly]):not([disabled]), main textarea:not([readonly]):not([disabled]), main [contenteditable="true"]')).toHaveCount(0);
@@ -330,8 +528,11 @@ for (const c of cases) {
     let row = page.getByRole('row').filter({ hasText: marker });
     await expect(row).toHaveCount(1);
     await expect(row).toContainText(marker);
+    if (customerPid) await expect(row).not.toContainText(customerPid);
     await clickRowActionByLocator(page, row, 'edit', '编辑');
-    await expect(field(c.key).getByRole('textbox')).toHaveValue(keyValue);
+    if (customerPid) {
+      await expect(page.getByTestId('select-trigger-bom_cpm_customer_id')).toHaveValue(marker);
+    } else await expect(field(c.key).getByRole('textbox')).toHaveValue(keyValue);
     await field(c.remark).getByRole('textbox').fill('rule-gate-edited');
     await submit(page, `bom:update_${c.command}`);
     await expect.poll(async () => (await records())[0]?.[c.remark]).toBe('rule-gate-edited');
@@ -592,7 +793,7 @@ test('header alias enabled/disabled affects new BOM conversions and preserves pr
   expect(customerId).toBeTruthy();
   const project = await executeCommand(page, 'bom:create_project', {
     bom_project_name: marker, bom_project_customer_id: customerId, bom_pcba_code: marker,
-    bom_project_library_source: 'excel_current_library',
+    bom_project_quality_level: 'industrial',
   }, undefined, 'create');
   const projectId = String(project.recordId ?? project.pid ?? project.projectId ?? '');
   expect(projectId).toBeTruthy();
@@ -928,7 +1129,7 @@ test(`${kind} rule enabled/disabled changes extracted attributes in real BOM con
   expect(customerId).toBeTruthy();
   const project = await executeCommand(page, 'bom:create_project', {
     bom_project_name: marker, bom_project_customer_id: customerId, bom_pcba_code: marker,
-    bom_project_library_source: 'excel_current_library',
+    bom_project_quality_level: 'industrial',
   }, undefined, 'create');
   const projectId = String(project.recordId ?? project.pid ?? project.projectId ?? '');
   expect(projectId).toBeTruthy();
@@ -1132,7 +1333,9 @@ for (const kind of ['aml', 'avl'] as const) {
     await page.getByRole('button', { name: '保存', exact: true }).click();
     const invalidBody = await (await invalidTransition).json();
     expect(String(invalidBody.code)).not.toBe('0');
-    expect(JSON.stringify(invalidBody)).toContain('rejected -> approved');
+    expect(JSON.stringify(invalidBody)).toContain('当前关系状态不允许此变更，请检查当前状态后重新选择。');
+    await expect(page.getByText('当前关系状态不允许此变更，请检查当前状态后重新选择。', { exact: true }).first()).toBeVisible();
+    await info.attach(`${kind}-invalid-transition-localized`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     expect(await readDynamicRecord(page, model, first)).toEqual(rejectedRecord);
     await page.getByRole('button', { name: '取消', exact: true }).click();
     const approvedRow = page.getByRole('row').filter({ hasText: marker })
@@ -1252,6 +1455,7 @@ for (const kind of ['aml', 'avl'] as const) {
     await expect(page.getByRole('heading', { name: '物料关系治理证据', exact: true })).toBeVisible();
     await expect(page.getByText(`Reviewed ${marker}`, { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: '审核处理', exact: true })).toHaveCount(0);
+    await info.attach(`${kind}-issue-approved-browser`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     await info.attach(`${kind}-issue-resolution`, { body: JSON.stringify({ before, missing, ineffective, after }), contentType: 'application/json' });
   });
 }
@@ -1327,7 +1531,7 @@ test('B18-03 part map: mapping applies to a new conversion, prior snapshots stay
   const customerId = String(account.recordId ?? account.pid ?? account.id ?? '');
   const project = await executeCommand(page, 'bom:create_project', {
     bom_project_name: marker, bom_project_customer_id: customerId, bom_pcba_code: marker,
-    bom_project_library_source: 'excel_current_library',
+    bom_project_quality_level: 'industrial',
   }, undefined, 'create');
   const projectId = String(project.recordId ?? project.pid ?? project.projectId ?? '');
   const field = (name: string) => page.getByTestId(`form-field-${name}`);
@@ -1365,7 +1569,7 @@ test('B18-03 part map: mapping applies to a new conversion, prior snapshots stay
 
   await page.goto('/p/bom_customer_part_map', { waitUntil: 'domcontentloaded' });
   await page.locator('main').getByRole('button', { name: '新建', exact: true }).first().click();
-  await field('bom_cpm_customer_id').getByRole('textbox').fill(customerId);
+  await chooseMappedCustomer(page, marker, customerId);
   await field('bom_cpm_customer_pn_raw').getByRole('textbox').fill(customerPn);
   await field('bom_cpm_customer_pn_norm').getByRole('textbox').fill(customerPn);
   await field('bom_cpm_material_code').getByRole('textbox').fill(mappedMaterial);
@@ -1404,7 +1608,7 @@ test('B18-03 part map: mapping applies to a new conversion, prior snapshots stay
 
   await page.goto('/p/bom_customer_part_map', { waitUntil: 'domcontentloaded' });
   await page.locator('main').getByRole('button', { name: '新建', exact: true }).first().click();
-  await field('bom_cpm_customer_id').getByRole('textbox').fill(customerId);
+  await chooseMappedCustomer(page, marker, customerId);
   await field('bom_cpm_customer_pn_raw').getByRole('textbox').fill(customerPn);
   await field('bom_cpm_customer_pn_norm').getByRole('textbox').fill(customerPn);
   await field('bom_cpm_material_code').getByRole('textbox').fill(`${mappedMaterial}DUP`);
@@ -1426,6 +1630,8 @@ test('B18-03 part map: mapping applies to a new conversion, prior snapshots stay
   expect(finalMappings, 'duplicate mapping is rejected without creating another row').toHaveLength(1);
   expect(finalMappings[0].bom_cpm_status).toBe('active');
   expect(finalMappings[0].bom_cpm_material_code).toBe(mappedMaterial);
+  await expect(page.getByTestId('select-trigger-bom_cpm_customer_id')).toHaveValue(marker);
+  await expect(page.locator('main')).not.toContainText(customerId);
   await page.screenshot({ path: info.outputPath('B18-03-duplicate-safe-error.png') });
   await info.attach('B18-03-part-map-evidence', {
     body: JSON.stringify({

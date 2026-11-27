@@ -1,4 +1,5 @@
 import { definePlugin } from '@auraboot/plugin-sdk'
+import './profiles/reportProfile';
 import { toNavigationResources } from '../_shared/types.js'
 import { manifest } from './manifest.js'
 import { RESOURCES } from './resources.js'

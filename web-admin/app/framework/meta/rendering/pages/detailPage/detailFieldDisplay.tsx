@@ -30,6 +30,16 @@ export function resolveDetailSectionIcon(block: BlockConfig): LucideIcon {
   return key && DETAIL_SECTION_ICONS[key] ? DETAIL_SECTION_ICONS[key] : FileText;
 }
 
+/** Declared status tones never infer business meaning from translated labels. */
+export function getDetailHeaderStatusTone(tone: unknown): string {
+  switch (tone) {
+    case 'success': return 'bg-status-green-bg text-status-green';
+    case 'warning': return 'bg-status-amber-bg text-status-amber';
+    case 'neutral': return 'bg-subtle text-text-2';
+    default: return 'bg-accent-weak text-accent';
+  }
+}
+
 export function getDetailValueTone(value: unknown): string {
   const text = String(value ?? '').toLowerCase();
   if (text.includes('已启用') || text.includes('enabled') || text.includes('管理员托管')) {
@@ -249,6 +259,10 @@ export function collectDetailDictCodes(
       ) {
         collectFromFields(block.fields);
       }
+      if (block.blockType === 'sub-table' || block.blockType === 'table') {
+        const columns = Array.isArray(block.columns) ? block.columns : block.table?.columns;
+        if (Array.isArray(columns)) collectFromFields(columns as FieldConfig[]);
+      }
       if ((block as any).tabs) {
         for (const tab of (block as any).tabs) {
           if (tab.blocks) walkBlocks(tab.blocks);
@@ -261,6 +275,6 @@ export function collectDetailDictCodes(
   };
   walkBlocks(schema.blocks);
   if (schema.extension?.headerStatusField)
-    collectFromFields([{ field: schema.extension.headerStatusField }]);
+    collectFromFields([{ field: schema.extension.headerStatusField, dictCode: schema.extension.headerStatusDictCode }]);
   return [...new Set(codes)];
 }

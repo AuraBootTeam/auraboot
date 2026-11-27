@@ -38,7 +38,6 @@ import java.util.Map;
 public class DataPermissionController {
 
     private final DataPermissionPolicyService policyService;
-    private final RoleMapper roleMapper;
 
     // ==================== Policy CRUD ====================
 
@@ -145,9 +144,11 @@ public class DataPermissionController {
         List<Map<String, Object>> enriched = bindings.stream().map(b -> {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("rolePid", b.getRolePid());
-            Role role = roleMapper.findByPid(b.getRolePid());
-            row.put("roleName", role != null ? role.getName() : b.getRolePid());
-            row.put("roleCode", role != null ? role.getCode() : "");
+            Role role = policyService.resolveBindableRole(b.getRolePid());
+            if (role == null)
+                throw new org.springframework.security.access.AccessDeniedException("Policy role binding is unavailable in this tenant");
+            row.put("roleName", role.getName());
+            row.put("roleCode", role.getCode());
             return row;
         }).toList();
         return ApiResponse.success(PaginationResult.of(enriched, (long) enriched.size(), 1, Math.max(enriched.size(), 1)));
@@ -187,17 +188,13 @@ public class DataPermissionController {
     public ApiResponse<Map<String, Object>> previewFilter(
             @RequestParam String modelCode,
             @RequestParam(required = false) Long userId) {
-        if (userId == null) {
-            userId = MetaContext.getCurrentUserId();
-        }
-
-        String rowFilter = policyService.previewRowFilter(modelCode, userId);
-        List<DataPermissionPolicy> effectivePolicies = policyService.getEffectivePolicies(
-                MetaContext.getCurrentTenantId(), modelCode, userId);
+        var preview=policyService.preview(modelCode,userId);
+        String rowFilter=preview.rowFilter();
+        List<DataPermissionPolicy> effectivePolicies=preview.effectivePolicies();
 
         return ApiResponse.success(Map.of(
                 "modelCode", modelCode,
-                "userId", userId,
+                "userId", preview.userId(),
                 "rowFilter", rowFilter != null ? rowFilter : "",
                 "effectivePolicies", effectivePolicies,
                 "policyCount", effectivePolicies.size()

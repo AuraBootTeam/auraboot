@@ -35,6 +35,11 @@ class PlatformReleaseAuthenticationIT extends BaseIntegrationTest {
         }
     }
 
+    private com.auraboot.framework.integration.PlatformAdministrationFixture platformFixture;
+    @org.junit.jupiter.api.AfterEach void cleanupPlatformFixture() {
+        if (platformFixture != null) platformFixture.close();
+    }
+
     @Autowired WebApplicationContext web;
     @Autowired JwtAuthenticationFilter filter;
     @Autowired JwtUtil jwt;
@@ -76,7 +81,8 @@ class PlatformReleaseAuthenticationIT extends BaseIntegrationTest {
                     .andExpect(jsonPath("$.code").value("409"));
             assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM ab_platform_release_registry WHERE platform_code=?", Integer.class, code));
             jdbc.update("UPDATE ab_role SET status='inactive' WHERE id=?", tenantRoleId);
-            long roleId = AdminGuardTestSupport.grantPlatformAdmin(jdbc, testTenant.getId(), testUser.getId());
+            platformFixture = com.auraboot.framework.integration.PlatformAdministrationFixture.grant(jdbc, testUser.getId());
+            long roleId = platformFixture.roleId();
             roles.invalidateAll();
             clearIdentity();
             mvc.perform(post(uri).header("Authorization", "Bearer " + token)

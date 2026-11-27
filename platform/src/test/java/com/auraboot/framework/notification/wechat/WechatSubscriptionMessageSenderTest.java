@@ -80,6 +80,65 @@ class WechatSubscriptionMessageSenderTest {
     private WechatSubscriptionMessageSender sender(){return new WechatSubscriptionMessageSender(configuration,mini,
             new WechatMiniStableTokenClient(mini),List.of(authority),recipients,identities,clock);}
     private Request request(){return new Request(42,"synthetic-ref");}
+    @Test void distinctTemplateContractsSendOnlyTheirOwnExactFields() throws Exception {
+        configuration.setEnabled(true); configuration.setTemplateId(null); configuration.setFieldMaxLengths(Map.of());
+        new org.springframework.boot.context.properties.bind.Binder(
+                new org.springframework.boot.context.properties.source.MapConfigurationPropertySource(Map.of(
+                    "aura.notification.wechat-subscription.templates.quote-template.field-max-lengths.thing4", "20",
+                    "aura.notification.wechat-subscription.templates.order-template.field-max-lengths.thing9", "40")))
+                .bind("aura.notification.wechat-subscription", org.springframework.boot.context.properties.bind.Bindable.ofInstance(configuration));
+        grant=new Grant(42,"quote-ref",grant.userPid(),grant.appId(),grant.identityPid(),grant.openid(),
+                "quote-template","quote-grant","quote-reservation",clock.instant().plusSeconds(60),Map.of("thing4","报价提醒"));
+        authority=(tenant,ref)->Optional.of(grant);
+        var sender=sender();
+        assertThat(sender.sendOnce(new Request(42,"quote-ref")).status()).isEqualTo(Status.PROVIDER_ACCEPTED);
+        grant=new Grant(42,"order-ref",grant.userPid(),grant.appId(),grant.identityPid(),grant.openid(),
+                "order-template","order-grant","order-reservation",clock.instant().plusSeconds(60),Map.of("thing9","订单发货提醒"));
+        assertThat(sender.sendOnce(new Request(42,"order-ref")).status()).isEqualTo(Status.PROVIDER_ACCEPTED);
+        var json=new ObjectMapper();
+        var sent=requests.stream().filter(value->value.startsWith("POST /cgi-bin/message/subscribe/send")).toList();
+        assertThat(sent).hasSize(2);
+        var quote=json.readTree(sent.get(0).substring(sent.get(0).indexOf('{')));
+        var order=json.readTree(sent.get(1).substring(sent.get(1).indexOf('{')));
+        assertThat(quote.path("template_id").asText()).isEqualTo("quote-template");
+        assertThat(quote.path("data").properties()).extracting(Map.Entry::getKey).containsExactly("thing4");
+        assertThat(order.path("template_id").asText()).isEqualTo("order-template");
+        assertThat(order.path("data").properties()).extracting(Map.Entry::getKey).containsExactly("thing9");
+    }
+    private void namedContracts() {
+        configuration.setEnabled(true);configuration.setTemplateId(null);configuration.setFieldMaxLengths(Map.of());
+        var quote=new WechatSubscriptionProperties.Template();quote.setFieldMaxLengths(Map.of("thing4",20));
+        var order=new WechatSubscriptionProperties.Template();order.setFieldMaxLengths(Map.of("thing9",40));
+        configuration.setTemplates(Map.of("quote-template",quote,"order-template",order));
+        grant=new Grant(42,"synthetic-ref",grant.userPid(),grant.appId(),grant.identityPid(),grant.openid(),
+                "quote-template",grant.grantReference(),grant.reservationReference(),grant.expiresAt(),Map.of("thing4","报价提醒"));
+    }
+    @Test void namedContractsRejectLegacyMixUnknownTemplateAndForeignFieldsWithoutNetwork() {
+        namedContracts();configuration.setTemplateId("legacy-template");
+        assertThat(sender().sendOnce(request()).reason()).isEqualTo(Reason.CONFIGURATION_INCOMPLETE);
+        assertThat(claimed).isFalse();configuration.setTemplateId(null);
+        grant=new Grant(42,"synthetic-ref",grant.userPid(),grant.appId(),grant.identityPid(),grant.openid(),
+                "unknown-template",grant.grantReference(),grant.reservationReference(),grant.expiresAt(),grant.values());
+        assertThat(sender().sendOnce(request()).reason()).isEqualTo(Reason.GRANT_INVALID);
+        claimed.set(false);namedContracts();
+        grant=new Grant(42,"synthetic-ref",grant.userPid(),grant.appId(),grant.identityPid(),grant.openid(),
+                grant.templateId(),grant.grantReference(),grant.reservationReference(),grant.expiresAt(),Map.of("thing9","订单字段"));
+        assertThat(sender().sendOnce(request()).reason()).isEqualTo(Reason.FIELDS_INVALID);
+        assertThat(requests).isEmpty();
+    }
+    @Test void removingOrChangingSelectedTemplateAfterPrepareCannotReachTransport() {
+        namedContracts();var sender=sender();var prepared=sender.prepare(request()).prepared();assertThat(prepared).isNotNull();
+        configuration.getTemplates().get("quote-template").setFieldMaxLengths(Map.of("thing4",19));
+        assertThat(sender.sendPrepared(prepared).reason()).isEqualTo(Reason.CONFIGURATION_INCOMPLETE);
+        configuration.setTemplates(Map.of("order-template",configuration.getTemplates().get("order-template")));
+        assertThat(sender.sendPrepared(prepared).reason()).isEqualTo(Reason.CONFIGURATION_INCOMPLETE);
+        assertThat(requests).isEmpty();
+    }
+    @Test void malformedNamedTemplateCannotSilentlyFallBackToAnotherContract() {
+        namedContracts();configuration.getTemplates().get("order-template").setFieldMaxLengths(Map.of());
+        assertThat(sender().sendOnce(request()).reason()).isEqualTo(Reason.CONFIGURATION_INCOMPLETE);
+        assertThat(claimed).isFalse();assertThat(requests).isEmpty();
+    }
     @Test void disabledOrIncompleteConfigurationNeverCallsGrantTokenOrSend() {
         assertThat(sender().sendOnce(request()).reason()).isEqualTo(Reason.DISABLED);
         configuration.setEnabled(true);configuration.setTemplateId("");
@@ -139,6 +198,36 @@ class WechatSubscriptionMessageSenderTest {
         assertThat(sender().sendOnce(request()).reason()).isEqualTo(Reason.GRANT_UNAVAILABLE);assertThat(requests).hasSize(2);
         assertThat(grant.toString()).doesNotContain("synthetic-openid","报价提醒");
     }
+    @Test void acceptsTheOfficialUnderscoredBusinessNumberField() throws Exception {
+        configuration.setEnabled(true);
+        configuration.setFieldMaxLengths(Map.of("character_string19", 32, "time21", 16, "thing17", 20, "phrase13", 5));
+        grant = new Grant(42, grant.resolutionReference(), grant.userPid(), grant.appId(), grant.identityPid(),
+                grant.openid(), grant.templateId(), grant.grantReference(), grant.reservationReference(),
+                grant.expiresAt(), Map.of("character_string19", "RFQ-26001", "time21", "2026-11-26 16:00",
+                        "thing17", "请在截止前提交报价", "phrase13", "待报价"), clock.instant(),
+                "pages/notification-entry/index?kind=quote&id=quote-1");
+        assertThat(sender().sendOnce(request()).status()).isEqualTo(Status.PROVIDER_ACCEPTED);
+        var request = requests.getLast();
+        var body = new ObjectMapper().readTree(request.substring(request.indexOf('{')));
+        assertThat(body.path("data").path("character_string19").path("value").asText()).isEqualTo("RFQ-26001");
+        assertThat(body.path("data").path("time21").path("value").asText()).isEqualTo("2026-11-26 16:00");
+    }
+
+    @Test void sendsTheReservedMiniProgramPageForSingleAndAggregateReminders() throws Exception {
+        configuration.setEnabled(true);
+        for (String path : List.of("pages/notification-entry/index?kind=quote&id=quote-1",
+                "pages/notification-entry/index?kind=order")) {
+            claimed.set(false);
+            grant = new Grant(42, grant.resolutionReference(), grant.userPid(), grant.appId(), grant.identityPid(),
+                    grant.openid(), grant.templateId(), grant.grantReference(), grant.reservationReference(),
+                    grant.expiresAt(), grant.values(), clock.instant(), path);
+            assertThat(sender().sendOnce(request()).status()).isEqualTo(Status.PROVIDER_ACCEPTED);
+            var request = requests.getLast();
+            var json = new ObjectMapper().readTree(request.substring(request.indexOf('{')));
+            assertThat(json.path("page").asText()).isEqualTo(path);
+        }
+    }
+
     @ParameterizedTest @ValueSource(strings={"{}","{\"errcode\":1}","{\"access_token\":\"synthetic-token\",\"expires_in\":0}"})
     void tokenFailureIsNotAttemptedAndNeverCallsMessageEndpoint(String response) {
         configuration.setEnabled(true);tokenResponse=response;

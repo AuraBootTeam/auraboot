@@ -91,7 +91,7 @@ public class AuraPluginManager extends SpringPluginManager {
      */
     @Override
     protected PluginLoader createPluginLoader() {
-        return new CompoundPluginLoader()
+        PluginLoader delegate = new CompoundPluginLoader()
                 .add(new PluginLoader() {
                     @Override
                     public boolean isApplicable(Path pluginPath) {
@@ -102,17 +102,41 @@ public class AuraPluginManager extends SpringPluginManager {
                     @Override
                     public ClassLoader loadPlugin(Path pluginPath, PluginDescriptor pluginDescriptor) {
                         Path artifact = pluginPath.toAbsolutePath().normalize();
-                        String digest = pluginArtifactDigest(artifact);
                         ClassLoader parent = Thread.currentThread().getContextClassLoader();
                         PluginClassLoader pluginClassLoader = new PluginClassLoader(
                                 AuraPluginManager.this, pluginDescriptor, parent);
                         pluginClassLoader.addFile(pluginPath.toFile());
-                        loadedArtifacts.put(pluginClassLoader,
-                                new LoadedPluginArtifact(pluginDescriptor.getPluginId(), artifact, digest));
                         return pluginClassLoader;
                     }
                 })
                 .add(new DefaultPluginLoader(this));
+        // Verify outside CompoundPluginLoader: its fallback logic otherwise swallows the useful failure.
+        return new PluginLoader() {
+            @Override public boolean isApplicable(Path pluginPath) { return delegate.isApplicable(pluginPath); }
+            @Override public ClassLoader loadPlugin(Path pluginPath, PluginDescriptor descriptor) {
+                Path artifact = pluginPath.toAbsolutePath().normalize();
+                String digest = Files.isRegularFile(artifact) && artifact.toString().toLowerCase(Locale.ROOT).endsWith(".jar")
+                        ? pluginArtifactDigest(artifact) : null;
+                ClassLoader loader = delegate.loadPlugin(pluginPath, descriptor);
+                verifyCompatibleCarrier(loader);
+                if (digest != null) loadedArtifacts.put(loader,
+                        new LoadedPluginArtifact(descriptor.getPluginId(), artifact, digest));
+                return loader;
+            }
+        };
+    }
+
+    private static void verifyCompatibleCarrier(ClassLoader loader) {
+        try {
+            com.auraboot.framework.application.database.mybatis.MybatisCarrierIntegrity.verify(loader);
+        } catch (RuntimeException failure) {
+            // CATCH: release only the rejected loader; preserve the original integrity failure.
+            if (loader instanceof java.io.Closeable closeable) {
+                try { closeable.close(); }
+                catch (IOException closeFailure) { failure.addSuppressed(closeFailure); }
+            }
+            throw failure;
+        }
     }
 
     /**

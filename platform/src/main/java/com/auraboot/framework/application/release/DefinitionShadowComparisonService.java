@@ -109,7 +109,10 @@ public final class DefinitionShadowComparisonService {
             List<PluginResource> rows = definitions.findComparableResources(tenantId, plugin.getPid());
             if (rows != null) {
                 for (PluginResource row : rows) {
-                    String identity = row.getResourceType() + ":" + row.getResourceCode();
+                    // Dashboards share the page identity space, but current imports retain
+                    // their first-class resource type. Older imports used page records.
+                    String type = "dashboard".equals(row.getResourceType()) ? "page" : row.getResourceType();
+                    String identity = type + ":" + row.getResourceCode();
                     require(actual.putIfAbsent(identity, row) == null, "Duplicate legacy plugin resource identity");
                 }
             }

@@ -1,3 +1,4 @@
+import { createControlledQuoteProvider } from './quote-controlled-provider';
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
 import {
@@ -165,6 +166,7 @@ test.describe('QuoteOps DeepSeek BOM price suggestions', () => {
     page,
   }) => {
     const created = await seedMinimalDeepSeekQuote(page);
+    const provider = await createControlledQuoteProvider(page);
 
     try {
       await openQuoteDetailFromList(page, created);
@@ -211,6 +213,7 @@ test.describe('QuoteOps DeepSeek BOM price suggestions', () => {
         )
         .toMatch(/CNY|待定|\d|暂不可用|未配置|unavailable/i);
 
+      expect(provider.requests, 'the UI journey must reach only the controlled local provider').toBeGreaterThan(0);
       const evidenceRows = await queryDynamicRecords(
         page,
         'qo_price_evidence_common',
@@ -252,7 +255,13 @@ test.describe('QuoteOps DeepSeek BOM price suggestions', () => {
         /java\.lang|IllegalStateException|MetaContext not initialized/i,
         { timeout: 20_000 },
       );
+      await page.getByTestId(`table-row-${created.lineId}`).click();
+      await expect(page.getByTestId('review-drawer')).toBeVisible();
+      await expect(page.getByTestId('review-drawer').getByRole('row').filter({ hasText: /DeepSeek/ }).first()).toBeVisible();
+      await expect(page.getByTestId('review-drawer')).not.toContainText('正在加载候选物料');
+      await test.info().attach('deepseek-governed-price-result', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     } finally {
+      await provider.close();
       await cleanupRows(page, created);
     }
   });

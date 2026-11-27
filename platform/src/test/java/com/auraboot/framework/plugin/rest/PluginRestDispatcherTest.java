@@ -197,6 +197,26 @@ class PluginRestDispatcherTest {
         return buf;
     }
 
+    @Test void declaredProjectionIsPassedOnlyAfterTheRoutePermissionIsGranted() throws Exception {
+        permit();var ext=mock(RestEndpointExtension.class);
+        var route=new RestRoute("GET","/whoami","probe.probe.read",AuthPolicy.AUTHENTICATED,true,true,null);
+        var match=new RestEndpointRegistry.Match(ext,route,Map.of());var models=java.util.Set.of("owned_quote");
+        when(ext.tenantProjectionReadModels(route)).thenReturn(models);
+        when(registry.match("probe","GET","/whoami")).thenReturn(Optional.of(match));
+        var context=mock(PluginRequestContext.class);when(ctxFactory.current(false,route,models)).thenReturn(context);
+        when(pipeline.execute(any(),any(),any())).thenReturn(okBuffer());
+        dispatchThroughAuthorization("probe",new MockHttpServletRequest("GET","/api/ext/probe/whoami"),new MockHttpServletResponse());
+        verify(ctxFactory).current(false,route,models);verify(ctxFactory,never()).current(false);
+        verify(pipeline).execute(any(),any(),org.mockito.ArgumentMatchers.same(context));
+    }
+    @Test void deniedRouteCannotObtainProjectionContext() {
+        permit();when(perms.hasPermission(42L,"probe.probe.read")).thenReturn(false);
+        var ext=mock(RestEndpointExtension.class);when(registry.match("probe","GET","/whoami")).thenReturn(Optional.of(whoamiMatch(ext)));
+        assertThatThrownBy(()->dispatchThroughAuthorization("probe",new MockHttpServletRequest("GET","/api/ext/probe/whoami"),new MockHttpServletResponse()))
+                .isInstanceOf(AccessDeniedException.class);
+        org.mockito.Mockito.verifyNoInteractions(ctxFactory,pipeline);
+    }
+
     @Test
     void unmatchedRoute_returns404() throws Exception {
         MockHttpServletRequest req = new MockHttpServletRequest("GET", "/api/ext/probe/nope");

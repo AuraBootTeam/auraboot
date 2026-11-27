@@ -100,9 +100,9 @@ export const ConflictResolver: React.FC<ConflictResolverProps> = ({
             try {
               const parsed = JSON.parse(e.target.value);
               setMergedData(parsed);
-            } catch {
+            } catch (error) {
               // 忽略解析错误，继续编辑
-            }
+ console.warn('[ConflictResolver] previously-silent catch', error);            }
           }}
           placeholder="请输入合并后的 JSON 数据..."
         />

@@ -23,6 +23,7 @@ import java.net.ConnectException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
@@ -48,6 +49,10 @@ class CommandHandlerAsyncTaskExecutorTest {
         member.setStatus("active");
         when(members.findByTenantIdAndUserId(123L, 45L)).thenReturn(member);
         when(roles.getRoleIdsByMemberIdAndTenantId(67L, 123L)).thenReturn(java.util.List.of(89L));
+        var authorization = mock(DeferredCommandAuthorization.class);
+        when(authorization.authorize(any(), any(), any(), any(), any(), any(), any())).thenAnswer(invocation ->
+                new DeferredCommandAuthorization.Decision(null, null, 7L, invocation.getArgument(4), java.util.Map.of()));
+        ReflectionTestUtils.setField(executor, "deferredAuthorization", authorization);
         ReflectionTestUtils.setField(executor, "tenantMemberService", members);
         ReflectionTestUtils.setField(executor, "userRoleService", roles);
     }
@@ -84,6 +89,48 @@ class CommandHandlerAsyncTaskExecutorTest {
         assertThat(result.isRetryable()).isFalse();
         assertThat(result.getErrorMessage()).contains("not installed");
         verify(handler, org.mockito.Mockito.never()).execute(org.mockito.ArgumentMatchers.any());
+        assertThat(MetaContext.exists()).isFalse();
+    }
+
+    @Test
+    void resumable_pipeline_command_uses_current_command_boundary_without_direct_handler_or_stale_permits() throws Exception {
+        var handler=mock(CommandHandlerExtension.class);
+        when(extensionRegistry.getCommandHandler("bom:import_material_library")).thenReturn(Optional.of(handler));
+        var pipeline=mock(com.auraboot.framework.meta.service.CommandExecutor.class);
+        ReflectionTestUtils.setField(executor,"commandExecutor",pipeline);
+        when(pipeline.execute(eq("bom:import_material_library"),org.mockito.ArgumentMatchers.any())).thenAnswer(call->{
+            com.auraboot.framework.meta.dto.CommandExecuteRequest request=call.getArgument(1);
+            assertThat(request.getTargetRecordPid()).isEqualTo("owned-record");
+            assertThat(request.getTargetRecordId()).isEqualTo("owned-record");
+            assertThat(request.getPayload()).containsEntry("source_file_id","01KFILE");
+            assertThat(MetaContext.getCurrentTenantId()).isEqualTo(123L);
+            assertThat(MetaContext.snapshot().memberId()).isEqualTo(67L);
+            assertThat(MetaContext.snapshot().roleIds()).containsExactly(89L);
+            assertThat(MetaContext.hasCommandAuthority()).isFalse();
+            assertThat(MetaContext.hasCommandPermitScope()).isFalse();
+            return com.auraboot.framework.meta.dto.CommandExecuteResult.builder().commandCode("bom:import_material_library")
+                    .phaseReached("completed").data(Map.of("state","succeeded","billNo","TEST-PO")).build();
+        });
+        var input=params("bom:import_material_library");input.put("recordPid","owned-record");
+        input.put("resumeOnRestart",true);input.put("dispatchThroughPipeline",true);
+        input.put("commandAuthority","stale-authority");input.put("commandPermitScope","ALL");
+        var result=executor.execute(input,noop);
+        assertThat(result.isSuccess()).isTrue();assertThat(result.getData().path("billNo").asText()).isEqualTo("TEST-PO");
+        verify(handler,org.mockito.Mockito.never()).execute(org.mockito.ArgumentMatchers.any());
+        assertThat(MetaContext.exists()).isFalse();
+    }
+
+    @Test
+    void revoked_membership_stops_pipeline_dispatch_before_any_command_or_handler() throws Exception {
+        var handler=mock(CommandHandlerExtension.class);
+        when(extensionRegistry.getCommandHandler("bom:import_material_library")).thenReturn(Optional.of(handler));
+        var pipeline=mock(com.auraboot.framework.meta.service.CommandExecutor.class);
+        ReflectionTestUtils.setField(executor,"commandExecutor",pipeline);
+        ReflectionTestUtils.setField(executor,"tenantMemberService",mock(com.auraboot.framework.tenant.service.TenantMemberService.class));
+        var input=params("bom:import_material_library");input.put("recordPid","owned-record");
+        input.put("resumeOnRestart",true);input.put("dispatchThroughPipeline",true);
+        assertThat(executor.execute(input,noop).isSuccess()).isFalse();
+        org.mockito.Mockito.verifyNoInteractions(pipeline);verify(handler,org.mockito.Mockito.never()).execute(org.mockito.ArgumentMatchers.any());
         assertThat(MetaContext.exists()).isFalse();
     }
 
@@ -147,6 +194,10 @@ class CommandHandlerAsyncTaskExecutorTest {
     @Test
     void removed_membership_cannot_execute_recovered_task() throws Exception {
         var members = mock(com.auraboot.framework.tenant.service.TenantMemberService.class);
+        var authorization = mock(DeferredCommandAuthorization.class);
+        when(authorization.authorize(any(), any(), any(), any(), any(), any(), any())).thenAnswer(invocation ->
+                new DeferredCommandAuthorization.Decision(null, null, 7L, invocation.getArgument(4), java.util.Map.of()));
+        ReflectionTestUtils.setField(executor, "deferredAuthorization", authorization);
         ReflectionTestUtils.setField(executor, "tenantMemberService", members);
         CommandHandlerExtension handler = mock(CommandHandlerExtension.class);
         when(extensionRegistry.getCommandHandler("bom:import_material_library"))
@@ -291,6 +342,13 @@ class CommandHandlerAsyncTaskExecutorTest {
             var input=params("bom:import_material_library");
             input.set("handlerParams",objectMapper.valueToTree(Map.of("tenantSecretRead",optIn,
                     "tenantSecretServiceTypes",java.util.List.of("integration"),"tenantSecretFields",java.util.List.of("appSecret"))));
+            var currentPolicy = Map.<String,Object>of("tenantSecretRead",optIn,
+                    "tenantSecretServiceTypes",java.util.List.of("integration"),"tenantSecretFields",java.util.List.of("appSecret"));
+            var authorization = mock(DeferredCommandAuthorization.class);
+            when(authorization.authorize(any(),any(),any(),any(),any(),any(),any())).thenReturn(
+                    new DeferredCommandAuthorization.Decision(null,null,7L,Map.of(),currentPolicy));
+            ReflectionTestUtils.setField(executor,"deferredAuthorization",authorization);
+            input.set("handlerParams",objectMapper.valueToTree(Map.of("tenantSecretRead",!Boolean.TRUE.equals(optIn))));
             assertThat(executor.execute(input,noop).isSuccess()).isTrue();
             assertThat(captured.get()).isNotNull();
         }
@@ -298,7 +356,7 @@ class CommandHandlerAsyncTaskExecutorTest {
     }
 
     @Test
-    void restoresExactCommandWriterIdentityOnlyFromPersistedPermitPlan() throws Exception {
+    void restoresExactCommandWriterIdentityOnlyFromCurrentPermitPlan() throws Exception {
         AtomicReference<String> commandSeen = new AtomicReference<>();
         CommandHandlerExtension handler = mock(CommandHandlerExtension.class);
         when(handler.execute(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> {
@@ -309,6 +367,11 @@ class CommandHandlerAsyncTaskExecutorTest {
                 .thenReturn(Optional.of(handler));
         ObjectNode input = params("bom:import_material_library");
         input.put("commandPermitScope", "ALL");
+        var authorization = mock(DeferredCommandAuthorization.class);
+        when(authorization.authorize(any(),any(),any(),any(),any(),any(),any())).thenReturn(
+                new DeferredCommandAuthorization.Decision("current.duty","TARGET",11L,Map.of(),Map.of()));
+        ReflectionTestUtils.setField(executor,"deferredAuthorization",authorization);
+
 
         AsyncTaskResult result = executor.execute(input, noop);
 
@@ -318,7 +381,7 @@ class CommandHandlerAsyncTaskExecutorTest {
     }
 
     @Test
-    void commandCodeWithoutPersistedPermitPlanDoesNotBecomeWriterAuthority() throws Exception {
+    void currentDecisionWithoutScopeDoesNotBecomeWriterAuthority() throws Exception {
         AtomicReference<String> commandSeen = new AtomicReference<>("not-run");
         CommandHandlerExtension handler = mock(CommandHandlerExtension.class);
         when(handler.execute(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> {
@@ -350,8 +413,8 @@ class CommandHandlerAsyncTaskExecutorTest {
 
         AsyncTaskResult result = executor.execute(input, noop);
 
-        assertThat(result.isSuccess()).isTrue();
-        assertThat(commandSeen.get()).isNull();
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(commandSeen).hasValue("not-run");
     }
 
     @Test

@@ -1045,7 +1045,7 @@ describe('UnifiedDesignerPage', () => {
     replaceState.mockRestore();
   });
 
-  it('saves a manifest-backed Studio edit into the same ChangeSet without touching PageSchema', async () => {
+  it('saves a manifest-backed Studio edit into the same ChangeSet without touching UnifiedPageSchema', async () => {
     setSearch('?contextId=ctx_secure_once');
     const handoff = createHandoff('list_customer', '/dataSource');
     const baseline = createDocument('document_one', 'Isolated Draft');

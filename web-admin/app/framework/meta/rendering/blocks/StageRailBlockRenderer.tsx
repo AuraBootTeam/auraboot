@@ -74,12 +74,15 @@ export const StageRailBlockRenderer: React.FC<StageRailBlockRendererProps> = ({
               locale,
               t,
             )}
+            {currentIndex >= 0 && (
+              <span className="ml-2 tabular-nums">{currentIndex + 1}/{stages.length}</span>
+            )}
           </span>
         ) : null}
       </div>
 
       <div className="overflow-x-auto pb-1">
-        <ol className="flex min-w-[680px] items-start" aria-label={title}>
+        <ol className="flex items-start" style={{ minWidth: stages.length * 44 }} aria-label={title}>
           {stages.map((stage, index) => {
             const state =
               currentIndex === index ? 'current' : currentIndex > index ? 'complete' : 'upcoming';
@@ -105,7 +108,7 @@ export const StageRailBlockRenderer: React.FC<StageRailBlockRendererProps> = ({
                 >
                   {state === 'complete' ? '✓' : index + 1}
                 </span>
-                <span className={`mt-2 text-xs font-medium whitespace-nowrap ${classes.text}`}>
+                <span className={`mt-2 text-xs font-medium break-words ${classes.text}`}>
                   {getLocalizedText(stage.label, locale, t)}
                 </span>
               </li>

@@ -1,0 +1,17 @@
+{
+  "description": { "zh-CN": "受保护文件预览", "en-US": "Protected file preview" },
+  "close": { "zh-CN": "关闭", "en-US": "Close" },
+  "download": { "zh-CN": "下载 PDF", "en-US": "Download PDF" },
+  "unavailable": {
+    "zh-CN": "文件预览失败，请刷新后重试。",
+    "en-US": "Unable to preview the file. Refresh and try again."
+  },
+  "denied": {
+    "zh-CN": "当前无权查看此文件，请刷新并核对访问权限。",
+    "en-US": "This file is no longer accessible. Refresh and check your access."
+  },
+  "invalid": {
+    "zh-CN": "未返回完整的 PDF 文件，请刷新后重试。",
+    "en-US": "A complete PDF was not returned. Refresh and try again."
+  }
+}

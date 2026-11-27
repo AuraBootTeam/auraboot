@@ -98,6 +98,27 @@ describe('deployment branding server resolver', () => {
     });
   });
 
+  it('accepts Business after its support and upgrade periods and isolates edition cache entries', async () => {
+    const configPath = await writeBranding();
+    const business = {
+      ...signedEnvironment(configPath),
+      EDITION: 'business',
+      AURABOOT_COMMERCIAL_LICENSE_PATH: join(licenseFixtureRoot, 'license-business.json'),
+      AURABOOT_COMMERCIAL_LICENSE_SIGNATURE_PATH: join(licenseFixtureRoot, 'license-business.sig'),
+      AURABOOT_COMMERCIAL_LICENSE_PUBLIC_KEY_PATH: join(licenseFixtureRoot, 'public-business.pem'),
+      AURABOOT_COMMERCIAL_LICENSE_KEY_ID: 'test-business-2026-01',
+    };
+
+    await expect(resolveDeploymentBranding(business)).resolves.toMatchObject({
+      mode: 'commercial', productName: 'Northstar',
+    });
+    // The same paths and order must not reuse a different edition's verified cache entry.
+    await expect(resolveDeploymentBranding({ ...business, EDITION: 'standard' }))
+      .rejects.toThrow(/edition does not match/);
+    await expect(resolveDeploymentBranding({ ...business, EDITION: 'community' }))
+      .resolves.toMatchObject({ mode: 'community', productName: 'AuraBoot' });
+  });
+
   it('fails closed for signed License tampering and deployment mismatches', async () => {
     const configPath = await writeBranding();
     const directory = await mkdtemp(join(tmpdir(), 'auraboot-license-tampered-'));

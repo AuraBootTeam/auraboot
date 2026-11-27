@@ -22,7 +22,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import static com.auraboot.framework.common.constant.ResponseCode.BadParam;
@@ -121,9 +120,7 @@ public class PermissionMatrixController {
         if (role == null) {
             throw new RootUnCheckedException(BadParam, "Role not found by PID: " + rolePid);
         }
-        dataScopeService.setScope(tenantId, role.getId(),
-            request.resourceCode(), request.actionCode(),
-            request.scopeType(), request.mergeStrategy());
+        matrixService.setRoleScope(tenantId,role.getId(),request);
         return ApiResponse.success();
     }
 
@@ -152,7 +149,6 @@ public class PermissionMatrixController {
      * @param request Body with scopeType (all/dept_and_sub/team/dept/self/none; null clears)
      */
     @PutMapping("/{rolePid}/default-scope")
-    @Transactional
     @Operation(summary = "Set role default data scope")
     public ApiResponse<Void> setDefaultScope(
             @PathVariable String rolePid,
@@ -163,10 +159,7 @@ public class PermissionMatrixController {
             throw new RootUnCheckedException(BadParam, "Role not found by PID: " + rolePid);
         }
         log.info("Setting role default data scope: rolePid={}, scopeType={}", rolePid, request.scopeType());
-        roleService.setDefaultDataScopeType(role.getId(), request.scopeType());
-        if (request.scopeType() != null && !request.scopeType().isBlank()) {
-            matrixService.applyDefaultScopeToCurrentGrants(tenantId, role.getId(), request.scopeType());
-        }
+        matrixService.setDefaultRoleScope(tenantId,role.getId(),request.scopeType());
         return ApiResponse.success();
     }
 

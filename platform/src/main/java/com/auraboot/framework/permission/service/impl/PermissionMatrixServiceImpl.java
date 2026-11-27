@@ -35,7 +35,11 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class PermissionMatrixServiceImpl implements PermissionMatrixService {
+    private final com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
 
+
+    private final com.auraboot.framework.permission.service.RoleAuthorizationAuthoringAccess authoringAccess;
+    private final com.auraboot.framework.rbac.service.RoleService roles;
     private final PermissionService permissionService;
     private final PermissionMapper permissionMapper;
     private final RolePermissionService rolePermissionService;
@@ -69,7 +73,8 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
     @Override
     public PermissionMatrixDTO getMatrixForRole(Long tenantId, Long roleId) {
         List<PermissionDTO> allActive = permissionService.findAllActive();
-        Set<Long> grantedIds = rolePermissionService.getPermissionIdsByRoleId(roleId);
+        Set<Long> grantedIds = permissionService.findRoleConfiguredPermissions(roleId).stream()
+                .map(PermissionDTO::getId).collect(java.util.stream.Collectors.toSet());
 
         // Build a lookup map: "resourceCode:actionCode" -> RoleDataScope
         List<RoleDataScope> scopes = dataScopeService.getScopesByRole(tenantId, roleId);
@@ -88,6 +93,7 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
     @Override
     @Transactional
     public void batchUpdateRolePermissions(Long roleId, List<PermissionGrantRequest> grants) {
+        requireWrite(currentTenant(),roleId);
         if (grants == null || grants.isEmpty()) {
             return;
         }
@@ -118,6 +124,7 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
     @Override
     @Transactional
     public void applyDefaultScopeToCurrentGrants(Long tenantId, Long roleId, String scopeType) {
+        requireWrite(tenantId,roleId);
         Set<Long> grantedIds = rolePermissionService.getPermissionIdsByRoleId(roleId);
         if (grantedIds.isEmpty()) {
             return;
@@ -132,6 +139,46 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
             dataScopeService.setScope(tenantId, roleId, p.getResourceCode(), p.getAction(), scopeType, "MAX");
         }
         log.info("Applied default data scope '{}' to {} current grants: roleId={}", scopeType, granted.size(), roleId);
+    }
+
+    @Override
+    @Transactional
+    public void setRoleScope(Long tenantId, Long roleId, DataScopeUpdateRequest request) {
+        requireWrite(tenantId,roleId);
+        if(request==null || request.resourceCode()==null || request.resourceCode().isBlank()
+                || request.actionCode()==null || request.actionCode().isBlank())
+            throw new RootUnCheckedException(BadParam,"Invalid role action scope");
+        Set<Long> granted=rolePermissionService.getPermissionIdsByRoleId(roleId);
+        boolean mapped=permissionService.findAllActive().stream().anyMatch(permission->
+                granted.contains(permission.getId()) && hasRecordScopeMapping(permission)
+                && (request.resourceCode().equals(permission.getResourceCode()) && request.actionCode().equals(permission.getAction())
+                    || permission.getExtension() != null
+                    && permission.getExtension().get("domainModels") instanceof java.util.Map<?,?> models
+                    && models.get(request.resourceCode()) instanceof java.util.List<?> actions
+                    && actions.contains(request.actionCode())));
+        if(!mapped) throw new RootUnCheckedException(BadParam,"Action scope requires a current mapped role permission");
+        dataScopeService.setScope(tenantId,roleId,request.resourceCode(),request.actionCode(),request.scopeType(),request.mergeStrategy());
+    }
+
+    @Override
+    @Transactional
+    public void setDefaultRoleScope(Long tenantId,Long roleId,String scopeType) {
+        requireWrite(tenantId,roleId);
+        roles.setDefaultDataScopeType(roleId,scopeType);
+        if(scopeType!=null) applyDefaultScopeToCurrentGrants(tenantId,roleId,scopeType);
+    }
+
+    private void requireWrite(Long tenantId, Long roleId) {
+        if(tenantId==null || !Objects.equals(tenantId,currentTenant()))
+            throw new org.springframework.security.access.AccessDeniedException("Role scope belongs to another tenant");
+        authorizationWriteLock.mutate();
+        authoringAccess.requireWrite();
+        authoringAccess.requireTarget(roleId);
+    }
+
+    private Long currentTenant() {
+        return com.auraboot.framework.application.tenant.MetaContext.exists()
+                ?com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId():null;
     }
 
     // ========================================================================

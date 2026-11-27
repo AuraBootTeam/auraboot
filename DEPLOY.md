@@ -112,8 +112,9 @@ is not evidence that the current candidate has been published:
 **Mainland China:** Gitee and Tencent TCR mirrors are deferred. There is no verified
 mainland registry endpoint to substitute here. This configuration defaults to GHCR;
 check access and the availability of all three images for your chosen release tag
-before starting. Current 1.0 readiness evidence does not establish registry
-publication, multi-architecture availability or a complete fresh installation.
+before starting. Registry status (2026-11-14): the three images above are published
+on GHCR and `latest` manifests resolve anonymously; treat `latest` as a convenience
+pointer only — pin a release tag and verify its digest for anything beyond a trial.
 
 Redis / MinIO / monitoring are advanced add-ons — for those, use the source
 `docker-compose.yml` profiles (`--profile cache` / `storage` / `monitoring`). Redis is

@@ -68,7 +68,8 @@ def main():
     executable = private / 'trivy'
     executable.chmod(0o700)
     cache = private / 'cache'
-    cache_input = dataset('trivy-databases-20261105')
+    # New requests use the undated slot; legacy admitted requests stay replayable.
+    cache_input = dataset('trivy-databases') or dataset('trivy-databases-20261105')
     if cache_input:
         cache.mkdir(mode=0o700)
         with tarfile.open(cache_input) as snapshot:

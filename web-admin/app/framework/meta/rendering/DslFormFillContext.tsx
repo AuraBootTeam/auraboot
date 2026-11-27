@@ -1,7 +1,6 @@
 /** Shared draft mutation boundary for every AI form-fill entry. */
 import React, { createContext, useContext, useEffect, useMemo, useRef } from 'react';
-import { useAuraBotSafe } from '~/plugins/core-aurabot/hooks/useAuraBotSafe';
-import { auraBotApi } from '~/plugins/core-aurabot/services/auraBotApi';
+import { getDslFormFillBackend } from './dslFormFillBackend';
 import type { FormFillResult, FormFillTarget, FormFillReview } from './formFill';
 
 export interface DslFormFillApi {
@@ -19,8 +18,7 @@ export function DslFormFillProvider({
   target: FormFillTarget;
   children: React.ReactNode;
 }) {
-  const auraBot = useAuraBotSafe();
-  const register = auraBot?.registerFormFillTarget;
+  const register = getDslFormFillBackend()?.registerTarget;
   const active = useRef<FormFillTarget | null>(target);
   const busy = useRef(false);
   active.current = target;
@@ -57,14 +55,9 @@ export function DslFormFillProvider({
         const reviews: Record<string, FormFillReview> = Object.create(null);
         const seen = new Set<string>();
         try {
-          const conversation = await auraBotApi.ensureConversation('aurabot');
-          await auraBotApi.chatStream(
+          await getDslFormFillBackend()?.extract(
             {
-              sessionId: crypto.randomUUID(),
               message: text,
-              agentCode: 'aurabot',
-              conversationId: conversation.conversationId,
-              clientMsgId: crypto.randomUUID(),
               formFill,
               pageContext: { kind: 'form', modelCode: formFill.modelCode },
             },

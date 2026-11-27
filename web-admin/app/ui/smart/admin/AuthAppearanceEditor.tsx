@@ -17,6 +17,16 @@ const CONTENT_LABELS: Record<AuthContentField, [string, string]> = { badge: ['�
 const CONTROL = 'w-full rounded-control border border-border-strong bg-panel px-3 py-2 text-text focus:outline-none focus:ring-2 focus:ring-accent-weak';
 const BUTTON = 'rounded-control border border-border-strong bg-panel px-3 py-2 text-sm text-text disabled:opacity-50';
 
+/** A failed response carries its reason in `context` — already localized by the server; a string
+ *  on this endpoint and `{ error }` on command endpoints. `message` is only the response-code
+ *  label ("Business error"), which is what the page showed instead of the actual reason. */
+function failureReason(result: { message?: string; context?: unknown }, fallback = ''): string {
+  const nested = result.context as { error?: unknown } | null | undefined;
+  const detail = typeof result.context === 'string' ? result.context
+    : nested && typeof nested === 'object' && typeof nested.error === 'string' ? nested.error : '';
+  return detail.trim() || result.message || fallback;
+}
+
 /** Typed custom block hosted by the administration DSL page. */
 export function AuthAppearanceEditor() {
   const { t, locale } = useI18n();
@@ -31,7 +41,9 @@ export function AuthAppearanceEditor() {
       '$i18n:auth.appearance.releaseNotFound': label('releaseNotFound', '未找到所选历史发布版本，请重新加载。', 'The selected release was not found. Reload the history.'),
       '$i18n:auth.appearance.assetMissing': label('assetMissing', '所选图片不存在，请重新上传后发布。', 'An image is missing. Upload it again before publishing.'),
     };
-    return messages[message] ?? (message.startsWith('$i18n:') ? label('invalidConfig', '配置尚不完整，请检查文案和图片。', 'Configuration is incomplete. Check the copy and images.') : message);
+    // The server resolves these keys itself; the bare-key form is what it returns when it cannot.
+    const key = message.startsWith('$i18n:') ? message : message.startsWith('auth.appearance.') ? `$i18n:${message}` : '';
+    return (key && messages[key]) || (key ? label('invalidConfig', '配置尚不完整，请检查文案和图片。', 'Configuration is incomplete. Check the copy and images.') : message);
   };
   const branding = useRootLoaderData()?.branding ?? COMMUNITY_BRANDING;
   const [view, setView] = useState<AppearanceView>();
@@ -56,7 +68,7 @@ export function AuthAppearanceEditor() {
     setLoading(true); setError('');
     try {
       const result = await get<AppearanceView>('/api/admin/auth-appearance');
-      if (!ResultHelper.isSuccess(result) || !result.data) throw new Error(result.message);
+      if (!ResultHelper.isSuccess(result) || !result.data) throw new Error(failureReason(result));
       accept(result.data);
     } catch (cause) { setError(explainError(cause)); }
     finally { setLoading(false); }
@@ -75,7 +87,7 @@ export function AuthAppearanceEditor() {
       const result = operation === 'save'
         ? await put<AppearanceView>('/api/admin/auth-appearance/draft', { expectedVersion: view.version, appearance })
         : await post<AppearanceView>(`/api/admin/auth-appearance/${operation}`, { expectedVersion: view.version, ...(operation === 'rollback' ? { targetVersion: Number(rollbackVersion) } : {}) });
-      if (!ResultHelper.isSuccess(result) || !result.data) throw new Error(result.message);
+      if (!ResultHelper.isSuccess(result) || !result.data) throw new Error(failureReason(result));
       accept(result.data);
       setNotice(label(operation === 'save' ? 'saved' : 'released', operation === 'save' ? '草稿已保存，线上页面未改变。' : '已发布。新打开的认证页面将使用此版本。', operation === 'save' ? 'Draft saved. The live appearance has not changed.' : 'Published. Newly opened authentication pages will use this version.'));
       setConfirm(null);
@@ -99,9 +111,9 @@ export function AuthAppearanceEditor() {
       const body = new FormData(); body.append('file', file);
       const response = await fetch('/api/admin/auth-appearance/assets', { method: 'POST', body });
       const result = await response.json();
-      if (!response.ok || !ResultHelper.isSuccess(result) || typeof result.data?.url !== 'string') throw new Error(result.message || label('uploadFailed', '图片上传失败。', 'Image upload failed.'));
+      if (!response.ok || !ResultHelper.isSuccess(result) || typeof result.data?.url !== 'string') throw new Error(failureReason(result, label('uploadFailed', '图片上传失败。', 'Image upload failed.')));
       change({ ...draft, images: { ...(draft.images ?? { mode: 'none' }), [key]: result.data.url } });
-    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    } catch (cause) { setError(explainError(cause)); }
     finally { setBusy(false); }
   };
   const theme = draft.theme ?? {};

@@ -2,7 +2,7 @@ import React from 'react';
 import type {
   TabContainerConfig,
   HierarchySelection,
-} from '~/plugins/core-designer/components/studio/domain/schema/layout-hierarchy';
+} from '~/framework/smart/schema/layout-hierarchy';
 
 interface HierarchyOutlineProps {
   hierarchy: TabContainerConfig;

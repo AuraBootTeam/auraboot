@@ -8,8 +8,8 @@
  * @since 3.2.0
  */
 
-import type { TabContainerConfig } from '~/plugins/core-designer/components/studio/domain/schema/layout-hierarchy';
-import type { LinkageRule } from '~/plugins/core-designer/components/studio/workbench/panels/linkage/types';
+import type { TabContainerConfig } from '~/framework/smart/schema/layout-hierarchy';
+import type { LinkageRule } from '~/framework/meta/schemas/linkage-types';
 
 export interface Position {
   row: number;
@@ -65,7 +65,7 @@ export interface Block {
 /**
  * Canvas-internal schema — represents the complete page structure in the designer workbench.
  *
- * NOTE: This is the designer-internal model. The canonical runtime PageSchema
+ * NOTE: This is the designer-internal model. The canonical runtime UnifiedPageSchema
  * lives in domain/dsl/types.ts.
  *
  * @alias CanvasSchema kept for backwards compat within workbench/

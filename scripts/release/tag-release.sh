@@ -2,8 +2,8 @@
 #
 # Gated OSS release tag entrypoint.
 #
-# A release tag is the irreversible boundary that publishes release notes and
-# triggers image builds. Run the real-model digital-employee capability gate on
+# A release tag records source identity. Publishing notes and images requires
+# a separately authorized workflow_dispatch with publish=true. Run the real-model digital-employee capability gate on
 # the exact clean main commit immediately before creating that tag.
 #
 # Usage:
@@ -66,7 +66,7 @@ echo "[release-tag] created $tag at $head_sha"
 
 if [[ "$PUSH" == "1" ]]; then
   git -C "$ROOT" push origin "$tag"
-  echo "[release-tag] pushed $tag; release-notes and image workflows are now triggered"
+  echo "[release-tag] pushed $tag; publication requires a separately authorized manual opt-in"
 else
   echo "[release-tag] local tag only. Push after inspection with: git push origin $tag"
 fi

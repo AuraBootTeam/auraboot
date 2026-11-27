@@ -46,32 +46,7 @@ export type {
   ThemeConfig,
 } from './types';
 
-import type {
-  CardImageViewport,
-  LocalizedText,
-  BusinessActivityDataSource,
-  BusinessActivityRecordMapping,
-  BusinessActivityDetailField,
-  BusinessActivitySnapshotField,
-  LayoutConfig,
-  BlockLayoutConfig,
-  FieldConfig,
-  ButtonConfig,
-  TableConfig,
-  ColumnConfig,
-  ListTabConfig,
-  DetailTabConfig,
-  SubTableConfig,
-  MonthlyGridConfig,
-  DefaultSortConfig,
-  SummaryConfig,
-  DataSourceConfig,
-  HandlerConfig,
-  EventConfig,
-  ThemeConfig,
-  PageDataSourceConfig,
-} from './types';
-import type { PageExtensionConfig as RuntimePageExtensionConfig } from './types';
+import type { CardImageViewport, LocalizedText, BusinessActivityDataSource, BusinessActivityRecordMapping, BusinessActivityDetailField, BusinessActivitySnapshotField, LayoutConfig, BlockLayoutConfig, FieldConfig, ButtonConfig, TableConfig, ColumnConfig, ListTabConfig, DetailTabConfig, SubTableConfig, MonthlyGridConfig, DefaultSortConfig, SummaryConfig, DataSourceConfig, HandlerConfig, EventConfig, ThemeConfig, PageDataSourceConfig, PageExtensionConfig as RuntimePageExtensionConfig } from './types';
 import type { AuthoritativeSourceConfig } from './source-state';
 
 /** Serializable open extension boundary; retain the runtime's legacy any compatibility. */
@@ -80,6 +55,7 @@ export interface PageExtensionConfig {
   workspaceShell?: RuntimePageExtensionConfig['workspaceShell'];
   detailHeaderLayout?: RuntimePageExtensionConfig['detailHeaderLayout'];
   detailBodyOrder?: RuntimePageExtensionConfig['detailBodyOrder'];
+  compactHeaderActions?: RuntimePageExtensionConfig['compactHeaderActions'];
 }
 
 // ---------------------------------------------------------------------------
@@ -120,6 +96,8 @@ export interface StrictBlockConfig {
   previewLimit?: number;
 
   // List tabs
+  /** Optional unified panel around tab navigation and its content. */
+  surface?: 'bare' | 'card';
   tabs?: ListTabConfig[] | DetailTabConfig[];
 
   // Sub-table (master-detail)

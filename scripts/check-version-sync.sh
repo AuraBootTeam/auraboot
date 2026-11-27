@@ -49,9 +49,14 @@ if rg -n "^version\\s*=.*SNAPSHOT|^version=.*SNAPSHOT" "$ROOT/platform" \
   exit 1
 fi
 
-if ! rg -q "version = file\\('../VERSION'\\)\\.text\\.trim\\(\\)" "$ROOT/platform/build.gradle"; then
-  echo "[version-sync] platform/build.gradle must derive its version from ../VERSION" >&2
+if ! rg -q "version = file\\('../VERSION'\\)\\.text\\.trim\\(\\)" "$ROOT/platform/build.gradle" && ! {
+  rg -q "apply from: 'gradle/library-version.gradle'" "$ROOT/platform/build.gradle" &&
+  rg -q "def applicationVersion = file\\('../VERSION'\\)\\.text\\.trim\\(\\)" "$ROOT/platform/gradle/library-version.gradle" &&
+  rg -Fq 'def selectedVersion = previewVersion ?: applicationVersion' "$ROOT/platform/gradle/library-version.gradle" &&
+  rg -q 'version = selectedVersion' "$ROOT/platform/gradle/library-version.gradle"
+}; then
+  echo "[version-sync] Gradle application mode must derive its version from ../VERSION" >&2
   exit 1
 fi
 
-echo "[version-sync] OK — VERSION == platform.version == Gradle artifact version == $v_file"
+echo "[version-sync] OK — VERSION == platform.version == default Gradle application version == $v_file (explicit library mode is independent)"

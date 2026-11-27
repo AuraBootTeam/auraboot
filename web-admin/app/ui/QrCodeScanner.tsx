@@ -100,7 +100,7 @@ export default function QrCodeScanner({ isOpen, onClose, onScan }: QrCodeScanner
         }
       } catch (urlError) {
         // Not a valid URL
-      }
+        console.warn('[QrCodeScanner] previously-silent catch', error);      }
 
       return null;
     }

@@ -70,6 +70,8 @@ import { ActionCancelledError } from '~/framework/meta/runtime/actions/ActionCan
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useDetailModal } from '~/framework/meta/rendering/pages/detail/DetailModalProvider';
+import { useProtectedFilePreview } from '~/framework/meta/rendering/components/ProtectedFilePreviewProvider';
+import FILE_PREVIEW_TEXT from '~/framework/meta/rendering/components/ProtectedFilePreviewProvider.i18n.json';
 import { resolveDetailModalTarget } from '~/framework/meta/rendering/pages/detail/detailModalTarget';
 import {
   downloadWithAuth,
@@ -152,10 +154,7 @@ function resolveTargetExpectedVersion(
  * resolve their row model into `tableName` (resolveRowActionModel), so the
  * default keeps that contract.
  */
-function resolveRecordReadModel(
-  recordReadModel: string | undefined,
-  tableName: string,
-): string {
+function resolveRecordReadModel(recordReadModel: string | undefined, tableName: string): string {
   return toNonBlankString(recordReadModel) || tableName;
 }
 
@@ -194,6 +193,26 @@ function resolveRuntimeTemplate(value: unknown, runtimeContext: Record<string, u
   if (exact) return readPath(runtimeContext, exact[1]);
   return value.replace(/\$\{([^}]+)\}/g, (_match, path) =>
     String(readPath(runtimeContext, path) ?? ''),
+  );
+}
+
+export function resolveCommandOperationType(
+  explicitOperationType: string | undefined,
+  semanticActionText: string,
+  explicitDownload: boolean,
+  targetRecordPid: string | undefined,
+): string | undefined {
+  return (
+    explicitOperationType ||
+    (semanticActionText.includes('delete')
+      ? 'delete'
+      : semanticActionText.includes('create')
+        ? 'create'
+        : semanticActionText.includes('update')
+          ? 'update'
+          : targetRecordPid && !explicitDownload
+            ? 'update'
+            : undefined)
   );
 }
 
@@ -272,8 +291,11 @@ function resolveCommandPayload(
   // cannot turn into undefined fields and reach the command transport.
   const resolve = (value: unknown): unknown => {
     if (Array.isArray(value)) return value.map(resolve);
-    if (value && typeof value === 'object' &&
-        [Object.prototype, null].includes(Object.getPrototypeOf(value))) {
+    if (
+      value &&
+      typeof value === 'object' &&
+      [Object.prototype, null].includes(Object.getPrototypeOf(value))
+    ) {
       return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, resolve(item)]));
     }
     return typeof value === 'string' && value.includes('${')
@@ -283,10 +305,16 @@ function resolveCommandPayload(
   try {
     return resolve(configured) as Record<string, any>;
   } catch {
-    throw new Error(getLocalizedText({
-      'zh-CN': '无法解析当前操作的输入，请检查选择后重试。',
-      en: 'Unable to resolve the action inputs. Check your selections and try again.',
-    }, String(runtimeContext.locale || 'en-US'), runtimeContext.t as any));
+    throw new Error(
+      getLocalizedText(
+        {
+          'zh-CN': '无法解析当前操作的输入，请检查选择后重试。',
+          en: 'Unable to resolve the action inputs. Check your selections and try again.',
+        },
+        String(runtimeContext.locale || 'en-US'),
+        runtimeContext.t as any,
+      ),
+    );
   }
 }
 
@@ -500,6 +528,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
   );
 
   const openDetailModal = useDetailModal();
+  const openFilePreview = useProtectedFilePreview();
   const promptLifecycle = useRef<AbortController | null>(null);
   useEffect(() => {
     const controller = new AbortController();
@@ -780,7 +809,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
 
   const handleAction = useCallback(
     async (button: ButtonConfig, record?: Record<string, any>) => {
-      captureTriggerFocus();
+      const returnFocusTo = captureTriggerFocus();
       const normalizedButton = normalizeButtonProps(button);
       const actionDef = normalizeAction(normalizedButton);
       const confirmVariant =
@@ -814,6 +843,18 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
 
         switch (actionDef.type) {
           case 'command': {
+            if (
+              actionDef.preview &&
+              (actionDef.download ||
+                !openFilePreview ||
+                actionDef.preview.contentType !== 'application/pdf' ||
+                typeof actionDef.preview.fileIdField !== 'string' ||
+                !/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/.test(
+                  actionDef.preview.fileIdField,
+                ) ||
+                actionDef.preview.fileIdField.length > 200)
+            )
+              throw new Error(getLocalizedText(FILE_PREVIEW_TEXT.unavailable, locale));
             const offboardingAction = toNonBlankString(
               (actionDef as any).offboardingAction ?? (normalizedButton as any).offboardingAction,
             );
@@ -1007,17 +1048,12 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             const semanticActionText =
               `${btnLabel ?? ''} ${btnCode ?? ''} ${explicitCommand}`.toLowerCase();
             const explicitOperationType = toNonBlankString((actionDef as any).operationType);
-            const operationType =
-              explicitOperationType ||
-              (semanticActionText.includes('delete')
-                ? 'delete'
-                : semanticActionText.includes('create')
-                  ? 'create'
-                  : semanticActionText.includes('update')
-                    ? 'update'
-                    : targetRecordPid
-                      ? 'update'
-                      : undefined);
+            const operationType = resolveCommandOperationType(
+              explicitOperationType,
+              semanticActionText,
+              Boolean(explicitCommand && (actionDef.download || actionDef.preview)),
+              targetRecordPid,
+            );
             const conventionOperationType = operationType?.toLowerCase();
             const refreshIds = resolveCommandRefreshIds(
               actionDef as unknown as Record<string, unknown>,
@@ -1099,14 +1135,31 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               );
             }
             surfaceTemporaryPassword(commandResult);
-            const downloadedInline = downloadBase64CommandArtifact(commandResult);
-            if (!downloadedInline && !(commandResult as any)?.__asyncFailed && actionDef.download) {
-              const downloadUrl = resolveCommandFileDownload(commandResult, actionDef.download);
-              if (!downloadUrl)
-                throw new Error(
-                  'Command download result is missing the configured file identifier',
-                );
-              await downloadWithAuth(downloadUrl);
+            let previewUrl: string | undefined;
+            if (actionDef.preview && !(commandResult as any)?.__asyncFailed) {
+              previewUrl = resolveCommandFileDownload(commandResult, actionDef.preview);
+              if (!previewUrl) throw new Error(getLocalizedText(FILE_PREVIEW_TEXT.invalid, locale));
+            } else {
+              const downloadedInline = downloadBase64CommandArtifact(commandResult);
+              if (
+                !downloadedInline &&
+                !(commandResult as any)?.__asyncFailed &&
+                actionDef.download
+              ) {
+                const downloadUrl = resolveCommandFileDownload(commandResult, actionDef.download);
+                if (!downloadUrl)
+                  throw new Error(
+                    t(
+                      'command.download.fileUnavailable',
+                      undefined,
+                      'The record does not provide an accessible file. Ask an administrator to check access.',
+                    ),
+                  );
+                await downloadWithAuth(downloadUrl, {
+                  requireAttachment: true,
+                  requireNonEmpty: true,
+                });
+              }
             }
             if ((commandResult as any)?.__asyncFailed) {
               if (context.loadData) {
@@ -1123,7 +1176,19 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             if (refreshIds && dataSourceManager?.reload) {
               await dataSourceManager.reload(refreshIds);
             }
-            if (!context.loadData && !(refreshIds && dataSourceManager?.reload)) {
+            if (previewUrl && openFilePreview && !actionScope?.aborted) {
+              await openFilePreview({
+                url: previewUrl,
+                contentType: 'application/pdf',
+                signal: actionScope,
+                returnFocusTo,
+              });
+            }
+            if (
+              !actionDef.preview &&
+              !context.loadData &&
+              !(refreshIds && dataSourceManager?.reload)
+            ) {
               navigate(`/p/${tableName}`);
             }
             if (promptUpload && !promptUploadUsesPanelFeedback) {
@@ -1428,7 +1493,8 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                   (freshContext as any).fetchResult = fr;
                   const contextWithRecord = { ...freshContext, record, row: record };
                   await flowRunner.run(actionDef.steps, contextWithRecord as any);
-                  if (context.loadData) await context.loadData({ filters: context.filters });
+                  if (actionDef.refresh !== false && context.loadData)
+                    await context.loadData({ filters: context.filters });
                   return;
                 }
               }
@@ -1455,7 +1521,8 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                   });
                 }
               }
-              if (context.loadData) await context.loadData({ filters: context.filters });
+              if (actionDef.refresh !== false && context.loadData)
+                await context.loadData({ filters: context.filters });
             }
             return;
           }
@@ -1467,8 +1534,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             // (plugins#771). Surface the misconfiguration loudly instead:
             // always log with the page identifier; throw in development so the
             // catch block turns it into a visible error surface.
-            const supportedTypes =
-              'command, navigate, state_transition, builtin, workflow, flow';
+            const supportedTypes = 'command, navigate, state_transition, builtin, workflow, flow';
             const detail =
               `Unknown action.type "${actionDef.type}" on button "${normalizedButton.code}" ` +
               `(page: ${tableName}). Supported types: ${supportedTypes}. ` +
@@ -1517,6 +1583,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       surfaceTemporaryPassword,
       captureTriggerFocus,
       openDetailModal,
+      openFilePreview,
     ],
   );
 

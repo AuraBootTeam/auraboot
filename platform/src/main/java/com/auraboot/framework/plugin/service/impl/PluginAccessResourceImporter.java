@@ -66,23 +66,35 @@ final class PluginAccessResourceImporter {
 
     private void captureImportSnapshot(PluginResource resource, Object manifestDto) { captureImportSnapshotOperation.execute(resource,manifestDto); }
 
-    void reconcileRolePermissionBindings(PluginManifestExtended manifest, Long tenantId){
+    void reconcileRolePermissionBindings(PluginManifestExtended manifest, Long tenantId) {
+        reconcileRolePermissionBindings(manifest, tenantId, null, null, java.util.Set.of());
+    }
+
+    void reconcileRolePermissionBindings(PluginManifestExtended manifest, Long tenantId,
+                                        String pluginPid, String importId, java.util.Set<String> createdRolePids) {
         if (manifest.getRoles() == null || manifest.getRoles().isEmpty()) {
             return;
         }
-        // Strict fail-closed: after model publication every declared role permission must
-        // resolve and bind. Every role is still attempted so one broken declaration does
+        // After publication every declaration must resolve. Only roles created by this
+        // import may receive initial bindings; existing roles retain administrator choices.
+        // Every role is attempted so one broken declaration does
         // not hide the others, then the import fails with the full list (the caller's
         // import transaction rolls the plugin back). The previous per-role warn+skip here
         // mirrored updateRolePermissions' lenience and let bad compositions silently
         // degrade roles until they surfaced as missing-access findings rounds later.
+        Map<String, String> rolePids = createdRolePids.isEmpty() ? Map.of()
+                : roleService.findByTenantId(tenantId).stream().collect(Collectors.toMap(Role::getCode, Role::getPid));
         List<String> failures = new ArrayList<>();
         for (RoleDefinitionDTO role : manifest.getRoles()) {
             if (role == null || !role.isValid()) {
                 continue;
             }
             try {
-                resourceImporter.reconcileRolePermissions(role, tenantId);
+                if (rolePids.get(role.getCode()) == null || !createdRolePids.contains(rolePids.get(role.getCode()))) {
+                    resourceImporter.reconcileRolePermissions(role, tenantId);
+                } else {
+                    resourceImporter.reconcileImportedRolePermissions(role, tenantId, pluginPid, importId);
+                }
             } catch (Exception e) {
                 failures.add("role '" + role.getCode() + "': " + e.getMessage());
             }
@@ -206,7 +218,7 @@ final class PluginAccessResourceImporter {
                 captureImportSnapshot(resource, role);
                 saveOrUpdatePluginResource(resource, tenantId);
                 result.incrementResourceCount(ResourceType.ROLE, resource.getActionEnum());
-                if (resource.getResourcePid() != null) {
+                if (resource.getActionEnum() == ResourceAction.CREATE && resource.getResourcePid() != null) {
                     result.addCreatedResource(ResourceType.ROLE, resource.getResourcePid());
                 }
             }
@@ -221,6 +233,8 @@ final class PluginAccessResourceImporter {
     void importMenus(PluginManifestExtended manifest, ImportRequest request,
                              ImportExecuteResult result, String pluginPid, String importId, Long tenantId){
         if (manifest.getMenus() == null) return;
+
+        ensureMenuReferencedPermissions(manifest, pluginPid, importId, tenantId);
 
         // Clear menu code→id map before processing this batch
         if (resourceImporter instanceof PluginResourceImporterImpl impl) {
@@ -257,6 +271,51 @@ final class PluginAccessResourceImporter {
 
         // Auto-generate menu i18n records from name:zh-CN / name:en fields
         generateMenuI18nRecords(sorted, tenantId);
+    }
+
+    /**
+     * Menus may reference permission codes the target tenant has never seen — a fan-out
+     * into a fresh school tenant where the plugin declares the code in menus.json but not
+     * in permissions.json used to abort at preview (S-REF-MENU-PERMISSION) and, when the
+     * import did proceed, left the menu 403-ing at runtime because the code resolved to
+     * nothing. Create any missing code here, before menu rows are written, so an import
+     * is self-contained. Existing codes are never touched (SKIP strategy: only the
+     * create branch runs), and codes this creates are bound to tenant_admin exactly like
+     * every other freshly created permission declaration.
+     */
+    void ensureMenuReferencedPermissions(PluginManifestExtended manifest, String pluginPid,
+                                         String importId, Long tenantId) {
+        Set<String> referenced = new LinkedHashSet<>();
+        for (MenuDefinitionDTO menu : manifest.getMenus()) {
+            if (menu != null && menu.getPermissionCode() != null && !menu.getPermissionCode().isBlank()) {
+                referenced.add(menu.getPermissionCode());
+            }
+        }
+        if (referenced.isEmpty()) return;
+
+        List<PluginResource> createdPermissions = new ArrayList<>();
+        for (String code : referenced) {
+            PermissionDTO existing = null;
+            try {
+                existing = permissionService.findByTenantIdAndCode(tenantId, code);
+            } catch (Exception e) {
+                log.debug("Menu permission lookup failed, treating as missing: code={}, reason={}",
+                        logSafe(code), logSafe(e.toString()));
+            }
+            if (existing != null) continue;
+
+            log.info("Menu references permission '{}' absent from tenant {} — creating it during import",
+                    logSafe(code), tenantId);
+            PluginResource created = resourceImporter.importPermission(
+                    PermissionDefinitionDTO.builder().code(code).build(),
+                    pluginPid, importId, tenantId, ImportRequest.ConflictStrategy.SKIP);
+            if (created != null && created.getActionEnum() == ResourceAction.CREATE) {
+                createdPermissions.add(created);
+            }
+        }
+        if (!createdPermissions.isEmpty()) {
+            bindCreatedPermissionsToTenantAdmin(createdPermissions, tenantId);
+        }
     }
 
     List<MenuDefinitionDTO> topologicalSortMenus(List<MenuDefinitionDTO> menus){

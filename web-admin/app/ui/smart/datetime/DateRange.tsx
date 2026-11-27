@@ -228,25 +228,7 @@ export const DateRange = forwardRef<HTMLDivElement, DateRangeProps>(
         inline={inline}
         error={meta.showError ? errorText : undefined}
       >
-        <FieldControl
-          inline={inline}
-          rightSlot={
-            clearable && hasValue && !disabledValue ? (
-              <FieldActionGroup>
-                <FieldActionButton type="button" onClick={handleClear} iconOnly>
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </FieldActionButton>
-              </FieldActionGroup>
-            ) : undefined
-          }
-        >
+        <FieldControl inline={inline}>
           <div
             ref={ref}
             className={clsx('flex w-full items-center gap-2', className)}
@@ -297,6 +279,20 @@ export const DateRange = forwardRef<HTMLDivElement, DateRangeProps>(
                 'min-w-0 flex-1',
               )}
             />
+            {clearable && hasValue && !disabledValue && (
+              <FieldActionGroup>
+                <FieldActionButton
+                  type="button"
+                  onClick={handleClear}
+                  aria-label={st({ 'zh-CN': '清除日期范围', 'en-US': 'Clear date range' })}
+                  iconOnly
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </FieldActionButton>
+              </FieldActionGroup>
+            )}
           </div>
         </FieldControl>
       </FieldBase>

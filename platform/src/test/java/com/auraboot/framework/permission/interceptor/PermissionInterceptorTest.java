@@ -63,6 +63,27 @@ class PermissionInterceptorTest {
         MetaContext.clear();
     }
 
+    @Test void publishedDomainCommandDefersFunctionAuthorizationToTheSharedApplicationBoundary() throws Exception {
+        authenticate(7L); MetaContext.setContext(100L,7L,"actor","actor");
+        var definitions=mock(com.auraboot.framework.meta.mapper.CommandDefinitionMapper.class);
+        var policies=mock(com.auraboot.framework.permission.service.impl.PermissionSnapshotCache.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(interceptor,"commandDefinitions",definitions);
+        org.springframework.test.util.ReflectionTestUtils.setField(interceptor,"domainPolicies",policies);
+        when(request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE)).thenReturn(Map.of("commandCode","example:read"));
+        var command=new com.auraboot.framework.meta.entity.CommandDefinition();command.setCode("example:read");
+        command.setExecutionConfig("{\"permissions\":[\"example.cap.read\"]}");
+        when(definitions.findCurrentByCode("example:read")).thenReturn(command);
+        var permission=new com.auraboot.framework.permission.entity.Permission();permission.setResourceType("operation");permission.setAction("read");
+        permission.setExtension(Map.of("domainModels",Map.of("example",List.of("read"))));
+        when(policies.resolvePermissionDefinition(100L,"example.cap.read")).thenReturn(permission);
+        var controller=new com.auraboot.framework.meta.controller.config.CommandController(null,null,null,null);
+        var method=controller.getClass().getMethod("execute",String.class,com.auraboot.framework.meta.dto.CommandExecuteRequest.class);
+        assertThat(interceptor.preHandle(request,response,new HandlerMethod(controller,method))).isTrue();
+        verifyNoInteractions(userPermissionService);
+        command.setExecutionConfig("{\"permissions\":[\"example.cap.read\",\"old.execute\"]}");
+        assertThatThrownBy(()->interceptor.preHandle(request,response,new HandlerMethod(controller,method))).isInstanceOf(AccessDeniedException.class);
+    }
+
     @Test
     void dashboardVersionHandlersKeepReadWriteAndPublicSharingIndependent() throws Exception {
         authenticate(7L);

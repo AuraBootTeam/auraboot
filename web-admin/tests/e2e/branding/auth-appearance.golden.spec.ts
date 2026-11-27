@@ -45,7 +45,7 @@ test('menu → draft → preview → publish → anonymous SSR → rollback', as
   const baseline = await publish(page);
   await page.getByRole('combobox', { name: 'Headline display mode', exact: true }).selectOption('hidden');
   await page.getByRole('combobox', { name: 'Highlighted text display mode', exact: true }).selectOption('hidden');
-  await page.getByRole('combobox', { name: 'Background effect', exact: true }).selectOption('beams');
+  await page.getByRole('combobox', { name: /^Background effect(?: |$)/ }).selectOption('beams');
   const saved = await save(page);
   expect(saved.publishedVersion).toBe(baseline.publishedVersion);
   await page.reload();
@@ -54,9 +54,9 @@ test('menu → draft → preview → publish → anonymous SSR → rollback', as
   await expect(preview.locator('[data-auth-template]')).toHaveAttribute('data-auth-template', 'split');
   await expect(preview.locator('.auth-brand-headline')).toHaveCount(0);
   await expect(preview.locator('.auth-fx-beams span').first()).toBeVisible();
-  await page.getByRole('combobox', { name: 'Background effect', exact: true }).selectOption('aurora');
+  await page.getByRole('combobox', { name: /^Background effect(?: |$)/ }).selectOption('aurora');
   await expect(preview.locator('.auth-fx-aurora span').first()).toBeVisible();
-  await page.getByRole('combobox', { name: 'Background effect', exact: true }).selectOption('beams');
+  await page.getByRole('combobox', { name: /^Background effect(?: |$)/ }).selectOption('beams');
   await save(page);
 
   const anonymous = await browser.newContext({ baseURL: requireRuntimeUrl('base'), storageState: { cookies: [], origins: [] }, locale: 'en-US' });

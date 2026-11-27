@@ -1,5 +1,5 @@
 import { createRef } from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { renderDetailPageView } from '../renderDetailPageView';
@@ -73,6 +73,20 @@ describe('actual detail presentation body', () => {
     expect(screen.getByRole('button', { name: 'Export PDF' })).toBeInTheDocument();
     expect(screen.getByTestId('ab:detail:case:container')).toHaveStyle({ minHeight: 0 });
   });
+  it.each([undefined, false])('uses the standard utility menu unless explicitly overridden (%s)', (override) => {
+    const view = args(null);
+    view.schema = { ...view.schema, extension: { showReport: false, compactHeaderActions: override } };
+    render(<MemoryRouter>{renderDetailPageView(view)}</MemoryRouter>);
+    const menu = screen.queryByText('More actions');
+    if (override === false) {
+      expect(menu).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Print' })).toBeInTheDocument();
+    } else {
+      expect(menu?.closest('details')).not.toHaveAttribute('open');
+      expect(menu?.closest('details')).toContainElement(screen.getByText('Print'));
+    }
+  });
+
   it('keeps the normal detail heading and reads the same actual-height variable for its minimum height', () => {
     render(<MemoryRouter>{renderDetailPageView(args(null))}</MemoryRouter>);
     expect(screen.getByRole('heading', { name: 'Actual event subject' })).toBeInTheDocument();
@@ -80,4 +94,103 @@ describe('actual detail presentation body', () => {
       minHeight: 'calc(100vh - var(--workspace-header-height, 64px))',
     });
   });
+});
+
+describe('detail permission recovery', () => {
+  it.each([
+    ['en', 'Go to home'],
+    ['zh-CN', '返回首页'],
+  ])('returns denied deep links to an accessible home in %s', (locale, label) => {
+    render(
+      <MemoryRouter>
+        {renderDetailPageView({
+          ...args(null),
+          locale,
+          recordError: 'Forbidden',
+          recordAccessDenied: true,
+        })}
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link', { name: label })).toHaveAttribute('href', '/home');
+    expect(screen.queryByText('Actual event subject')).not.toBeInTheDocument();
+  });
+
+  it('keeps non-permission errors on the original model list', () => {
+    render(
+      <MemoryRouter>
+        {renderDetailPageView({ ...args(null), recordError: 'Not found', recordNotFound: true })}
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/p/case');
+  });
+
+  it('closes a denied modal without navigating its host', () => {
+    const onClose = vi.fn();
+    render(
+      <MemoryRouter>
+        {renderDetailPageView({
+          ...args({ mode: 'modal', footerTarget: null, onClose }),
+          closeLabel: 'Close',
+          recordError: 'Forbidden',
+          recordAccessDenied: true,
+        })}
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+});
+
+describe('detail header business status', () => {
+  it('does not display header values retained for a different record', () => {
+    render(<MemoryRouter>{renderDetailPageView({
+      ...args(null), recordData: { pid: 'current', subject: 'Current record' },
+      runtime: { getContext: () => ({ form: { pid: 'previous', subject: 'Previous record' } }) } as any,
+    } as Parameters<typeof renderDetailPageView>[0])}</MemoryRouter>);
+    expect(screen.getByRole('heading', { name: 'Current record', exact: true })).toBeInTheDocument();
+    expect(screen.queryByText('Previous record')).not.toBeInTheDocument();
+  });
+
+  it('reflects refreshed form header facts without replacing the persisted record or drafts', () => {
+    const base = args(null);
+    const persisted = { subject: 'Original title', progress: 'ready', deadline_display: 'Original cutoff' };
+    let form: Record<string, unknown> = {};
+    const renderView = () => <MemoryRouter>{renderDetailPageView({
+      ...base,
+      schema: { ...base.schema, extension: { ...base.schema.extension,
+        headerStatusField: 'progress', headerStatusDictCode: 'business_status', headerStatusTones: {ready:'success',collecting:'warning'}, headerSubtitleFields: ['deadline'], headerFacts: [{field:'buyerName',label:'Buyer'}],
+      } },
+      recordData: persisted,
+      runtime: { getContext: () => ({ form }) } as any,
+      enrichField: (field: any) => field,
+      getDictItems: () => [{ value: 'ready', label: 'All replied' }, { value: 'collecting', label: 'Awaiting reply' }],
+    } as Parameters<typeof renderDetailPageView>[0])}</MemoryRouter>;
+    const view = render(renderView());
+    expect(screen.getByText('All replied')).toHaveClass('text-status-green');
+    form = { subject: 'Updated title', buyerName: 'Confirmed buyer', progress: 'collecting', deadline_display: 'Updated cutoff', rows: [{ quantity: '99' }] };
+    view.rerender(renderView());
+    expect(screen.getByRole('heading', { name: 'Updated title', exact: true })).toBeInTheDocument();
+    expect(screen.getByText('Awaiting reply')).toHaveClass('text-status-amber');
+    expect(screen.getByText('Updated cutoff')).toBeInTheDocument();
+    expect(screen.getByTestId('detail-header-facts')).toHaveTextContent('Confirmed buyer');
+    expect(persisted.progress).toBe('ready');
+    expect(form.rows).toEqual([{ quantity: '99' }]);
+  });
+
+  it.each([['business_status', 'business_status'], [undefined, 'native_status']])(
+    'uses the configured header dictionary %s while retaining the field default', (override, expected) => {
+      const base = args(null);
+      const getDictItems = vi.fn(() => [{ value: 'ready', label: 'All suppliers replied' }]);
+      render(<MemoryRouter>{renderDetailPageView({
+        ...base,
+        schema: { ...base.schema, extension: { ...base.schema.extension, headerStatusField: 'progress', headerStatusDictCode: override } },
+        recordData: { subject: 'Event', progress: 'ready' },
+        enrichField: (field: any) => ({ ...field, dictCode: 'native_status' }),
+        getDictItems,
+      } as Parameters<typeof renderDetailPageView>[0])}</MemoryRouter>);
+      expect(getDictItems).toHaveBeenCalledWith(expected);
+      expect(screen.getByText('All suppliers replied')).toBeInTheDocument();
+    },
+  );
 });

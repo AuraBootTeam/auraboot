@@ -125,8 +125,6 @@ describe('OSS plugin config audit', () => {
     before('pcba-manufacturing', 'pcba-solution');
     before('pcba-compliance', 'pcba-solution');
     before('pcba-industry', 'pcba-manufacturing');
-    before('pcba-procurement', 'pcba-warehouse');
-    before('pcba-manufacturing', 'pcba-warehouse');
     before('pcba-manufacturing', 'pcba-compliance');
   });
 
@@ -199,6 +197,7 @@ describe('OSS plugin config audit', () => {
     assert.match(wrapper, /has_help=0/);
     assert.match(wrapper, /if \[ "\$has_help" -eq 1 \]/);
     assert.deepEqual(Object.keys(profiles).sort(), [
+      'bom-quote',
       'core',
       'default',
       'demo',

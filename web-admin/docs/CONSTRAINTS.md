@@ -1,5 +1,7 @@
 # Runtime Platform 约束与最佳实践（中文完整版）
 
+> Path update (2026-11-14): `app/meta/**` → `app/framework/meta/**`; the designer studio moved into the `core-designer` plugin (`app/plugins/core-designer/components/studio/**`). Re-verify exact file names before relying on them.
+
 本文件总结运行期需要遵守的规则、常见风险以及建议方案，以保障组件体系、数据源和表达式在
 设计器与生产环境之间保持一致、稳定。
 
@@ -148,7 +150,7 @@
 
 | 场景 | 问题 | 改进 |
 | --- | --- | --- |
-| 组件直接从 `app/studio/...` import | 绕过 ComponentLoader，无法懒加载和缓存 | 仅在 manifest 中定义，使用 ComponentLoader 渲染 |
+| 组件直接从 `app/plugins/core-designer/components/studio/...` import | 绕过 ComponentLoader，无法懒加载和缓存 | 仅在 manifest 中定义，使用 ComponentLoader 渲染 |
 | 数据源未声明 `dependOn` | 需要在组件层手动 `fetch`，容易遗漏 | 在 schema 中声明依赖，交给 DataSourceManager |
 | Hook 内 `new Function` | 运行期和设计器行为不一致，存在安全隐患 | 改用 `expressionEvaluator.evaluate/bind` |
 | 文档散落在不同目录 | 难以维护、团队难以找到规范 | 统一放在 `docs/ ` |

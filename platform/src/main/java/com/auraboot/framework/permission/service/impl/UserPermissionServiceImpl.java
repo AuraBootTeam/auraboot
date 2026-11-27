@@ -3,6 +3,7 @@ package com.auraboot.framework.permission.service.impl;
 import com.auraboot.framework.application.security.AdminRoleChecker;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.permission.enums.RoleCodes;
+import com.auraboot.framework.permission.service.SnapshotTransactionMemo;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import io.micrometer.observation.annotation.Observed;
 import lombok.RequiredArgsConstructor;
@@ -260,14 +261,29 @@ public class UserPermissionServiceImpl implements UserPermissionService {
             return false;
         }
 
+        if (permissionCode.startsWith("model.") && permissionCode.lastIndexOf('.') > 6) {
+            int separator = permissionCode.lastIndexOf('.');
+            String model = permissionCode.substring(6, separator), action = permissionCode.substring(separator + 1);
+            var candidates = permissionSnapshotCache.hasDomainModel(tenantId, model)
+                    ? permissionSnapshotCache.resourcePermissionCodes(tenantId, model, action) : null;
+            var ordinary = com.auraboot.framework.permission.engine.evaluator.PermissionCodeCandidates.forResourceAction(model, action);
+            if (candidates != null && !candidates.equals(ordinary)) {
+                // Published domain ownership is authoritative: retained model grants are policy references only.
+                return candidates.stream().anyMatch(code -> hasPermission(tenantId, userId, memberId, code));
+            }
+        }
+
         log.debug("Checking permission by explicit member context: tenantId={}, userId={}, memberId={}, permissionCode={}",
                 tenantId, userId, memberId, permissionCode);
 
         if (applicationRuntimePrimaryEnabled && defaultApplicationCode != null
                 && !defaultApplicationCode.isBlank()) {
-            Set<String> roles = roleMapper.findByMemberIdAndTenantId(memberId, tenantId).stream()
-                    .map(com.auraboot.framework.rbac.entity.Role::getCode)
-                    .filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+            // Role codes are read from the database; inside one read-only snapshot transaction they cannot change.
+            Set<String> roles = SnapshotTransactionMemo.get(new RoleCodesKey(tenantId, memberId),
+                    () -> roleMapper.findByMemberIdAndTenantId(memberId, tenantId).stream()
+                            .map(com.auraboot.framework.rbac.entity.Role::getCode)
+                            .filter(Objects::nonNull)
+                            .collect(java.util.stream.Collectors.toUnmodifiableSet()));
             if (applicationRuntimeDefinitionCatalog.permissionsForRoles(
                     tenantId, defaultApplicationCode.trim(), roles).contains(permissionCode)
                     || (roles.contains(RoleCodes.TENANT_ADMIN)
@@ -275,6 +291,15 @@ public class UserPermissionServiceImpl implements UserPermissionService {
                             tenantId, defaultApplicationCode.trim()).contains(permissionCode))) {
                 return true;
             }
+        }
+        var declared = permissionSnapshotCache.resolvePermissionDefinition(tenantId, permissionCode);
+        if (declared != null && declared.getExtension() instanceof Map<?,?> extension
+                && extension.containsKey("retiredDomainOperation")) return false;
+        var alternatives = permissionSnapshotCache.domainPermissionAlternatives(tenantId, permissionCode);
+        if (alternatives != null && alternatives.size() > 1) {
+            var effectiveDomainIds = permissionSnapshotCache.getEffectivePermissionIds(tenantId, userId, memberId);
+            return alternatives.stream().map(code -> permissionSnapshotCache.resolvePermissionId(tenantId, code))
+                    .filter(Objects::nonNull).anyMatch(effectiveDomainIds::contains);
         }
         Long permissionId = permissionSnapshotCache.resolvePermissionId(tenantId, permissionCode);
         if (permissionId == null) {
@@ -393,4 +418,7 @@ public class UserPermissionServiceImpl implements UserPermissionService {
                 && !defaultApplicationCode.isBlank() && MetaContext.exists()
                 && MetaContext.getCurrentTenantId() != null;
     }
+
+    /** The two inputs the member's role-code lookup depends on. */
+    private record RoleCodesKey(Long tenantId, Long memberId) {}
 }

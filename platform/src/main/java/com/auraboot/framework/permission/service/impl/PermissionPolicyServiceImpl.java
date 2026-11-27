@@ -46,6 +46,8 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class PermissionPolicyServiceImpl implements PermissionPolicyService {
+    private final com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
+
 
     private final RolePermissionMapper rolePermissionMapper;
     private final PermissionMapper permissionMapper;
@@ -58,6 +60,17 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
     @Override
+    public ConditionGuard loadedConditionGuard(Permission permission, Long bindingId, String conditionAstJson, String conditionsJson) {
+        if (permission == null || bindingId == null) throw new IllegalArgumentException("Loaded permission binding is required");
+        return new ConditionGuard(bindingId,conditionAstJson,conditionsJson,runtimeValidationError(permission,conditionsJson));
+    }
+
+    @Override
+    @org.springframework.cache.annotation.Cacheable(value = "conditionGuards",
+            cacheManager = "permissionCacheManager",
+            key = "T(com.auraboot.framework.meta.cache.DataAccessCacheEpoch).current() + ':' + "
+                    + "T(com.auraboot.framework.application.tenant.MetaContext).getCurrentTenantId() + ':' + "
+                    + "#memberId + ':' + #permissionCode")
     public List<ConditionGuard> getConditionGuards(Long memberId, String permissionCode) {
         Long tenantId = MetaContext.getCurrentTenantId();
         List<Long> roleIds = resolveRoleIds(memberId, tenantId);
@@ -84,7 +97,7 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
                     row.getConditionsJson(),
                     runtimeValidationError(permission, row.getConditionsJson())));
         }
-        return guards;
+        return List.copyOf(guards);
     }
 
     @Override
@@ -150,6 +163,7 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
     @Override
     @Transactional
     public void setPolicy(Long roleId, Long permissionId, Map<String, Object> policyValues) {
+        authorizationWriteLock.mutate();
         RolePermission rp = findRolePermission(roleId, permissionId);
         if (rp == null) {
             throw new RootUnCheckedException(ResponseCode.BadParam,

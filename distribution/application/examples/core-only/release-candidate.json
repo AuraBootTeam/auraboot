@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "v1.0.0-rc.14",
+  "version": "1.0.0",
+  "phase": "release-candidate",
+  "status": "unpublished",
+  "targetPlatform": "linux-amd64",
+  "licenseFile": "LICENSE.txt",
+  "noticeFile": "NOTICE"
+}

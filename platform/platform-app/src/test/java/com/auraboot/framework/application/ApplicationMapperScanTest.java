@@ -28,6 +28,12 @@ class ApplicationMapperScanTest {
         assertThat(registry.containsBeanDefinition("applicationDefinitionMapper"))
             .as("application release catalog dependency in %s", application.getSimpleName())
             .isTrue();
+        assertThat(registry.containsBeanDefinition("wechatSubscriptionConsentMapper"))
+            .as("verified subscription receiver mapper in %s", application.getSimpleName())
+            .isTrue();
+        assertThat(registry.containsBeanDefinition("wechatSubscriptionObservationMapper"))
+            .as("self-scoped subscription observation mapper in %s", application.getSimpleName())
+            .isTrue();
     }
     @Test
     void sharedTestScanRetainsProductionComponentsAndExcludesUnrelatedTestConfigurations() throws Exception {

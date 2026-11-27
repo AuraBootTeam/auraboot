@@ -1,6 +1,7 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import MissionControl from '../index';
+import { get } from '~/shared/services/http-client';
 import { missionControlText } from '../missionControlText';
 import messages from '../missionControl.i18n.json';
 
@@ -142,7 +143,7 @@ const db = vi.hoisted(() => {
 vi.mock('~/shared/services/http-client', () => ({
   get: vi.fn(async (url: string, params: Record<string, string> = {}) => {
     let records: unknown[] = [];
-    if (url === '/api/dynamic/agent-schedule/list') {
+    if (url === '/api/dynamic/agent_schedule_list/list') {
       records = db.schedules;
     } else if (url === '/api/dynamic/agent-observation/list') {
       records = db.observations;
@@ -171,6 +172,15 @@ function renderPage() {
 }
 
 describe('MissionControl locale contracts', () => {
+  it('reads schedules through the published page key rather than the unqualified model route', async () => {
+    renderPage();
+    await waitFor(() => expect(get).toHaveBeenCalledWith('/api/dynamic/agent_schedule_list/list', {
+      pageSize: '10',
+      filters: JSON.stringify([{ fieldName: 'schedule_status', operator: 'EQ', value: 'active' }]),
+    }));
+    expect(get).not.toHaveBeenCalledWith('/api/dynamic/agent-schedule/list', expect.anything());
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     // Tab anchors write #analytics/#observations into the URL; reset so every

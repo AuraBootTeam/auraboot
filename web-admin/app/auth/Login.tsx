@@ -1,3 +1,4 @@
+import LoginCapabilities from './LoginCapabilities';
 import AuthAppearanceShell from './AuthAppearanceShell';
 import { resolveAuthContent } from '~/config/auth-appearance';
 import {
@@ -34,7 +35,9 @@ import { migrateLegacyBrowserSession } from './legacy-session-migration';
 
 const REMEMBER_KEY = 'auth.remember';
 const REMEMBER_EMAIL_KEY = 'auth.rememberedEmail';
-const REMEMBER_PWD_KEY = 'auth.rememberedPwd';
+// Legacy key of the removed "remember password" feature (base64 is encoding,
+// not encryption). Kept only to clear values already stored in browsers.
+const LEGACY_REMEMBER_PWD_KEY = 'auth.rememberedPwd';
 const CHANNEL_I18N_KEYS: Record<string, string> = {
   EMAIL_PASSWORD: 'auth.channel.emailPassword',
   email_password: 'auth.channel.emailPassword',
@@ -110,9 +113,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         channelOptions = legacyResult.data.map(legacyLoginChannelOption);
       }
     }
-  } catch {
+  } catch (error) {
     // Fall back to email/password when the backend predates channel descriptors.
-  }
+ console.warn('[Login] previously-silent catch', error);  }
 
   return { channelOptions, accessPolicy };
 };
@@ -386,16 +389,6 @@ function completeLogin(user: User, request: Request, redirectTo: string, remembe
   });
 }
 
-// ============================================================
-// Capability rows shown on the left brand panel (desktop only)
-// ============================================================
-interface CapabilityRow {
-  key: string;
-  title: string;
-  desc: string;
-  icon: React.ReactNode;
-}
-
 export default function LoginPage() {
   const rootData = useRootLoaderData();
   const compliance = rootData!.icpCompliance;
@@ -512,16 +505,11 @@ export default function LoginPage() {
     if (savedRemember === 'true') {
       setRemember(true);
       const savedEmail = window.localStorage.getItem(REMEMBER_EMAIL_KEY);
-      const savedPwd = window.localStorage.getItem(REMEMBER_PWD_KEY);
       if (savedEmail) setEmail(savedEmail);
-      if (savedPwd) {
-        try {
-          setPassword(atob(savedPwd));
-        } catch {
-          /* ignore corrupt data */
-        }
-      }
     }
+    // The remembered-password feature was removed; proactively clear the
+    // legacy value so the fix also lands on browsers that still hold it.
+    window.localStorage.removeItem(LEGACY_REMEMBER_PWD_KEY);
   }, []);
 
   useEffect(() => {
@@ -564,88 +552,6 @@ export default function LoginPage() {
     };
   }, [wechatOnly, wechatQrEnabled]);
 
-  const tiles: CapabilityRow[] = [
-    {
-      key: 'designer',
-      title: t('auth.feature.designer', undefined, '拖拽即页面'),
-      desc: t('auth.feature.designer.desc', undefined, '可视化设计器,零代码上线'),
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
-          <rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
-          <rect
-            x="14"
-            y="3"
-            width="7"
-            height="7"
-            rx="1.5"
-            stroke="currentColor"
-            strokeWidth="1.8"
-          />
-          <rect
-            x="3"
-            y="14"
-            width="7"
-            height="7"
-            rx="1.5"
-            stroke="currentColor"
-            strokeWidth="1.8"
-          />
-          <rect
-            x="14"
-            y="14"
-            width="7"
-            height="7"
-            rx="1.5"
-            stroke="currentColor"
-            strokeWidth="1.8"
-          />
-        </svg>
-      ),
-    },
-    {
-      key: 'dataModel',
-      title: t('auth.feature.dataModel', undefined, '建模即数据'),
-      desc: t('auth.feature.dataModel.desc', undefined, '动态模型 + 字段级权限审计'),
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
-          <ellipse cx="12" cy="6" rx="8" ry="3" stroke="currentColor" strokeWidth="1.8" />
-          <path
-            d="M4 6v6c0 1.66 3.58 3 8 3s8-1.34 8-3V6M4 12v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"
-            stroke="currentColor"
-            strokeWidth="1.8"
-          />
-        </svg>
-      ),
-    },
-    {
-      key: 'workflow',
-      title: t('auth.feature.workflow', undefined, '画布即流程'),
-      desc: t('auth.feature.workflow.desc', undefined, 'BPMN 编排 + 规则引擎自动执行'),
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
-          <circle cx="6" cy="6" r="2.5" stroke="currentColor" strokeWidth="1.8" />
-          <circle cx="18" cy="6" r="2.5" stroke="currentColor" strokeWidth="1.8" />
-          <circle cx="12" cy="18" r="2.5" stroke="currentColor" strokeWidth="1.8" />
-          <path d="M8 7l3 9M16 7l-3 9" stroke="currentColor" strokeWidth="1.8" />
-        </svg>
-      ),
-    },
-    {
-      key: 'aiAgent',
-      title: t('auth.feature.aiAgent', undefined, '配置即 AI'),
-      desc: t('auth.feature.aiAgent.desc', undefined, 'Agent 在租户内调用全部业务命令'),
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
-          <path
-            d="M12 3l2 4 4 1-3 3 1 4-4-2-4 2 1-4-3-3 4-1 2-4z"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-    },
-  ];
 
   const oidcOption = socialOptions.find(
     (option) => option.code === 'oidc' || option.providerType?.toLowerCase() === 'oidc',
@@ -917,7 +823,7 @@ export default function LoginPage() {
               {/* Badge */}
               <span className="mt-6 inline-flex items-center gap-2 self-start rounded-full bg-[#eef4e7] px-3.5 py-1.5 text-[13px] font-semibold text-[#35745b] dark:bg-[#35745b]/15 dark:text-[#a4c08b]">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#35745b]" />
-                {branding.loginBadge ?? t('auth.badge', undefined, 'AI 原生 · 企业应用运行时')}
+                {branding.loginBadge ?? t('auth.badge', undefined, '企业应用平台')}
               </span>
 
               {/* Headline with brand-colored highlight word */}
@@ -932,9 +838,9 @@ export default function LoginPage() {
                 </h1>
               ) : (
                 <h1 className="mt-6 max-w-[580px] text-[34px] leading-[1.16] font-extrabold tracking-tight text-balance text-[#213d32] lg:text-[44px] xl:text-[50px] dark:text-white">
-                  {t('auth.headline.pre', undefined, '配置即应用,')}
+                  {t('auth.headline.pre', undefined, '内置成体系，')}
                   <span className="mx-1.5 text-[#35745b] dark:text-[#86a663]">
-                    {t('auth.headline.em', undefined, 'AI 即战力')}
+                    {t('auth.headline.em', undefined, '定制有空间')}
                   </span>
                   {t('auth.headline.post', undefined, '')}
                 </h1>
@@ -946,7 +852,7 @@ export default function LoginPage() {
                   t(
                     'auth.lead',
                     undefined,
-                    '把每个业务能力沉淀为命令——人能点、AI 能调、全端可交付。',
+                    '把工程经验做进底座，让人和 AI 专注业务。',
                   )}
               </p>
 
@@ -987,35 +893,18 @@ export default function LoginPage() {
                         {feature}
                       </div>
                     ))
-                  : tiles.map((tile) => (
-                      <div
-                        key={tile.key}
-                        className="flex items-start gap-4 border-t border-[#e5ebdf] py-5 last:border-b dark:border-gray-800"
-                      >
-                        <div className="flex h-11 w-11 flex-none items-center justify-center rounded-xl bg-[#eef4e7] text-[#35745b] dark:bg-[#35745b]/15 dark:text-[#a4c08b]">
-                          {tile.icon}
-                        </div>
-                        <div>
-                          <div className="text-base font-bold text-[#213d32] dark:text-white">
-                            {tile.title}
-                          </div>
-                          <div className="mt-1 text-[13.5px] text-[#819184] dark:text-gray-500">
-                            {tile.desc}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                  : <LoginCapabilities />}
               </div>
 
               {/* Trust pillars — platform-level positioning only; deployments
                   that ship their own login story replace it entirely. */}
               {!hasDeploymentLoginStory(branding) && (
                 <div className="mt-9 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13.5px] font-medium text-[#52604d] dark:text-gray-400">
-                  <span>{t('auth.pillar.model', undefined, '模型驱动')}</span>
+                  <span>{t('auth.pillar.model', undefined, '数据与页面')}</span>
                   <span className="h-1 w-1 rounded-full bg-[#c9d3c0] dark:bg-gray-600" />
-                  <span>{t('auth.pillar.command', undefined, '命令治理')}</span>
+                  <span>{t('auth.pillar.command', undefined, '规则与流程')}</span>
                   <span className="h-1 w-1 rounded-full bg-[#c9d3c0] dark:bg-gray-600" />
-                  <span>{t('auth.pillar.plugin', undefined, '全端交付')}</span>
+                  <span>{t('auth.pillar.plugin', undefined, '插件与扩展')}</span>
                 </div>
               )}
             </div>
@@ -1064,8 +953,8 @@ async function startWechatQrLogin() {
       window.sessionStorage.setItem(loginOAuthStateKey('wechat_web'), result.data.state);
       window.location.href = result.data.url;
     }
-  } catch {
-    /* ignore */
+  } catch (error) {
+    console.warn('[Login] start wechat QR login failed', error);
   }
 }
 
@@ -1081,8 +970,8 @@ async function startSocialLogin(provider: string) {
       window.sessionStorage.setItem(loginOAuthStateKey(provider), result.data.state);
       window.location.href = result.data.authorizeUrl;
     }
-  } catch {
-    /* ignore */
+  } catch (error) {
+    console.warn(`[Login] start ${provider} login failed`, error);
   }
 }
 
@@ -1147,18 +1036,16 @@ function EmailPasswordForm({
         if (typeof window === 'undefined') return;
         const formData = new FormData(e.currentTarget);
         const trimmedEmail = (formData.get('identifier') as string)?.trim() || '';
-        const pwd = (formData.get('password') as string) || '';
         const isRemember = (e.currentTarget.elements.namedItem('remember') as HTMLInputElement)
           ?.checked;
         if (isRemember && trimmedEmail) {
           window.localStorage.setItem(REMEMBER_KEY, 'true');
           window.localStorage.setItem(REMEMBER_EMAIL_KEY, trimmedEmail);
-          window.localStorage.setItem(REMEMBER_PWD_KEY, btoa(pwd));
         } else {
           window.localStorage.removeItem(REMEMBER_KEY);
           window.localStorage.removeItem(REMEMBER_EMAIL_KEY);
-          window.localStorage.removeItem(REMEMBER_PWD_KEY);
         }
+        window.localStorage.removeItem(LEGACY_REMEMBER_PWD_KEY);
       }}
       className="space-y-5"
     >
@@ -1391,8 +1278,8 @@ function SmsLoginForm({
       if (ResultHelper.isSuccess(result)) {
         setCountdown(60);
       }
-    } catch {
-      /* ignore */
+    } catch (error) {
+      console.warn('[Login] send SMS code failed', error);
     }
     setSending(false);
   }, [mobile]);
@@ -1526,8 +1413,8 @@ function EmailCodeLoginForm({
       if (ResultHelper.isSuccess(result)) {
         setCountdown(60);
       }
-    } catch {
-      /* ignore */
+    } catch (error) {
+      console.warn('[Login] send email code failed', error);
     }
     setSending(false);
   }, [email]);

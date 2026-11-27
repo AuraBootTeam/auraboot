@@ -94,9 +94,12 @@ the original review behavior; pause idle services through their product owner.
 | `application/run-product-release-archive-stage.sh` | 1 | 2026-10-25 | Run the product release archive stage and preserve its release evidence. |
 | `project-delivery-demo.sh` | 1 | 2026-10-25 | Drive the project delivery walkthrough against an explicitly selected runtime. |
 | `application/deployment-target-attestation.it.mjs` | 0 | 2026-09-25 | Verify target reservation and signed deployment observation through the protected executor. |
+| `application/case-role-navigation.mjs` | 0 | 2026-11-13 | Assign only declared case navigation through revision-checked public APIs; never grant business permissions. |
 | `application/run-migrator-image-gate.mjs` | 0 | 2026-09-25 | Run the retained-container Linux migrator lifecycle gate and emit digest-bound evidence. |
 | `db/check-db-matches-snapshot.sh` | 1 | 2026-07-23 | Answer one question about an EXISTING database: does it still match |
 | `db/check-schema-drift.sh` | 1 | 2026-06-22 | Regenerate the schema snapshot from Flyway and diff it against the committed |
+| `db/normalize-schema-dump.py` | 0 | 2026-11-13 | Normalize only volatile PostgreSQL dump metadata; preserve application DDL for schema drift. |
+| `db/check-migration-version-floor.sh` | 0 | 2026-11-13 | Reject stale released migration version/count before schema drift generation. |
 | `db/test-stage-pre1900-core-migrations.sh` | 0 | 2026-09-25 | Verify deterministic staging of immutable pre-#1900 Core migration bytes. |
 | `digital-employee-capability-eval-run.sh` | 0 | 2026-07-25 | Managed capability-eval runner; full/focused/deterministic module-owned catalogs, native receipts and retained runtime. |
 | `oss-e2e-gate-run.sh` | 0 | 2026-07-24 | oss-e2e-gate-run.sh — self-contained, one-command OSS E2E regression gate. |
@@ -144,7 +147,11 @@ the original review behavior; pause idle services through their product owner.
 | `billing-it-run.sh` | 0 | 2026-07-31 | Exact-class billing integration-test runner with non-zero XML evidence checks. |
 | `ci/prepare-library-candidate.sh` | 1 | 2026-10-23 | Prepare native runtime-library candidates under a frozen Jenkins context without application assembly or remote publication. |
 | `ci/verify-oss-native-candidate.sh` | 1 | 2026-11-04 | Build, export and unpack an unpublished native package under frozen CI inputs; retain exact legal notices without publication. |
+| `ci/verify-oss-full-codeql.sh` | 1 | 2026-11-11 | Run the original full Java and JavaScript CodeQL policy on frozen source; retain findings for individual review without suppression. |
+| `command-input-source-contract.mjs` | 1 | 2026-11-11 | Validate the existing command input source contract. |
 | `ci/oss-native-install.py` | Verify cold initialization, old-to-new upgrade, backup recovery and corrupt-candidate rejection using packaged lifecycle and an attempt-owned Linux database. |
+| `ci/verify-public-project-install.py` | Run the public Compose/project initialization and existing three browser journeys in an admitted isolated Linux attempt; preserve volumes and verify stop/reopen. |
+| `ci/verify-public-project-install.test.py` | Validate Compose array/NDJSON service states and reject malformed container entries. |
 | `deploy/prod-deploy.sh` | 0 | 2026-06-18 | Production deploy orchestrator. Runs the schema migration + release ledger |
 | `dev/ci-env-export.sh` | 0 | 2026-05-09 | ci-env-export.sh — env contract for generic CI runners. Defaults are |
 | `dev/ga-e2e-env-export.sh` | 0 | 2026-05-09 | ga-e2e-env-export.sh — env contract for the GA (GitHub Actions) E2E |
@@ -297,7 +304,7 @@ the original review behavior; pause idle services through their product owner.
 | `performance/measure-home.mjs` | 0 | 2026-10-16 | Measure browser home readiness and retain the native performance evidence. |
 | `performance/seed-api.mjs` | 0 | 2026-10-16 | Seed fixtures through the explicit performance API target. |
 | `publish-repos.sh` | 1 | 2026-04-15 |  |
-| `prepare-quickstart-env.py` | 2 | 2026-10-18 | Prepare missing persistent protocol signing material without printing or rotating existing keys. |
+| `prepare-quickstart-env.py` | Prepare missing protocol material without rotation; explicit `--new-local-evaluation` refuses existing state, creates independent private configuration and restores tracked public Docker resource readability. |
 | `quickstart.sh` | 8 | 2026-07-13 | quickstart.sh — turn a freshly-started AuraBoot stack into a usable one. |
 | `release/bump-version.sh` | 1 | 2026-06-18 | Bump the release version. Single source of truth = VERSION at repo root. |
 | `reset-db.sh` | 13 | 2026-06-18 | AuraBoot Database Reset Script |
@@ -425,3 +432,5 @@ isolated bootstrap with no enabled tenant or platform LLM provider. Pin
 button against the original backend and its explicitly enabled local LLM stub;
 this is transport/assembly evidence, not live-provider or generated-DSL quality.
 The base run reports the full-only draft case as not applicable.
+
+| `sync-permission-i18n.mjs` | 1 | 2026-11-14 | Synchronize permission labels from existing registered permissions and locale resources. |

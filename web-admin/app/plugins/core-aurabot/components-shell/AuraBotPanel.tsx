@@ -83,9 +83,9 @@ export function AuraBotPanel() {
         const json = await res.json();
         const records: AgentDefinitionRecord[] = json?.data?.records || [];
         setAgents([AURABOT_DEFAULT, ...normalizeAgentOptions(records)]);
-      } catch {
+      } catch (error) {
         // Silently ignore — keep default AuraBot only
-      }
+ console.warn('[AuraBotPanel] previously-silent catch', error);      }
     };
     loadAgents();
   }, [state.panelState]);
@@ -197,6 +197,7 @@ export function AuraBotPanel() {
             <button
               onClick={() => setHistoryOpen(!historyOpen)}
               className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-white/50 hover:text-gray-600 dark:hover:bg-gray-700/50 dark:hover:text-gray-300"
+              aria-label="Chat History"
               title="Chat History"
               data-testid="aurabot-history-trigger"
             >
@@ -291,6 +292,7 @@ export function AuraBotPanel() {
               navigate('/meta/ai-modeling');
             }}
             className="rounded-lg p-1.5 text-indigo-400 transition-colors hover:bg-white/50 hover:text-indigo-600 dark:hover:bg-gray-700/50 dark:hover:text-indigo-300"
+            aria-label={t('aurabot.ai_modeling_entry', undefined, 'AI Modeling Wizard')}
             title={t('aurabot.ai_modeling_entry', undefined, 'AI Modeling Wizard')}
             data-testid="aurabot-ai-modeling-trigger"
           >

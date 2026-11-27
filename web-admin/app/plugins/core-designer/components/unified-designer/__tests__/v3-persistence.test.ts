@@ -42,7 +42,7 @@ const listDocumentV3: PageSchemaV3 = {
   ],
 };
 
-describe('PageSchema V3 validation', () => {
+describe('UnifiedPageSchema V3 validation', () => {
   it('rejects duplicate block ids and invalid parent-child relationships', () => {
     const result = validatePageSchemaV3({
       ...samplePageSchemaV3,
@@ -63,7 +63,7 @@ describe('PageSchema V3 validation', () => {
     expect(result.errors.map((error) => error.code)).toContain('invalid_child_block');
   });
 
-  it('accepts the composite fixture as a valid Recursive PageSchema V3 document', () => {
+  it('accepts the composite fixture as a valid Recursive UnifiedPageSchema V3 document', () => {
     expect(validatePageSchemaV3(samplePageSchemaV3)).toEqual({ valid: true, errors: [] });
   });
 
@@ -99,7 +99,7 @@ describe('PageSchema V3 validation', () => {
   });
 });
 
-describe('PageSchema V3 repository', () => {
+describe('UnifiedPageSchema V3 repository', () => {
   it('loads V3 documents from backend page DTOs', async () => {
     const api = {
       getPageByPid: vi.fn().mockResolvedValue({

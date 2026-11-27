@@ -4,8 +4,6 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.entity.Field;
 import com.auraboot.framework.meta.entity.payload.FieldFeatureBean;
-import com.auraboot.framework.meta.mapper.MetaFieldMapper;
-import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
 import com.auraboot.framework.meta.service.impl.RollUpFieldRegistry;
 import com.auraboot.framework.meta.service.impl.RollUpSummaryService;
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
@@ -32,8 +30,6 @@ public class RollUpController {
 
     private final RollUpSummaryService rollUpSummaryService;
     private final RollUpFieldRegistry rollUpFieldRegistry;
-    private final MetaFieldMapper metaFieldMapper;
-    private final MetaModelFieldBindingMapper modelFieldBindingMapper;
 
     /**
      * Batch recalculate a roll-up field for all parent records.
@@ -44,7 +40,7 @@ public class RollUpController {
         Long tenantId = MetaContext.getCurrentTenantId();
 
         // Look up the field to find its rollUp config
-        Field field = metaFieldMapper.findCurrentByCode(request.getFieldCode());
+        Field field = rollUpSummaryService.findFieldByCode(request.getFieldCode());
         if (field == null) {
             return ApiResponse.error("Field not found: " + request.getFieldCode());
         }
@@ -59,7 +55,7 @@ public class RollUpController {
         // Determine parent model
         String parentModel = request.getParentModel();
         if (parentModel == null) {
-            parentModel = modelFieldBindingMapper.findModelCodeByFieldId(field.getId());
+            parentModel = rollUpSummaryService.findParentModelCode(field.getId());
         }
         if (parentModel == null) {
             return ApiResponse.error("Cannot determine parent model for field: " + request.getFieldCode());

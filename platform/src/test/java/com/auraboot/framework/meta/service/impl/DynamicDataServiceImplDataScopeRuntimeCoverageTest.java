@@ -104,6 +104,20 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
 
     @Spy private ThreadContextScopes threadContexts = new ThreadContextScopes(List.of());
 
+    @org.mockito.Mock private NativeReadFieldProjection nativeReadFields;
+    @org.junit.jupiter.api.BeforeEach
+    void stubIndependentNativeFieldBoundary() {
+        org.mockito.Mockito.lenient().when(applicationContext.getBean(NativeRecordFieldAuthorization.class))
+                .thenReturn(org.mockito.Mockito.mock(NativeRecordFieldAuthorization.class));
+        org.mockito.Mockito.lenient().when(nativeReadFields.readWithinSnapshot(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any())).thenAnswer(call -> ((java.util.function.Supplier<?>) call.getArgument(1)).get());
+        org.mockito.Mockito.lenient().when(nativeReadFields.project(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyList())).thenAnswer(call -> call.getArgument(1));
+        org.mockito.Mockito.lenient().when(nativeReadFields.publicWriteResult(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyMap(), org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(call -> call.getArgument(1));
+    }
+
     @InjectMocks
     private DynamicDataServiceImpl service;
 
@@ -493,7 +507,7 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
         lenient().when(dataPermissionEngine.getNonWritableFields(TENANT_ID, MODEL_CODE, USER_ID))
                 .thenReturn(java.util.Set.of("quantity"));
         assertThatThrownBy(() -> service.compareAndSet(MODEL_CODE, RECORD_ID, "row_version", 7L,
-                Map.of("quantity", 25))).isInstanceOf(MetaServiceException.class).hasMessageContaining("non-writable");
+                Map.of("quantity", 25))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class).hasMessageContaining("non-writable");
         verify(dynamicDataMapper, never()).updateByQuery(anyString(), anyMap());
     }
 
@@ -819,6 +833,9 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
     }
 
     private void wireModel(ModelDefinition model) {
+        lenient().when(fieldPermissionService.getFieldPermissions(MEMBER_ID,model.getCode()))
+                .thenAnswer(invocation -> FieldPermissionSet.allAllowed(model.getFields().stream()
+                        .map(FieldDefinition::getCode).collect(java.util.stream.Collectors.toSet())));
         lenient().when(metadataService.getDefinitionByCode(model.getCode())).thenReturn(model);
         lenient().when(metadataService.getModelDefinition(model.getCode())).thenReturn(Optional.of(model));
         lenient().when(metadataService.getPrimaryKeyField(model.getCode())).thenReturn(primaryKey());

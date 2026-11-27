@@ -25,6 +25,7 @@ public class AutomationWorkflowRuntime {
     private final ObjectMapper objectMapper;
     @org.springframework.beans.factory.annotation.Qualifier("compositeActionExecutor")
     private final org.springframework.beans.factory.ObjectProvider<com.auraboot.framework.automation.executor.ActionExecutor> actionExecutors;
+    private final com.auraboot.framework.permission.service.HumanActorContext actors;
 
     public String deploy(Automation automation) {
         AutomationFlowCompiler.CompiledFlow compiled = compiler.compile(automation);
@@ -46,6 +47,14 @@ public class AutomationWorkflowRuntime {
     // Failed action transactions must roll back without erasing the enclosing automation log.
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public List<ActionResult> run(Automation automation, String recordPid,
+                                  Map<String, Object> triggerPayload, Long automationLogId) {
+        trustedActor(automation);
+        return actors.call(automation.getTenantId(), MetaContext.getCurrentUserId(),
+                MetaContext.getCurrentUserPid(), MetaContext.getCurrentMemberId(),
+                () -> runAsCurrentActor(automation, recordPid, triggerPayload, automationLogId));
+    }
+
+    private List<ActionResult> runAsCurrentActor(Automation automation, String recordPid,
                                   Map<String, Object> triggerPayload, Long automationLogId) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("automationPid", automation.getPid());

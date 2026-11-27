@@ -261,9 +261,9 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
         try {
           const parsed = JSON.parse(value);
           if (Array.isArray(parsed)) return parsed;
-        } catch {
+        } catch (error) {
           // CATCH: non-transactional JSON parse guard; fall through to raw value
-        }
+ console.warn('[ControlledFieldRenderer] previously-silent catch', error);        }
       }
       return value;
     }
@@ -287,14 +287,17 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
               response: item,
             }));
           }
-        } catch {
+        } catch (error) {
           // Ignore malformed persisted file JSON and fall through to raw value.
-        }
+ console.warn('[ControlledFieldRenderer] previously-silent catch', error);        }
       }
       return Array.isArray(value) ? value : [];
     }
     if (expectsJsonObjectValue) {
-      return parseJsonObject(value);
+      // Keep a controlled range controlled when reset removes the parent value.
+      // Passing undefined would restore the smart field's previous local dates.
+      const parsed = parseJsonObject(value);
+      return componentLower === 'daterange' ? parsed ?? {} : parsed;
     }
     return value;
   }, [componentLower, expectsJsonObjectValue, isMemberPickerMultiple, isUploadComponent, field.props?.multiple, value]);
@@ -588,31 +591,33 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   return (
     <>
       <div
-        className={`controlled-field-renderer ${isFullWidth ? 'col-span-full' : ''}`}
+        className={`controlled-field-renderer ${isFullWidth ? 'col-span-full' : ''} ${field.props?.inline ? 'flex flex-col gap-1 sm:flex-row sm:items-start sm:gap-3' : ''}`}
         data-testid={`field-${field.field}`}
       >
         {resolvedLabel && (
-          <label htmlFor={field.field} className="text-text-2 mb-1 block text-sm font-medium">
+          <label htmlFor={field.field} className={`text-text-2 block text-sm font-medium ${field.props?.inline ? 'shrink-0 whitespace-nowrap pt-2' : 'mb-1'}`}>
             {resolvedLabel}
             {isRequired && <span className="text-status-red ml-0.5">*</span>}
           </label>
         )}
-        {shouldRenderAsText ? (
-          <div className="text-text py-2 text-sm">
-            {safeReadOnlyDisplay}
-          </div>
-        ) : (
-          <>
-            {/* While this wrapper shows the field error, the control suppresses its own
-                copy of it — otherwise the same message renders twice (form-context error
-                here + the control's identical validationRules run inside its FieldBase). */}
-            <FieldErrorOwnedByWrapperContext.Provider value={Boolean(error)}>
-              <ComponentLoader componentName={componentName} props={componentProps} />
-            </FieldErrorOwnedByWrapperContext.Provider>
-            <FieldError message={error} />
-          </>
-        )}
-        <FieldHelp message={resolvedHelpText} />
+        <div className={field.props?.inline ? 'w-full min-w-0 sm:flex-1' : undefined}>
+          {shouldRenderAsText ? (
+            <div className="text-text py-2 text-sm">
+              {safeReadOnlyDisplay}
+            </div>
+          ) : (
+            <>
+              {/* While this wrapper shows the field error, the control suppresses its own
+                  copy of it — otherwise the same message renders twice (form-context error
+                  here + the control's identical validationRules run inside its FieldBase). */}
+              <FieldErrorOwnedByWrapperContext.Provider value={Boolean(error)}>
+                <ComponentLoader componentName={componentName} props={componentProps} />
+              </FieldErrorOwnedByWrapperContext.Provider>
+              <FieldError message={error} />
+            </>
+          )}
+          <FieldHelp message={resolvedHelpText} />
+        </div>
       </div>
       {allowCreate && (
         <ReferenceCreateDialog

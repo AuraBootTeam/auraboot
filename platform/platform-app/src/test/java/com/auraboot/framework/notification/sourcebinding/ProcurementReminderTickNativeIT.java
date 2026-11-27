@@ -4,7 +4,10 @@ import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.crypto.FieldEncryptionService;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.integration.DeclaredTestInfrastructure;
 import com.auraboot.framework.integration.ReliableEventDeliveryExecutor;
+import com.auraboot.framework.integration.ReliableOutboxDispatchListener;
+import com.auraboot.framework.meta.mapper.OutboxEventMapper;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.notification.service.impl.PluginNotificationDeliveryAccessorImpl;
 import com.auraboot.framework.plugin.extension.BackgroundDataAccessor;
@@ -24,6 +27,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -36,16 +40,21 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor;
+import org.springframework.scheduling.config.CronTask;
+import org.springframework.scheduling.config.ScheduledTask;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Explicit controlled tick over one new synthetic tenant; never a global timer or external delivery proof. */
@@ -70,7 +79,9 @@ class ProcurementReminderTickNativeIT {
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper json;
     @Autowired DataSource dataSource;
+    @Autowired DataRedisProperties redis;
     @MockitoBean SchedulerEngine schedulerEngine;
+    @MockitoBean ReliableOutboxDispatchListener commitDispatcher;
 
     @DynamicPropertySource
     static void matchingCryptoAndProductDirectory(DynamicPropertyRegistry properties) {
@@ -82,18 +93,30 @@ class ProcurementReminderTickNativeIT {
                 .ifPresent(path -> properties.add("aura.plugins.dir", path::toString));
     }
 
+    private void requireLocalTestDatabase() throws Exception {
+        var profile = NativeProcurementWorkspace.profile();
+        assertThat(redis.getDatabase()).isEqualTo(profile.redisDatabase());
+        try (var connection = dataSource.getConnection()) {
+            assertThat(connection.getMetaData().getDatabaseProductName()).isEqualTo("PostgreSQL");
+            assertThat(connection.getCatalog()).isEqualTo(profile.database());
+            String jdbc = connection.getMetaData().getURL().substring("jdbc:".length());
+            var address = java.net.URI.create(jdbc);
+            assertThat(address.getHost()).isIn("127.0.0.1", "localhost");
+            assertThat(address.getPort()).isEqualTo(5432);
+            assertThat(address.getPath()).isEqualTo("/" + profile.database());
+        }
+        if (NativeProcurementWorkspace.runtime().equals("procurement-fixed-reminders")) {
+            DeclaredTestInfrastructure.assertSelected(dataSource, redis);
+        }
+    }
+
     @Test
     void actualControlledTickQueuesOnceAndDeliversTwoExplicitInAppRecipients() throws Exception {
         Path evidence = Path.of(required("PROCUREMENT_REMINDER_TICK_EVIDENCE_DIR")).toRealPath();
         assertThat(evidence.startsWith(NativeProcurementWorkspace.root().resolve(".workspace/evidence").resolve(NativeProcurementWorkspace.runtime()).toRealPath())).isTrue();
         assertThat(context.getBeansOfType(ScheduledAnnotationBeanPostProcessor.class)).isEmpty();
         assertThat(context.getBean(com.auraboot.framework.notification.wechat.WechatSubscriptionProperties.class).isEnabled()).isFalse();
-        assertThat(System.getenv("TEST_REDIS_DATABASE")).isEqualTo("13");
-        try (var connection = dataSource.getConnection()) {
-            assertThat(connection.getMetaData().getDatabaseProductName()).isEqualTo("PostgreSQL");
-            assertThat(connection.getCatalog()).isEqualTo("enterprise_22");
-            assertThat(connection.getMetaData().getURL()).matches("jdbc:postgresql://(?:127\\.0\\.0\\.1|localhost):5432/enterprise_22(?:\\?.*)?");
-        }
+        requireLocalTestDatabase();
         Map<String, Object> receipt = new LinkedHashMap<>();
         receipt.put("matchingEncryptionAdmission", S06NativeEncryptionAdmission.admit(System.getenv(), json,
                 context.getBean(FieldEncryptionService.class), getClass(), context.getEnvironment().getActiveProfiles()));
@@ -103,8 +126,8 @@ class ProcurementReminderTickNativeIT {
         Map<String, Object> newMetadataBefore = metadata(fixture.tenantId(), true);
         Map<String, Object> businessBeforeTick = snapshot(fixture.tables(), fixture.tenantId(), true);
         ControlledClock clock = new ControlledClock();
-        var restricted = new TenantBoundBackground(fixture.tenantId(), fixture.supplierPid(), fixture.quotePid(),
-                context.getBean(BackgroundDataAccessor.class));
+        var restricted = new TenantBoundBackground(fixture.tenantId(), fixture.supplierPid(), fixture.taskPid(),
+                fixture.quotePid(), fixture.namespace(), context.getBean(BackgroundDataAccessor.class));
         String stage = "controlled-tick-starting";
         boolean completed = false;
         try (var loader = new URLClassLoader(new java.net.URL[]{fixture.productJar().toUri().toURL()}, getClass().getClassLoader())) {
@@ -172,20 +195,21 @@ class ProcurementReminderTickNativeIT {
             assertThat(worker.process(fixture.tenantId(), fixture.binding().code(), sourcePid)).isEqualTo(2);
             assertThat(rows("ab_outbox", fixture.tenantId())).isEqualTo(originalOutbox);
             var executor = context.getBean(ReliableEventDeliveryExecutor.class);
-            for (var event : events) executor.deliver(event, host, UniqueIdGenerator.generate());
+            var leases = deliverClaimed(events, executor, host);
             assertThat(jdbc.queryForList("SELECT user_id FROM ab_notification WHERE tenant_id=? ORDER BY user_id", Long.class,
                     fixture.tenantId())).containsExactlyInAnyOrderElementsOf(fixture.recipientIds());
             assertThat(count("ab_integration_receipt", fixture.tenantId())).isEqualTo(2);
             List<String> inbox = rows("ab_notification", fixture.tenantId());
             List<String> receipts = rows("ab_integration_receipt", fixture.tenantId());
-            for (var event : events) executor.deliver(event, host, UniqueIdGenerator.generate());
+            for (var event : events) executor.deliver(event, host, leases.get(event.eventId()).token());
             assertThat(rows("ab_notification", fixture.tenantId())).isEqualTo(inbox);
             assertThat(rows("ab_integration_receipt", fixture.tenantId())).isEqualTo(receipts);
             assertThat(snapshot(fixture.tables(), fixture.tenantId(), true)).isEqualTo(afterTick);
             assertThat(snapshot(baselineTables, fixture.tenantId(), false)).isEqualTo(protectedBefore);
             assertThat(metadata(fixture.tenantId(), true)).isEqualTo(newMetadataBefore);
             receipt.put("sourcePid", sourcePid);
-            receipt.put("ownedOutboxRowsBeforeTeardown", originalOutbox.stream().map(SourceBindingCanonical::parse).toList());
+            deferFixtureIntents(leases);
+            receipt.put("ownedOutboxRowsBeforeTeardown", actualOwnedOutboxRows(rows("ab_outbox", fixture.tenantId())));
             receipt.put("protectedSnapshot", protectedBefore);
             receipt.put("businessAfterTick", afterTick);
             receipt.put("inboxCount", inbox.size());
@@ -354,14 +378,22 @@ class ProcurementReminderTickNativeIT {
     static final class TenantBoundBackground implements java.lang.reflect.InvocationHandler {
         final long tenant;
         final String supplier;
+        final String task;
         final String quote;
+        final String number;
         final BackgroundDataAccessor actual;
         final List<Map<String, Object>> calls = new ArrayList<>();
         int tryCreates;
-        TenantBoundBackground(long tenant, String supplier, String quote, BackgroundDataAccessor actual) {
-            if (tenant <= 0 || supplier == null || supplier.isBlank() || quote == null || quote.isBlank())
+        TenantBoundBackground(long tenant, String supplier, String task, String quote, String number,
+                              BackgroundDataAccessor actual) {
+            if (tenant <= 0 || List.of(supplier, task, quote, number).stream().anyMatch(String::isBlank))
                 throw new IllegalArgumentException("Exact new fixture identity required");
-            this.tenant = tenant; this.supplier = supplier; this.quote = quote; this.actual = java.util.Objects.requireNonNull(actual);
+            this.tenant = tenant;
+            this.supplier = supplier;
+            this.task = task;
+            this.quote = quote;
+            this.number = number;
+            this.actual = java.util.Objects.requireNonNull(actual);
         }
         BackgroundDataAccessor proxy() {
             return (BackgroundDataAccessor) Proxy.newProxyInstance(BackgroundDataAccessor.class.getClassLoader(),
@@ -374,12 +406,6 @@ class ProcurementReminderTickNativeIT {
                     "model", args.length > 1 ? String.valueOf(args[1]) : "transaction"));
             try { return method.invoke(actual, args); }
             catch (InvocationTargetException error) { throw error.getCause(); }
-        }
-        static String reminderKey(String supplier) {
-            StringBuilder key = new StringBuilder();
-            for (String part : List.of(supplier, "quote", "2026-10-13", "09:30"))
-                key.append(part.length()).append(':').append(part);
-            return key.toString();
         }
         void validate(String operation, Object[] args) {
             if (operation.equals("executeInTransaction") && args.length == 1 && args[0] instanceof Runnable) return;
@@ -395,13 +421,11 @@ class ProcurementReminderTickNativeIT {
                         && page.anyOfFilters().isEmpty() && page.keyword().isEmpty() && page.page() >= 1
                         && page.size() == DataPageQuery.MAX_SIZE && page.sorts().equals(List.of(new DataPageQuery.Sort("pid", false)));
             }
-            if (operation.equals("tryCreate") && args.length == 3 && args[1].equals("qo_procurement_reminder_common") && args[2] instanceof Map<?, ?> values) {
-                allowed = values.keySet().equals(Set.of("qo_pr_reminder_key", "qo_pr_reminder_supplier_pid", "qo_pr_reminder_kind",
-                        "qo_pr_reminder_slot_at", "qo_pr_reminder_state", "qo_pr_reminder_revision", "qo_pr_reminder_targets"))
-                        && supplier.equals(values.get("qo_pr_reminder_supplier_pid")) && "quote".equals(values.get("qo_pr_reminder_kind"))
-                        && SLOT.toString().equals(values.get("qo_pr_reminder_slot_at")) && "pending".equals(values.get("qo_pr_reminder_state"))
-                        && Integer.valueOf(0).equals(values.get("qo_pr_reminder_revision")) && List.of(quote).equals(values.get("qo_pr_reminder_targets"))
-                        && reminderKey(supplier).equals(values.get("qo_pr_reminder_key"));
+            if (operation.equals("getById") && args.length == 3) {
+                allowed = args[1].equals("s2p_sourcing_event") && task.equals(args[2]);
+            }
+            if (operation.equals("tryCreate") && args.length == 3 && args[1].equals("qo_procurement_reminder_common")) {
+                allowed = exactReminder(supplier, quote, "quote", SLOT, number).equals(args[2]);
                 if (allowed) tryCreates++;
             }
             if (!allowed) throw new SecurityException("Tick operation boundary rejected");
@@ -417,12 +441,7 @@ class ProcurementReminderTickNativeIT {
         Path evidence = Files.createDirectory(parent.resolve("pf4j-automatic-native"));
         assertThat(context.getBeansOfType(ScheduledAnnotationBeanPostProcessor.class)).isEmpty();
         assertThat(context.getBean(com.auraboot.framework.notification.wechat.WechatSubscriptionProperties.class).isEnabled()).isFalse();
-        assertThat(System.getenv("TEST_REDIS_DATABASE")).isEqualTo("13");
-        try (var connection = dataSource.getConnection()) {
-            assertThat(connection.getMetaData().getDatabaseProductName()).isEqualTo("PostgreSQL");
-            assertThat(connection.getCatalog()).isEqualTo("enterprise_22");
-            assertThat(connection.getMetaData().getURL()).matches("jdbc:postgresql://(?:127\\.0\\.0\\.1|localhost):5432/enterprise_22(?:\\?.*)?");
-        }
+        requireLocalTestDatabase();
         var receipt = new LinkedHashMap<String, Object>();
         receipt.put("kind", "procurement-pf4j-automatic-quote-shipment-native-v1");
         receipt.put("matchingEncryptionAdmission", S06NativeEncryptionAdmission.admit(System.getenv(), json,
@@ -437,7 +456,10 @@ class ProcurementReminderTickNativeIT {
         String stage = "automatic-fixture-starting";
         boolean completed = false;
         try {
-            fixture = ProductQuoteReminderNativeFacet.prepareAutomaticFixture(services(), evidence);
+            Instant quoteCutoff = NativeProcurementWorkspace.runtime().equals("procurement-fixed-reminders")
+                    ? Instant.parse(required("PROCUREMENT_NATIVE_QUOTE_CUTOFF")) : SLOT.plusSeconds(3600);
+            assertThat(quoteCutoff).isAfter(SLOT);
+            fixture = ProductQuoteReminderNativeFacet.prepareAutomaticFixture(services(), evidence, quoteCutoff);
             var q = fixture.quote();
             var tables = new LinkedHashMap<>(physicalTables(q.tenantId()));
             tables.put("qo_procurement_reminder_common", q.tables().get("qo_procurement_reminder_common"));
@@ -452,8 +474,9 @@ class ProcurementReminderTickNativeIT {
                 String target = kind.equals("quote") ? q.quotePid() : fixture.orderPid();
                 var binding = kind.equals("quote") ? q.binding() : fixture.shipmentBinding();
                 var clock = Clock.fixed(slot, ZoneId.of("UTC"));
-                var frame = new AutomaticBackground(q.tenantId(), q.supplierPid(), q.quotePid(), fixture.orderPid(),
-                        target, kind, slot, context.getBean(BackgroundDataAccessor.class));
+                String number = kind.equals("quote") ? q.namespace() : q.namespace() + "-auto";
+                var frame = new AutomaticBackground(q.tenantId(), q.supplierPid(), q.taskPid(), q.quotePid(), fixture.orderPid(),
+                        target, kind, slot, number, fixture.quoteCutoff(), context.getBean(BackgroundDataAccessor.class));
                 var phase = new LinkedHashMap<String, Object>();
                 phase.put("kind", kind); phase.put("slot", slot.toString());
                 phase.put("backgroundCalls", frame.calls); phase.put("transactionThreads", frame.transactionThreads);
@@ -474,7 +497,8 @@ class ProcurementReminderTickNativeIT {
                 JsonNode reminder = matches.getFirst();
                 assertThat(reminder.path("qo_pr_reminder_state").asText()).isEqualTo("pending");
                 assertThat(reminder.path("qo_pr_reminder_supplier_pid").asText()).isEqualTo(q.supplierPid());
-                assertThat(reminder.path("qo_pr_reminder_key").asText()).isEqualTo(AutomaticBackground.key(q.supplierPid(), kind, slot));
+                assertThat(reminder.path("qo_pr_reminder_key").asText()).isEqualTo(frame.exactReminder().get("qo_pr_reminder_key"));
+                assertThat(reminder.path("qo_pr_reminder_business_number").asText()).isEqualTo(number);
                 JsonNode targets = reminder.path("qo_pr_reminder_targets");
                 if (targets.isTextual()) targets = json.readTree(targets.textValue());
                 assertThat(targets).isEqualTo(json.valueToTree(List.of(target)));
@@ -520,12 +544,12 @@ class ProcurementReminderTickNativeIT {
                             ? "Synthetic Product pending quotation facts" : "Synthetic open order pending shipment");
                 }
                 var executor = context.getBean(ReliableEventDeliveryExecutor.class);
-                for (var event : events) executor.deliver(event, host, UniqueIdGenerator.generate());
+                var leases = deliverClaimed(events, executor, host);
                 assertThat(jdbc.queryForList("SELECT user_id FROM ab_notification WHERE tenant_id=? AND source_type=? AND source_id=? ORDER BY user_id",
                         Long.class, q.tenantId(), binding.code(), source)).containsExactlyInAnyOrderElementsOf(q.recipientIds());
                 var inbox = rows("ab_notification", q.tenantId());
                 var deliveryReceipts = rows("ab_integration_receipt", q.tenantId());
-                for (var event : events) executor.deliver(event, host, UniqueIdGenerator.generate());
+                for (var event : events) executor.deliver(event, host, leases.get(event.eventId()).token());
                 assertThat(rows("ab_notification", q.tenantId())).isEqualTo(inbox);
                 assertThat(rows("ab_integration_receipt", q.tenantId())).isEqualTo(deliveryReceipts);
                 phase.put("sourcePid", source);
@@ -534,8 +558,9 @@ class ProcurementReminderTickNativeIT {
                 phase.put("transactionThreads", frame.transactionThreads); phase.put("backgroundCalls", frame.calls);
                 assertThat(outbox.stream().map(SourceBindingCanonical::parse).map(row -> row.path("event_id").asText()).collect(java.util.stream.Collectors.toSet()))
                         .isEqualTo(events.stream().map(IntegrationEventEnvelope::eventId).collect(java.util.stream.Collectors.toSet()));
-                // The unchanged teardown snapshot uses ORDER BY id, not event hash or JSON lexical order.
-                phase.put("ownedOutboxRows", actualOwnedOutboxRows(outbox));
+                deferFixtureIntents(leases);
+                // Seal the persisted rows after releasing the test-owned dispatch lease.
+                phase.put("ownedOutboxRows", actualOwnedOutboxRows(rows("ab_outbox", q.tenantId())));
                 var after = new LinkedHashMap<>(automaticSnapshot(tables, q.tenantId(), true));
                 var before = new LinkedHashMap<>(ownedBusinessBefore);
                 after.remove("qo_procurement_reminder_common"); before.remove("qo_procurement_reminder_common");
@@ -613,6 +638,35 @@ class ProcurementReminderTickNativeIT {
         }
     }
 
+    private record DeliveryLease(long outboxId, String token) {}
+
+    private Map<String, DeliveryLease> deliverClaimed(List<IntegrationEventEnvelope> events, ReliableEventDeliveryExecutor executor,
+                                               PluginNotificationDeliveryAccessorImpl host) {
+        var outbox = context.getBean(OutboxEventMapper.class);
+        var transaction = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+        var leases = new LinkedHashMap<String, DeliveryLease>();
+        for (var event : events) {
+            String lease = UniqueIdGenerator.generate();
+            var claimed = transaction.execute(status -> outbox.claimKnownEvent(event.tenantId(), event.eventId(),
+                    "native-reminder-test-worker", lease, Instant.now().plusSeconds(60)));
+            assertThat(claimed).hasSize(1);
+            executor.deliver(event, host, lease);
+            leases.put(event.eventId(), new DeliveryLease(claimed.getFirst().getId(), lease));
+        }
+        return leases;
+    }
+
+    private void deferFixtureIntents(Map<String, DeliveryLease> leases) {
+        // The test deliberately stops before dispatcher acknowledgment. Transition only its leases
+        // through the dispatcher failure path so the cleanup helper can remove the pending intents.
+        var outbox = context.getBean(OutboxEventMapper.class);
+        Instant retryAt = Instant.now().plusSeconds(600);
+        for (var lease : leases.values()) {
+            assertThat(outbox.recordFailureFenced(lease.outboxId(), lease.token(), retryAt,
+                    "TEST_OWNED_DISPATCH_NOT_ACKNOWLEDGED")).isEqualTo(1);
+        }
+    }
+
     static void registerAutomaticScheduling(org.springframework.context.annotation.AnnotationConfigApplicationContext child) {
         // Same real infrastructure processor created by Spring SchedulingConfiguration, registered only in this child.
         child.registerBean(org.springframework.scheduling.config.TaskManagementConfigUtils.SCHEDULED_ANNOTATION_PROCESSOR_BEAN_NAME,
@@ -652,7 +706,7 @@ class ProcurementReminderTickNativeIT {
         java.util.concurrent.ScheduledThreadPoolExecutor executor = null;
         try (var child = new org.springframework.context.annotation.AnnotationConfigApplicationContext()) {
             child.getEnvironment().getPropertySources().addFirst(new org.springframework.core.env.MapPropertySource("synthetic-only", Map.of(
-                    "quote.procurement.reminder.enabled", "true", "quote.procurement.reminder.poll-ms", "25")));
+                    "quote.procurement.reminder.enabled", "true")));
             registerAutomaticScheduling(child);
             child.registerBean("taskScheduler", org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler.class, () -> timer);
             child.registerBean(BackgroundDataAccessor.class, () -> bounded);
@@ -687,14 +741,24 @@ class ProcurementReminderTickNativeIT {
             assertThat(processor.getScheduledTasks()).isEmpty();
             var registry = new com.auraboot.framework.plugin.pf4j.BackgroundComponentRegistry(child, registrationManager);
             try {
+                // Advance the scheduler clock from just before the fixture slot. The executor still runs in real time.
+                var clock = Clock.systemUTC();
+                timer.setClock(Clock.offset(clock, Duration.between(clock.instant(), fixedClock.instant().minusSeconds(2))));
                 registry.register(owner);
                 org.mockito.Mockito.verify(registrationManager).getExtensionsOfType(
                         com.auraboot.framework.plugin.extension.BackgroundComponentExtension.class, owner);
                 assertThat(registry.registeredBeanNames(owner)).containsExactly("procurementReminderScheduler");
                 assertThat(captured.bean.get()).isNotNull();
                 assertThat(child.getBean("procurementReminderScheduler")).isSameAs(captured.bean.get());
-                assertThat(processor.getScheduledTasks()).hasSize(1);
-                assertThat(frame.committed.await(5, java.util.concurrent.TimeUnit.SECONDS)).as("two real automatic commits").isTrue();
+                var tasks = processor.getScheduledTasks().stream().map(ScheduledTask::getTask)
+                        .map(CronTask.class::cast)
+                        .collect(java.util.stream.Collectors.toMap(CronTask::getExpression, task -> task));
+                assertThat(tasks).containsOnlyKeys("0 30 9,11 * * MON-FRI", "0 0 16,18 * * MON-FRI", "0 0 14 * * *");
+                var expectedTask = tasks.get(frame.kind.equals("quote") ? "0 30 9,11 * * MON-FRI" : "0 0 14 * * *");
+                // Replay the registered callback once within the same slot to exercise durable deduplication.
+                timer.schedule(expectedTask.getRunnable(), fixedClock.instant().plusSeconds(1));
+                assertThat(frame.committed.await(8, java.util.concurrent.TimeUnit.SECONDS))
+                        .as("cron callback and same-slot replay both committed").isTrue();
             } finally {
                 registry.unregister(owner);
                 assertThat(processor.getScheduledTasks()).isEmpty();
@@ -734,10 +798,40 @@ class ProcurementReminderTickNativeIT {
         }
     }
 
+    static Map<String, Object> exactReminder(String supplier, String target, String kind, Instant slot, String number) {
+        return exactReminder(supplier, target, kind, slot, number, SLOT.plusSeconds(3600));
+    }
+
+    private static Map<String, Object> exactReminder(String supplier, String target, String kind, Instant slot,
+                                                     String number, Instant quoteCutoff) {
+        var local = slot.atZone(ZoneId.of("Asia/Shanghai"));
+        StringBuilder key = new StringBuilder();
+        for (String part : List.of(supplier, kind, local.toLocalDate().toString(), local.toLocalTime().toString()))
+            key.append(part.length()).append(':').append(part);
+        var fields = new LinkedHashMap<String, Object>(Map.of(
+                "qo_pr_reminder_key", key.toString(), "qo_pr_reminder_supplier_pid", supplier,
+                "qo_pr_reminder_kind", kind, "qo_pr_reminder_slot_at", slot.toString(),
+                "qo_pr_reminder_state", "pending", "qo_pr_reminder_revision", 0,
+                "qo_pr_reminder_targets", List.of(target), "qo_pr_reminder_business_number", number));
+        if (kind.equals("quote")) {
+            String deadline = java.time.format.DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm")
+                    .withZone(ZoneId.of("Asia/Shanghai")).format(quoteCutoff);
+            fields.put("qo_pr_reminder_deadline_text", deadline);
+            fields.put("qo_pr_reminder_business_status", "待报价");
+            fields.put("qo_pr_reminder_short_memo", "请在截止前提交报价");
+            fields.put("qo_pr_reminder_summary_text", "询价单号：" + number + "。报价截止：" + deadline + "。请在截止前提交报价。");
+        } else {
+            fields.put("qo_pr_reminder_business_status", "未发货");
+            fields.put("qo_pr_reminder_short_memo", "未发货，请核对剩余数量");
+            fields.put("qo_pr_reminder_summary_text", "采购订单号：" + number + "。发货状态：未发货。请核对剩余数量并提交发货。");
+        }
+        return fields;
+    }
+
     static final class AutomaticBackground implements java.lang.reflect.InvocationHandler {
         final long tenant;
-        final String supplier, quote, order, target, kind;
-        final Instant slot;
+        final String supplier, task, quote, order, target, kind, number;
+        final Instant slot, quoteCutoff;
         final BackgroundDataAccessor actual;
         final java.util.concurrent.CountDownLatch committed = new java.util.concurrent.CountDownLatch(2);
         final java.util.concurrent.atomic.AtomicInteger completedTransactions = new java.util.concurrent.atomic.AtomicInteger();
@@ -746,13 +840,29 @@ class ProcurementReminderTickNativeIT {
         final List<String> transactionThreads = new java.util.concurrent.CopyOnWriteArrayList<>();
         final List<Map<String, Object>> calls = new java.util.concurrent.CopyOnWriteArrayList<>();
         final ThreadLocal<Boolean> transaction = ThreadLocal.withInitial(() -> false);
-        AutomaticBackground(long tenant, String supplier, String quote, String order, String target, String kind, Instant slot, BackgroundDataAccessor actual) {
-            if (tenant <= 0 || List.of(supplier, quote, order, target).stream().anyMatch(String::isBlank)
+        AutomaticBackground(long tenant, String supplier, String task, String quote, String order,
+                            String target, String kind, Instant slot, String number, BackgroundDataAccessor actual) {
+            this(tenant, supplier, task, quote, order, target, kind, slot, number, SLOT.plusSeconds(3600), actual);
+        }
+
+        AutomaticBackground(long tenant, String supplier, String task, String quote, String order,
+                            String target, String kind, Instant slot, String number, Instant quoteCutoff,
+                            BackgroundDataAccessor actual) {
+            if (tenant <= 0 || List.of(supplier, task, quote, order, target, number).stream().anyMatch(String::isBlank)
                     || !(kind.equals("quote") && target.equals(quote) && slot.equals(SLOT)
                     || kind.equals("shipment") && target.equals(order) && slot.equals(SHIPMENT_SLOT)))
                 throw new IllegalArgumentException("Exact synthetic automatic phase required");
-            this.tenant = tenant; this.supplier = supplier; this.quote = quote; this.order = order; this.target = target;
-            this.kind = kind; this.slot = slot; this.actual = java.util.Objects.requireNonNull(actual);
+            this.tenant = tenant;
+            this.supplier = supplier;
+            this.task = task;
+            this.quote = quote;
+            this.order = order;
+            this.target = target;
+            this.kind = kind;
+            this.slot = slot;
+            this.number = number;
+            this.quoteCutoff = quoteCutoff;
+            this.actual = java.util.Objects.requireNonNull(actual);
         }
         BackgroundDataAccessor proxy() {
             return (BackgroundDataAccessor) Proxy.newProxyInstance(BackgroundDataAccessor.class.getClassLoader(), new Class<?>[]{BackgroundDataAccessor.class}, this);
@@ -781,17 +891,8 @@ class ProcurementReminderTickNativeIT {
                 failure.compareAndSet(null, error.getCause()); throw error.getCause();
             } catch (Throwable error) { failure.compareAndSet(null, error); throw error; }
         }
-        static String key(String supplier, String kind, Instant slot) {
-            var local = slot.atZone(ZoneId.of("Asia/Shanghai"));
-            StringBuilder result = new StringBuilder();
-            for (String part : List.of(supplier, kind, local.toLocalDate().toString(), local.toLocalTime().toString()))
-                result.append(part.length()).append(':').append(part);
-            return result.toString();
-        }
         Map<String, Object> exactReminder() {
-            return Map.of("qo_pr_reminder_key", key(supplier, kind, slot), "qo_pr_reminder_supplier_pid", supplier,
-                    "qo_pr_reminder_kind", kind, "qo_pr_reminder_slot_at", slot.toString(), "qo_pr_reminder_state", "pending",
-                    "qo_pr_reminder_revision", 0, "qo_pr_reminder_targets", List.of(target));
+            return ProcurementReminderTickNativeIT.exactReminder(supplier, target, kind, slot, number, quoteCutoff);
         }
         void validate(String op, Object[] args) {
             if (op.equals("executeInTransaction") && args.length == 1 && args[0] instanceof Runnable && !transaction.get()) return;
@@ -807,6 +908,8 @@ class ProcurementReminderTickNativeIT {
                 if (expected != null && page.exactFilters().equals(expected) && page.anyOfFilters().isEmpty() && page.keyword().isEmpty()
                         && page.page() >= 1 && page.size() == DataPageQuery.MAX_SIZE && page.sorts().equals(List.of(new DataPageQuery.Sort("pid", false)))) return;
             }
+            if (op.equals("getById") && args.length == 3 && transaction.get() && kind.equals("quote")
+                    && args[1].equals("s2p_sourcing_event") && task.equals(args[2])) return;
             if (op.equals("tryCreate") && args.length == 3 && transaction.get() && args[1].equals("qo_procurement_reminder_common")
                     && exactReminder().equals(args[2])) return;
             throw new SecurityException("Automatic operation boundary rejected");

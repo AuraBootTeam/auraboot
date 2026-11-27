@@ -111,7 +111,7 @@ public class AuthController {
             @RequestBody AuthStrategyRequest request,
             HttpServletRequest httpRequest) {
         String ip = extractIp(httpRequest);
-        if (!loginRateLimiter.isAllowed(ip, request.getEmail())) {
+        if (!loginRateLimiter.isAllowed(ip, request.getMobile())) {
             return ApiResponse.error(ResponseCode.BadParam, "Too many login attempts. Please try again later.", null);
         }
         request.setChannelCode("sms");

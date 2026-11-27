@@ -157,6 +157,11 @@ describe('root loader authentication guard', () => {
 
   it('does not destroy an authenticated session when user resolution is temporarily unavailable', async () => {
     mocks.getTokenFromRequest.mockResolvedValue('still-valid-token');
+    // Hermetic: stub every network dependency the loader may touch — an
+    // unstubbed one leaves a real fetch in the path (observed as transient
+    // 'fetch failed' locally and on CI, 2026-11-14).
+    mocks.fetchBootstrapStatus.mockResolvedValue(null);
+    mocks.fetchAccessPolicy.mockResolvedValue({ userRegistrationPolicy: 'closed' });
     mocks.getUserInfo.mockRejectedValue(new Error('Network error: fetch failed'));
 
     const { loader } = await import('~/root');
@@ -236,6 +241,17 @@ describe('root loader authentication guard', () => {
     });
     expect(mocks.getUserInfo).not.toHaveBeenCalled();
     expect(mocks.getUserMenus).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, '   '])('uses Community identity when no explicit edition is supplied (%s)', async (edition) => {
+    vi.stubEnv('EDITION', edition);
+    mocks.getTokenFromRequest.mockResolvedValue(null);
+    const { loader } = await import('~/root');
+    const result = await loader({ request: new Request('http://localhost/login') } as any);
+    expect(result).toMatchObject({
+      edition: 'community',
+      branding: { productName: 'AuraBoot', mode: 'community' },
+    });
   });
 
   it('injects ICP settings from the BFF runtime environment', async () => {

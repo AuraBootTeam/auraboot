@@ -25,18 +25,28 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class CapabilityViewServiceImpl implements CapabilityViewService {
+    private final com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
+    private final com.auraboot.framework.permission.service.RoleAuthorizationAuthoringAccess authoringAccess;
+
 
     private final PermissionService permissionService;
     private final CapabilityRegistryService capabilityRegistryService;
     private final CapabilityResolver capabilityResolver;
     private final RolePermissionService rolePermissionService;
     private final MenuMapper menuMapper;
+    private final com.auraboot.framework.application.tenant.ApplicationCatalogPolicy catalogPolicy;
 
     @Override
     public List<CapabilityGroup> resolveForRole(Long roleId) {
         Long tenantId = MetaContext.getCurrentTenantId();
         List<PermissionDTO> allActive = permissionService.findAllActive();
+        Set<String> domainModels = allActive.stream().filter(permission -> permission.getExtension() != null)
+                .map(permission -> permission.getExtension().get("domainModels"))
+                .filter(java.util.Map.class::isInstance).map(value -> (java.util.Map<?,?>) value)
+                .flatMap(value -> value.keySet().stream()).map(String::valueOf).collect(Collectors.toSet());
         List<String> allCodes = allActive.stream()
+                .filter(permission -> permission.getExtension() == null || !permission.getExtension().containsKey("retiredDomainOperation"))
+                .filter(permission -> !"model".equals(permission.getResourceType()) || !domainModels.contains(permission.getResourceCode()))
                 .map(PermissionDTO::getCode).filter(Objects::nonNull).toList();
         // code -> localized display name, so convention-derived capabilities render business labels
         // (e.g. 许可证) instead of the raw resource segment (license).
@@ -49,8 +59,7 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
         Set<String> granted = roleCodes(roleId);
         List<CapabilityDefinitionDTO> declarations = capabilityRegistryService.listDeclarations(tenantId);
         List<CapabilityGroup> groups = capabilityResolver.resolve(declarations, allCodes, granted, names, extensions);
-        annotateUnlockedMenus(groups);
-        return groups;
+        return catalogPolicy.read(tenantId).groups(annotateNavigation(groups));
     }
 
     /**
@@ -58,18 +67,16 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
      * the menu's permissionCode is one of the capability's included codes. Pure read-side decoration
      * so the v2 page can render "解锁菜单: …"; never affects authorization.
      */
-    private void annotateUnlockedMenus(List<CapabilityGroup> groups) {
+    private List<CapabilityGroup> annotateNavigation(List<CapabilityGroup> groups) {
+        List<Menu> menus = menuMapper.findAllActiveMenus();
         Map<String, List<String>> menusByPermission = new LinkedHashMap<>();
-        for (Menu menu : menuMapper.findAllActiveMenus()) {
+        for (Menu menu : menus) {
             String code = menu.getPermissionCode();
             String name = menu.getName();
             if (code == null || code.isBlank() || name == null || name.isBlank()) {
                 continue;
             }
             menusByPermission.computeIfAbsent(code, k -> new ArrayList<>()).add(name);
-        }
-        if (menusByPermission.isEmpty()) {
-            return;
         }
         for (CapabilityGroup group : groups) {
             for (Capability cap : group.getCapabilities()) {
@@ -89,6 +96,7 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
                 }
             }
         }
+        return CapabilityNavigationGroups.regroup(groups, menus);
     }
 
     @Override
@@ -112,6 +120,10 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
     @Transactional
     public void applyCapabilitySelection(Long roleId, Set<String> selectedCapabilityCodes,
                                          Set<String> revokedPartialCapabilityCodes) {
+        authorizationWriteLock.lock();
+        authoringAccess.requireWrite();
+        authoringAccess.requireTarget(roleId);
+        authorizationWriteLock.mutate();
         List<PermissionDTO> all = permissionService.findAllActive();
         CapabilitySelectionPreview plan = calculateSelection(roleId, selectedCapabilityCodes, revokedPartialCapabilityCodes, all);
         Map<String, Long> codeToId = all.stream()
@@ -132,7 +144,9 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
     private CapabilitySelectionPreview calculateSelection(
             Long roleId, Set<String> selectedCapabilityCodes, Set<String> revokedPartialCapabilityCodes,
             List<PermissionDTO> all) {
-        List<CapabilityDefinitionDTO> declarations = capabilityRegistryService.listDeclarations(MetaContext.getCurrentTenantId());
+        var scope = catalogPolicy.read(MetaContext.getCurrentTenantId());
+        List<CapabilityDefinitionDTO> allDeclarations = capabilityRegistryService.listDeclarations(MetaContext.getCurrentTenantId());
+        List<CapabilityDefinitionDTO> declarations = scope.declarations(allDeclarations);
         Map<String, Set<String>> capabilityCodes = new LinkedHashMap<>();
         declarations.stream().filter(CapabilityDefinitionDTO::isValid)
                 .forEach(d -> capabilityCodes.put(d.getCode(), new LinkedHashSet<>(d.getIncludes())));
@@ -155,13 +169,23 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
                 .flatMap(Set::stream).collect(Collectors.toSet());
         explicitRevocations.stream().flatMap(code -> capabilityCodes.get(code).stream())
                 .filter(current::contains).forEach(revokable::add);
+        // A product editor cannot revoke hidden grants, including shared dependency codes.
+        allDeclarations.stream().filter(CapabilityDefinitionDTO::isValid)
+                .filter(declaration -> !scope.capability(declaration.getCode()))
+                .flatMap(declaration -> declaration.getIncludes().stream()).forEach(revokable::remove);
         List<String> grant = desired.stream().filter(code -> !current.contains(code)).sorted().toList();
         List<String> revoke = revokable.stream().filter(code -> !desired.contains(code)).sorted().toList();
+        if (!grant.isEmpty() || !revoke.isEmpty()) {
+            Map<String, Long> identities = all.stream().filter(permission -> permission.getCode() != null)
+                    .collect(Collectors.toMap(PermissionDTO::getCode, PermissionDTO::getId, (first, second) -> first));
+            rolePermissionService.validateCapabilityChanges(roleId,
+                    grant.stream().map(identities::get).toList(), revoke.stream().map(identities::get).toList());
+        }
         Set<String> resulting = new LinkedHashSet<>(current);
         resulting.removeAll(revoke);
         resulting.addAll(grant);
         List<CapabilityGroup> groups = capabilityResolver.resolve(declarations, new ArrayList<>(available), resulting);
-        annotateUnlockedMenus(groups);
+        groups = scope.groups(annotateNavigation(groups));
         List<Capability> affected = groups.stream().flatMap(group -> group.getCapabilities().stream())
                 .filter(cap -> !cap.isConventionDerived())
                 .filter(cap -> cap.getIncludes().stream().anyMatch(code -> grant.contains(code) || revoke.contains(code)))
@@ -174,7 +198,7 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
     }
 
     private Set<String> roleCodes(Long roleId) {
-        return permissionService.findRolePermissions(roleId).stream()
+        return permissionService.findRoleConfiguredPermissions(roleId).stream()
                 .map(PermissionDTO::getCode).filter(Objects::nonNull).collect(Collectors.toSet());
     }
 }

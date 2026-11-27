@@ -1,6 +1,7 @@
 import * as React from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { cn } from '~/utils/cn';
+import { twMerge } from 'tailwind-merge';
 
 const Dialog = DialogPrimitive.Root;
 const DialogTrigger = DialogPrimitive.Trigger;
@@ -32,7 +33,7 @@ const DialogContent = React.forwardRef<
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
-      className={cn(
+      className={twMerge(cn(
         'border-border bg-panel shadow-pop fixed z-50 w-full border duration-200',
         placement === 'right'
           ? 'inset-y-0 right-0 flex h-dvh max-h-dvh min-h-0 max-w-2xl flex-col gap-0 overflow-hidden p-0'
@@ -44,7 +45,7 @@ const DialogContent = React.forwardRef<
         placement === 'center' && 'data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]',
         'dark:border-gray-700 dark:bg-gray-900',
         className,
-      )}
+      ))}
       {...props}
     >
       {children}

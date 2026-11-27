@@ -946,9 +946,9 @@ export default function UnifiedDesignerPage() {
           setConflictError('裁决期间服务器再次更新，请基于新的 Latest 复核');
           return;
         }
-      } catch {
+      } catch (error) {
         // Surface the original resolution error when the refresh probe also fails.
-      }
+ console.warn('[unified-designer] previously-silent catch', error);      }
       setConflictError(
         resolutionError instanceof Error ? resolutionError.message : '无法保存三方冲突裁决',
       );
@@ -1065,9 +1065,9 @@ export default function UnifiedDesignerPage() {
         setAuthoringSession(latest);
         setDocument(canonicalDocument);
         setWorkbenchGeneration((current) => current + 1);
-      } catch {
+      } catch (error) {
         // Keep the original prepare/submit failure visible when the refresh also fails.
-      }
+ console.warn('[unified-designer] previously-silent catch', error);      }
     } finally {
       setSubmissionPending(false);
     }
@@ -1151,9 +1151,9 @@ export default function UnifiedDesignerPage() {
             current ? { ...current, revision: latest.revision } : current,
           );
         }
-      } catch {
+      } catch (error) {
         // Keep the current read-only document when the authoritative reload also fails.
-      }
+ console.warn('[unified-designer] previously-silent catch', error);      }
       if (reconciliation === 'COMMITTED_HERE') {
         setLeaseTakeoverFeedback({
           tone: 'success',
@@ -1922,7 +1922,7 @@ function NewPageWorkspaceWizard({
                   <option value="detail">详情</option>
                 </select>
                 <span className="text-xs font-normal leading-5 text-slate-500">
-                  仪表板是一等资源，不属于 PageSchema 页面类型；请使用
+                  仪表板是一等资源，不属于 UnifiedPageSchema 页面类型；请使用
                   <a
                     href="/dashboard-designer"
                     className="ml-1 font-semibold text-blue-700 underline-offset-2 hover:underline"

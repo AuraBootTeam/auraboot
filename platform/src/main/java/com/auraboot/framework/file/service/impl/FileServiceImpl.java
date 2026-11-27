@@ -66,6 +66,10 @@ public class FileServiceImpl implements FileService {
     private CdnUrlRewriter cdnUrlRewriter;
 
     @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.auraboot.framework.file.security.BusinessArtifactAccessGuard artifactAccess;
+
+    @Autowired(required = false)
     private List<FileDeletionGuard> deletionGuards = List.of();
 
     @Value("${file.download.base-url:}")
@@ -86,7 +90,8 @@ public class FileServiceImpl implements FileService {
             "application/json", "application/xml",
             "application/x-yaml", "application/yaml", "text/yaml",
             "application/zip", "application/x-zip", "application/x-zip-compressed", "application/gzip",
-            "application/vnd.rar", "application/x-rar-compressed", "application/x-7z-compressed"
+            "application/vnd.rar", "application/x-rar-compressed", "application/x-7z-compressed",
+            "video/mp4", "video/quicktime"
     );
 
     /**
@@ -123,30 +128,7 @@ public class FileServiceImpl implements FileService {
     @Override
     public FileUploadResponseDTO uploadFile(MultipartFile file, Long userId) {
         try {
-            if (file.isEmpty()) {
-                throw new IllegalArgumentException("File must not be empty");
-            }
-
-            // Validate file size
-            long maxFileSize = (multipartProperties != null
-                    ? multipartProperties.getMaxFileSize()
-                    : new MultipartProperties().getMaxFileSize()).toBytes();
-            if (maxFileSize >= 0 && file.getSize() > maxFileSize) {
-                throw new BusinessException("File too large: max " + (maxFileSize / 1024 / 1024) + "MB");
-            }
-
-            // Validate file extension
-            String extension = getFileExtension(file.getOriginalFilename());
-            if (BLOCKED_EXTENSIONS.contains(extension.toLowerCase())) {
-                throw new BusinessException("File extension not allowed: " + extension);
-            }
-
-            // Validate the file type from its actual content, not the
-            // client-declared Content-Type (which is unreliable and spoofable).
-            String contentType = file.getContentType();
-            if (!isAllowedUpload(file, extension)) {
-                throw new BusinessException("File type not allowed: " + contentType);
-            }
+            validateUpload(file);
 
             FileEntity fileEntity = createFileEntity(file, userId);
             fileEntity.setPid(UniqueIdGenerator.generate());
@@ -170,6 +152,76 @@ public class FileServiceImpl implements FileService {
             log.error("File upload failed", e);
             throw new BusinessException("File upload failed: " + e.getMessage(), e);
         }
+    }
+
+    private void validateUpload(MultipartFile file) {
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("File must not be empty");
+        }
+
+        // Validate file size
+        long maxFileSize = (multipartProperties != null
+                ? multipartProperties.getMaxFileSize()
+                : new MultipartProperties().getMaxFileSize()).toBytes();
+        if (maxFileSize >= 0 && file.getSize() > maxFileSize) {
+            throw new BusinessException("File too large: max " + (maxFileSize / 1024 / 1024) + "MB");
+        }
+
+        // Validate file extension
+        String extension = getFileExtension(file.getOriginalFilename());
+        if (BLOCKED_EXTENSIONS.contains(extension.toLowerCase())) {
+            throw new BusinessException("File extension not allowed: " + extension);
+        }
+
+        // Validate the file type from its actual content, not the
+        // client-declared Content-Type (which is unreliable and spoofable).
+        String contentType = file.getContentType();
+        if (!isAllowedUpload(file, extension)) {
+            throw new BusinessException("File type not allowed: " + contentType);
+        }
+    }
+
+    @Override
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public FileEntity persistBusinessArtifact(MultipartFile file, Long userId,
+            com.auraboot.framework.file.security.BusinessArtifactAuthorization provenance) {
+        requireActiveMutationTransaction();
+        if (TransactionSynchronizationManager.isCurrentTransactionReadOnly()
+                || provenance == null || !MetaContext.exists() || MetaContext.isImpersonating()
+                || userId == null || userId <= 0 || !userId.equals(MetaContext.getCurrentUserId())
+                || !provenance.tenantId().equals(MetaContext.getCurrentTenantId())) {
+            throw new org.springframework.security.access.AccessDeniedException("An owned business artifact transaction is required");
+        }
+        // Encode before any I/O: an unreadable provenance record must never be persisted.
+        String encoded = provenance.encode();
+        validateUpload(file);
+        FileEntity entity = createFileEntity(file, userId);
+        entity.setPid(UniqueIdGenerator.generate());
+        entity.setTenantId(provenance.tenantId());
+        entity.setArtifactAuthorization(encoded);
+        entity.setRetentionLocked(true);
+        String storageKey = entity.getFileName();
+        // Register before upload so a provider that writes partially and then throws is covered.
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override public void afterCompletion(int status) {
+                if (status != STATUS_COMMITTED) {
+                    try { storageProvider.delete(storageKey); }
+                    catch (RuntimeException failure) {
+                        log.error("Business artifact rollback cleanup failed: key={}", storageKey, failure);
+                    }
+                }
+            }
+        });
+        try (InputStream input = file.getInputStream()) {
+            entity.setLocalPath(storageProvider.upload(storageKey, input, file.getSize(), file.getContentType()));
+        } catch (IOException failure) {
+            throw new IllegalStateException("Cannot read generated artifact bytes", failure);
+        }
+        entity.setStorageType(storageProvider.type());
+        entity.setStatus(UploadStatus.SUCCESS.getCode());
+        if (fileMapper.insert(entity) != 1) throw new IllegalStateException("Business artifact was not persisted");
+        // No URL is resolved here. The scoped caller returns only the protected download route.
+        return entity;
     }
 
     @Override
@@ -196,6 +248,13 @@ public class FileServiceImpl implements FileService {
             return null;
         }
         return fileMapper.selectById(fileId);
+    }
+
+    @Override
+    public void assertFileReadAllowed(FileEntity file) {
+        if (file == null || file.getArtifactAuthorization() == null) return;
+        if (artifactAccess == null) throw new org.springframework.security.access.AccessDeniedException("Business artifact access guard is unavailable");
+        artifactAccess.authorize(file);
     }
 
     @Override
@@ -289,7 +348,7 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public boolean createFileRelation(FileRelationRequestDTO request, Long userId) {
         if (userId == null || !userId.equals(MetaContext.getCurrentUserId()))
             throw new org.springframework.security.access.AccessDeniedException("File relations require the current actor");
@@ -331,7 +390,7 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public boolean appendFileRelation(FileRelationRequestDTO request, Long userId) {
         if (!MetaContext.exists()) throw new BusinessException("An authenticated business file relation is required");
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -367,7 +426,7 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public void assertFileRelationMutationAllowed(String entityType, String entityId, String fieldName) {
         relationMutationGuard.authorize(entityType,entityId,fieldName);
     }
@@ -399,7 +458,7 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public boolean removeFileRelation(String entityType, String entityId, String fieldName) {
         assertFileRelationMutationAllowed(entityType,entityId,fieldName);
         QueryWrapper<FileRelationEntity> wrapper = new QueryWrapper<>();
@@ -415,6 +474,11 @@ public class FileServiceImpl implements FileService {
         FileEntity fileEntity = findByPid(fileId);
         if (fileEntity == null) {
             return null;
+        }
+
+        if (fileEntity.getArtifactAuthorization() != null) {
+            assertFileReadAllowed(fileEntity);
+            return baseUrl + "/api/file/download/" + fileEntity.getPid();
         }
 
         String storageKey = fileEntity.getFileName();
@@ -551,10 +615,20 @@ public class FileServiceImpl implements FileService {
                 || startsWith(head, 0xFF, 0xD8, 0xFF)               // JPEG
                 || startsWith(head, 0x47, 0x49, 0x46, 0x38)         // "GIF8"
                 || startsWith(head, 0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1)   // OLE2 (legacy Office)
+                || isMp4(head)                                     // ISO-BMFF media container (....ftyp: mp4/mov)
                 || isWebp(head)) {                                 // RIFF....WEBP
             return ContentSignature.ALLOWED;
         }
         return ContentSignature.UNKNOWN;
+    }
+
+    /** ISO-BMFF media containers (MP4/MOV/3GP): a "ftyp" box sits at byte offset 4. */
+    private static boolean isMp4(byte[] head) {
+        if (head.length < 8) {
+            return false;
+        }
+        return (head[4] & 0xFF) == 0x66 && (head[5] & 0xFF) == 0x74
+                && (head[6] & 0xFF) == 0x79 && (head[7] & 0xFF) == 0x70;  // "ftyp"
     }
 
     private static boolean isWebp(byte[] head) {

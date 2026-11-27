@@ -70,7 +70,8 @@ public class DocumentFlowService {
                 targetData.put(entry.getKey(), resolved);
             }
         }
-        targetData.put("tenant_id", tenantId);
+        // The data service sets tenant_id itself; a payload that carries it is refused by the
+        // native field authorization outside the command's permit scope.
 
         Map<String, Object> created;
         try {
@@ -151,8 +152,6 @@ public class DocumentFlowService {
             if (lineMapping.getTargetForeignKey() != null) {
                 lineData.put(lineMapping.getTargetForeignKey(), targetRecordId);
             }
-
-            lineData.put("tenant_id", tenantId);
 
             try {
                 dynamicDataService.create(lineMapping.getTargetLineModel(), lineData);

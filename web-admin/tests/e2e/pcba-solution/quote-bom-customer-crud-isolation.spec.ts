@@ -127,6 +127,7 @@ test.describe('Quote/BOM customer delete + data-scope isolation @smoke', () => {
       ]);
       customerId = String(ownRows[0]?.pid ?? '');
       expect(customerId, 'sales A customer pid resolvable').toBeTruthy();
+      await a.page.screenshot({ path: test.info().outputPath('customer-owner-scope.png'), fullPage: true });
     } finally {
       await a.context.close();
     }
@@ -151,6 +152,7 @@ test.describe('Quote/BOM customer delete + data-scope isolation @smoke', () => {
       const writeRejected = ![200, 201].includes(write.status())
         || String((writeBody as { code?: unknown }).code ?? '0') !== '0';
       expect(writeRejected, 'B01-02: foreign customer write must be refused (same self scope)').toBe(true);
+      await b.page.screenshot({ path: test.info().outputPath('customer-foreign-scope-empty.png'), fullPage: true });
     } finally {
       await b.context.close();
     }
@@ -167,6 +169,7 @@ test.describe('Quote/BOM customer delete + data-scope isolation @smoke', () => {
       ]);
       expect(afterRows.length, 'customer still present exactly once for admin').toBe(1);
       expect(String(afterRows[0]?.crm_acc_name ?? ''), 'denied foreign write must not rename the customer').toBe(marker);
+      await ap.screenshot({ path: test.info().outputPath('customer-admin-scope.png'), fullPage: true });
     } finally {
       await adminCtx.close();
     }

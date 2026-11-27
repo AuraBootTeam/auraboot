@@ -34,4 +34,9 @@ public interface CommandDispatcherAccessor {
      *         unavailable on this host
      */
     Object execute(String commandCode, String modelCode, String recordPid, Map<String, Object> payload);
+    /** Correlated nested execution; older hosts must reject instead of dropping the caller's durable operation key. */
+    default Object execute(String commandCode,String modelCode,String recordPid,Map<String,Object> payload,String clientRequestId) {
+        throw new UnsupportedOperationException("Correlated command dispatch is unavailable");
+    }
+
 }

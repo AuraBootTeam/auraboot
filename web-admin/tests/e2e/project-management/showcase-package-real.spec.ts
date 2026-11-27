@@ -224,7 +224,7 @@ test('PK complete business entry and secondary professional actions navigate thr
   await expect(page.getByRole('textbox', { name: '项目预算', exact: true })).toHaveValue(
     '128,000.00',
   );
-  await expect(page.getByRole('combobox', { name: '所属客户', exact: true })).toContainText(
+  await expect(page.getByRole('combobox', { name: '所属客户', exact: true })).toHaveValue(
     '华辰制造',
   );
   await expect(page.getByRole('main').getByText('林晓', { exact: true }).first()).toBeVisible();

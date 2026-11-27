@@ -140,6 +140,8 @@ public class PluginManifestExtended extends PluginManifest {
      * Agent definitions to import.
      */
     private List<AgentDefinitionDTO> agentDefinitions;
+    /** Optional recipes, materialized only by an explicit agentTemplateCodes request. */
+    private List<AgentDefinitionDTO> agentTemplates;
 
     /**
      * Saved view definitions to import.

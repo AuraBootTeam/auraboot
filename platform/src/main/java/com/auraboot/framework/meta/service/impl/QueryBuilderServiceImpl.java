@@ -125,7 +125,7 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
         if (conditions != null && !conditions.isEmpty()) {
             for (QueryCondition condition : conditions) {
                 validateCondition(condition, modelDefinition);
-                String columnName = resolveColumnName(modelDefinition, condition.getFieldName());
+                String columnName = resolveConditionColumnName(modelDefinition, condition.getFieldName());
                 Object normalizedValue = normalizeConditionValue(modelDefinition, condition);
                 builder.addCondition(columnName, condition.getOperator().name(), normalizedValue);
             }
@@ -276,7 +276,7 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
         // 添加条件
         if (conditions != null) {
             for (QueryCondition condition : conditions) {
-                String columnName = resolveColumnName(modelDefinition, condition.getFieldName());
+                String columnName = resolveConditionColumnName(modelDefinition, condition.getFieldName());
                 builder.addCondition(columnName, condition.getOperator().name(), condition.getValue());
             }
         }
@@ -532,6 +532,17 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
             return this;
         }
 
+        @Override
+        public QueryBuilder includeNativeReadAuthorization() {
+            if (queryType != QueryType.SELECT) throw new IllegalStateException("Authorization facts require a SELECT");
+            if (selectFields.isEmpty()) selectFields.add("*");
+            for (String field : List.of("pid AS __ab_auth_pid", "tenant_id AS __ab_auth_tenant",
+                    "created_by AS __ab_auth_creator", "TRUE AS __ab_auth_creator_loaded")) {
+                if (!selectFields.contains(field)) selectFields.add(field);
+            }
+            return this;
+        }
+
         public QueryBuilderImpl setSelectFields(List<String> fields) {
             this.selectFields = fields != null ? new ArrayList<>(fields) : new ArrayList<>();
             return this;
@@ -717,6 +728,21 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
             }
         }
         throw new MetaServiceException("Field not found in model: " + fieldName);
+    }
+
+    /** Computed predicates use the same declared SQL as SELECT, before counting or paging. */
+    private String resolveConditionColumnName(ModelDefinition model, String fieldName) {
+        String physical = resolveColumnName(model, fieldName);
+        if (SYSTEM_FIELDS.contains(fieldName)) return physical;
+        for (FieldDefinition field : model.getFields()) {
+            if ((fieldName.equals(field.getCode()) || fieldName.equals(field.getColumnName()))
+                    && !field.isJsonbVirtual() && field.isComputedReadonly() && field.getComputeExpression() != null
+                    && !field.getComputeExpression().isBlank()) {
+                com.auraboot.framework.meta.security.SqlSafetyUtils.validateSqlFragment(field.getComputeExpression());
+                return "(" + field.getComputeExpression() + ")";
+            }
+        }
+        return physical;
     }
 
     private Object normalizeConditionValue(ModelDefinition modelDefinition, QueryCondition condition) {

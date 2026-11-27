@@ -70,3 +70,12 @@ describe('TableBlockRenderer — row-action record alias (per-row gating)', () =
     expect(screen.getAllByTestId('row-action-restore')).toHaveLength(1);
   });
 });
+
+ it('uses the shared object cell for title and subtitle without interpreting user HTML', () => {
+   const block = { id: 'caption', blockType: 'table', dataSource: 'rows', columns: [
+     { field: 'title', label: 'Title', presentation: { kind: 'object', subtitleFields: ['subtitle'] } },
+   ] } as unknown as BlockConfig;
+   const { container } = render(<TableBlockRenderer block={block} runtime={makeRuntime({ rows: [{ pid: 'banner', title: '<script>unsafe</script>', subtitle: 'Supplier notice' }] })} />);
+   expect(screen.getByText('<script>unsafe</script>')).toBeTruthy();expect(screen.getByText('Supplier notice')).toBeTruthy();
+   expect(container.querySelector('script')).toBeNull();
+ });

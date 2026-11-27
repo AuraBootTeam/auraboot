@@ -30,6 +30,7 @@ public class OpenApiEndpointService {
     private final OpenApiPublicationMapper mapper;
     private final OpenApiProtocolHash hashes;
     private final ObjectMapper json;
+    private final OpenApiSynchronousIntegrationService integrations;
 
     @Transactional
     public OpenApiResourceService.Result invoke(MachinePrincipal principal, String code, String method, String recordPid,
@@ -75,6 +76,13 @@ public class OpenApiEndpointService {
             Map<String, List<String>> query, Map<String, Object> body, String key, String ifMatch) {
         String binding = contract.bindingCode();
         return switch (contract.kind()) {
+            case INTEGRATION -> {
+                if (ifMatch != null || body == null || !body.keySet().equals(Set.of("input"))
+                        || !(body.get("input") instanceof Map<?,?>))
+                    throw new IllegalArgumentException("Published integration input object required");
+                Map<String,Object> input = json.convertValue(body.get("input"), new TypeReference<>() { });
+                yield integrations.execute(principal, binding, contract.code(), key, input);
+            }
             case RESOURCE_GET -> resources.get(principal, binding, pid);
             case RESOURCE_LIST -> {
                 if (!Set.of("limit", "cursor", "filters", "sort", "direction").containsAll(query.keySet()))

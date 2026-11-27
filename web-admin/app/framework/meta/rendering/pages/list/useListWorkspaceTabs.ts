@@ -1,3 +1,4 @@
+import type { FieldConfig } from '~/framework/meta/schemas/types';
 import { findListFilterTabsBlock } from './listSchemaPolicy';
 import React, { useEffect, useMemo, useState } from 'react';
 import { type ViewFilterConfig } from '~/framework/smart/types/savedView';
@@ -5,7 +6,7 @@ import { buildApiEndpoint, getLocalizedText } from '~/routes/_shared/dynamic-rou
 import { fetchResult } from '~/shared/services/http-client';
 import { type User, ResultHelper } from '~/utils/type';
 
-import { tabFilterToQueryCondition, type ListQueryFilterCondition } from './listFilterConditions';
+import { applyApiTabCondition, applyApiUserFilters, tabFilterToQueryCondition, type ListQueryFilterCondition } from './listFilterConditions';
 import type { PaginationResult } from './listPageStateUtils';
 import type { DynamicEntity } from './listPageTypes';
 
@@ -23,13 +24,14 @@ interface ListWorkspaceTabsInput {
     chipFiltersList?: ViewFilterConfig[],
     filterFieldMap?: Map<string, any>,
   ) => string | undefined;
-  filters: Record<string, any>;
+  getSubmittedFilters: () => Record<string, any>;
   chipFilters: ViewFilterConfig[];
   modelFieldMapRef: React.RefObject<Map<string, any>>;
   token: string | null | undefined;
   keywordRef: React.RefObject<string>;
   data: DynamicEntity[];
   schemaExtension: any;
+  filterBlock?: { fields?: FieldConfig[] };
 }
 
 /** Load workspace tab counts from the active list query. */
@@ -42,13 +44,14 @@ export function useListWorkspaceTabs({
   dataReady,
   user,
   buildFiltersParam,
-  filters,
+  getSubmittedFilters,
   chipFilters,
   modelFieldMapRef,
   token,
   keywordRef,
   data,
   schemaExtension,
+  filterBlock,
 }: ListWorkspaceTabsInput) {
   const listTabsBlock = useMemo(() => {
     const found = findListFilterTabsBlock(allBlocks);
@@ -81,23 +84,23 @@ export function useListWorkspaceTabs({
     Promise.all(
       (listTabsBlock.tabs as any[]).map(async (tab) => {
         const condition = tabFilterToQueryCondition(tab.filter, user?.pid);
-        const queryFilters = buildFiltersParam(
-          condition,
-          filters,
-          chipFilters,
-          modelFieldMapRef.current,
-        );
+        const api = schema.dataSource?.type === 'api' && Boolean(schema.dataSource.endpoint);
+        const submitted = getSubmittedFilters();
+        const params: Record<string, any> = api ? { page: 0, size: 1 } : { pageNum: 1, pageSize: 1 };
+        if (keywordRef.current.trim()) params.keyword = keywordRef.current.trim();
+        if (api) {
+          applyApiUserFilters(params, submitted, filterBlock?.fields);
+          applyApiTabCondition(params, condition);
+        } else {
+          const queryFilters = buildFiltersParam(condition, submitted, chipFilters, modelFieldMapRef.current);
+          if (queryFilters) params.filters = queryFilters;
+        }
         const result = await fetchResult<PaginationResult<DynamicEntity>>(
-          `${buildApiEndpoint(schema.modelCode!)}/list`,
+          api ? schema.dataSource.endpoint : `${buildApiEndpoint(schema.modelCode!)}/list`,
           {
-            method: 'get',
+            method: api ? (schema.dataSource.method || 'get') : 'get',
             token: token || undefined,
-            params: {
-              pageNum: 1,
-              pageSize: 1,
-              ...(keywordRef.current.trim() ? { keyword: keywordRef.current.trim() } : {}),
-              ...(queryFilters ? { filters: queryFilters } : {}),
-            },
+            params,
           },
         );
         if (!ResultHelper.isSuccess(result) || !result.data || Array.isArray(result.data))
@@ -116,7 +119,7 @@ export function useListWorkspaceTabs({
     return () => {
       current = false;
     };
-  }, [listTabsBlock, schema?.modelCode, data, dataReady, filters, chipFilters, token, user?.pid]);
+  }, [listTabsBlock, filterBlock, schema?.modelCode, schema?.dataSource, data, dataReady, getSubmittedFilters, chipFilters, token, user?.pid]);
   const workspace = schemaExtension.presentation === 'workspace';
 
   return { listPageTitle, listTabsBlock, workspaceTabCounts, workspaceTabCountError, workspace };

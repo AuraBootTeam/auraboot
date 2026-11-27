@@ -131,7 +131,7 @@ const CascadeDropdown: React.FC<CascadeDropdownProps> = ({
   };
 
   return (
-    <div ref={containerRef} className="relative min-w-[150px] flex-1">
+    <div ref={containerRef} className="relative min-w-32 flex-1">
       <label className="text-text-2 mb-1 block text-xs font-medium dark:text-gray-400">
         {levelLabel}
       </label>
@@ -143,7 +143,7 @@ const CascadeDropdown: React.FC<CascadeDropdownProps> = ({
         onClick={handleTriggerClick}
         disabled={isDisabled}
         className={cn(
-          'rounded-control bg-panel flex h-9 w-full items-center justify-between border px-3 py-2 text-sm shadow-sm',
+          'rounded-control bg-panel flex h-[var(--ds-control-field)] w-full items-center justify-between border px-3 text-sm shadow-card',
           'focus-visible:shadow-focus focus:outline-none',
           'disabled:cursor-not-allowed disabled:opacity-50',
           'dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100',
@@ -422,7 +422,7 @@ export const CascadeSelect: React.FC<CascadeSelectProps> = ({
   };
 
   return (
-    <div className={cn('space-y-2', className)}>
+    <div className={cn('space-y-1', className)}>
       {/* Label */}
       {label && (
         <label className="text-text-2 block text-sm font-medium dark:text-gray-300">
@@ -455,10 +455,7 @@ export const CascadeSelect: React.FC<CascadeSelectProps> = ({
         })}
       </div>
 
-      {/* Selected path display */}
-      {value.length > 0 && value.some(Boolean) && (
-        <div className="text-text-2 text-sm dark:text-gray-400">Selected: {getDisplayValue()}</div>
-      )}
+      {value.some(Boolean) && <span className="sr-only">{getDisplayValue()}</span>}
 
       {/* Error */}
       {error && <p className="text-status-red text-sm">{error}</p>}

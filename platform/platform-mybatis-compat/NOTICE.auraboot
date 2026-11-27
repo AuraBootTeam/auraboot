@@ -1,0 +1,11 @@
+AuraBoot compatible MyBatis security carrier
+
+This vendor-qualified build is not an official MyBatis release.
+It preserves the implementation class bytes of org.mybatis:mybatis:3.5.19,
+replaces its relocated OGNL with ognl:ognl:3.4.17, and relocates
+org.javassist:javassist:3.33.0-GA into the original MyBatis namespaces.
+Original upstream license and notice resources remain in the archive.
+Input coordinates and SHA-256 digests are recorded in inputs.json.
+
+The OGNL stricter-invocation list is defense in depth, not a sandbox for
+untrusted expressions. Application access-control requirements still apply.

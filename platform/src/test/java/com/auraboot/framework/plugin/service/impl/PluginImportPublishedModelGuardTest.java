@@ -45,7 +45,16 @@ class PluginImportPublishedModelGuardTest {
         var ordered=inOrder(schemas,events,permissions);
         ordered.verify(schemas).syncModelToTable(eq("fixture_guarded"),any());
         ordered.verify(events).publishEvent(argThat((ModelTablePublishedEvent e)->"fixture_guarded".equals(e.getModelCode())));
-        ordered.verify(permissions).registerPermissions("fixture_guarded","fixture",7L);
+        // autoAssign (not register): a model arriving in this tenant for the FIRST time must
+        // receive role-template grants, otherwise every non-admin role 403s after import
+        // (score-import production incident). generatePermissions only grants when the
+        // resource node is newly created, so re-imports stay grant-neutral.
+        ordered.verify(permissions).autoAssignPermissions("fixture_guarded","fixture",7L);
+    }
+
+    @Test void publishedImportNeverFallsBackToGrantFreeRegistration(){
+        run(true);
+        verify(permissions, never()).registerPermissions(anyString(), anyString(), anyLong());
     }
     @Test void hookRejectionEscapesAndDoesNotRegisterPermissions(){
         doThrow(new IllegalStateException("immutable guard rejected schema"))

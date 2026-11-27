@@ -7,6 +7,7 @@ import { test, expect, type Page } from '../../fixtures';
 import { ensureSidebarExpanded } from '../helpers';
 import { loginViaUI } from '../../helpers/auth-fixtures';
 import {
+  attachFixedCountSource,
   createCorrectedBomWorkbook,
   dynamicCreate,
   executeCommand,
@@ -20,6 +21,7 @@ import {
   readDynamicRecord,
   reassignRecordOwnerByEmail,
   setYunhanMockScenario,
+  trackFixtureRow,
   writeMiniBoardZip,
   QUOTE_ROLE_TEST_PASSWORD,
   yunhanMockControlUrl,
@@ -479,7 +481,6 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         bom_project_customer_id: accountId,
         bom_project_quality_level: 'industrial',
         bom_pcba_code: `SSG-${suffix}`.slice(0, 24),
-        bom_project_library_source: 'excel_current_library',
       });
       const projectId = String(project.recordId ?? '');
       expect(projectId, 'sales creates own BOM project').toBeTruthy();
@@ -1430,12 +1431,35 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         qo_ci_quote_id: quoteId, qo_ci_cost_type: 'packaging', qo_ci_amount: 1,
         qo_ci_source: 'manual_override', qo_ci_override: true,
       }, aclFixtures);
-      const boardScopeHitId = await dynamicCreate(exporterPage, 'qo_process_fee_rule_hit_common', {
-        qo_pfrh_quote_id: quoteId, qo_pfrh_process_stage: 'SMT',
-        qo_pfrh_match_status: 'matched', qo_pfrh_point_source: 'SIMPLE_COUNT_V1',
-        qo_pfrh_point_basis: 'SIMPLE_COUNT_V1', qo_pfrh_metering_qty: 3,
-        qo_pfrh_unit_points: 0.5, qo_pfrh_total_points: 1.5,
-      }, aclFixtures);
+      // Internal rule hits have no public creation grant, including for administrators.
+      // Reuse the real fixed-count input fixture and its normal application command.
+      const forbiddenHitCreate = await exporterPage.request.post(
+        '/api/dynamic/qo_process_fee_rule_hit_common/create',
+        { data: { qo_pfrh_quote_id: quoteId, qo_pfrh_process_stage: 'SMT' } },
+      );
+      expect(forbiddenHitCreate.status(), 'internal rule hits reject public creation').toBe(403);
+      const rfqs = await queryDynamicRecords(exporterPage, 'crm_customer_request_pcba_rfq', [
+        { fieldName: 'crm_customer_request_id', operator: 'EQ', value: quote.qo_quote_customer_request_id },
+      ]);
+      expect(rfqs, 'the uploaded quote retains its own RFQ').toHaveLength(1);
+      const countInputs: CreatedRows = {
+        ...created,
+        rows: [{ model: 'crm_customer_request_pcba_rfq', pid: String(rfqs[0].pid) }],
+      };
+      await attachFixedCountSource(exporterPage, countInputs);
+      await reassignRecordOwnerByEmail(countInputs.rows.slice(1), SALES_USER.email);
+      await executeCommand(page, 'qo_quote_common:compute_process_fee',
+        { count_hole_mode: 'none' }, quoteId, 'update');
+      const boardScopeHits = await queryDynamicRecords(page, 'qo_process_fee_rule_hit_common', [
+        { fieldName: 'qo_pfrh_quote_id', operator: 'EQ', value: quoteId },
+        { fieldName: 'qo_pfrh_process_stage', operator: 'EQ', value: 'SMT' },
+      ]);
+      expect(boardScopeHits).toHaveLength(1);
+      expect(Number(boardScopeHits[0].qo_pfrh_metering_qty)).toBe(3);
+      expect(Number(boardScopeHits[0].qo_pfrh_total_points)).toBe(1.5);
+      const boardScopeHitId = String(boardScopeHits[0].pid);
+      trackFixtureRow(exporterPage, aclFixtures,
+        { model: 'qo_process_fee_rule_hit_common', pid: boardScopeHitId });
       await reassignRecordOwnerByEmail(aclFixtures, SALES_USER.email);
 
       const ownedRepricePreviews = await queryDynamicRecords(page, 'qo_reprice_preview_common', [

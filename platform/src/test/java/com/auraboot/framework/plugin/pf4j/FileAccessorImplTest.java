@@ -26,6 +26,19 @@ import static org.mockito.Mockito.when;
 class FileAccessorImplTest {
 
     @Test
+    void stamped_artifact_open_and_describe_reauthorize_before_any_bytes() {
+        var entity = file("artifact-pid", "stored.txt", "generated.txt"); entity.setStatus("success");
+        entity.setArtifactAuthorization("host-owned-provenance");
+        when(fileService.getFileById("artifact-pid")).thenReturn(entity);
+        org.mockito.Mockito.doThrow(new org.springframework.security.access.AccessDeniedException("revoked"))
+                .when(fileService).assertFileReadAllowed(entity);
+        var accessor = new FileAccessorImpl(fileService, storageProvider,42L);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> accessor.open("artifact-pid")).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> accessor.describe("artifact-pid")).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        org.mockito.Mockito.verifyNoInteractions(storageProvider);
+    }
+
+    @Test
     void linkExisting_persists_uploaded_file_relation_without_copying_bytes() {
         FileEntity entity = file("upload-pid", "stored.xlsx", "upload.xlsx");
         entity.setCreatedBy(42L);

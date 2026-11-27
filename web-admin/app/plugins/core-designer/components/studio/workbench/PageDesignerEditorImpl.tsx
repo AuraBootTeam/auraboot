@@ -29,7 +29,7 @@ import { pageManagerService } from '~/plugins/core-designer/components/studio/se
 import type { PageMeta } from '~/plugins/core-designer/components/studio/services/page-manager';
 import {
   resolveLocalizedText,
-  type PageSchema,
+  type UnifiedPageSchema,
 } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 import { DEVICE_PRESETS } from '~/plugins/core-designer/components/studio/workbench/canvas/devices/presets';
 import { initRegistry } from '~/plugins/core-designer/components/studio/registry';
@@ -51,7 +51,7 @@ function sanitizeExportFilePart(value: string | undefined | null): string {
   return cleaned || 'page';
 }
 
-export function parseImportedPageSchema(raw: unknown): PageSchema {
+export function parseImportedPageSchema(raw: unknown): UnifiedPageSchema {
   if (!raw || typeof raw !== 'object') {
     throw new Error('导入文件不是有效 JSON 对象');
   }
@@ -79,11 +79,11 @@ export function parseImportedPageSchema(raw: unknown): PageSchema {
   }
 
   return {
-    ...(candidate as Partial<PageSchema>),
+    ...(candidate as Partial<UnifiedPageSchema>),
     schemaVersion: 2,
-    kind: candidate.kind as PageSchema['kind'],
-    layout: candidate.layout as PageSchema['layout'],
-    blocks: candidate.blocks as PageSchema['blocks'],
+    kind: candidate.kind as UnifiedPageSchema['kind'],
+    layout: candidate.layout as UnifiedPageSchema['layout'],
+    blocks: candidate.blocks as UnifiedPageSchema['blocks'],
     id: typeof candidate.id === 'string' ? candidate.id : '',
   };
 }
@@ -99,9 +99,9 @@ export function parseImportedPageSchema(raw: unknown): PageSchema {
  * `__tests__/PageDesignerEditorImpl.test.tsx`.
  */
 export function applySettingsToSchema(
-  schema: PageSchema,
+  schema: UnifiedPageSchema,
   settings: { page: { enableMultiView: boolean; formPresentation?: FormPresentation } },
-): PageSchema {
+): UnifiedPageSchema {
   return {
     ...schema,
     extension: {
@@ -112,7 +112,7 @@ export function applySettingsToSchema(
   };
 }
 
-export function readEnableMultiView(schema: PageSchema | null | undefined): boolean {
+export function readEnableMultiView(schema: UnifiedPageSchema | null | undefined): boolean {
   return schema?.extension?.enableMultiView === true;
 }
 
@@ -139,8 +139,8 @@ export default function PageDesignerEditorImpl() {
   const { locale } = useI18n();
   const schemaImportInputRef = useRef<HTMLInputElement | null>(null);
 
-  // PageSchema V2 state
-  const [schema, setSchema] = useState<PageSchema | null>(null);
+  // UnifiedPageSchema V2 state
+  const [schema, setSchema] = useState<UnifiedPageSchema | null>(null);
 
   // DSL history for undo/redo — initialized with a placeholder, updated once schema loads
   const dslHistory = usePageSchemaHistory(
@@ -188,7 +188,7 @@ export default function PageDesignerEditorImpl() {
 
   // Ref for debounced auto-save timer
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const latestSchemaRef = useRef<PageSchema | null>(null);
+  const latestSchemaRef = useRef<UnifiedPageSchema | null>(null);
 
   // Clean up debounce timer on unmount
   useEffect(() => {
@@ -244,7 +244,7 @@ export default function PageDesignerEditorImpl() {
 
   // Schema change handler — also pushes to history and schedules auto-save
   const handleSchemaChange = useCallback(
-    (newSchema: PageSchema) => {
+    (newSchema: UnifiedPageSchema) => {
       setSchema(newSchema);
       latestSchemaRef.current = newSchema;
       dslHistory.pushState(newSchema);
@@ -288,7 +288,7 @@ export default function PageDesignerEditorImpl() {
 
   // Schema save handler (called by DesignerRouter sub-components on explicit save)
   const handleSchemaSave = useCallback(
-    async (newSchema: PageSchema) => {
+    async (newSchema: UnifiedPageSchema) => {
       if (!id) return;
       await pageManagerService.updatePageSchema(id, newSchema);
       toolbarActions.markSaved();
@@ -359,7 +359,7 @@ export default function PageDesignerEditorImpl() {
       try {
         const text = await file.text();
         const imported = parseImportedPageSchema(JSON.parse(text));
-        const currentIdentitySchema: PageSchema = {
+        const currentIdentitySchema: UnifiedPageSchema = {
           ...imported,
           id: schema?.id || meta?.id || id || imported.id,
           pageKey: schema?.pageKey || meta?.pageKey || imported.pageKey,
@@ -392,9 +392,9 @@ export default function PageDesignerEditorImpl() {
   // Shared AI merge handler — used by both toolbar (legacy dialog) and AI panel
   const handleAiGenerated = useCallback(
     (generated: {
-      kind: PageSchema['kind'];
-      blocks: PageSchema['blocks'];
-      layout: PageSchema['layout'];
+      kind: UnifiedPageSchema['kind'];
+      blocks: UnifiedPageSchema['blocks'];
+      layout: UnifiedPageSchema['layout'];
       schemaVersion: 2;
       mergeMode?: MergeMode;
     }) => {
@@ -403,11 +403,11 @@ export default function PageDesignerEditorImpl() {
       const mergedBlocks =
         mergeMode === 'append' ? [...existingBlocks, ...generated.blocks] : generated.blocks;
 
-      const aiSchema: PageSchema = {
+      const aiSchema: UnifiedPageSchema = {
         ...(schema || {}),
         schemaVersion: 2 as const,
         id: meta?.id || '',
-        kind: (generated.kind as PageSchema['kind']) || 'list',
+        kind: (generated.kind as UnifiedPageSchema['kind']) || 'list',
         modelCode: schema?.modelCode || meta?.viewModelCode || '',
         blocks: mergedBlocks,
         layout: generated.layout,

@@ -104,7 +104,7 @@ public class FileAccessorImpl implements FileAccessor {
         requireText(entityId, "entityId");
         requireText(fieldName, "fieldName");
         fileService.assertFileRelationMutationAllowed(entityType, entityId, fieldName);
-        SavedFile saved = save(originalName, contentType, bytes);
+        SavedFile saved = saveForRelation(originalName, contentType, bytes, entityType, entityId, fieldName);
         FileRelationRequestDTO relation = new FileRelationRequestDTO();
         relation.setEntityType(entityType);
         relation.setEntityId(entityId);
@@ -123,7 +123,7 @@ public class FileAccessorImpl implements FileAccessor {
         requireText(entityId, "entityId");
         requireText(fieldName, "fieldName");
         fileService.assertFileRelationMutationAllowed(entityType, entityId, fieldName);
-        SavedFile saved = save(originalName, contentType, bytes);
+        SavedFile saved = saveForRelation(originalName, contentType, bytes, entityType, entityId, fieldName);
         FileRelationRequestDTO relation = new FileRelationRequestDTO();
         relation.setEntityType(entityType);
         relation.setEntityId(entityId);
@@ -133,6 +133,17 @@ public class FileAccessorImpl implements FileAccessor {
             throw new IllegalStateException("additional file relation was not persisted");
         }
         return saved;
+    }
+
+    private SavedFile saveForRelation(String originalName,String contentType,byte[] bytes,
+            String model,String pid,String relation) {
+        var stamp=com.auraboot.framework.meta.security.DocumentArtifactCommandScope.captureFile(
+                model,pid,relation,safeOriginalName(originalName),contentType);
+        if(stamp==null)return save(originalName,contentType,bytes);
+        var stored=fileService.persistBusinessArtifact(
+                new ByteArrayMultipartFile("file",safeOriginalName(originalName),contentType,bytes),userId,stamp);
+        if(stored==null || stored.getPid()==null || stored.getFileSize()==null)throw new IllegalStateException("Document file was not persisted");
+        return new SavedFile(stored.getPid(),stored.getOriginalName(),stored.getFileSize(),"/api/file/download/"+stored.getPid());
     }
 
     private static String firstText(String first, String second) {
@@ -181,6 +192,7 @@ public class FileAccessorImpl implements FileAccessor {
         if (Boolean.TRUE.equals(entity.getDeletedFlag()) || "deleted".equalsIgnoreCase(entity.getStatus())) {
             throw new IllegalArgumentException("File is not active: " + fileId);
         }
+        if (entity.getArtifactAuthorization() != null) fileService.assertFileReadAllowed(entity);
         return entity;
     }
 

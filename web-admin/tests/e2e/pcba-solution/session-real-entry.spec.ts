@@ -45,6 +45,15 @@ test.describe('X01 session real-entry', () => {
     const body = await renew.json();
     expect(body?.renewed, 'fresh session is outside the renewal window: renewal must not fire unconditionally').toBe(false);
 
+    await page.getByTestId('sidebar').locator('a[href="/p/crm_account_common"]').click();
+    const search = page.getByTestId('list-search-input').first();
+    await search.fill('Session activity proof');
+    await search.press('Enter');
+    await expect(page.getByTestId('dynamic-list')).toHaveAttribute('data-ready', 'true');
+    await search.focus();
+    await expect(search).toBeFocused();
+    await test.info().attach('session-visible-page-activity', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+
     const { client: verify } = await openPgClient();
     try {
       const row = await verify.query(
@@ -113,5 +122,10 @@ test.describe('X01 session real-entry', () => {
     await page.goto('/');
     await page.waitForURL(/login/, { timeout: 20_000 }).catch(() => {});
     expect(page.url(), 'the app lands on the login flow after revocation').toMatch(/login/);
+    await expect(page.getByRole('button', { name: '立即登录', exact: true })).toBeVisible();
+    await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true');
+    await expect(page.locator('#identifier')).toBeVisible();
+    await expect(page.locator('#password')).toBeVisible();
+    await page.screenshot({ path: test.info().outputPath('revoked-session-login-ready.png'), fullPage: true });
   });
 });

@@ -123,6 +123,10 @@ public class RolePermission {
     @TableField(value = "data_scope_ast", typeHandler = JsonbObjectTypeHandler.class, jdbcType = JdbcType.OTHER)
     private Object dataScopeAst;
 
+    /** Field allowance on this exact grant; null retains legacy behavior. */
+    @TableField(value = "field_scope", typeHandler = JsonbObjectTypeHandler.class, jdbcType = JdbcType.OTHER)
+    private Object fieldScope;
+
     /** Provenance: which package/override produced this grant (explainer/audit). */
     private String sourceRef;
 

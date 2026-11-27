@@ -113,7 +113,8 @@ final class PluginImportChangePreview {
         if (manifest.getRoles() != null) {
             for (RoleDefinitionDTO role : manifest.getRoles()) {
                 ResourceAction action = resourceImporter.checkRoleExists(tenantId, role.getCode())
-                        ? ResourceAction.UPDATE : ResourceAction.CREATE;
+                        || resourceImporter.checkRetiredRoleExists(tenantId, role.getCode())
+                        ? ResourceAction.SKIP : ResourceAction.CREATE;
                 result.addChange(ResourceType.ROLE, enrichWithUserModified(tenantId, ResourceType.ROLE, role.getCode(),
                         ImportPreviewResult.ResourceChange.builder()
                         .resourceType(ResourceType.ROLE)

@@ -41,6 +41,9 @@ import static org.mockito.Mockito.when;
  */
 @ExtendWith(MockitoExtension.class)
 class RolePermissionServiceImplTest {
+    @org.mockito.Mock
+    private com.auraboot.framework.permission.service.RoleAuthorizationWriteLock authorizationWriteLock;
+
 
     @Mock
     private RolePermissionMapper rolePermissionMapper;
@@ -57,6 +60,8 @@ class RolePermissionServiceImplTest {
     @Mock
     private DataScopeService dataScopeService;
 
+    @Mock private com.auraboot.framework.permission.service.RoleAuthorizationCopyService authorizationCopies;
+
     @InjectMocks
     private RolePermissionServiceImpl service;
 
@@ -68,6 +73,63 @@ class RolePermissionServiceImplTest {
     @AfterEach
     void tearDown() {
         MetaContext.clear();
+    }
+
+    private RolePermission capabilityBinding(String type, String source, Long snapshot, boolean deleted) {
+        Role role = new Role(); role.setId(7L); role.setTenantId(100L);
+        when(roleMapper.selectById(7L)).thenReturn(role);
+        Permission permission = new Permission(); permission.setId(50L); permission.setTenantId(100L);
+        when(permissionMapper.findByIds(anyList())).thenReturn(List.of(permission));
+        RolePermission binding = new RolePermission(); binding.setPid("fixture-binding"); binding.setRoleId(7L);
+        binding.setTenantId(100L); binding.setPermissionId(50L); binding.setGrantType(type);
+        binding.setSourceRef(source); binding.setSnapshotId(snapshot); binding.setDeletedFlag(deleted);
+        when(rolePermissionMapper.findAllForCapabilityAuthoring(7L, 100L)).thenReturn(List.of(binding));
+        return binding;
+    }
+
+    @Test void capabilityReviewAllowsDirectAndDetachedCopyRemovalWithoutWriting() {
+        var binding = capabilityBinding("grant", null, null, false);
+        service.validateCapabilityChanges(7L, List.of(), List.of(50L));
+        binding.setSourceRef("copy:"+com.auraboot.framework.common.util.UniqueIdGenerator.generate()+":"
+                +com.auraboot.framework.common.util.UniqueIdGenerator.generate());
+        service.validateCapabilityChanges(7L, List.of(), List.of(50L));
+        org.mockito.Mockito.verifyNoInteractions(authorizationWriteLock, eventPublisher);
+    }
+
+    @Test void capabilityReviewNeverDeletesNegativeOrPublishedBindings() {
+        var binding = capabilityBinding("deny", null, null, false);
+        assertThatThrownBy(() -> service.validateCapabilityChanges(7L, List.of(), List.of(50L))).isInstanceOf(BusinessException.class);
+        binding.setGrantType("grant"); binding.setSnapshotId(991L);
+        assertThatThrownBy(() -> service.validateCapabilityChanges(7L, List.of(), List.of(50L))).isInstanceOf(BusinessException.class);
+        binding.setSnapshotId(null); binding.setSourceRef("package:fixture");
+        assertThatThrownBy(() -> service.validateCapabilityChanges(7L, List.of(), List.of(50L))).isInstanceOf(BusinessException.class);
+        org.mockito.Mockito.verifyNoInteractions(authorizationWriteLock, eventPublisher);
+    }
+
+    @Test void capabilityAdditionCannotReplaceADenyOrReviveAManagedTombstone() {
+        var binding = capabilityBinding("deny", null, null, false);
+        assertThatThrownBy(() -> service.validateCapabilityChanges(7L, List.of(50L), List.of())).isInstanceOf(BusinessException.class);
+        binding.setGrantType("grant"); binding.setDeletedFlag(true); binding.setSnapshotId(991L);
+        assertThatThrownBy(() -> service.validateCapabilityChanges(7L, List.of(50L), List.of())).isInstanceOf(BusinessException.class);
+        binding.setSnapshotId(null); binding.setSourceRef("copy:unverified");
+        assertThatThrownBy(() -> service.validateCapabilityChanges(7L, List.of(50L), List.of())).isInstanceOf(BusinessException.class);
+        org.mockito.Mockito.verifyNoInteractions(authorizationWriteLock, eventPublisher);
+    }
+
+    @Test void capabilityReviewRejectsForeignRoleBeforeReadingItsBindings() {
+        Role role = new Role(); role.setId(7L); role.setTenantId(200L);
+        when(roleMapper.selectById(7L)).thenReturn(role);
+        assertThatThrownBy(() -> service.validateCapabilityChanges(7L, List.of(50L), List.of()))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        org.mockito.Mockito.verifyNoInteractions(permissionMapper, rolePermissionMapper, authorizationWriteLock, eventPublisher);
+    }
+
+    @Test void capabilityReviewDoesNotConvertAStoreFailureIntoAnEmptyBindingSet() {
+        capabilityBinding("grant", null, null, false);
+        when(rolePermissionMapper.findAllForCapabilityAuthoring(7L, 100L)).thenThrow(new IllegalStateException("synthetic source store failure"));
+        assertThatThrownBy(() -> service.validateCapabilityChanges(7L, List.of(), List.of(50L)))
+                .isInstanceOf(IllegalStateException.class).hasMessage("synthetic source store failure");
+        org.mockito.Mockito.verifyNoInteractions(authorizationWriteLock, eventPublisher);
     }
 
     @Test
@@ -151,6 +213,16 @@ class RolePermissionServiceImplTest {
         verify(dataScopeService).setScope(100L, 7L, "crm.account", "read", "self", "MAX");
         verify(rolePermissionMapper, never()).batchInsert(anyList());
         verify(eventPublisher).publishEvent(org.mockito.ArgumentMatchers.isA(com.auraboot.framework.permission.event.RolePermissionChangedEvent.class));
+    }
+
+    @Test void inheritedDefaultsDoNotMaterializeGenericEntryFallbackScopes() {
+        Role role = new Role(); role.setId(7L); role.setDefaultDataScopeType("all");
+        when(roleMapper.selectById(7L)).thenReturn(role);
+        when(dataScopeService.getScopesByRole(100L, 7L)).thenReturn(List.of());
+        Permission fallback = perm(50L, "sl.sales.manage", "view"); fallback.setCode("sl.sales.manage");
+        when(permissionMapper.findByIds(anyList())).thenReturn(List.of(fallback));
+        service.assignPermissionsToRole(7L, List.of(50L));
+        verify(dataScopeService, never()).setScope(anyLong(), anyLong(), anyString(), anyString(), anyString(), anyString());
     }
 
     private Permission perm(Long id, String resourceCode, String action) {
@@ -375,24 +447,25 @@ class RolePermissionServiceImplTest {
         assertThat(byResource).containsEntry("MODEL", 1L);
     }
 
-    @Test
-    void copyRolePermissionsSkipsWhenSourceEmpty() {
-        when(rolePermissionMapper.findByRoleId(7L, 100L)).thenReturn(List.of());
-
-        assertThat(service.copyRolePermissions(7L, 8L)).isTrue();
-        verify(rolePermissionMapper, never()).batchInsert(anyList());
+    private void copyRoles() {
+        for (Long id : List.of(7L, 8L)) {
+            Role role = new Role(); role.setId(id); role.setTenantId(100L);
+            org.mockito.Mockito.lenient().when(roleMapper.selectById(id)).thenReturn(role);
+        }
+    }
+    @Test void copyRejectsForeignNumericTargetEvenWhenTheSourceIsEmpty() {
+        copyRoles(); Role foreign = new Role(); foreign.setTenantId(1L);
+        when(roleMapper.selectById(8L)).thenReturn(foreign);
+        assertThatThrownBy(() -> service.copyRolePermissions(7L, 8L))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        org.mockito.Mockito.verifyNoInteractions(rolePermissionMapper, eventPublisher);
     }
 
     @Test
-    void copyRolePermissionsAssignsToTarget() {
-        RolePermission rp = new RolePermission();
-        rp.setPermissionId(50L);
-        when(rolePermissionMapper.findByRoleId(7L, 100L)).thenReturn(List.of(rp));
-
-        assertThat(service.copyRolePermissions(7L, 8L)).isTrue();
-
-        ArgumentCaptor<List<RolePermission>> captor = ArgumentCaptor.forClass(List.class);
-        verify(rolePermissionMapper).batchInsert(captor.capture());
-        assertThat(captor.getValue().get(0).getRoleId()).isEqualTo(8L);
+    void copyRolePermissionsDelegatesCompleteStateInsteadOfFlatteningIds() {
+        copyRoles();when(authorizationCopies.copy(7L,8L)).thenReturn(true);
+        assertThat(service.copyRolePermissions(7L,8L)).isTrue();
+        verify(authorizationCopies).copy(7L,8L);
+        org.mockito.Mockito.verifyNoInteractions(rolePermissionMapper,eventPublisher);
     }
 }

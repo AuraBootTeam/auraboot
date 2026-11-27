@@ -1,0 +1,5 @@
+{
+  "none": { "zh-CN": "无", "en": "None" },
+  "guidance": { "zh-CN": "管理包含写和读，写包含读。现有数据范围、字段策略和发布门禁继续生效。", "en": "Manage includes Write and Read; Write includes Read. Existing record scopes, field policies and release gates still apply." },
+  "legacy": { "zh-CN": "存在历史零散授权，尚未归入完整级别。选择级别后请预览差异，保存前授权保持不变。", "en": "Legacy grants do not form a complete level. Select a level and review the differences; access remains unchanged until saved." }
+}

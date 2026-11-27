@@ -1,11 +1,13 @@
 import type { PluginResource } from '../_shared/types.js'
 
 export const RESOURCES: PluginResource[] = [
+  {key:'settings.navigation',path:'/settings/navigation',title:{en:'Menu management',zh:'菜单管理'},icon:'menu',file:'./plugins/core-settings/pages/navigation/NavigationManagement.tsx'},
+  {key:'settings.navigation.target',path:'/navigation/:entryPid',title:{en:'External page',zh:'外部页面'},icon:'globe',file:'./plugins/core-settings/pages/navigation/EmbeddedNavigation.tsx'},
   { key: 'settings.plugins', path: '/settings/plugins', title: { en: 'Plugins', zh: '插件管理' }, icon: 'puzzle', menu: { order: 10, group: 'settings' }, file: './plugins/core-settings/pages/settings/PluginManagement.tsx' },
   { key: 'settings.user-prefs', path: '/settings/user-preferences', title: { en: 'User Preferences', zh: '用户偏好' }, icon: 'sliders', menu: { order: 20, group: 'settings' }, file: './plugins/core-settings/pages/settings/user-preferences.tsx' },
   { key: 'settings.notif-prefs', path: '/settings/notification-preferences', title: { en: 'Notification Preferences', zh: '通知偏好' }, icon: 'bell', menu: { order: 40, group: 'settings' }, file: './plugins/core-settings/pages/settings/notification-preferences.tsx' },
   { key: 'settings.billing', path: '/settings/billing', title: { en: 'Billing', zh: '账单' }, icon: 'credit-card', menu: { order: 50, group: 'settings' }, file: './plugins/core-settings/pages/settings/billing.tsx' },
-  { key: 'settings.webhooks', path: '/settings/webhooks', title: { en: 'Webhooks', zh: 'Webhooks' }, icon: 'webhook', menu: { order: 60, group: 'settings' }, file: './plugins/core-settings/pages/settings/webhooks.tsx' },
+  { key: 'settings.webhooks', path: '/settings/webhooks', title: { en: 'Webhooks', zh: 'Webhooks' }, icon: 'webhook', file: './plugins/core-settings/pages/settings/webhooks.tsx' },
   { key: 'settings.api-docs', path: '/settings/api-docs', title: { en: 'Open Platform', zh: '开放平台' }, icon: 'file-code', menu: { order: 70, group: 'settings' }, file: './plugins/core-settings/pages/settings/api-docs.tsx' },
   { key: 'settings.connectors', path: '/settings/connectors', title: { en: 'Connectors', zh: '连接器' }, icon: 'plug', menu: { order: 80, group: 'settings' }, file: './plugins/core-settings/pages/settings/connectors.tsx' },
   { key: 'settings.exchange-rates', path: '/settings/exchange-rates', title: { en: 'Exchange Rates', zh: '汇率' }, icon: 'banknote', menu: { order: 90, group: 'settings' }, file: './plugins/core-settings/pages/settings/exchange-rates.tsx' },

@@ -64,6 +64,8 @@ Pages are DSL documents that compose blocks (list, form, detail, custom). There 
 ### Command
 A command is the only sanctioned write path. Every command — whether triggered by a button, an automation rule, a workflow task, or an AI agent — flows through the same multi-stage pipeline: resolve, authenticate, authorize, validate against entitlement and SoD, check preconditions, guard state transitions, execute, audit, dispatch events, and trigger side effects.
 
+> **Pipeline routing (2026-11-15, default on):** the default REST CRUD surface for models without a custom command (`/api/dynamic/...`) now routes through synthesized `dynamic.*` commands (seeded per tenant on first use), so SoD, idempotency, state guards, events and pipeline auditing apply to it. Handler-owned invocation authorization re-derives `model.{pageKey}.{op}` server-side, fail-closed. The pre-pipeline direct-write path (permission checks + direct audit, `phaseReached="direct"`) remains available as an explicit rollback switch: set `aura.command.synthesized-dynamic-writes=false`.
+
 This contract is what makes the rest of the platform possible. Without it, audit and AI-safe execution would be aspirations, not guarantees.
 
 → [Commands](https://docs.auraboot.com)
@@ -118,7 +120,7 @@ Several capabilities exist on top of this open-core architecture and are offered
 - **Observability Pro** — distributed tracing wired into the command pipeline, end-to-end latency budgets per stage
 - **Advanced governance** — extended ABAC policies, field-level masking strategies, cross-organization data-scope delegation
 
-These are extensions of the same contracts described above, not parallel runtimes. The open-source platform remains the truth source for how commands, permissions, plugins, and processes are defined.
+These are extensions of the same contracts described above, not parallel runtimes. The platform source remains the truth source for how commands, permissions, plugins, and processes are defined.
 
 ---
 

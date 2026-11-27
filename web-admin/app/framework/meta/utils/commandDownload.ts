@@ -15,11 +15,16 @@ function filenameFromContentDisposition(header: string | null): string | undefin
 }
 
 export class FileDownloadHttpError extends Error {
-  constructor(readonly status: number, message: string) { super(message); }
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 
 export class FileDownloadValidationError extends Error {
-  constructor(readonly code: 'CONTENT_TYPE' | 'ATTACHMENT' | 'EMPTY') {
+  constructor(readonly code: 'CONTENT_TYPE' | 'ATTACHMENT' | 'DISPOSITION' | 'EMPTY') {
     super('The protected file response failed validation');
   }
 }
@@ -27,32 +32,62 @@ export class FileDownloadValidationError extends Error {
 export interface FileDownloadOptions {
   expectedContentTypes?: readonly string[];
   requireAttachment?: boolean;
+  /** Native previewable files use inline; both forms must provide a server filename. */
+  requireNamedDisposition?: boolean;
   requireNonEmpty?: boolean;
   resolveFailure?: (response: Response) => Promise<string>;
+  signal?: AbortSignal;
 }
 
-export async function downloadWithAuth(url: string, options: FileDownloadOptions = {}): Promise<void> {
-  if (typeof window === 'undefined' || typeof document === 'undefined') return;
-
+/** Read protected bytes once; callers own presentation and object-URL lifetime. */
+export async function readProtectedFile(url: string, options: FileDownloadOptions = {}) {
   const response = await fetch(url, {
     method: 'GET',
     credentials: 'same-origin',
+    ...(options.signal ? { signal: options.signal } : {}),
   });
   if (!response.ok) {
-    throw new FileDownloadHttpError(response.status, options.resolveFailure
-      ? await options.resolveFailure(response) : `Download failed: ${response.status} ${response.statusText}`);
+    throw new FileDownloadHttpError(
+      response.status,
+      options.resolveFailure
+        ? await options.resolveFailure(response)
+        : `Download failed: ${response.status} ${response.statusText}`,
+    );
   }
   const disposition = response.headers.get('Content-Disposition');
   const fileName = filenameFromContentDisposition(disposition);
   const contentType = response.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase();
-  if (options.expectedContentTypes?.length && !options.expectedContentTypes.some(type => type.toLowerCase() === contentType)) {
+  if (
+    options.expectedContentTypes?.length &&
+    !options.expectedContentTypes.some((type) => type.toLowerCase() === contentType)
+  ) {
     throw new FileDownloadValidationError('CONTENT_TYPE');
   }
-  if (options.requireAttachment && (!/^attachment(?:;|$)/i.test(disposition?.trim() || '') || !fileName)) {
+  if (
+    options.requireAttachment &&
+    (!/^attachment(?:;|$)/i.test(disposition?.trim() || '') || !fileName)
+  ) {
     throw new FileDownloadValidationError('ATTACHMENT');
   }
+  if (
+    options.requireNamedDisposition &&
+    (!/^(?:inline|attachment)(?:;|$)/i.test(disposition?.trim() || '') || !fileName?.trim())
+  ) {
+    throw new FileDownloadValidationError('DISPOSITION');
+  }
   const blob = await response.blob();
+  options.signal?.throwIfAborted();
   if (options.requireNonEmpty && blob.size === 0) throw new FileDownloadValidationError('EMPTY');
+  return { blob, fileName, contentType };
+}
+
+export async function downloadWithAuth(
+  url: string,
+  options: FileDownloadOptions = {},
+): Promise<void> {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  const { blob, fileName } = await readProtectedFile(url, options);
+  options.signal?.throwIfAborted();
   const objectUrl = window.URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = objectUrl;

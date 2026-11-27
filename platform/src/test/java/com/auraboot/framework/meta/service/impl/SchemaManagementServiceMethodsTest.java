@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.meta.ddl.DdlDialect;
 import com.auraboot.framework.meta.ddl.DdlDialectProvider;
+import com.auraboot.framework.meta.ddl.PostgresDdlDialect;
 import com.auraboot.framework.meta.ddl.TableMetadataService;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
@@ -437,6 +438,43 @@ class SchemaManagementServiceMethodsTest {
         verify(dynamicDataMapper, atLeastOnce()).alterTable(anyString());
     }
 
+    @Test
+    @DisplayName("syncModelToTable - 字符列改为 jsonb 时带上方言给出的 USING 子句")
+    void testSyncModelToTable_CharacterToUtfJsonbCarriesUsingClause() {
+        // A multiple-file field maps to jsonb; a column created before that is a character type,
+        // and PostgreSQL refuses the change without a USING clause.
+        testField = FieldDefinition.builder()
+                .code("test_field")
+                .columnName("test_column")
+                .dataType("file")
+                .extraProps(java.util.Map.of("multiple", true))
+                .required(false)
+                .build();
+        testModel.setFields(List.of(testField));
+        // The clause itself is the dialect's rule (pinned in PostgresDdlDialectTest); what is
+        // checked here is that the service appends it. A dialect named PostgreSQL would take the
+        // sync into index handling that needs a DataSource, which this test does not have.
+        when(ddlDialect.mapDataType(testField)).thenReturn("jsonb");
+        when(ddlDialect.getAlterColumnTypeUsing("test_column", "character varying(255)", "jsonb"))
+                .thenReturn(" USING NULLIF(test_column, '')::jsonb");
+
+        when(metaModelService.getModelDefinitionFromDb("test_model"))
+                .thenReturn(Optional.of(testModel));
+        when(tableMetadataService.tableExists("tb_test")).thenReturn(true);
+        when(tableMetadataService.columnExists("tb_test", "test_column")).thenReturn(true);
+        when(tableMetadataService.getColumnTypeDefinition("tb_test", "test_column"))
+                .thenReturn("character varying(255)");
+        when(tableMetadataService.isColumnNullable("tb_test", "test_column")).thenReturn(true);
+        when(dynamicDataMapper.alterTable(anyString())).thenReturn(0);
+
+        SchemaOperationResult result = schemaManagementService.syncModelToTable("test_model", null);
+
+        assertTrue(result.getSuccess(), "sync failed: " + result.getErrorMessage());
+        assertTrue(result.getExecutedDDL().stream().anyMatch(ddl -> ddl.equals(
+                "ALTER TABLE tb_test ALTER COLUMN test_column TYPE jsonb USING NULLIF(test_column, '')::jsonb")),
+                "executed DDL: " + result.getExecutedDDL());
+    }
+
     // ==================== removeFieldFromModel 测试 ====================
 
     @Test
@@ -565,6 +603,37 @@ class SchemaManagementServiceMethodsTest {
         assertEquals(SchemaOperationResult.SchemaOperationType.UPDATE_FIELD, result.getOperationType());
         assertNotNull(result.getExecutedDDL());
         assertEquals("ALTER TABLE tb_test ALTER COLUMN test_column TYPE VARCHAR(255)", result.getExecutedDDL().get(0));
+    }
+
+    @Test
+    @DisplayName("updateModelField - 字符列改为 jsonb 时带上方言给出的 USING 子句")
+    void testUpdateModelField_CharacterToUtfJsonbCarriesUsingClause() {
+        testField = FieldDefinition.builder()
+                .code("test_field")
+                .columnName("test_column")
+                .dataType("file")
+                .extraProps(java.util.Map.of("multiple", true))
+                .required(false)
+                .build();
+        testModel.setFields(List.of(testField));
+        when(ddlDialectProvider.getDialect()).thenReturn(new PostgresDdlDialect());
+
+        when(metaModelService.getModelDefinition("test_model"))
+                .thenReturn(Optional.of(testModel));
+        when(metaModelService.getFieldDefinition("test_model", "test_field"))
+                .thenReturn(testField);
+        when(tableMetadataService.tableExists("tb_test")).thenReturn(true);
+        when(tableMetadataService.columnExists("tb_test", "test_column")).thenReturn(true);
+        when(tableMetadataService.getColumnTypeDefinition("tb_test", "test_column"))
+                .thenReturn("character varying(255)");
+        when(tableMetadataService.isColumnNullable("tb_test", "test_column")).thenReturn(true);
+        when(dynamicDataMapper.alterTable(anyString())).thenReturn(0);
+
+        SchemaOperationResult result = schemaManagementService.updateModelField("test_model", "test_field");
+
+        assertTrue(result.getSuccess());
+        assertEquals("ALTER TABLE tb_test ALTER COLUMN test_column TYPE jsonb USING NULLIF(test_column, '')::jsonb",
+                result.getExecutedDDL().get(0));
     }
 
     @Test

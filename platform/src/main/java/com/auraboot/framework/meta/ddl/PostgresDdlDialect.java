@@ -70,6 +70,38 @@ public class PostgresDdlDialect implements DdlDialect {
         }
     }
 
+    private static final java.util.regex.Pattern BARE_IDENTIFIER = java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+
+    @Override
+    public String getAlterColumnTypeUsing(String columnName, String currentType, String targetType) {
+        // The column name comes from field metadata and is written into SQL as it is.
+        if (columnName == null || !BARE_IDENTIFIER.matcher(columnName).matches()) {
+            throw new IllegalArgumentException("Column name is not a bare identifier: " + columnName);
+        }
+        String from = normalizeType(currentType);
+        String to = normalizeType(targetType);
+        if ("JSONB".equals(to) && isCharacterType(from)) {
+            // PostgreSQL has no assignment cast from a character type to jsonb. An empty string
+            // becomes NULL; any other value has to be valid JSON, or the statement fails as a
+            // whole and the column is left as it was.
+            return " USING NULLIF(" + columnName + ", '')::jsonb";
+        }
+        if (isCharacterType(to) && "JSONB".equals(from)) {
+            return " USING " + columnName + "::" + targetType.trim();
+        }
+        return "";
+    }
+
+    /** Same shape as the schema service's comparison: upper case, VARCHAR for CHARACTER VARYING, no blanks. */
+    private static String normalizeType(String type) {
+        return type == null ? "" : type.trim().toUpperCase(Locale.ROOT).replace("CHARACTER VARYING", "VARCHAR").replaceAll("\\s+", "");
+    }
+
+    private static boolean isCharacterType(String type) {
+        return type.startsWith("VARCHAR") || type.startsWith("CHARACTER") || type.startsWith("CHAR(")
+                || "CHAR".equals(type) || "TEXT".equals(type);
+    }
+
     @Override
     public String formatDefaultValue(Object defaultValue, String dataType) {
         if (defaultValue == null) {
@@ -83,21 +115,55 @@ public class PostgresDdlDialect implements DdlDialect {
                 || "file".equalsIgnoreCase(dataType)
                 || "image".equalsIgnoreCase(dataType)
                 || "json".equalsIgnoreCase(dataType) || "jsonb".equalsIgnoreCase(dataType)) {
-            return "'" + value.replace("'", "''") + "'";
+            return quoteLiteral(value);
         }
 
         if ("date".equalsIgnoreCase(dataType) || "datetime".equalsIgnoreCase(dataType) || "timestamp".equalsIgnoreCase(dataType)) {
             if ("NOW()".equalsIgnoreCase(value) || "current_timestamp".equalsIgnoreCase(value)) {
                 return "current_timestamp";
             }
-            return "'" + value + "'";
+            return quoteLiteral(value);
+        }
+
+        if ("time".equalsIgnoreCase(dataType)) {
+            return quoteLiteral(value);
         }
 
         if ("boolean".equalsIgnoreCase(dataType)) {
             return Boolean.parseBoolean(value) ? "true" : "false";
         }
 
-        return value;
+        if ("integer".equalsIgnoreCase(dataType) || "long".equalsIgnoreCase(dataType)) {
+            try {
+                return Long.toString(Long.parseLong(value.trim()));
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException(
+                        "Invalid integer default value for PostgreSQL data type '" + dataType + "': " + value, e);
+            }
+        }
+
+        if ("decimal".equalsIgnoreCase(dataType) || "money".equalsIgnoreCase(dataType)) {
+            try {
+                return new java.math.BigDecimal(value.trim()).toPlainString();
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException(
+                        "Invalid numeric default value for PostgreSQL data type '" + dataType + "': " + value, e);
+            }
+        }
+
+        // Everything else (including array defaults, which have no safe literal
+        // form here) is rejected rather than spliced into DDL verbatim.
+        throw new IllegalArgumentException(
+                "Unsupported default value for PostgreSQL data type '" + dataType + "': " + value);
+    }
+
+    /**
+     * Quotes a value as a single SQL string literal. Doubling embedded single
+     * quotes makes it impossible for the value to escape the literal, so the
+     * result can be safely embedded in generated DDL.
+     */
+    private static String quoteLiteral(String value) {
+        return "'" + value.replace("'", "''") + "'";
     }
 
     @Override

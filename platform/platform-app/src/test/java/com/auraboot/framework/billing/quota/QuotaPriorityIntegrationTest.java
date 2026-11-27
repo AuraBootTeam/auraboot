@@ -39,7 +39,7 @@ import static org.assertj.core.api.Assertions.*;
  * for the per-test account ID.
  *
  * <p>Prerequisites: billing migration applied to the {@code aura_boot} test DB.
- * {@code psql -h localhost -d aura_boot -f platform/src/main/resources/database/migrations/2026-06-10-billing-quota.sql}
+ * {@code psql -h localhost -d aura_boot -f platform/src/testFixtures/resources/database/migrations/2026-06-10-billing-quota.sql}
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class QuotaPriorityIntegrationTest extends BaseIntegrationTest {

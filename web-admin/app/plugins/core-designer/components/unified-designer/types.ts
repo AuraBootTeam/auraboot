@@ -1,50 +1,16 @@
 import type { PropertySchema } from '~/shared/designer';
+// The v3 page-schema contract lives in the framework now; import locally for
+// the definitions below and re-export for existing plugin-internal callers.
+import type {
+  LocalizedText,
+  PageSchemaV3Kind,
+  PageSchemaV3,
+  LayoutConfigV3,
+  DslBlockV3,
+} from '~/framework/meta/schemas/page-schema-v3';
 
-export type LocalizedText = string | Record<string, string>;
+export type { LocalizedText, PageSchemaV3Kind, PageSchemaV3, LayoutConfigV3, DslBlockV3 };
 
-export type PageSchemaV3Kind = 'list' | 'detail' | 'form' | 'dashboard' | 'composite';
-
-export interface LayoutConfigV3 {
-  type?: string;
-  cols?: number;
-  columns?: number;
-  rowHeight?: number;
-  gap?: number;
-  span?: number;
-  x?: number;
-  y?: number;
-  w?: number;
-  h?: number;
-  width?: number;
-  [key: string]: unknown;
-}
-
-export interface PageSchemaV3 {
-  schemaVersion: 3;
-  kind: PageSchemaV3Kind;
-  id: string;
-  pageKey?: string;
-  modelCode?: string;
-  title?: LocalizedText;
-  layout?: LayoutConfigV3;
-  blocks: DslBlockV3[];
-  extension?: Record<string, unknown>;
-}
-
-export interface DslBlockV3 {
-  id: string;
-  blockType: string;
-  region?: string;
-  title?: LocalizedText;
-  field?: string;
-  widgetType?: string;
-  actionType?: string;
-  dataSource?: Record<string, unknown>;
-  layout?: LayoutConfigV3;
-  props?: Record<string, unknown>;
-  blocks?: DslBlockV3[];
-  extension?: Record<string, unknown>;
-}
 
 export interface ModelFieldDefinition {
   modelCode: string;

@@ -13,12 +13,12 @@ import { agentFetch } from '~/shared/services/application-capabilities';
 
 import React, { useState } from 'react';
 import { buildPageGenerationPrompt, parsePageDslResponse } from './ai-page-prompt';
-import type { PageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
+import type { UnifiedPageSchema } from '~/plugins/core-designer/components/studio/domain/dsl/types';
 
 export interface AiPageGenerateDialogProps {
   open: boolean;
   onClose: () => void;
-  onGenerated: (dsl: { kind: PageSchema['kind']; blocks: PageSchema['blocks']; layout: PageSchema['layout']; schemaVersion: 2 }) => void;
+  onGenerated: (dsl: { kind: UnifiedPageSchema['kind']; blocks: UnifiedPageSchema['blocks']; layout: UnifiedPageSchema['layout']; schemaVersion: 2 }) => void;
   modelCode?: string;
   modelFields?: Array<{ code: string; name: string; type: string }>;
 }

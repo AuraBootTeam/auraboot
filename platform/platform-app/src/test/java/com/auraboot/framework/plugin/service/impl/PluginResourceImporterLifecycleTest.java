@@ -1,8 +1,5 @@
 package com.auraboot.framework.plugin.service.impl;
 
-import com.auraboot.framework.agent.entity.AgentDefinition;
-import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
-import com.auraboot.framework.agent.mapper.AgentEvalCaseMapper;
 import com.auraboot.framework.dashboard.dto.*;
 import com.auraboot.framework.dashboard.service.DashboardService;
 import com.auraboot.framework.meta.dto.*;
@@ -45,8 +42,7 @@ class PluginResourceImporterLifecycleTest {
     @Mock DashboardService dashboardService;
     @Mock NamedQueryService namedQueryService;
     @Mock NamedQueryMapper namedQueryMapper;
-    @Mock AgentDefinitionMapper agentDefinitionMapper;
-    @Mock AgentEvalCaseMapper agentEvalCaseMapper;
+    @Mock com.auraboot.framework.plugin.service.AgentDefinitionResourceLifecycle agentResources;
     @Mock PluginResourceMapper pluginResourceMapper;
     @Mock JdbcTemplate jdbcTemplate;
     @Mock DictService dictService;
@@ -57,8 +53,7 @@ class PluginResourceImporterLifecycleTest {
     @org.junit.jupiter.api.BeforeEach
     void wireAgentResourceProvider() {
         org.springframework.test.util.ReflectionTestUtils.setField(importer, "agentDefinitionResources",
-                new com.auraboot.framework.agent.integration.plugin.AgentDefinitionResourceAdapter(
-                        agentDefinitionMapper, agentEvalCaseMapper, pluginResourceMapper, jdbcTemplate, objectMapper));
+                agentResources);
     }
 
     DashboardDefinitionDTO dashboard() {
@@ -148,22 +143,13 @@ class PluginResourceImporterLifecycleTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
-    void agentImportPreservesIdentityAndCarriesConfiguration(boolean existing) {
-        var dto = AgentDefinitionDTO.builder().agentCode("invoice_assistant").name("Invoice assistant")
-                .model("test-model").tools(List.of("invoice.read")).skills(List.of("summarize"))
-                .guardrails(Map.of("maxWrites", 0)).systemPrompt("Read invoices").maxTools(4).build();
-        var stored = new AgentDefinition(); stored.setPid("agent-42"); stored.setId(42L);
-        if (existing) when(agentDefinitionMapper.selectOne(any())).thenReturn(stored);
-        var result = importer.importAgentDefinition(dto, "plugin-42", "import-42", 42L, ImportRequest.ConflictStrategy.OVERWRITE);
-        assertThat(result.getActionEnum()).isEqualTo(existing ? ResourceAction.UPDATE : ResourceAction.CREATE);
-        var capture = ArgumentCaptor.forClass(AgentDefinition.class);
-        if (existing) verify(agentDefinitionMapper).updateById(capture.capture()); else verify(agentDefinitionMapper).insert(capture.capture());
-        assertThat(capture.getValue().getAgentCode()).isEqualTo("invoice_assistant");
-        assertThat(capture.getValue().getTools()).isEqualTo("[\"invoice.read\"]");
-        assertThat(capture.getValue().getMaxTools()).isEqualTo(4);
-        assertThat(capture.getValue().getAllowedOperations()).containsExactly("query", "create", "update", "delete", "transition");
-        verify(jdbcTemplate).update("DELETE FROM ab_agent_eval_case WHERE tenant_id = ? AND agent_code = ?", 42L, "invoice_assistant");
-        if (existing) assertThat(result.getResourcePid()).isEqualTo("agent-42");
+    void agentImportDelegatesDefinitionAndConflictStrategy(boolean existing) {
+        var dto = AgentDefinitionDTO.builder().agentCode("invoice_assistant").name("Invoice assistant").build();
+        var expected = PluginResource.builder().action(existing ? "update" : "create").resourcePid("agent-42").build();
+        when(agentResources.importAgentDefinition(dto, "plugin-42", "import-42", 42L, ImportRequest.ConflictStrategy.OVERWRITE))
+                .thenReturn(expected);
+        assertThat(importer.importAgentDefinition(dto, "plugin-42", "import-42", 42L, ImportRequest.ConflictStrategy.OVERWRITE)).isSameAs(expected);
+        verify(agentResources).importAgentDefinition(dto, "plugin-42", "import-42", 42L, ImportRequest.ConflictStrategy.OVERWRITE);
     }
 
     @ParameterizedTest @ValueSource(strings={"CREATE","OVERWRITE","SKIP","ERROR"})
@@ -227,12 +213,13 @@ class PluginResourceImporterLifecycleTest {
             case "NAMED_QUERY" -> verify(namedQueryMapper).updateStatusByPid("r-42","archived");
         }
     }
-    @Test void agentRestoreScopesEvalCasesToTenantAndAgentIdentity() {
+    @Test void agentRestoreDelegatesOriginalResourceToInstalledProvider() {
         var resource=PluginResource.builder().resourceType("AGENT_DEFINITION").resourcePid("agent-42").resourceCode("invoice_agent").tenantId(42L).build();
         importer.restoreResource(resource);
-        verify(jdbcTemplate).update(contains("UPDATE ab_agent_definition"),eq("agent-42"));
-        verify(jdbcTemplate).update(contains("WHERE tenant_id = ? AND agent_code = ?"),eq(42L),eq("invoice_agent"));
+        verify(agentResources).restore(resource);
+        verifyNoInteractions(jdbcTemplate);
     }
+
     @Test void malformedRecordWriterDeclarationFailsBeforeModelOrResourcePersistence() {
         var dto=ModelDefinitionDTO.builder().code("shared_bid").extension(Map.of("recordCommandWriters",true)).build();
         assertThatThrownBy(()->importer.importModel(dto,"p","i",42L,ImportRequest.ConflictStrategy.OVERWRITE,false))

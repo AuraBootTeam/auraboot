@@ -193,7 +193,7 @@ jobs:
       - name: Checkstyle (main)
         if: steps.changes.outputs.run == 'true'
         working-directory: platform
-        run: ./gradlew --no-daemon checkstyleMain
+        run: ./gradlew --no-daemon checkstyleMain --stacktrace
 
       - name: PMD (main)
         if: steps.changes.outputs.run == 'true'

@@ -1,6 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { registerColorPropertyEditor } from '../ColorPropertyEditor';
 import { propertyEditorRegistry } from '../PropertyEditorRegistry';
+
+// A retried run in the same worker may leave residue in the singleton
+// registry; start every case from a known state (clear() is the test seam).
+beforeEach(() => {
+  propertyEditorRegistry.clear('designer.color');
+});
+
+
 
 describe('built-in property editor lifecycle', () => {
   it('retains the same editor across repeated renderer initialization without allowing a conflicting editor', () => {
@@ -8,14 +16,25 @@ describe('built-in property editor lifecycle', () => {
     const initial = propertyEditorRegistry.resolve('designer.color');
     const disposeAgain = registerColorPropertyEditor();
     expect(propertyEditorRegistry.resolve('designer.color')).toBe(initial);
-    expect(() => propertyEditorRegistry.register('designer.color', () => null)).toThrow(
-      'Conflicting',
-    );
+    let conflict: unknown = 'no-throw';
+    try {
+      propertyEditorRegistry.register('designer.color', () => null);
+    } catch (e) {
+      conflict = e;
+    }
+    expect(conflict).toBeInstanceOf(Error);
+    expect((conflict as Error).message).toContain('Conflicting');
     disposeAgain();
     expect(() => propertyEditorRegistry.resolve('designer.color')).toThrow('Unregistered');
     dispose();
     const disposeAfterReload = registerColorPropertyEditor();
     expect(propertyEditorRegistry.resolve('designer.color')).toBe(initial);
     disposeAfterReload();
+  });
+  it('does not swallow a conflict with an existing extension', () => {
+    const extension = () => null;
+    propertyEditorRegistry.register('designer.color', extension);
+    expect(() => registerColorPropertyEditor()).toThrow('Conflicting');
+    expect(propertyEditorRegistry.resolve('designer.color')).toBe(extension);
   });
 });

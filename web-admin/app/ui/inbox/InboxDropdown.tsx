@@ -110,9 +110,9 @@ export function InboxHeaderWidget() {
     if (!item.isRead) {
       try {
         await markRead(item.id);
-      } catch {
+      } catch (error) {
         // Non-critical
-      }
+ console.warn('[InboxDropdown] previously-silent catch', error);      }
     }
     setOpen(false);
 

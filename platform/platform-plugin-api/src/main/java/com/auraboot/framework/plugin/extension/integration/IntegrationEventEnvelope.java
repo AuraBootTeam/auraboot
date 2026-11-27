@@ -51,8 +51,13 @@ public record IntegrationEventEnvelope(
         if (sequence < 0) {
             throw new IllegalArgumentException("sequence must be non-negative");
         }
-        payload = immutableJsonObject(Objects.requireNonNull(payload, "payload"), "payload");
+        payload = immutablePayload(payload);
         headers = immutableHeaders(headers);
+    }
+
+    /** Recursively freeze JSON facts without constructing an event or granting any execution authority. */
+    public static Map<String,Object> immutablePayload(Map<String,?> payload) {
+        return immutableJsonObject(Objects.requireNonNull(payload, "payload"), "payload");
     }
 
     private static String requireText(String value, String field) {
