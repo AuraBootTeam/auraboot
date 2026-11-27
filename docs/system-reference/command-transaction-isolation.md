@@ -244,3 +244,15 @@ An existing weaker caller transaction is not upgraded or escaped. The native
 field authorization boundary continues to reject that incoherent carrier. This
 contract changes only decision evaluation and its source lookup, rather than
 changing shared database defaults or unrelated command transactions.
+
+## Record subscriptions and member visibility
+
+Watch creation and removal own a REPEATABLE READ transaction so the native
+record-read grant and subscription write share one coherent snapshot. Delivery
+recipient checks retain their existing independently refreshed subject context.
+
+Member detail, member teams, offboarding impact and offboarding candidate reads
+own read-only REPEATABLE READ transactions. The native member-record READ and
+the action-specific preflight decision remain mandatory; these boundaries grant
+no administrator role or additional member action. A weaker existing caller
+transaction is still rejected by native field authorization rather than escaped.
