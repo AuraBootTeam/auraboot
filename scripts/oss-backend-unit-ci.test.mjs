@@ -316,12 +316,23 @@ test('cleanup does not claim release or touch a network when allocation never su
 
 test('cleanup retains stop and release errors without turning them into a successful release claim', t => {
   const result = cleanupWithDocker(t, { created: true, stopFails: true, releaseFails: true, initialStatus: 0 });
-  assert.equal(result.status, 0, 'cleanup must preserve the original suite result');
+  assert.equal(result.status, 2, 'a successful test run cannot hide incomplete owned cleanup');
   assert.match(result.stdout, /stop_status=stop-failed network_status=release-failed/);
   assert.match(readFileSync(path.join(result.artifacts, 'compose-stop.log'), 'utf8'), /stop failure fixture/);
   assert.match(readFileSync(path.join(result.artifacts, 'network-release.log'), 'utf8'), /active endpoints fixture/);
   assert.doesNotMatch(result.stdout, /network_status=released|network released/);
 });
+
+for (const [initialStatus, stopFails, releaseFails, expected] of [
+  [0, true, false, 2], [0, false, true, 2], [1, true, true, 1], [2, true, true, 2],
+]) {
+  test(`owned cleanup preserves failure ${initialStatus}, stop=${stopFails}, release=${releaseFails}`, t => {
+    const result = cleanupWithDocker(t, { created: true, initialStatus, stopFails, releaseFails });
+    assert.equal(result.status, expected);
+    assert.match(result.stderr, /owned infrastructure cleanup incomplete/);
+    assert.doesNotMatch(result.commands, /down|prune|foreign/);
+  });
+}
 
 for (const [sharedStatus, bootstrapStatus, expected] of [[0, 0, 0], [1, 0, 1], [0, 1, 1], [2, 1, 2]]) {
   test(`independent bootstrap preserves statuses ${sharedStatus}/${bootstrapStatus}`, t => {

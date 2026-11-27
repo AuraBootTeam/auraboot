@@ -128,6 +128,10 @@ cleanup() {
       network_status=release-failed
     fi
   fi
+  if [[ "$stop_status" != stopped || "$network_status" == release-failed ]]; then
+    printf '[oss-backend-unit-ci] environment-invalid: owned infrastructure cleanup incomplete\n' >&2
+    [[ "$status" -ne 0 ]] || status=2
+  fi
   printf '[oss-backend-unit-ci] runtime retained: stop_status=%s network_status=%s compose_project=%s artifacts=%s\n' \
     "$stop_status" "$network_status" "$COMPOSE_PROJECT" "$ARTIFACTS"
   exit "$status"
