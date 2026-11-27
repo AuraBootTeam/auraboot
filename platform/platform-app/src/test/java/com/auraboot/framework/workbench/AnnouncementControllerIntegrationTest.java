@@ -52,6 +52,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("AnnouncementController - Integration Tests")
 @Transactional
 class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
+    private final String fixtureNamespace = "announcement-controller-"
+            + UniqueIdGenerator.generate().toLowerCase(java.util.Locale.ROOT);
+
+    @Override
+    protected String testFixtureNamespace() {
+        return fixtureNamespace;
+    }
 
     @Autowired
     private WebApplicationContext webApplicationContext;

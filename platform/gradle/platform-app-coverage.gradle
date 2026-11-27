@@ -30,7 +30,9 @@ tasks.named('test', Test) {
     inputs.dir coverageOutput
     outputs.file layout.buildDirectory.file('jacoco/test.exec')
     systemProperty 'jacoco-agent.destfile', layout.buildDirectory.file('jacoco/test.exec').get().asFile.absolutePath
-    systemProperty 'jacoco-agent.append', 'false'
+    // The task clears stale data once below. Each sequential fork must append
+    // its own session, otherwise worker rollover erases earlier class coverage.
+    systemProperty 'jacoco-agent.append', 'true'
     doFirst {
         delete layout.buildDirectory.file('jacoco/test.exec')
         def output = coverageOutput.get().asFile

@@ -343,8 +343,13 @@ public class BaseIntegrationTest {
     /**
      * 创建测试用户
      */
+    /** Stateful committed scenarios can own an identity without changing legacy fixtures. */
+    protected String testFixtureNamespace() {
+        return "integration-test";
+    }
+
     private User createTestUser() {
-        String testEmail = "integration-test@auraboot.com";
+        String testEmail = testFixtureNamespace() + "@auraboot.com";
         
         // 先尝试查找现有用户
         User existingUser = userService.findByEmail(testEmail);
@@ -374,7 +379,7 @@ public class BaseIntegrationTest {
      * 创建测试租户
      */
     private Tenant createTestTenant() {
-        String testTenantName = "integration-test-tenant";
+        String testTenantName = testFixtureNamespace() + "-tenant";
         
         // 先尝试查找现有租户
         Tenant existingTenant = tenantService.findByName(testTenantName);
