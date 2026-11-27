@@ -24,16 +24,40 @@ class PluginAccessResourceImporterTest {
     final UserPermissionService users=mock(UserPermissionService.class);
     final RoleService roles=mock(RoleService.class);
     final RolePermissionMapper bindings=mock(RolePermissionMapper.class);
+    final com.auraboot.framework.menu.service.RoleNavigationService navigation =
+            mock(com.auraboot.framework.menu.service.RoleNavigationService.class);
     final PluginAccessResourceImporter.GenerateMenuI18nRecordsOperation0 menuI18n=mock(PluginAccessResourceImporter.GenerateMenuI18nRecordsOperation0.class);
     final PluginAccessResourceImporter.GeneratePermissionI18nRecordsOperation1 permissionI18n=mock(PluginAccessResourceImporter.GeneratePermissionI18nRecordsOperation1.class);
     final PluginAccessResourceImporter.SaveOrUpdatePluginResourceOperation save=mock(PluginAccessResourceImporter.SaveOrUpdatePluginResourceOperation.class);
     final PluginAccessResourceImporter.CaptureImportSnapshotOperation snapshot=mock(PluginAccessResourceImporter.CaptureImportSnapshotOperation.class);
-    final PluginAccessResourceImporter importer=new PluginAccessResourceImporter(resources,masks,capabilities,permissions,users,roles,bindings,menuI18n,permissionI18n,save,snapshot);
+    final PluginAccessResourceImporter importer=new PluginAccessResourceImporter(resources,masks,capabilities,permissions,users,roles,bindings,navigation,menuI18n,permissionI18n,save,snapshot);
     PermissionDefinitionDTO permission(String code) { return PermissionDefinitionDTO.builder().code(code).build(); }
     PluginResource trackedResource(String action, Long permissionId, String code) {
         var resource=new PluginResource(); resource.setAction(action); resource.setResourceId(permissionId); resource.setResourceCode(code); return resource;
     }
     Role tenantAdmin() { var admin=new Role(); admin.setCode("tenant_admin"); admin.setId(7L); return admin; }
+    @Test
+    void navigationDefaultsApplyOnlyToRolesCreatedByThisImport() {
+        var newRole = new Role();
+        newRole.setCode("buyer");
+        newRole.setPid("new-buyer");
+        var existingRole = new Role();
+        existingRole.setCode("approver");
+        existingRole.setPid("existing-approver");
+        when(roles.findByTenantId(42L)).thenReturn(List.of(newRole, existingRole));
+
+        var manifest = new PluginManifestExtended();
+        manifest.setRoles(List.of(
+                RoleDefinitionDTO.builder().code("buyer").defaultMenuCodes(List.of("import-materials")).build(),
+                RoleDefinitionDTO.builder().code("approver").defaultMenuCodes(List.of("review")).build()));
+
+        importer.initializeRoleNavigationDefaults(manifest, 42L, "plugin", Set.of("new-buyer"));
+        importer.initializeRoleNavigationDefaults(manifest, 42L, "plugin", Set.of());
+
+        verify(navigation).seedPluginDefaults(newRole, "plugin", List.of("import-materials"));
+        verifyNoMoreInteractions(navigation);
+    }
+
     @Test void createdPermissionsBindToThisTenantAdminAndInvalidateCaches() {
         when(roles.findByTenantId(42L)).thenReturn(List.of(tenantAdmin()));
         when(permissions.findRolePermissions(7L)).thenReturn(List.of());

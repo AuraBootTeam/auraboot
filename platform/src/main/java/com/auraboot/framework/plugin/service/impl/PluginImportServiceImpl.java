@@ -136,6 +136,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final PermissionService permissionService;
     private final UserPermissionService userPermissionService;
     private final RoleService roleService;
+    private final com.auraboot.framework.menu.service.RoleNavigationService roleNavigationService;
     private final RolePermissionMapper rolePermissionMapper;
     private final DistributedLock distributedLock;
     private final I18nResourceService i18nResourceService;
@@ -1148,8 +1149,11 @@ public class PluginImportServiceImpl implements PluginImportService {
         // without model write access on first import. Reconcile now that every generated
         // action resolves. Only roles created by this batch receive deferred seed grants;
         // existing roles are validated without restoring administrator-revoked access.
-        pluginAccessResourceImporter().reconcileRolePermissionBindings(manifest, tenantId, pluginPid, importId,
-                new java.util.HashSet<>(result.getCreatedResources().getOrDefault(ResourceType.ROLE.name(), List.of())));
+        Set<String> createdRolePids = new HashSet<>(
+                result.getCreatedResources().getOrDefault(ResourceType.ROLE.name(), List.of()));
+        var accessImporter = pluginAccessResourceImporter();
+        accessImporter.reconcileRolePermissionBindings(manifest, tenantId, pluginPid, importId, createdRolePids);
+        accessImporter.initializeRoleNavigationDefaults(manifest, tenantId, pluginPid, createdRolePids);
 
         // Semantic resources reference imported model/field codes, so publication
         // must run only after model auto-publish and schema synchronization.
@@ -1953,7 +1957,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     }
 
     private PluginAccessResourceImporter pluginAccessResourceImporter() {
-        return new PluginAccessResourceImporter(resourceImporter, fieldMaskService, capabilityRegistryService, permissionService, userPermissionService, roleService, rolePermissionMapper, this::generateMenuI18nRecords, this::generatePermissionI18nRecords, this::saveOrUpdatePluginResource, this::captureImportSnapshot);
+        return new PluginAccessResourceImporter(resourceImporter, fieldMaskService, capabilityRegistryService, permissionService, userPermissionService, roleService, rolePermissionMapper, roleNavigationService, this::generateMenuI18nRecords, this::generatePermissionI18nRecords, this::saveOrUpdatePluginResource, this::captureImportSnapshot);
     }
 
     private PluginDefinitionResourceImporter pluginDefinitionResourceImporter() {
