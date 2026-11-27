@@ -667,12 +667,12 @@ final class S06Current001PluginCleanupAdmission {
         Set<String> keys = new HashSet<>(); map.fieldNames().forEachRemaining(keys::add); return keys;
     }
     static Map<String, String> automaticMainSources(Path root) throws Exception {
-        String tracked = automaticGit(root, "ls-files", "-z", "--", "platform/src/main");
+        String tracked = automaticGit(root, "ls-files", "-z", "--", "platform/src/main", ":(glob)platform/*/src/main/**");
         var result = new java.util.TreeMap<String, String>();
         for (String relative : tracked.split(java.util.regex.Pattern.quote(Character.toString(0)), -1)) {
             if (relative.isEmpty()) continue;
             Path file = root.resolve(relative).normalize();
-            require(relative.startsWith("platform/src/main/") && file.startsWith(root)
+            require(relative.matches("platform/(?:[^/]+/)?src/main/.+") && file.startsWith(root)
                     && root.relativize(file).toString().equals(relative), "CLEANUP_AUTOMATIC_MAIN_PATH_ESCAPE");
             Path current = file;
             while (!current.equals(root)) {

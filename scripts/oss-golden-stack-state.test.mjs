@@ -25,13 +25,19 @@ for (const external of [false, true]) test(`env reads ${external ? 'external CI'
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /export BACKEND_URL=http:\/\/127\.0\.0\.1:6430/);
   assert.ok(result.stdout.includes(`export AURA_EVIDENCE_ROOT=${workspace}/evidence`));
+  assert.ok(result.stdout.includes(`export PW_STORAGE_DIR=${workspace}/evidence/playwright/storage`));
+  for (const role of ['ADMIN','OPERATOR','VIEWER']) {
+    assert.ok(result.stdout.includes(`export PW_${role}_STORAGE_STATE=${workspace}/evidence/playwright/storage/${role.toLowerCase()}.json`));
+  }
 });
 
 
 test('warm reads the same selected admin state as Playwright without falling back to tracked fixtures', () => {
   const source = fs.readFileSync(path.join(import.meta.dirname, 'oss-golden-stack.sh'), 'utf8');
   const warm = source.slice(source.indexOf('cmd_warm() {'));
-  const selection = warm.match(/  local admin_json[\s\S]*?(?=  local env_exports;)/)?.[0];
+  assert.ok(warm.indexOf('  eval "$env_exports"') < warm.indexOf('  local admin_json='),
+    'Warm must select authentication state after the runtime environment establishes its owned output');
+  const selection = warm.match(/  local admin_json[\s\S]*?(?=  local evidence_root=)/)?.[0];
   assert.ok(selection, 'Warm admin-state selection must exist');
   const cases = [
     [{}, '/fixture/web-admin/tests/storage/admin.json'],

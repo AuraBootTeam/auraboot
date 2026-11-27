@@ -31,6 +31,17 @@ Use Workspace `runtime suspend` / `runtime resume` for whole-stack lifecycle.
 Direct supervisor termination stops only its authenticated frontend tree and
 prevents further child restarts; runtime databases and evidence remain retained.
 
+### Owned OSS browser authentication state
+
+The golden stack's `env` command defaults Playwright authentication state to
+`<runtime-evidence>/playwright/storage`, with separate admin/operator/viewer
+files. `warm` loads that runtime environment before selecting the admin state.
+Setup, authentication and route checks therefore use the same files without
+writing credentials into tracked `web-admin/tests/storage` fixtures. Explicit
+`PW_STORAGE_DIR` and per-role state overrides retain their existing contract.
+A failed source or process identity check still fails the gate; no source reset,
+ignore rule or health-only fallback replaces that evidence.
+
 ### Product image gate ownership preservation
 
 `application/run-product-release-image-gate.sh` refuses an existing work root,

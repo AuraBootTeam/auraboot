@@ -11,7 +11,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** Hermetic source-policy guard; it proves retention intent, not DB execution. */
 class SemanticAcceptanceFixtureContractTest {
-    private static final Path SOURCES = Path.of("src/test/java/com/auraboot/framework/semantic/service");
+    private static final Path SOURCES = Path.of("platform-app/src/test/java/com/auraboot/framework/semantic/service");
 
     @Test
     void acceptanceTeardownRetainsOwnedDatabaseEvidence() throws Exception {
