@@ -91,9 +91,9 @@ describe('Card-grid draft form fields', () => {
     setup(true, false, false, true, false, undefined, true);
     const cards: HTMLElement[] = screen.getAllByTestId('card-grid-card');
     expect(cards[0].querySelector('[data-testid="grid-item-availableQty"]')).not.toBeNull();
-    expect(cards[0].querySelector<HTMLElement>('[data-testid="grid-item-proposedQty"]')!.style.gridColumn).toBe('7 / span 6');
+    expect((cards[0].querySelector('[data-testid="grid-item-proposedQty"]') as HTMLElement).style.gridColumn).toBe('7 / span 6');
     expect(cards[1].querySelector('[data-testid="grid-item-availableQty"]')).toBeNull();
-    expect(cards[1].querySelector<HTMLElement>('[data-testid="grid-item-proposedQty"]')!.style.gridColumn).toBe('1 / span 6');
+    expect((cards[1].querySelector('[data-testid="grid-item-proposedQty"]') as HTMLElement).style.gridColumn).toBe('1 / span 6');
     expect(within(cards[1]).getByRole('textbox', { name: 'Proposed quantity' })).toHaveValue('40');
   });
 

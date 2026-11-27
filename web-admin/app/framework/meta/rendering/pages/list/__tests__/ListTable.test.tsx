@@ -39,6 +39,45 @@ function renderListTable(overrides: Partial<ListTableProps> = {}) {
   return render(<ListTable {...props} />);
 }
 
+describe('ListTable keyboard row navigation', () => {
+  it.each(['flat', 'tree'] as const)('activates the %s data row with Enter and Space', (mode) => {
+    const onRowClick = vi.fn();
+    renderListTable({
+      onRowClick,
+      ...(mode === 'tree' ? { treeConfig: { parentField: 'parent_id' } } : {}),
+    });
+    const row = screen.getByTestId('table-row-0');
+    expect(row).toHaveAttribute('tabindex', '0');
+    row.focus();
+    expect(row).toHaveFocus();
+    fireEvent.keyDown(row, { key: 'Enter' });
+    fireEvent.keyDown(row, { key: ' ' });
+    expect(onRowClick).toHaveBeenCalledTimes(2);
+    expect(onRowClick).toHaveBeenNthCalledWith(1, { pid: 'row-1', name: 'Mission Control', kind: '列表' });
+    expect(onRowClick).toHaveBeenNthCalledWith(2, { pid: 'row-1', name: 'Mission Control', kind: '列表' });
+  });
+
+  it('does not hijack nested inputs or buttons, modifier shortcuts, or held keys', () => {
+    const onRowClick = vi.fn();
+    renderListTable({
+      onRowClick,
+      renderCellContent: (_record, column) => column.field === 'name'
+        ? <input aria-label="Inline name" defaultValue="Mission Control" />
+        : <button type="button">Expand details</button>,
+    });
+    for (const control of [screen.getByRole('textbox'), screen.getByRole('button', { name: 'Expand details' })]) {
+      fireEvent.keyDown(control, { key: 'Enter' });
+      fireEvent.keyDown(control, { key: ' ' });
+    }
+    const row = screen.getByTestId('table-row-0');
+    for (const properties of [{ ctrlKey: true }, { altKey: true }, { metaKey: true }, { shiftKey: true }, { repeat: true }]) {
+      fireEvent.keyDown(row, { key: 'Enter', ...properties });
+    }
+    fireEvent.keyDown(row, { key: 'ArrowDown' });
+    expect(onRowClick).not.toHaveBeenCalled();
+  });
+});
+
 describe('ListTable selection column layout', () => {
   it('fills spare viewport space without expanding personalized column widths', () => {
     const viewport = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);

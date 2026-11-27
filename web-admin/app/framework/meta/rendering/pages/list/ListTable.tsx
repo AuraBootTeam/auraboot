@@ -175,9 +175,10 @@ export const ListTable = React.memo(function ListTable({
   const [containerWidth, setContainerWidth] = useState(0);
   const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set());
   const expansionDefinition = JSON.stringify(rowExpansion);
+  const expansionRows = rowExpansion ? JSON.stringify(data.map((record) => getPublicRecordKey(record))) : '';
   useEffect(() => {
     setExpandedDetails(new Set());
-  }, [data, modelCode, expansionDefinition]);
+  }, [expansionRows, modelCode, expansionDefinition]);
 
   const getColumnWidth = useCallback(
     (column: ColumnConfig) => {
@@ -500,10 +501,18 @@ export const ListTable = React.memo(function ListTable({
   })();
   const getRowClassName = (rowId: string) =>
     cn(
-      'group cursor-pointer text-text-2 transition-colors hover:bg-hover',
+      'group cursor-pointer text-text-2 transition-colors hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent',
       selectedIds.has(rowId) && 'bg-accent-weak',
       previewRecordId === rowId && 'bg-accent-weak/50',
     );
+
+  const handleRowKeyDown = (event: React.KeyboardEvent<HTMLTableRowElement>, record: Record<string, any>) => {
+    if (event.target !== event.currentTarget || event.defaultPrevented || event.repeat
+      || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    onRowClick(record);
+  };
 
   function renderCellContent(record: Record<string, any>, column: ColumnConfig, index: number) {
     const content = renderBaseCellContent(record, column, index);
@@ -806,6 +815,8 @@ export const ListTable = React.memo(function ListTable({
                           data-tree-depth={node.depth}
                           className={getRowClassName(rowId)}
                           style={{ height: `${rowHeightCfg.px}px`, ...cfInline }}
+                          tabIndex={0}
+                          onKeyDown={(event) => handleRowKeyDown(event, record)}
                           onClick={() => onRowClick(record)}
                         >
                           {enableSelection && (
@@ -937,6 +948,8 @@ export const ListTable = React.memo(function ListTable({
                         data-index={virtualRow.index}
                         className={getRowClassName(rowId)}
                         style={{ height: `${rowHeightCfg.px}px`, ...cfInline }}
+                        tabIndex={0}
+                        onKeyDown={(event) => handleRowKeyDown(event, record)}
                         onClick={() => onRowClick(record)}
                       >
                         {enableSelection && (
@@ -1052,6 +1065,8 @@ export const ListTable = React.memo(function ListTable({
                         data-record-pid={rowId || undefined}
                         className={getRowClassName(rowId)}
                         style={{ height: `${rowHeightCfg.px}px`, ...cfInline }}
+                        tabIndex={0}
+                        onKeyDown={(event) => handleRowKeyDown(event, record)}
                         onClick={() => onRowClick(record)}
                       >
                         {enableSelection && (

@@ -36,6 +36,7 @@ function runtime(rows: Record<string, unknown>[]): SchemaRuntime {
     getContext: () => context,
     getEvaluator: () => ({
       evaluateCondition: (expression: string, values: Record<string, any>) => {
+        if (expression.includes('row.changed == true')) return values.row?.changed === true;
         if (expression.includes("operational_state == 'ready'")) {
           return values.record?.operational_state === 'ready';
         }
@@ -118,6 +119,37 @@ const block = {
 
 describe('TableBlockRenderer mobile cards', () => {
   beforeEach(() => handleActionSpy.mockReset());
+
+  it('lets matching row backgrounds override the default card while keeping selection and unmatched rows', () => {
+    const changed = { ...row, changed: true };
+    const unchanged = { ...row, pid: 'pool-item-2', changed: false };
+    const schema = runtime([changed, unchanged]);
+    render(<TableBlockRenderer block={{ ...block,
+      rowClassRules: [{ when: '${row.changed == true}', className: 'bg-amber-50' }],
+    } as any} runtime={schema} />);
+    const highlighted = screen.getByTestId('table-mobile-card-pool-item-1');
+    const ordinary = screen.getByTestId('table-mobile-card-pool-item-2');
+    expect(highlighted).toHaveClass('bg-amber-50');
+    expect(highlighted).not.toHaveClass('bg-panel');
+    expect(highlighted).toHaveClass('border-accent', 'ring-2');
+    expect(ordinary).toHaveClass('bg-panel');
+    expect(ordinary).not.toHaveClass('bg-amber-50');
+    fireEvent.click(ordinary);
+    expect(schema.getContext().state.selectedPoolItem.pid).toBe('pool-item-2');
+    expect(handleActionSpy).not.toHaveBeenCalled();
+  });
+
+  it('preserves configured localized empty guidance on mobile without adding actions', () => {
+    render(<TableBlockRenderer block={{ ...block, empty: {
+      title: { 'zh-CN': '当前没有可查看的记录', en: 'No records' },
+      description: { 'zh-CN': '请返回修改记录并选择一次正式提交。', en: 'Select a formal submission from history.' },
+    } } as any} runtime={runtime([])} />);
+    const empty = screen.getByTestId('table-mobile-empty');
+    expect(empty).toHaveTextContent('当前没有可查看的记录');
+    expect(empty).toHaveTextContent('请返回修改记录并选择一次正式提交。');
+    expect(empty).not.toHaveTextContent('Select a formal submission');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
 
   it('replaces the wide table with task cards and direct actions on mobile', () => {
     render(<TableBlockRenderer block={block} runtime={runtime([row])} />);

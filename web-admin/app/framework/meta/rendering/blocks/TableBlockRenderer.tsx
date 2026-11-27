@@ -12,6 +12,7 @@ import { dictionaryData } from '~/shared/services/dict-adapter';
  */
 
 import React, { useEffect, useRef, useState } from 'react';
+import { twMerge } from 'tailwind-merge';
 import { useNavigate } from 'react-router';
 import type {
   BlockConfig,
@@ -1150,11 +1151,18 @@ const TableBlockBodyRenderer: React.FC<TableBlockRendererProps> = ({ block, runt
           data-testid="table-mobile-empty"
           className="border-border bg-panel text-text-2 rounded-card border px-5 py-8 text-center text-sm"
         >
-          {(block as any).empty?.title
-            ? getLocalizedText((block as any).empty.title, locale, t)
-            : t('common.noData') !== 'common.noData'
-              ? t('common.noData')
-              : 'No data'}
+          <div>
+            {(block as any).empty?.title
+              ? getLocalizedText((block as any).empty.title, locale, t)
+              : t('common.noData') !== 'common.noData'
+                ? t('common.noData')
+                : 'No data'}
+          </div>
+          {(block as any).empty?.description && (
+            <div className="mt-2">
+              {getLocalizedText((block as any).empty.description, locale, t)}
+            </div>
+          )}
         </div>
       );
     }
@@ -1172,9 +1180,9 @@ const TableBlockBodyRenderer: React.FC<TableBlockRendererProps> = ({ block, runt
               key={rowIdentity}
               data-testid={`table-mobile-card-${rowIdentity}`}
               onClick={() => handleRowClick(row, index)}
-              className={`rounded-card bg-panel border p-4 shadow-sm transition-colors ${
+              className={twMerge(`rounded-card bg-panel border p-4 shadow-sm transition-colors ${
                 isSelected ? 'border-accent ring-accent/15 ring-2' : 'border-border'
-              } ${selectionConfig?.bind ? 'cursor-pointer' : ''} ${rowClassName(row)}`}
+              } ${selectionConfig?.bind ? 'cursor-pointer' : ''} ${rowClassName(row)}`)}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
