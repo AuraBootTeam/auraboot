@@ -192,3 +192,29 @@ test('reuse rejects a requested slot mismatch before collection', t => {
   assert.equal(result.status, 2, result.stdout + result.stderr);
   assert.doesNotMatch(fs.readFileSync(f.calls, 'utf8'), /pnpm|stack import|stack up/);
 });
+
+
+test('an early zero exit cannot bypass execution reconciliation', t => {
+  const f = fixture(t);
+  const script = path.join(f.repo, 'scripts/hifi-golden-gate-run.sh');
+  fs.writeFileSync(script, fs.readFileSync(script, 'utf8').replace("log '3/6 import test-fixtures'", "exit 0\nlog '3/6 import test-fixtures'"));
+  const result = f.run();
+  assert.equal(result.status, 2, result.stdout + result.stderr);
+  assert.match(result.stderr, /before execution reconciliation/);
+  assert.equal(fs.existsSync(path.join(f.root, '.workspace/evidence/owned-run/execution-ledger.json')), false);
+});
+for (const [mode, settleExit, expected] of [['', 0, 0], ['', 2, 2], ['up-failure', 2, 2], ['missing-result', 2, 1]]) {
+  test(`native settlement preserves the exact gate verdict: ${mode || 'success'}/${settleExit}`, t => {
+    const f = fixture(t, mode);
+    const dir = path.join(f.repo, 'scripts/ci');
+    fs.mkdirSync(dir, { recursive: true });
+    // Caller contract only; the lifecycle helper has independent ownership tests.
+    fs.writeFileSync(path.join(dir, 'settle_runtime.py'), `import os,sys\nwith open(os.environ['CALLS'],'a') as f:f.write('settlement '+repr(sys.argv[1:])+'\\n')\nraise SystemExit(${settleExit})\n`);
+    const result = f.run({ AURA_CI_JOB_ID: 'job-' + 'a'.repeat(40), AURA_REGRESSION_ARTIFACTS: f.root });
+    assert.equal(result.status, expected, result.stdout + result.stderr);
+    const calls = fs.readFileSync(f.calls, 'utf8');
+    assert.equal(calls.split('\n').filter(row => row.startsWith('settlement ')).length, 1);
+    assert.ok(calls.includes("'--name', 'owned-run'"));
+    assert.doesNotMatch(calls, /stack (down|destroy)|runtime destroy/);
+  });
+}
