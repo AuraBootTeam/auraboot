@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: 04c697056b629380f72f6a0b698ede34f7d36a08cdda6277b18f571e594bf404
+ * Contract SHA-256: e8f1c1b497ac42c62fb894b06102121e44bca322703b4b07264a741eed05ce04
  */
 export interface paths {
     "/api/activities": {
@@ -40339,6 +40339,7 @@ export interface components {
             code?: string;
             dataScopes?: components["schemas"]["RoleDataScopeDefinitionDTO"][];
             defaultDataScopeType?: string;
+            defaultMenuCodes?: string[];
             description?: string;
             effectiveName?: string;
             isDefault?: boolean;
