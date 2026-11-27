@@ -225,7 +225,15 @@ class DynamicUpdateVersionConflictIT extends BaseIntegrationTest {
         Assertions.assertNotNull(member, "seeded user must have tenant member before authenticated API calls");
         var user = fixtureUsers.findByUserId(userId);
         Assertions.assertNotNull(user, "seeded user must exist before authenticated API calls");
-        Long environment = fixtureEnvironments.findOrCreateDefaultId(tenantId);
+        var previous = MetaContext.snapshot();
+        Long environment;
+        try {
+            MetaContext.setContext(tenantId, userId, user.getPid(), user.getUserName());
+            MetaContext.setMemberId(member.getId());
+            environment = fixtureEnvironments.findOrCreateDefaultId(tenantId);
+        } finally {
+            MetaContext.restore(previous);
+        }
 
         Filter contextFilter = (request, response, chain) -> {
             try {
