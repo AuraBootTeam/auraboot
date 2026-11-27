@@ -73,6 +73,9 @@ class DynamicUpdateVersionConflictIT extends BaseIntegrationTest {
     @Autowired
     private PluginImportService pluginImportService;
 
+    @Autowired private com.auraboot.framework.user.service.UserService fixtureUsers;
+    @Autowired private com.auraboot.framework.environment.service.EnvironmentService fixtureEnvironments;
+
     private MockMvc mockMvc;
     private MockMvc authenticatedMvc;
 
@@ -191,7 +194,8 @@ class DynamicUpdateVersionConflictIT extends BaseIntegrationTest {
                 .resolve("../plugins/showcase").normalize();
         Assertions.assertTrue(java.nio.file.Files.exists(pluginDir),
                 "showcase plugin directory must exist at " + pluginDir);
-        MetaContext.setContext(tenantId, userId, "e2e-test-user", "e2e@test.local");
+        MetaContext.setContext(tenantId, userId, user.getPid(), user.getUserName());
+                MetaContext.setEnvironmentId(environment);
         try {
             ImportPreviewResult preview = pluginImportService.parseDirectory(pluginDir.toString());
             Assertions.assertTrue(preview.isValid(), "showcase plugin parse must be valid: " + preview.getErrors());
@@ -214,16 +218,20 @@ class DynamicUpdateVersionConflictIT extends BaseIntegrationTest {
     private MockMvc authenticatedMvc(long tenantId, long userId) {
         TenantMember member = tenantMemberService.findByTenantIdAndUserId(tenantId, userId);
         Assertions.assertNotNull(member, "seeded user must have tenant member before authenticated API calls");
+        var user = fixtureUsers.findByUserId(userId);
+        Assertions.assertNotNull(user, "seeded user must exist before authenticated API calls");
+        Long environment = fixtureEnvironments.findOrCreateDefaultId(tenantId);
 
         Filter contextFilter = (request, response, chain) -> {
             try {
-                MetaContext.setContext(tenantId, userId, "e2e-test-user", "e2e@test.local");
+                MetaContext.setContext(tenantId, userId, user.getPid(), user.getUserName());
+                MetaContext.setEnvironmentId(environment);
                 MetaContext.setMemberId(member.getId());
                 CustomUserDetails userDetails = new CustomUserDetails(
                         "e2e@test.local",
                         "test-password",
                         userId,
-                        "e2e-test-user",
+                        user.getPid(),
                         AuthorityUtils.createAuthorityList("role_admin"),
                         true,
                         true,

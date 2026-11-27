@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @ActiveProfiles("integration-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DisplayName("WatchServiceImpl Coverage IT — toggles, watchers, guards")
-@org.springframework.transaction.annotation.Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+@org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
 class WatchServiceImplCoverageIT extends BaseIntegrationTest {
 
     private static final String MODEL = "watch_it_" + System.currentTimeMillis();
@@ -72,7 +72,10 @@ class WatchServiceImplCoverageIT extends BaseIntegrationTest {
     }
 
     @org.junit.jupiter.api.AfterEach
-    void releaseOwnedAuthority() { if (nativeAuthority != null) nativeAuthority.close(); }
+    void releaseOwnedAuthority() {
+        if (nativeAuthority != null) nativeAuthority.close();
+        if (tenantId != null) jdbcTemplate.update("DELETE FROM ab_watch WHERE tenant_id=? AND model_code=?", tenantId, MODEL);
+    }
 
     @AfterAll
     void cleanup() {

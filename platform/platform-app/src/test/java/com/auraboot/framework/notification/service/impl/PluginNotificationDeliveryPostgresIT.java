@@ -233,11 +233,26 @@ class PluginNotificationDeliveryPostgresIT {
         assertThatThrownBy(() -> executor.deliver(event,failAfterPersist,"native-failure-fence"))
                 .hasMessage("synthetic crash after persisted inbox");
         assertThat(counts()).isEqualTo(Map.of("outbox",1,"receipt",0,"inbox",0));
-        concurrent(() -> { executor.deliver(event,host,"native-failure-fence"); return true; });
+        Long eventRow = jdbc.queryForObject("SELECT id FROM ab_outbox WHERE tenant_id=? AND event_id=?", Long.class, tenant, event.eventId());
+        assertThat(outbox.recordFailureFenced(eventRow, "native-failure-fence", Instant.now(), "synthetic consumer crash")).isEqualTo(1);
+        var winningLease = new java.util.concurrent.atomic.AtomicReference<String>();
+        // Race the production lease claim, not two dispatchers illegally sharing one active lease.
+        var winners = concurrent(() -> {
+            String token = UniqueIdGenerator.generate();
+            var claimed = outbox.claimKnownEvent(tenant, event.eventId(), "notification-native-contender", token,
+                    Instant.now().plusSeconds(30));
+            if (claimed.isEmpty()) return false;
+            assertThat(claimed).hasSize(1);
+            executor.deliver(event, host, token);
+            winningLease.set(token);
+            return true;
+        });
+        assertThat(winners).containsExactlyInAnyOrder(true, false);
+        assertThat(winningLease.get()).isNotBlank();
         assertThat(counts()).isEqualTo(Map.of("outbox",1,"receipt",1,"inbox",1));
         assertThat(jdbc.queryForObject("SELECT status FROM ab_integration_receipt WHERE tenant_id = ? AND event_id = ?",String.class,tenant,event.eventId())).isEqualTo("applied");
         var original = jdbc.queryForMap("SELECT * FROM ab_notification WHERE tenant_id = ?",tenant);
-        executor.deliver(event,host,"native-failure-fence");
+        executor.deliver(event,host,winningLease.get());
         assertThat(jdbc.queryForMap("SELECT * FROM ab_notification WHERE tenant_id = ?",tenant)).isEqualTo(original);
         assertThat(original.get("user_id")).isEqualTo(user);
         assertThat(original.get("source_id")).isEqualTo(sourceId);

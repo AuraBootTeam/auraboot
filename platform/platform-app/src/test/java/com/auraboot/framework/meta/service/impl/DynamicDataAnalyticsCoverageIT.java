@@ -168,7 +168,7 @@ class DynamicDataAnalyticsCoverageIT extends BaseIntegrationTest {
                 () -> dynamicDataService.compareAndSet(MODEL, pid1, "counter", 11, new HashMap<>()));
         // primary key fields are never compare-eligible
         assertThrows(Exception.class,
-                () -> dynamicDataService.compareAndSet(MODEL, pidByName("A"), "ddan_pid", "x", "y"));
+                () -> dynamicDataService.compareAndSet(MODEL, pidByName("A"), "pid", "x", "y"));
     }
 
     @Test
@@ -218,7 +218,7 @@ class DynamicDataAnalyticsCoverageIT extends BaseIntegrationTest {
 
     private String pidByName(String name) {
         return jdbcTemplate.queryForObject(
-                "SELECT ddan_pid FROM mt_" + MODEL + " WHERE ddan_name = ?", String.class, name);
+                "SELECT pid FROM mt_" + MODEL + " WHERE ddan_name = ?", String.class, name);
     }
 
     // ---------- fixture harness (mirrors AtomicIncrementConcurrencyIT) ----------

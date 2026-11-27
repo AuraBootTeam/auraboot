@@ -975,6 +975,10 @@ public class HandlerPhase implements CommandPhase {
                         && status.getStatusCode().is4xxClientError()) {
                     throw status;
                 }
+                if (e instanceof com.auraboot.framework.meta.exception.RecordVersionConflictException conflict) {
+                    // Synthesized CRUD keeps the same stale-version response as the direct writer.
+                    throw conflict;
+                }
                 if (e instanceof com.auraboot.framework.exception.ConflictException conflict) {
                     // Host-issued capabilities retain their optimistic concurrency response.
                     throw conflict;

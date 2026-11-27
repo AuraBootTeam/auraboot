@@ -126,7 +126,9 @@ class CommandTargetFileAppendIT {
         actor();
         try {
             var commandTransaction = new TransactionTemplate(transactions);
-            commandTransaction.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
+            // This capability owns row locks and a TARGET permit; its transaction contract is writable,
+            // not an ordinary human projection. Recheck the locked row after each competing commit.
+            commandTransaction.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_READ_COMMITTED);
             commandTransaction.executeWithoutResult(status->{
                 // This is the caller's parent lock/CAS, ahead of every file lock. It serializes
                 // same-parent append calls and commits projection/evidence in the same transaction.
