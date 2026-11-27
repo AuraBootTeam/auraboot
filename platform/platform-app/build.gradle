@@ -338,3 +338,5 @@ tasks.register('verifyBaseApplicationAssembly') {
 check {
     dependsOn 'verifyBaseApplicationAssembly'
 }
+
+apply from: rootProject.file('gradle/platform-app-coverage.gradle')

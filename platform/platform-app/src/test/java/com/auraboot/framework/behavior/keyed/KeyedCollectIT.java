@@ -45,6 +45,7 @@ import static org.assertj.core.api.Assertions.catchThrowable;
  * plugin-import → initializer → createFieldIndex execution against the registered model is
  * validated end-to-end in SP4's assembled golden (the model is not registered in this bare IT DB).
  */
+@org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate
 @SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("integration-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)

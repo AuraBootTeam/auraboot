@@ -37,7 +37,7 @@ class CapabilityDescriptionLocalizationTest {
                 Path.of("../plugins", plugin, "config/capabilities.json").toFile(), new TypeReference<>() {});
         // Shipped-catalog tripwire: bump when a merged PR grows the catalog, and keep every
         // new declaration inside the localization contract asserted below.
-        assertThat(declarations).hasSize(plugin.equals("org-management") ? 12 : 102);
+        assertThat(declarations).hasSize(plugin.equals("org-management") ? 12 : 103);
         MetaContext.setContext(20L, 1L, "tester", "tester");
         for (CapabilityDefinitionDTO declaration : declarations) {
             // Chinese description is mandatory for every shipped capability.

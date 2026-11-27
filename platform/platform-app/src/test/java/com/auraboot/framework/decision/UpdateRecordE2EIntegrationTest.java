@@ -102,6 +102,8 @@ class UpdateRecordE2EIntegrationTest extends BaseIntegrationTest {
         metaFieldService.addToModel(AddFieldRequest.builder()
                 .modelCode(modelCode).code(statusField).dataType("string")
                 .displayName("Status").tenantId(getTestTenant().getId()).build());
+        grantCommittedPermissionToTestRole("model." + modelCode + ".create",
+                "model", modelCode, "create", "Create update-action fixture");
         String permission = "model." + modelCode + ".update";
         grantCommittedPermissionToTestRole(permission, "model", modelCode, "update", "Update test record");
         // The real command boundary requires both update capability and a readable named target.

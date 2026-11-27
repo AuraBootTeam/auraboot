@@ -995,7 +995,8 @@ jacocoTestReport {
     // Offline instrumentation writes here (jacoco-agent.destfile on the test task); the report
     // reads the ORIGINAL on-disk classes (build/classes) — coverage was recorded against their
     // stable IDs, so no runtime classdump of CGLIB proxies is needed.
-    executionData.setFrom(files("${buildDir}/jacoco/test.exec"))
+    executionData.setFrom(files("${buildDir}/jacoco/test.exec",
+            project(':platform-app').layout.buildDirectory.file('jacoco/test.exec')))
     afterEvaluate {
         def allClassDirs = classDirectories.files.collect {
             fileTree(dir: it, exclude: jacocoExcludes)
@@ -1042,7 +1043,8 @@ jacocoTestReport {
 jacocoTestCoverageVerification {
     dependsOn jacocoTestReport
     // Read the offline-instrumentation exec (same file the report uses).
-    executionData.setFrom(files("${buildDir}/jacoco/test.exec"))
+    executionData.setFrom(files("${buildDir}/jacoco/test.exec",
+            project(':platform-app').layout.buildDirectory.file('jacoco/test.exec')))
     afterEvaluate {
         // Verify against the original compiled classes — offline instrumentation records
         // coverage on their stable on-disk IDs, so no runtime CGLIB classdump is involved.

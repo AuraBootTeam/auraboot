@@ -60,6 +60,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /** Real HTTP/JWT, PostgreSQL and managed Qwen; spies inject faults, never synthetic vectors. */
 @Tag("agent-eval-live")
+@org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate
 @SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class MemoryEmbeddingMaintenanceLiveIT extends BaseIntegrationTest {

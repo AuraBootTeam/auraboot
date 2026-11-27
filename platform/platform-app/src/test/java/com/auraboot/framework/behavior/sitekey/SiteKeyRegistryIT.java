@@ -59,6 +59,7 @@ class SiteKeyRegistryIT {
                 updated_at TIMESTAMPTZ
             )
             """);
+        jdbcTemplate.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_mt_behavior_site_key_site_key ON mt_behavior_site_key (site_key)");
         cleanup();
         insert("IT_PID_ALPHA", TENANT_ALPHA, "abk_it_alpha", "Alpha App", "active");
         insert("IT_PID_BETA", TENANT_BETA, "abk_it_beta", "Beta App", "active");

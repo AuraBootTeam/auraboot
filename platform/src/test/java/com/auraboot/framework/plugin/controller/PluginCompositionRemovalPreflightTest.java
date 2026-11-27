@@ -64,6 +64,7 @@ class PluginCompositionRemovalPreflightTest {
     @Test void importRollbackRejectsBeforeResourceRestorationDeletionOrHistoryMutation() {
         MetaContext.setContext(1L,7L,"operator","Operator");
         var service=mock(PluginImportServiceImpl.class,CALLS_REAL_METHODS);
+        ReflectionTestUtils.setField(service,"packageReplacements",mock(com.auraboot.framework.plugin.service.impl.PluginPackageReplacements.class));
         ReflectionTestUtils.setField(service,"authorizationWriteLock",mock(com.auraboot.framework.permission.service.RoleAuthorizationWriteLock.class));
         var imports=mock(PluginImportHistoryMapper.class);var records=mock(PluginRecordMapper.class);
         var resources=mock(PluginResourceMapper.class);var manager=mock(AuraPluginManager.class);

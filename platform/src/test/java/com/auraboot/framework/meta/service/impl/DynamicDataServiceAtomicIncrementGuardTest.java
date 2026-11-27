@@ -113,7 +113,8 @@ class DynamicDataServiceAtomicIncrementGuardTest {
 
         when(metadataService.getModelDefinition("cr_cj_profile")).thenReturn(Optional.of(testModel));
 
-        MetaContext.setContext(1L, 7L, null, "system");
+        MetaContext.setContext(1L, 7L, "user-7", "tester");
+        MetaContext.setMemberId(8L);
     }
 
     @AfterEach

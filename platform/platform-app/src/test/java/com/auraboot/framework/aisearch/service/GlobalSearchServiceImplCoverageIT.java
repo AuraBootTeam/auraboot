@@ -53,6 +53,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @SpringBootTest(classes = TestApplication.class)
 @ActiveProfiles("integration-test")
+@org.springframework.transaction.annotation.Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
 @DisplayName("GlobalSearchServiceImpl Coverage IT — readable search + preferences")
 class GlobalSearchServiceImplCoverageIT extends BaseIntegrationTest {
 
@@ -94,6 +95,9 @@ class GlobalSearchServiceImplCoverageIT extends BaseIntegrationTest {
         seedModel(tenantId, beta, "gsb2", null, "entity", true);
         seedModel(tenantId, ghost, "gsg2", "Ghost (no table)", "entity", false);
         seedModel(tenantId, viewLike, "gsv2", "View-like model", "view", false);
+        for (String code : List.of(alpha, beta)) {
+            grantCommittedPermissionToTestRole("model." + code + ".create", "model", code, "create", "IT create " + code);
+        }
         seedRecord(alpha, "gsa2", "alpha-" + KEYWORD_TOKEN + "-one");
         seedRecord(alpha, "gsa2", "alpha-quiet");
         seedRecord(beta, "gsb2", "beta-" + KEYWORD_TOKEN + "-one");

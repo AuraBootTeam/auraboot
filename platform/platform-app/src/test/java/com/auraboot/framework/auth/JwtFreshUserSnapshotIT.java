@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** Real PostgreSQL, signed JWT, real filter and session service; no Redis or auth mocks. */
 class JwtFreshUserSnapshotIT extends BaseIntegrationTest {
     @Autowired UserService users;
+    @Autowired com.auraboot.framework.tenant.service.TenantMemberService members;
     @Autowired UnifiedUserDetailsService details;
     @Autowired JwtUtil jwt;
     @Autowired SessionManagementService sessions;
@@ -29,6 +30,7 @@ class JwtFreshUserSnapshotIT extends BaseIntegrationTest {
     @Test
     void oldTokenObservesDisableSecurityVersionAndSessionRevocation() throws Exception {
         User user = users.signUp("fresh-snapshot-" + System.nanoTime() + "@example.com", "SnapshotPass123!");
+        members.addMember(user.getId(), getTestTenant().getId(), "active");
         String token = jwt.generateTokenWithTenantId(details.loadUserByPid(user.getPid()),
                 user.getPid(), getTestTenant().getId(), 0);
         sessions.createSession(user.getId(), token, "127.0.0.1", "performance-regression");

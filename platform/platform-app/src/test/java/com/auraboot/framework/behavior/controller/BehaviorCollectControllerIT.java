@@ -38,6 +38,7 @@ import static org.mockito.Mockito.when;
  * {@code MetaContext}, the collect service enqueues through the memory MQ provider, and the
  * consumer persists/quarantines against Postgres.
  */
+@org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate
 @SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("integration-test")
 @TestPropertySource(properties = "aura.mq.type=memory")

@@ -130,6 +130,7 @@ class SkillEngineWiredExecutionIT extends BaseIntegrationTest {
         String modelCode = createModel(suffix, fieldCode + ":STRING");
 
         grantCommittedPermissionToTestRole("model." + modelCode + ".read", "model", modelCode, "read", "Read wired skill fixture");
+        grantCommittedPermissionToTestRole("model." + modelCode + ".create", "model", modelCode, "create", "Create wired skill fixture");
         String rowName = "WIRED-" + suffix;
         Map<String, Object> created = dynamicDataService.create(modelCode, Map.of(fieldCode, rowName));
         assertThat(created).as("seed row must be created").isNotNull();

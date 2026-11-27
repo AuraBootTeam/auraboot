@@ -92,6 +92,7 @@ class AgentWriteCommandPipelineIT {
     void setUp() {
         ensureTestDataExists();
         MetaContext.setContext(testTenant.getId(), testUser.getId(), testUser.getPid(), testUser.getUserName());
+        MetaContext.setMemberId(tenantMemberService.findByTenantIdAndUserId(testTenant.getId(), testUser.getId()).getId());
     }
 
     @AfterEach

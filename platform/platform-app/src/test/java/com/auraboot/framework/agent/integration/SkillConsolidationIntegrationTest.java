@@ -1,5 +1,20 @@
 package com.auraboot.framework.agent.integration;
 
+import com.auraboot.framework.meta.entity.Model;
+import com.auraboot.framework.meta.entity.Field;
+import com.auraboot.framework.meta.entity.ModelFieldBinding;
+import com.auraboot.framework.meta.entity.payload.ExtensionBean;
+import com.auraboot.framework.meta.entity.payload.FieldFeatureBean;
+import com.auraboot.framework.meta.constant.Status;
+import com.auraboot.framework.meta.dto.SchemaOperationResult;
+import com.auraboot.framework.meta.mapper.*;
+import com.auraboot.framework.meta.service.SchemaManagementService;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
+import java.time.Instant;
+import java.util.*;
+import com.auraboot.framework.meta.dto.CommandDefinitionCreateRequest;
+import com.auraboot.framework.meta.service.CommandService;
+
 import com.auraboot.framework.agent.dto.SkillInput;
 import com.auraboot.framework.agent.dto.SkillResult;
 import com.auraboot.framework.agent.provider.*;
@@ -26,9 +41,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Validates the full flow: NL input -> BIF (IntentParser + ObjectResolver + RiskEvaluator)
  * -> SkillEngine (dsl_dispatch) -> ToolProviderRegistry (DslToolProvider, PlatformToolProvider).
  *
- * The test tenant may not have business models registered, so DSL execution tests
- * verify routing correctness by checking that errors come from the domain layer
- * (CommandExecutor / DynamicDataService), not from the dispatch/routing layer.
+ * Write dispatch tests create an owned real model, published command and role grants,
+ * then require the governed kernel to resolve and attempt that exact command.
  */
 @SpringBootTest(classes = TestApplication.class)
 @ActiveProfiles("integration-test")
@@ -44,6 +58,110 @@ class SkillConsolidationIntegrationTest extends BaseIntegrationTest {
     @Autowired private ToolProviderRegistry toolProviderRegistry;
 
     private Long tenantId;
+    @Autowired private SchemaManagementService schemaManagementService;
+    @Autowired private MetaModelMapper metaModelMapper;
+    @Autowired private MetaFieldMapper metaFieldMapper;
+    @Autowired private MetaModelFieldBindingMapper fieldBindingMapper;
+    @Autowired private DynamicDataMapper dynamicDataMapper;
+    @Autowired private CommandService commandService;
+    private final List<String> createdTables = new ArrayList<>();
+    private final List<Model> createdModels = new ArrayList<>();
+    private final List<Field> createdFields = new ArrayList<>();
+    private final List<String> createdCommands = new ArrayList<>();
+
+    @org.junit.jupiter.api.AfterEach
+    void removeOwnedCommandFixtures() {
+        for (String pid : createdCommands) commandService.delete(pid);
+        for (String table : createdTables) dynamicDataMapper.alterTable("DROP TABLE IF EXISTS " + table);
+        for (Model model : createdModels) fieldBindingMapper.deleteByModelId(model.getId());
+        for (Field field : createdFields) metaFieldMapper.deleteById(field.getId());
+        for (Model model : createdModels) metaModelMapper.deleteById(model.getId());
+        createdCommands.clear(); createdTables.clear(); createdFields.clear(); createdModels.clear();
+    }
+
+    private Map<String,String> commandFixture() {
+        String suffix = System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0,4);
+        String field = "name_" + suffix;
+        String model = createModel(suffix, field + ":STRING");
+        String authority = "model." + model + ".create";
+        grantCommittedPermissionToTestRole(authority, "model", model, "create", "Create skill fixture");
+        grantCommittedPermissionToTestRole("model." + model + ".read", "model", model, "read", "Read skill fixture");
+        var request = new CommandDefinitionCreateRequest();
+        request.setCode(model + ":create"); request.setDisplayName("Create skill fixture");
+        request.setModelCode(model); request.setInputSchema("{}");
+        request.setExecutionConfig("{\"type\":\"create\",\"crudDefault\":true,\"permissions\":[\"" + authority
+                + "\"],\"inputFields\":[\"" + field + "\"]}");
+        var command = commandService.create(request);
+        createdCommands.add(command.getPid()); commandService.publish(command.getPid());
+        return Map.of("model",model,"field",field,"command",command.getCode());
+    }
+    private String createModel(String suffix, String... fieldDefs) {
+        String modelCode = "agw_" + suffix;
+        String tableName = "mt_" + modelCode.toLowerCase();
+        Model model = new Model();
+        model.setPid(UniqueIdGenerator.generate());
+        model.setTenantId(getTestTenant().getId());
+        model.setCode(modelCode);
+        model.setVersion(1);
+        model.setIsCurrent(true);
+        model.setStatus(Status.DRAFT.getCode());
+        model.setCreatedAt(Instant.now());
+        model.setUpdatedAt(Instant.now());
+        model.setDeletedFlag(false);
+        ExtensionBean ext = new ExtensionBean();
+        Map<String, Object> extMap = new HashMap<>();
+        extMap.put("displayName", "Agent Write Model " + suffix);
+        extMap.put("modelType", "entity");
+        ext.setExtension(extMap);
+        model.setExtension(ext);
+        metaModelMapper.insert(model);
+        createdModels.add(model);
+
+        int order = 1;
+        for (String fieldDef : fieldDefs) {
+            String[] parts = fieldDef.split(":");
+            String fieldCode = parts[0];
+            String dataType = parts.length > 1 ? parts[1] : "string";
+            boolean required = parts.length > 2 && "required".equals(parts[2]);
+            Field field = new Field();
+            field.setPid(UniqueIdGenerator.generate());
+            field.setTenantId(getTestTenant().getId());
+            field.setCode(fieldCode);
+            field.setDataType(dataType);
+            field.setVersion(1);
+            field.setIsCurrent(true);
+            field.setStatus(Status.DRAFT.getCode());
+            field.setCreatedAt(Instant.now());
+            field.setUpdatedAt(Instant.now());
+            field.setDeletedFlag(false);
+            FieldFeatureBean feature = new FieldFeatureBean();
+            feature.setRequired(required);
+            field.setFeature(feature);
+            ExtensionBean fieldExt = new ExtensionBean();
+            Map<String, Object> fieldExtMap = new HashMap<>();
+            fieldExtMap.put("displayName", fieldCode);
+            fieldExt.setExtension(fieldExtMap);
+            field.setExtension(fieldExt);
+            metaFieldMapper.insert(field);
+            createdFields.add(field);
+            fieldBindingMapper.insert(buildBinding(model.getId(), field.getId(), order++));
+        }
+        SchemaOperationResult result = schemaManagementService.createTableByModel(modelCode);
+        assertThat(result.isSuccess()).as("Table creation for %s", modelCode).isTrue();
+        createdTables.add(tableName);
+        return modelCode;
+    }
+
+    private ModelFieldBinding buildBinding(Long modelId, Long fieldId, int order) {
+        ModelFieldBinding binding = new ModelFieldBinding();
+        binding.setTenantId(getTestTenant().getId());
+        binding.setModelId(modelId);
+        binding.setFieldId(fieldId);
+        binding.setFieldOrder(order);
+        return binding;
+    }
+
+
 
     @BeforeEach
     void setup() {
@@ -216,13 +334,15 @@ class SkillConsolidationIntegrationTest extends BaseIntegrationTest {
     // ===== SkillEngine: dsl.command =====
 
     @Test
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     void skillEngine_dslCommand_dispatches_to_commandExecutor() {
+        var fixture = commandFixture();
         SkillInput input = SkillInput.builder()
                 .intent("create")
-                .object("crm_account_common")
+                .object(fixture.get("model"))
                 .parameters(Map.of(
-                        "commandCode", "crm_account_create",
-                        "crm_account_name", "SkillConsolidationTest_" + System.currentTimeMillis()
+                        "commandCode", fixture.get("command"),
+                        fixture.get("field"), "SkillConsolidationTest_" + System.currentTimeMillis()
                 ))
                 .build();
 
@@ -231,12 +351,14 @@ class SkillConsolidationIntegrationTest extends BaseIntegrationTest {
         assertThat(result).isNotNull();
         assertThat(result.getSkillCode()).isEqualTo("dsl.command");
         assertThat(result.getToolCallCount()).isEqualTo(1);
+        assertThat(result.getSourceToolCode()).isEqualTo("cmd:" + fixture.get("command"));
         // Domain-level error from CommandExecutor is acceptable (proves routing worked)
         if (result.getStatus() == SkillResult.Status.FAILED) {
             assertThat(result.getErrorMessage())
                     .describedAs("Error should be from CommandExecutor, not dispatch")
                     .doesNotContain("Skill not found")
-                    .doesNotContain("commandCode is required");
+                    .doesNotContain("commandCode is required")
+                    .doesNotContain("Tool is unavailable or not permitted");
         }
     }
 
@@ -362,7 +484,9 @@ class SkillConsolidationIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     void fullPipeline_createIntent_endToEnd() {
+        var fixture = commandFixture();
         // Step 1: Parse intent
         var intent = intentParser.parse("新建一个客户");
         assertThat(intent.getIntent()).isEqualTo("create");
@@ -372,18 +496,19 @@ class SkillConsolidationIntegrationTest extends BaseIntegrationTest {
         assertThat(risk).isEqualTo("L1");
         assertThat(riskEvaluator.deriveActionability(intent.getIntent())).isEqualTo("execute");
 
-        // Step 3: Resolve command (if model exists in test tenant)
-        String commandCode = objectResolver.resolveCommand(tenantId, "crm_account_common", "create");
-        // commandCode may be null if crm_account_common commands aren't in test tenant
+        // Step 3: Resolve the owned published command
+        String commandCode = objectResolver.resolveCommand(tenantId, fixture.get("model"), "create");
+        // Missing command discovery must fail this positive-path fixture.
 
         // Step 4: Execute via SkillEngine with a command code
-        String effectiveCommand = commandCode != null ? commandCode : "crm_account_create";
+        assertThat(commandCode).isEqualTo(fixture.get("command"));
+        String effectiveCommand = commandCode;
         SkillInput input = SkillInput.builder()
                 .intent("create")
-                .object("crm_account_common")
+                .object(fixture.get("model"))
                 .parameters(Map.of(
                         "commandCode", effectiveCommand,
-                        "crm_account_name", "FullPipelineTest_" + System.currentTimeMillis()
+                        fixture.get("field"), "FullPipelineTest_" + System.currentTimeMillis()
                 ))
                 .build();
 
@@ -391,6 +516,7 @@ class SkillConsolidationIntegrationTest extends BaseIntegrationTest {
         assertThat(result).isNotNull();
         assertThat(result.getSkillCode()).isEqualTo("dsl.command");
         assertThat(result.getToolCallCount()).isEqualTo(1);
+        assertThat(result.getSourceToolCode()).isEqualTo("cmd:" + fixture.get("command"));
     }
 
     @Test

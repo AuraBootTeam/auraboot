@@ -13,7 +13,7 @@ import static org.mockito.Mockito.*;
 
 /** Listing preserves named-query delegation and stable physical pagination. */
 class DynamicDataListingSupportTest {
-    @BeforeEach void context() { MetaContext.setContext(42L,43L,"u-43","tester"); }
+    @BeforeEach void context() { MetaContext.setContext(42L,43L,"u-43","tester"); MetaContext.setMemberId(44L); }
     @AfterEach void clear() { MetaContext.clear(); }
     final NamedQueryService queries=mock(NamedQueryService.class);
     final MetaModelMapper models=mock(MetaModelMapper.class);
