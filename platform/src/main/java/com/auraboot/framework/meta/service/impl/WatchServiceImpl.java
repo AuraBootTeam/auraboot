@@ -29,7 +29,7 @@ public class WatchServiceImpl implements WatchService {
     private final com.auraboot.framework.meta.service.RecordReadAccess recordReadAccess;
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public boolean toggleWatch(String modelCode, Long recordId) {
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
@@ -55,7 +55,7 @@ public class WatchServiceImpl implements WatchService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public boolean toggleWatchByRecordPid(String modelCode, String recordPid) {
         if (!StringUtils.hasText(recordPid)) {
             return false;

@@ -449,12 +449,12 @@ class DataPermissionEngineIntegrationTest {
 
             dynamicDataService.update(modelCode, ownedPid, Map.of(fieldCode, "own-updated"));
             assertScopeValue(modelCode, ownedPid, fieldCode, "own-updated");
-            assertThrows(MetaServiceException.class, () -> dynamicDataService.update(
+            assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> dynamicDataService.update(
                     modelCode, otherPid, Map.of(fieldCode, "forbidden-update")));
             assertScopeValue(modelCode, otherPid, fieldCode, "other-before");
             assertTrue(dynamicDataService.compareAndSet(
                     modelCode, ownedPid, fieldCode, "own-updated", "own-cas"));
-            assertFalse(dynamicDataService.compareAndSet(
+            assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> dynamicDataService.compareAndSet(
                     modelCode, otherPid, fieldCode, "other-before", "forbidden-cas"));
             assertScopeValue(modelCode, ownedPid, fieldCode, "own-cas");
             assertScopeValue(modelCode, otherPid, fieldCode, "other-before");
@@ -471,9 +471,9 @@ class DataPermissionEngineIntegrationTest {
             // HTTP action revocation is a separate boundary contract, not claimed by this test.
             dataScopeService.setScope(tenantId, localRole.getId(), modelCode, "update", "none", "MAX");
             assertEquals("none", dataScopeService.resolveScope(actorMember.getId(), modelCode, "update").scopeType());
-            assertThrows(MetaServiceException.class, () -> dynamicDataService.update(
+            assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> dynamicDataService.update(
                     modelCode, ownedPid, Map.of(fieldCode, "forbidden-after-revoke")));
-            assertFalse(dynamicDataService.compareAndSet(
+            assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> dynamicDataService.compareAndSet(
                     modelCode, ownedPid, fieldCode, "own-cas", "forbidden-after-revoke"));
             assertScopeValue(modelCode, ownedPid, fieldCode, "own-cas");
             assertScopeValue(modelCode, otherPid, fieldCode, "other-before");

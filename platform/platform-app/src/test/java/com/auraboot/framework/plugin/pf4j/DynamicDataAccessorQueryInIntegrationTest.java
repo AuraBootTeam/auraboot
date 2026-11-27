@@ -88,6 +88,7 @@ class DynamicDataAccessorQueryInIntegrationTest {
     @Autowired
     private DataPermissionPolicyService policyService;
 
+    private com.auraboot.framework.integration.NativePermissionFixture nativeAuthority;
     private DynamicDataAccessorImpl accessor;
     private String modelCode;
     private String tableName;
@@ -112,11 +113,16 @@ class DynamicDataAccessorQueryInIntegrationTest {
             modelInitialized = true;
         }
         ensureRoleBinding();
+        if (nativeAuthority == null) {
+            nativeAuthority = new com.auraboot.framework.integration.NativePermissionFixture(jdbcTemplate, fixturePermissions);
+            nativeAuthority.grantModel(modelCode, "read", "create", "delete");
+        }
     }
 
     @AfterAll
     void cleanup() {
         try {
+            if (nativeAuthority != null) nativeAuthority.close();
             purgeTestArtifacts();
         } finally {
             MetaContext.clear();
