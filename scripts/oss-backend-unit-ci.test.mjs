@@ -465,9 +465,10 @@ test('both original Gradle tasks receive the admitted argument vector without ch
   const invocations=result.stdout.trim().split('\n').map(line=>JSON.parse(line));assert.equal(invocations.length,2);
   for(const row of invocations) {assert.equal(row.database,'aura_boot');assert.equal(row.redis,'0');assert.equal(row.springRedis,'0');}
   const rows=invocations.map(row=>row.args);
-  for(const row of rows){assert.deepEqual(row.slice(3,8),argv);assert.deepEqual(row.slice(0,3),['--no-daemon','-p','platform']);}
-  assert.deepEqual(rows[0].slice(8),['--continue','cleanTest','test']);
-  assert.deepEqual(rows[1].slice(8),['--continue','bootstrapBillingAccountTest']);
+  for(const row of rows){assert.deepEqual(row.slice(3,3+argv.length),argv);assert.deepEqual(row.slice(0,3),['--no-daemon','-p','platform']);}
+  assert.ok(argv.includes('-PauraAppTestForkEvery=64'),'the admitted worker lifetime must reach every original Gradle invocation');
+  assert.deepEqual(rows[0].slice(3+argv.length),['--continue','cleanTest','test']);
+  assert.deepEqual(rows[1].slice(3+argv.length),['--continue','bootstrapBillingAccountTest']);
   assert.doesNotMatch(rows.flat().join('\n'),/--tests|exclude|retry|ContextCache/);
 });
 

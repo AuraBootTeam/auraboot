@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { createCookieSessionStorage } from 'react-router';
+import { openPlatformSession, installOpenPlatformSession } from '../../helpers/open-platform-session';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -121,17 +121,6 @@ const queryText = (cn: string) => {
   return queryEnglish[cn];
 };
 const UI_MUTATION = process.env.AURA_OPEN_PLATFORM_UI_MUTATION;
-const sessionStorage = createCookieSessionStorage({
-  cookie: {
-    name: '__session',
-    httpOnly: true,
-    path: '/',
-    sameSite: 'lax',
-    secrets: [process.env.SESSION_SECRET || 'dev-only-secret-do-not-use-in-production'],
-    secure: false,
-  },
-});
-
 // A supplied acceptance plan is materialized before any browser capture, including all unresolved rows.
 test.beforeAll(async () => {
   if (UI_MUTATION && !['scope-label-clipping', 'publication-overflow', 'intro-word-break', 'publication-title-locale', 'query-compatibility-feedback', 'query-confirmation-stale', 'major-grant-alias', 'resource-compatibility-feedback', 'resource-confirmation-stale', 'resource-catalog-feedback', 'resource-validation-feedback', 'resource-catalog-empty', 'resource-publish-conflict', 'sdk-ui-projection', 'protocol-visible-leak', 'editor-tab-order', 'token-artifact-failure'].includes(UI_MUTATION)) throw new Error('Unsupported Open Platform UI mutation');
@@ -1207,43 +1196,7 @@ test.describe('Dynamic installation authority journey', () => {
 });
 
 async function authenticate(page: import('@playwright/test').Page, locale = 'zh-CN', account: { email: string; password: string } = DEFAULT_TEST_ACCOUNT) {
-  const loginResponse = await page.request.post(`${BACKEND_URL}/api/auth/login`, {
-    data: { email: account.email, password: account.password },
-  });
-  expect(loginResponse.status()).toBe(200);
-  const login = await loginResponse.json();
-  expect(String(login.code)).toBe('0');
-  expect(login.data.jwt).toEqual(expect.any(String));
-  const authorization = { Authorization: `Bearer ${login.data.jwt}` };
-  const spacesResponse = await page.request.get(`${BACKEND_URL}/api/tenant-selection/my-spaces`, {
-    headers: authorization,
-  });
-  expect(spacesResponse.status()).toBe(200);
-  const spaces = await spacesResponse.json();
-  expect(String(spaces.code)).toBe('0');
-  const business = spaces.data.find(
-    (space: { spaceType: string; tenantId: string }) => space.spaceType === 'business',
-  );
-  expect(business).toBeDefined();
-  const selectionResponse = await page.request.post(`${BACKEND_URL}/api/tenant-selection/process`, {
-    headers: authorization,
-    data: { action: 'select', tenantId: business.tenantId },
-  });
-  expect(selectionResponse.status()).toBe(200);
-  const selected = await selectionResponse.json();
-  expect(String(selected.code)).toBe('0');
-  expect(selected.data.jwt).toEqual(expect.any(String));
-  const session = await sessionStorage.getSession();
-  session.set('jwtToken', selected.data.jwt);
-  const setCookie = await sessionStorage.commitSession(session, { maxAge: 604800 });
-  const value = setCookie.match(/__session=([^;]+)/)?.[1];
-  expect(value).toBeTruthy();
-  await page.context().addCookies([
-    { name: '__session', value: value!, url: WEB_BASE_URL, httpOnly: true, sameSite: 'Lax' },
-    { name: 'locale', value: locale, url: WEB_BASE_URL, sameSite: 'Lax' },
-  ]);
-  await page.addInitScript(value => localStorage.setItem('locale', value), locale);
-
+  await installOpenPlatformSession(page, await openPlatformSession(account), locale);
 }
 
 async function verifyBusyPublish(page: import('@playwright/test').Page, group: import('@playwright/test').Locator,

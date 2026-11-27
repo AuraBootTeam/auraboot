@@ -4,7 +4,8 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 export const JVM_RESOURCES = Object.freeze({daemonHeapMiB:1536, daemonMetaspaceMiB:256,
-  testHeapMiB:6144, testInitialHeapMiB:256, testMetaspaceMiB:768, nativeReserveMiB:512, workers:2});
+  testHeapMiB:6144, testInitialHeapMiB:256, testMetaspaceMiB:768, nativeReserveMiB:512, workers:2,
+  appTestClassesPerFork:64});
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 const quantity=value=>{
   const raw=value.trim();
@@ -36,7 +37,8 @@ export function resourceArguments() {
   const r=JVM_RESOURCES;
   return [`-Dorg.gradle.jvmargs=-Xmx${r.daemonHeapMiB}m -XX:MaxMetaspaceSize=${r.daemonMetaspaceMiB}m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8`,
     `-Dorg.gradle.workers.max=${r.workers}`,`-PauraTestMaxHeap=${r.testHeapMiB}m`,
-    `-PauraTestMinHeap=${r.testInitialHeapMiB}m`,`-PauraTestMaxMetaspace=${r.testMetaspaceMiB}m`];
+    `-PauraTestMinHeap=${r.testInitialHeapMiB}m`,`-PauraTestMaxMetaspace=${r.testMetaspaceMiB}m`,
+    `-PauraAppTestForkEvery=${r.appTestClassesPerFork}`];
 }
 export function inspectMemoryBudget({root='/sys/fs/cgroup',membership=readFileSync('/proc/self/cgroup','utf8')}={}) {
   const matches=membership.trim().split('\n').filter(line=>line.startsWith('0::'));

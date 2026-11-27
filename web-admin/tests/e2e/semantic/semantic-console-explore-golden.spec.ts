@@ -102,18 +102,23 @@ test.beforeAll(async ({ request }) => {
   }
   // Every offered limit is smaller than this namespace. Each title is its own
   // group with exact count one; no pre-existing row can satisfy the truncation.
-  // Bound concurrency; actual fixture setup duration still needs CI verification.
-  for (let offset = 0; offset < 501; offset += 8) {
-    await Promise.all(Array.from({ length: Math.min(8, 501 - offset) }, async (_, n) => {
-      const response = await request.post('/api/dynamic/e2et_order/create', { data: {
-        e2et_order_title: `SCTOP-${run}-${String(offset + n).padStart(3, '0')}`,
-        e2et_order_type: 'normal', e2et_order_urgent: false,
-        e2et_order_status: 'draft', e2et_order_date: dates[0],
-      } });
-      expect(response.ok(), await response.text()).toBeTruthy();
-      const body = await response.json();
-      expect(String(body.code), JSON.stringify(body)).toBe('0');
+  // Fixture loading is one bounded batch per transaction. Independent concurrent
+  // SERIALIZABLE commands may correctly return 409; this journey tests TopN,
+  // not caller retry policy. Keep all 501 exact groups and verify every write.
+  for (let offset = 0; offset < 501; offset += 50) {
+    const rows = Array.from({ length: Math.min(50, 501 - offset) }, (_, n) => ({
+      e2et_order_title: `SCTOP-${run}-${String(offset + n).padStart(3, '0')}`,
+      e2et_order_type: 'normal', e2et_order_urgent: false,
+      e2et_order_status: 'draft', e2et_order_date: dates[0],
     }));
+    const response = await request.post('/api/dynamic/e2et_order/batch', { data: rows });
+    expect(response.ok(), await response.text()).toBeTruthy();
+    const body = await response.json();
+    expect(String(body.code), JSON.stringify(body)).toBe('0');
+    expect(body.data).toMatchObject({ total: rows.length, success: rows.length, failed: 0, skipped: 0, errors: [] });
+    expect(body.data.successItems).toHaveLength(rows.length);
+    expect(body.data.successItems.map((row: Record<string, unknown>) => row.e2et_order_title).sort())
+      .toEqual(rows.map(row => row.e2et_order_title).sort());
   }
 });
 
