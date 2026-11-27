@@ -33,6 +33,12 @@ class TenantMemberServiceIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private TenantMemberService tenantMemberService;
 
+    @Autowired
+    private com.auraboot.framework.user.service.UserService users;
+
+    @Autowired
+    private com.auraboot.framework.plugin.extension.IdentityDirectoryAccessor identities;
+
     private Long memberId;
     private String memberPid;
 
@@ -105,6 +111,7 @@ class TenantMemberServiceIntegrationTest extends BaseIntegrationTest {
         assertThat(result).isTrue();
         TenantMember updated = tenantMemberService.getById(memberId);
         assertThat(updated.getStatus()).isEqualTo("inactive");
+        assertThat(updated.getLeaveDate()).isNotNull();
     }
 
     @Test
@@ -118,6 +125,12 @@ class TenantMemberServiceIntegrationTest extends BaseIntegrationTest {
         assertThat(result).isTrue();
         TenantMember updated = tenantMemberService.getById(memberId);
         assertThat(updated.getStatus()).isEqualTo("active");
+        assertThat(updated.getId()).isEqualTo(memberId);
+        assertThat(updated.getPid()).isEqualTo(memberPid);
+        assertThat(updated.getLeaveDate()).isNull();
+        var enabled = identities.findEnabledTenantMembership(getTestTenant().getId(), getTestUser().getPid());
+        assertThat(enabled).isNotNull();
+        assertThat(enabled.memberId()).isEqualTo(memberId);
     }
 
     @Test
@@ -152,12 +165,16 @@ class TenantMemberServiceIntegrationTest extends BaseIntegrationTest {
     @Order(21)
     @DisplayName("M3-02: getTenantIdByUserId returns exactly the test tenant ID")
     void getTenantIdByUserId_returnsExactTenantId() {
-        // This test relies on the test user belonging to exactly one tenant.
-        // If the test user belongs to multiple tenants, this will throw - which is also valid behavior to test.
-        assertThatCode(() -> {
-            Long tid = tenantMemberService.getTenantIdByUserId(getTestUser().getId());
-            assertThat(tid).isNotNull();
-        }).doesNotThrowAnyException();
+        // The shared base actor legitimately acquires other memberships in the
+        // complete suite. Give the single-tenant contract its own exact identity.
+        var user = users.signUp("single-tenant-"
+                + com.auraboot.framework.common.util.UniqueIdGenerator.generate().toLowerCase()
+                + "@example.test", "test-password-123");
+        tenantMemberService.addMember(user.getId(), getTestTenant().getId(), "active");
+        assertThat(tenantMemberService.getTenantIdsByUserId(user.getId()))
+                .containsExactly(getTestTenant().getId());
+        assertThat(tenantMemberService.getTenantIdByUserId(user.getId()))
+                .isEqualTo(getTestTenant().getId());
     }
 
     // ==================== M4: pagination ====================

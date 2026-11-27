@@ -585,6 +585,8 @@ PYLOG
     PGPASSWORD=auraboot psql -h 127.0.0.1 -p 5432 -U auraboot -d postgres -q \
       -c "DROP DATABASE IF EXISTS $pg_db WITH (FORCE)" -c "CREATE DATABASE $pg_db" \
       || die "could not recreate $pg_db"
+    # An explicitly recreated database invalidates its former administrator session.
+    rm -f "$sd/admin-session.json"
   elif [ "$(PGPASSWORD=auraboot psql -h 127.0.0.1 -p 5432 -U auraboot -d "$pg_db" -tAc \
             "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'" \
             2>/dev/null || echo 0)" = "0" ]; then
@@ -934,7 +936,7 @@ cmd_import() {
     read -r pg_host pg_port pg_user pg_db pg_pass <"$sd/pgenv"
   fi
 
-  local args=("--backend-url=http://127.0.0.1:$server_port" "--edition=oss" "--plugin-root=$REPO_ROOT/plugins")
+  local args=("--backend-url=http://127.0.0.1:$server_port" "--edition=oss" "--plugin-root=$REPO_ROOT/plugins" "--admin-session-file=$sd/admin-session.json")
   if [ "${#extra_plugin_roots[@]}" -gt 0 ]; then
     for extra_root in "${extra_plugin_roots[@]}"; do
       args+=("--extra-plugin-root=$extra_root")
@@ -971,10 +973,10 @@ cmd_warm() {
   local name="$1" sd; sd="$(state_dir "$name")" || return 1
   [ -f "$sd/ports" ] || die "no running stack for '$name' (run 'up' first)"
   local fe="$REPO_ROOT/web-admin"
-  local admin_json="${PW_ADMIN_STORAGE_STATE:-${PW_STORAGE_DIR:-tests/storage}/admin.json}"
-  [[ "$admin_json" = /* ]] || admin_json="$fe/$admin_json"
   local env_exports; env_exports="$(cmd_env "$name")"
   eval "$env_exports"
+  local admin_json="${PW_ADMIN_STORAGE_STATE:-${PW_STORAGE_DIR:-tests/storage}/admin.json}"
+  [[ "$admin_json" = /* ]] || admin_json="$fe/$admin_json"
   local evidence_root="$AURA_EVIDENCE_ROOT"
   mkdir -p "$evidence_root/playwright" "$sd/logs"
 
@@ -1043,6 +1045,12 @@ cmd_env() {
   fi
   [ -n "$evidence_root" ] || die "runtime env lacks AURA_EVIDENCE_ROOT; deploy the workspace runtime lifecycle before running this gate"
   mkdir -p "$evidence_root/playwright/evidence" "$evidence_root/logs/seed"
+  local storage_dir="${PW_STORAGE_DIR:-$evidence_root/playwright/storage}"
+  [[ "$storage_dir" = /* ]] || storage_dir="$REPO_ROOT/web-admin/$storage_dir"
+  printf 'export PW_STORAGE_DIR=%q\n' "$storage_dir"
+  printf 'export PW_ADMIN_STORAGE_STATE=%q\n' "${PW_ADMIN_STORAGE_STATE:-$storage_dir/admin.json}"
+  printf 'export PW_OPERATOR_STORAGE_STATE=%q\n' "${PW_OPERATOR_STORAGE_STATE:-$storage_dir/operator.json}"
+  printf 'export PW_VIEWER_STORAGE_STATE=%q\n' "${PW_VIEWER_STORAGE_STATE:-$storage_dir/viewer.json}"
   cat <<EOF
 # Playwright env contract for golden specs against '$name' (run from web-admin/):
 export PLAYWRIGHT_BASE_URL=http://127.0.0.1:$vite_port

@@ -29,6 +29,8 @@ import static org.assertj.core.api.Assertions.*;
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class DocGenerationServiceIntegrationTest extends BaseIntegrationTest {
+    @Autowired private com.auraboot.framework.tenant.service.TenantMemberService fixtureMembers;
+    @Autowired private com.auraboot.framework.environment.service.EnvironmentService fixtureEnvironments;
 
     @Autowired
     private DocGenerationService docGenerationService;
@@ -151,6 +153,7 @@ class DocGenerationServiceIntegrationTest extends BaseIntegrationTest {
     @Test
     @Order(6)
     @DisplayName("GEN-06: Tenant-scoped models, bound fields, commands and counts overwrite prior tenant output")
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     void tenantMetadataIsExcludedAndEmptyOutputReplacesPriorContent() throws Exception {
         String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
         String modelCode = "doc_scope_" + suffix;
@@ -177,8 +180,11 @@ class DocGenerationServiceIntegrationTest extends BaseIntegrationTest {
         other.setCreatedAt(Instant.now());
         other.setUpdatedAt(Instant.now());
         other = tenantService.createTenant(other);
+        var otherMembership = fixtureMembers.addMember(getTestUser().getId(), other.getId(), "active");
         try {
             MetaContext.setContext(other.getId(), getTestUser().getId(), getTestUser().getPid(), getTestUser().getUserName());
+            MetaContext.setMemberId(otherMembership.getId());
+            MetaContext.setEnvironmentId(fixtureEnvironments.findOrCreateDefaultId(other.getId()));
             GenerationResult empty = docGenerationService.generate(output.toString());
             assertThat(empty.models()).isZero();
             assertThat(empty.commands()).isZero();

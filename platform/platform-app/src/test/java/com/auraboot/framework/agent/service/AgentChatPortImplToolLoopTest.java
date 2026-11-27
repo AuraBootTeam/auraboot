@@ -1428,7 +1428,10 @@ class AgentChatPortImplToolLoopTest {
         assertThat(stored.getToolVersion()).isEqualTo("v1");
         assertThat(stored.getArgsHash()).hasSize(64);
         assertThat(stored.getIdempotencyKey()).isEqualTo(
-                "cmd_pe_create_procurement_comparison_draft:v1:" + stored.getArgsHash());
+                "pending-tool:intent:v2:" + ctx.tenantId() + ":" + ctx.turnId() + ":"
+                        + java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                                .digest("toolu-write".getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                        + ":cmd_pe_create_procurement_comparison_draft:v1:" + stored.getArgsHash());
         assertThat(stored.getPolicyDecisionReason()).isEqualTo("user_confirmation_required");
         // #1386 made the approval sentence show the command as the product names it
         // (namespace + colon) instead of the LLM-safe alias; this expectation was left

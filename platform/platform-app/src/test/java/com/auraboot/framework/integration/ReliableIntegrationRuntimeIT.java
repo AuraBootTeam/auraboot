@@ -42,6 +42,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DisplayName("AMOS-T01 reliable integration runtime — real PostgreSQL pilot")
 class ReliableIntegrationRuntimeIT {
+    // Explicit lease/replay tests drive the real worker themselves; hold commit signals to avoid a second claimant.
+    @org.springframework.test.context.bean.override.mockito.MockitoBean(name = "reliableOutboxDispatchExecutor")
+    private org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor heldCommitDispatch;
+
 
     private static final long TENANT_ID = 992_010_001L;
     private static final String EVENT_TYPE =
@@ -84,6 +88,9 @@ class ReliableIntegrationRuntimeIT {
 
     @AfterAll
     void cleanup() {
+        io.qameta.allure.Allure.addAttachment("Owned reliable integration terminal rows", "text/plain",
+                jdbc.queryForList("SELECT event_id,status,retry_count,last_error,lease_owner,ordering_key,event_sequence "
+                        + "FROM ab_outbox WHERE tenant_id=? ORDER BY id", TENANT_ID).toString());
         cleanupRows();
     }
 
@@ -336,9 +343,9 @@ class ReliableIntegrationRuntimeIT {
     }
 
     private void assertStatus(String eventId, String expected) {
-        assertThat(jdbc.queryForObject(
-                "SELECT status FROM ab_outbox WHERE tenant_id = ? AND event_id = ?",
-                String.class, TENANT_ID, eventId)).isEqualTo(expected);
+        var row = jdbc.queryForMap("SELECT status,retry_count,last_error,next_retry_at,lease_owner,event_sequence "
+                + "FROM ab_outbox WHERE tenant_id=? AND event_id=?", TENANT_ID, eventId);
+        assertThat(row.get("status")).as("Owned event %s state: %s", eventId, row).isEqualTo(expected);
     }
 
     private int countProjection(String eventId) {

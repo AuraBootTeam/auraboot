@@ -2,6 +2,8 @@
 
 import json
 import os
+import stat
+from pathlib import Path
 import sys
 import urllib.error
 import urllib.request
@@ -37,6 +39,48 @@ def business_session(request, email, password, tenant_id=None):
     return selected["jwt"]
 
 
+
+def cached_business_session(request, email, password, filename, base, tenant_id=None):
+    """Reuse one explicitly selected runtime session; invalid saved sessions fail closed."""
+    path = Path(filename)
+    if not path.is_absolute():
+        raise RuntimeError("Administrator session path must be absolute")
+    saved = None
+    if path.exists() or path.is_symlink():
+        info = path.lstat()
+        if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o600 or info.st_uid != os.geteuid():
+            raise RuntimeError("Administrator session must be an owned private regular file")
+        if info.st_size > 65536:
+            raise RuntimeError("Administrator session exceeds its size limit")
+        saved = json.loads(path.read_text())
+        if (not isinstance(saved, dict) or set(saved) != {"backendUrl", "email", "tenantId", "userId", "jwt"}
+                or saved["backendUrl"] != base or saved["email"] != email
+                or not isinstance(saved["jwt"], str) or not saved["jwt"]
+                or tenant_id is not None and str(saved["tenantId"]) != str(tenant_id)):
+            raise RuntimeError("Administrator session does not match this runtime and actor")
+        token = saved["jwt"]
+    else:
+        token = business_session(request, email, password, tenant_id)
+    data = response_data(request("/api/auth/me", headers={"Authorization": "Bearer " + token}), "administrator identity")
+    user = data.get("user") if isinstance(data, dict) else None
+    if (not isinstance(user, dict) or not user.get("id") or not user.get("tenantId")
+            or user.get("email") != email
+            or tenant_id is not None and str(user["tenantId"]) != str(tenant_id)):
+        raise RuntimeError("Administrator identity does not match the selected business session")
+    record = {"backendUrl": base, "email": email, "tenantId": str(user["tenantId"]),
+              "userId": str(user["id"]), "jwt": token}
+    if saved is not None:
+        if record != saved:
+            raise RuntimeError("Saved administrator identity changed")
+    else:
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "w") as stream:
+            json.dump(record, stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+    return token
+
+
 def main():
     base = os.environ["AURA_CORE_BASE_URL"].rstrip("/")
 
@@ -51,9 +95,14 @@ def main():
             return json.load(response)
 
     try:
-        token = business_session(request, os.environ["ADMIN_EMAIL"], os.environ["ADMIN_PASSWORD"],
-            os.environ.get("AURA_ADMIN_TENANT_ID") or None)
-    except (RuntimeError, urllib.error.URLError, ValueError, KeyError) as failure:
+        cache = os.environ.get("AURA_ADMIN_SESSION_FILE")
+        if cache:
+            token = cached_business_session(request, os.environ["ADMIN_EMAIL"], os.environ["ADMIN_PASSWORD"],
+                cache, base, os.environ.get("AURA_ADMIN_TENANT_ID") or None)
+        else:
+            token = business_session(request, os.environ["ADMIN_EMAIL"], os.environ["ADMIN_PASSWORD"],
+                os.environ.get("AURA_ADMIN_TENANT_ID") or None)
+    except (RuntimeError, urllib.error.URLError, ValueError, KeyError, OSError) as failure:
         # Never print a response envelope, credential or token on failure.
         print(f"Core administrator session failed: {failure}", file=sys.stderr)
         return 1

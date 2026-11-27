@@ -63,9 +63,12 @@ if(!collection && process.env.MODE==='skipped-result')report.suites[0].specs[0].
 if(!collection && process.env.MODE==='retried-result')report.suites[0].specs[0].tests[0].results.push({status:'passed',retry:1});
 if(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE){fs.mkdirSync(require('node:path').dirname(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE),{recursive:true});fs.writeFileSync(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE,JSON.stringify(report));console.log(collection?'Listing tests:':'12 passed');}else console.log(JSON.stringify(report));
 `, { mode: 0o755 });
+  fs.mkdirSync(path.join(repo, 'scripts/ci'), { recursive: true });
+  // This fixture verifies the caller; separate tests exercise real lifecycle admission.
+  fs.writeFileSync(path.join(repo, 'scripts/ci/settle_runtime.py'), `import os\nwith open(os.environ['CALLS'],'a') as f:f.write('settlement called\\n')\nprint('runtime status must be inspected; hermetic settlement fixture')\n`);
   registerFixtureWorkspace(root, repo);
   const env = { ...process.env, AURA_WORKSPACE_ROOT: root, AURA_WORKSPACE_STATE_DIR: path.join(root, 'state'),
-    AURA_CI_JOB_ID: 'test-job', AURA_REGRESSION_SLOT: '900', MODE: mode, CALLS: calls,
+    AURA_CI_JOB_ID: 'test-job', AURA_REGRESSION_ARTIFACTS: root, AURA_REGRESSION_SLOT: '900', MODE: mode, CALLS: calls,
     EVIDENCE: path.join(root, 'evidence'), PATH: path.join(root, 'bin') + path.delimiter + process.env.PATH };
   return { root, repo, calls, env, run: (args = ['--name', 'owned-run']) => spawnSync('bash',
     [path.join(repo, 'scripts/oss-e2e-gate-run.sh'), ...args], { env, encoding: 'utf8', timeout: 10000 }) };

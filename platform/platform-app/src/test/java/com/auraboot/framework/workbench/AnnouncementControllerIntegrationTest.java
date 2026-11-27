@@ -52,6 +52,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("AnnouncementController - Integration Tests")
 @Transactional
 class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
+    private final String fixtureNamespace = "announcement-controller-"
+            + UniqueIdGenerator.generate().toLowerCase(java.util.Locale.ROOT);
+
+    @Override
+    protected String testFixtureNamespace() {
+        return fixtureNamespace;
+    }
 
     @Autowired
     private WebApplicationContext webApplicationContext;
@@ -274,8 +281,15 @@ class AnnouncementControllerIntegrationTest extends BaseIntegrationTest {
             getTestTenant().getId(),version,getTestUser().getId()));
         assertEquals("completed",jdbc.queryForObject("SELECT status FROM ab_announcement_delivery WHERE tenant_id=? AND batch_pid=? AND user_pid=?",String.class,
             getTestTenant().getId(),batch,getTestUser().getPid()));
-        outboxWorker.pollAndDispatch();identity();
-        assertEquals("delivered",jdbc.queryForObject("SELECT status FROM ab_outbox WHERE tenant_id=? AND event_id=?",String.class,getTestTenant().getId(),batch));
+        // A commit-triggered worker can already own the root event's lease.
+        // Notification persistence precedes its separately committed delivered marker.
+        org.awaitility.Awaitility.await().pollInSameThread().atMost(java.time.Duration.ofSeconds(15)).untilAsserted(() -> {
+            identity();
+            outboxWorker.dispatchCurrentTenant("auraboot.announcement", java.util.Set.of(
+                com.auraboot.framework.workbench.service.AnnouncementReleaseService.RELEASED_EVENT), 100);
+            identity();
+            assertEquals("delivered",jdbc.queryForObject("SELECT status FROM ab_outbox WHERE tenant_id=? AND event_id=?",String.class,getTestTenant().getId(),batch));
+        });
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM ab_integration_dead_letter WHERE tenant_id=? AND event_id=?",Integer.class,getTestTenant().getId(),batch));
         jdbc.update("UPDATE ab_notification SET source_type='ANNOUNCEMENT' WHERE tenant_id=? AND source_id=?",getTestTenant().getId(),version);
         var query=new com.auraboot.framework.notification.dto.NotificationQueryRequest();query.setPageSize(100);

@@ -22,6 +22,10 @@ import static org.assertj.core.api.Assertions.*;
 @org.springframework.context.annotation.Import(OpenApiMachineDataIntegrationTest.EventFaultConfiguration.class)
 @org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
+    // Explicit lease/replay tests drive the real worker themselves; hold commit signals to avoid a second claimant.
+    @org.springframework.test.context.bean.override.mockito.MockitoBean(name = "reliableOutboxDispatchExecutor")
+    private org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor heldCommitDispatch;
+
     @Autowired private MetaModelService models;
     @Autowired private MetaFieldService metadataFields;
     @Autowired private SchemaManagementService schemas;
@@ -51,6 +55,7 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
     @Autowired private com.auraboot.framework.meta.controller.config.ModelController modelAdministration;
 
     @Autowired private org.springframework.jdbc.core.JdbcTemplate eventJdbc;
+    @Autowired private com.auraboot.framework.meta.mapper.OutboxEventMapper sourceOutbox;
     @Autowired private org.springframework.transaction.PlatformTransactionManager eventTransactions;
 
     @org.springframework.boot.test.context.TestConfiguration
@@ -335,6 +340,13 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                 .containsEntry("name", "Restored source");
     }
 
+    private Long claimSource(com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope event, String token) {
+        var claimed = sourceOutbox.claimKnownEvent(event.tenantId(), event.eventId(), "open-api-native-fixture", token,
+                Instant.now().plusSeconds(30));
+        assertThat(claimed).hasSize(1);
+        return claimed.getFirst().getId();
+    }
+
     private com.auraboot.framework.plugin.extension.integration.IntegrationEventEnvelope sourceEnvelope() throws Exception {
         var row = sourceEvents().getFirst();
         Map<String, Object> payload = json.readerFor(new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() { })
@@ -421,7 +433,9 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                 MetaContext.runWithCommandPermitScope("ALL", () -> data.create(contract.modelCode(),
                         new HashMap<>(Map.of("name", "Jittered retry", "zone", "A", "secret", "Never public"))));
                 source = sourceEnvelope();
+                Long sourceId = claimSource(source, "jitter-consumer-lease");
                 eventDelivery.deliver(source, modelEvents, "jitter-consumer-lease");
+                assertThat(sourceOutbox.markDeliveredFenced(sourceId, "jitter-consumer-lease")).isEqualTo(1);
                 claimed = deliveries.claimReady(50, "jitter-worker", "jitter-first-claim", Instant.now().plusSeconds(30))
                         .stream().filter(log -> source.eventId().equals(log.getEventId())).findFirst().orElseThrow();
                 Instant before = Instant.now();
@@ -544,8 +558,10 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                 MetaContext.runWithCommandPermitScope("ALL", () -> data.create(contract.modelCode(),
                         new HashMap<>(Map.of("name", "Source name", "zone", "A", "secret", "Never public"))));
                 var source = sourceEnvelope();
+                Long sourceId = claimSource(source, "fixture-consumer-lease");
                 eventDelivery.deliver(source, modelEvents, "fixture-consumer-lease");
-                eventDelivery.deliver(source, modelEvents, "duplicate-consumer-lease");
+                eventDelivery.deliver(source, modelEvents, "fixture-consumer-lease");
+                assertThat(sourceOutbox.markDeliveredFenced(sourceId, "fixture-consumer-lease")).isEqualTo(1);
                 assertThat(eventJdbc.queryForObject("SELECT COUNT(*) FROM ab_webhook_delivery_log WHERE tenant_id = ? AND event_id = ?",
                         Long.class, principal.tenantId(), source.eventId())).isEqualTo(1);
                 assertThat(eventJdbc.queryForObject("SELECT status FROM ab_integration_receipt WHERE tenant_id = ? AND event_id = ? AND consumer_code = ?",
@@ -598,7 +614,9 @@ class OpenApiMachineDataIntegrationTest extends BaseIntegrationTest {
                         secondRow.get("event_type").toString(), "dynamic-model", secondRow.get("subject").toString(), Instant.now(), principal.tenantId(),
                         "second-correlation", null, "open.resource:" + contract.code() + ":" + secondRow.get("subject"), ((Number) secondRow.get("event_sequence")).longValue(),
                         json.readValue(secondRow.get("payload").toString(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() { }), Map.of());
+                Long secondSourceId = claimSource(secondSource, "second-consumer-lease");
                 eventDelivery.deliver(secondSource, modelEvents, "second-consumer-lease");
+                assertThat(sourceOutbox.markDeliveredFenced(secondSourceId, "second-consumer-lease")).isEqualTo(1);
                 publications.revoke(principal.installationPid(), contract.code());
                 var revoked = deliveries.claimReady(50, "model-fixture-worker", "revoked-claim", Instant.now().plusSeconds(30)).stream()
                         .filter(log -> secondSource.eventId().equals(log.getEventId())).findFirst().orElseThrow();

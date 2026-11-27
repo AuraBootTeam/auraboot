@@ -31,6 +31,17 @@ Use Workspace `runtime suspend` / `runtime resume` for whole-stack lifecycle.
 Direct supervisor termination stops only its authenticated frontend tree and
 prevents further child restarts; runtime databases and evidence remain retained.
 
+### Owned OSS browser authentication state
+
+The golden stack's `env` command defaults Playwright authentication state to
+`<runtime-evidence>/playwright/storage`, with separate admin/operator/viewer
+files. `warm` loads that runtime environment before selecting the admin state.
+Setup, authentication and route checks therefore use the same files without
+writing credentials into tracked `web-admin/tests/storage` fixtures. Explicit
+`PW_STORAGE_DIR` and per-role state overrides retain their existing contract.
+A failed source or process identity check still fails the gate; no source reset,
+ignore rule or health-only fallback replaces that evidence.
+
 ### Product image gate ownership preservation
 
 `application/run-product-release-image-gate.sh` refuses an existing work root,
@@ -434,3 +445,14 @@ this is transport/assembly evidence, not live-provider or generated-DSL quality.
 The base run reports the full-only draft case as not applicable.
 
 | `sync-permission-i18n.mjs` | 1 | 2026-11-14 | Synchronize permission labels from existing registered permissions and locale resources. |
+# Focused backend diagnosis
+
+The existing `oss-backend-unit-ci.sh` runner accepts repeated
+`--test-class fully.qualified.ClassName` arguments for explicit, source-owned
+classes. It keeps its isolated PostgreSQL/Redis/Kafka provisioning, resource
+admission, bootstrap task and process cleanup. Focused execution disables build
+cache reuse, cleans the selected test tasks, and reconciles each class with its
+actual module JUnit records; absent, failed, or skipped classes cannot pass.
+`test-selection.json` and `focused-test-results.json` explicitly mark this mode
+as ineligible for full nightly qualification. With no arguments the original
+complete test command and nightly denominator are retained.

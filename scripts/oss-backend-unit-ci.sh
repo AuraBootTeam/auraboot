@@ -50,6 +50,31 @@ FLYWAY_IMAGE='flyway/flyway:12.8.1@sha256:b8a2d72926b98234c1fb8f45659fd23d8a001a
 
 mkdir -p "$ARTIFACTS"
 
+# Exact class selection is for root-cause validation only; no arguments keeps the
+# original complete nightly denominator. Admission precedes any infrastructure.
+selection_arguments="$(python3 -B "$SCRIPT_DIR/ci/backend_test_selection.py" plan \
+    "$PROJECT_ROOT/platform" "$ARTIFACTS/test-selection.json" "$@")" || exit 2
+FOCUSED_TEST_ARGUMENTS=()
+if [[ -n "$selection_arguments" ]]; then
+  while IFS= read -r argument; do FOCUSED_TEST_ARGUMENTS+=("$argument"); done <<< "$selection_arguments"
+fi
+
+if ! python3 -B "$SCRIPT_DIR/ci/test_migration_conventions.py" \
+    > "$ARTIFACTS/migration-convention-contracts.log" 2>&1; then
+  printf '[oss-backend-unit-ci] product-failure: migration convention contracts failed\n' >&2
+  exit 1
+fi
+# Static migration admission precedes image pulls and database mutation. Exact
+# infrastructure scope does not change business rules or the historical ratchet.
+if ! python3 "$SCRIPT_DIR/check-migration-conventions.py" \
+    "$PROJECT_ROOT/platform/src/main/resources/db/migration/core" \
+    --baseline-file "$SCRIPT_DIR/migration-conventions-baseline.txt" \
+    --infrastructure-policy "$SCRIPT_DIR/migration-conventions-infrastructure.json" \
+    > "$ARTIFACTS/migration-conventions.log" 2>&1; then
+  printf '[oss-backend-unit-ci] product-failure: new migration convention violations (see %s)\n' "$ARTIFACTS/migration-conventions.log" >&2
+  exit 1
+fi
+
 environment_invalid() {
   printf '[oss-backend-unit-ci] environment-invalid: %s\n' "$*" >&2
   exit 2
@@ -102,6 +127,10 @@ cleanup() {
     else
       network_status=release-failed
     fi
+  fi
+  if [[ "$stop_status" != stopped || "$network_status" == release-failed ]]; then
+    printf '[oss-backend-unit-ci] environment-invalid: owned infrastructure cleanup incomplete\n' >&2
+    [[ "$status" -ne 0 ]] || status=2
   fi
   printf '[oss-backend-unit-ci] runtime retained: stop_status=%s network_status=%s compose_project=%s artifacts=%s\n' \
     "$stop_status" "$network_status" "$COMPOSE_PROJECT" "$ARTIFACTS"
@@ -217,16 +246,7 @@ if ! run_flyway validate > "$ARTIFACTS/flyway-validate.log" 2>&1; then
   exit 1
 fi
 
-# Migration convention gate (P6 follow-up): the committed baseline holds the accepted
-# historical debt (1057 legacy violations); only NEW violations block the run. The
-# ratchet reports fixed entries so the baseline can shrink monotonically.
-if ! python3 "$SCRIPT_DIR/check-migration-conventions.py" \
-    "$PROJECT_ROOT/platform/src/main/resources/db/migration/core" \
-    --baseline-file "$SCRIPT_DIR/migration-conventions-baseline.txt" \
-    > "$ARTIFACTS/migration-conventions.log" 2>&1; then
-  printf '[oss-backend-unit-ci] product-failure: new migration convention violations (see %s)\n' "$ARTIFACTS/migration-conventions.log" >&2
-  exit 1
-fi
+
 
 # Ledger reconciliation (P6 follow-up): every migration file must be registered in the
 # freshly-applied ledger — catches naming drift and directory/ledger divergence early.
@@ -288,11 +308,16 @@ resource_arguments="$(node "$SCRIPT_DIR/lib/backend-ci-resources.mjs" "$ARTIFACT
   || environment_invalid 'JVM memory admission failed; inspect jvm-resource-plan.json before retry'
 RESOURCE_ARGUMENTS=()
 while IFS= read -r option; do RESOURCE_ARGUMENTS+=("$option"); done <<< "$resource_arguments"
-[[ ${#RESOURCE_ARGUMENTS[@]} == 5 ]] || environment_invalid 'incomplete bounded JVM arguments'
+[[ ${#RESOURCE_ARGUMENTS[@]} == 6 ]] || environment_invalid 'incomplete bounded JVM arguments'
 
 run_backend_gradle() {
   local database="$1"
   shift
+  local test_root="$ARTIFACTS/test-runtime/$database"
+  mkdir -p "$test_root/files" "$test_root/evidence" || return 2
+  chmod 700 "$test_root" "$test_root/files" "$test_root/evidence" || return 2
+AURA_FILE_STORAGE_PATH="$test_root/files" \
+AURA_EVIDENCE_ROOT="$test_root/evidence" \
 TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/${database}?charSet=UTF8" \
 TEST_EXPECTED_DATABASE="$database" \
 TEST_REDIS_DATABASE='0' \
@@ -320,7 +345,11 @@ GRADLE_OPTS="-Dmaven.repo.local=$ARTIFACTS/m2 ${GRADLE_OPTS:-}" \
 platform/gradlew --no-daemon -p platform "${RESOURCE_ARGUMENTS[@]}" "$@"
 }
 
-run_backend_gradle aura_boot --continue cleanTest test
+if (( ${#FOCUSED_TEST_ARGUMENTS[@]} > 0 )); then
+  run_backend_gradle aura_boot --continue --no-build-cache "${FOCUSED_TEST_ARGUMENTS[@]}"
+else
+  run_backend_gradle aura_boot --continue cleanTest test
+fi
 root_test_status=$?
 printf '%s\n' "$root_test_status" > "$ARTIFACTS/root-test-exit-code.txt"
 printf '%s\n' "$BOOTSTRAP_DATABASE" > "$ARTIFACTS/bootstrap-database.txt"
@@ -349,4 +378,9 @@ for build in "$PROJECT_ROOT/platform/build" "$PROJECT_ROOT"/platform/*/build; do
     fi
   done
 done
+if (( ${#FOCUSED_TEST_ARGUMENTS[@]} > 0 )); then
+  python3 -B "$SCRIPT_DIR/ci/backend_test_selection.py" reconcile \
+    "$ARTIFACTS/test-selection.json" "$ARTIFACTS/junit" \
+    || { [[ "$gradle_status" -ne 0 ]] || gradle_status=1; }
+fi
 exit "$gradle_status"

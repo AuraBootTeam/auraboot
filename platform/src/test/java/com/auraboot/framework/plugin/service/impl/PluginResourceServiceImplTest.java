@@ -58,6 +58,12 @@ class PluginResourceServiceImplTest {
 
     @InjectMocks private PluginResourceServiceImpl service;
 
+    @org.junit.jupiter.api.BeforeEach
+    void injectPackageReplacementBoundary() {
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "packageReplacements",
+                org.mockito.Mockito.mock(PluginPackageReplacements.class));
+    }
+
     @Test void compositionPreflightRejectsBothResourcePreviewAndExecutionBeforeAnyResourceAccess() {
         var record=new PluginRecord();record.setPid("composition");record.setPluginId("shared-application");
         when(pluginRecordMapper.findByPid("composition")).thenReturn(record);
@@ -480,7 +486,7 @@ class PluginResourceServiceImplTest {
     @DisplayName("executeUninstall fails when conflicts present and decisions missing")
     void executeUninstallMissingDecision() {
         PluginRecord plugin = PluginRecord.builder()
-                .pid("PLG-1").pluginId("p").displayName("P").version("1.0").build();
+                .pid("PLG-1").tenantId(1L).pluginId("p").displayName("P").version("1.0").build();
         when(pluginRecordMapper.findByPid("PLG-1")).thenReturn(plugin);
 
         // shared+modified+with-snapshot+detectable diff is fragile to mock through JdbcTemplate.

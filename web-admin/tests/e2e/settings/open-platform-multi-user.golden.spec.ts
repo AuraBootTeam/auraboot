@@ -1,8 +1,9 @@
-import { expect, test, type APIRequestContext, type Page, request as pwRequest } from '@playwright/test';
-import { createCookieSessionStorage } from 'react-router';
+import { expect, test, type Page, request as pwRequest } from '@playwright/test';
+import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
+import { openPlatformSession, installOpenPlatformSession, sessionHeaders, type OpenPlatformSession } from '../../helpers/open-platform-session';
 import path from 'node:path';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { BACKEND_URL, BASE_URL as WEB_BASE_URL } from '../../helpers/environments';
+import { BASE_URL as WEB_BASE_URL } from '../../helpers/environments';
 
 // GAP-02: owner / maintainer / viewer / non-member verified with four real
 // accounts against the real backend. UI screenshots only adjudicate rendering;
@@ -15,7 +16,7 @@ const EVIDENCE_DIR = path.join(
 const RUN_TAG = process.env.OP_MULTIUSER_RUN_TAG || `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 const PASSWORD = 'Closure2026x!';
 const ACCOUNTS = {
-  admin: { email: 'admin@auraboot.com', password: 'Test2026x' },
+  admin: DEFAULT_TEST_ACCOUNT,
   maintainer: { email: `opm-maintainer-${RUN_TAG}@op-closure.test`, password: PASSWORD },
   viewer: { email: `opm-viewer-${RUN_TAG}@op-closure.test`, password: PASSWORD },
   nonmember: { email: `opm-nonmember-${RUN_TAG}@op-closure.test`, password: PASSWORD },
@@ -26,68 +27,12 @@ const APP_DESCRIPTION = 'GAP-02 四真实账号权限验证：全部由真实后
 const PUBLICATION_MUTATION = process.env.OP_PUBLICATION_AUTHORITY_MUTATION || '';
 if (PUBLICATION_MUTATION && PUBLICATION_MUTATION !== 'admin-principal') throw new Error('Unsupported publication authority mutation');
 
-const sessionStorage = createCookieSessionStorage({
-  cookie: {
-    name: '__session',
-    httpOnly: true,
-    path: '/',
-    sameSite: 'lax',
-    secrets: [process.env.SESSION_SECRET || 'dev-only-secret-do-not-use-in-production'],
-    secure: false,
-  },
-});
-
-interface Session {
-  jwt: string;
-}
-
-async function apiLogin(context: APIRequestContext, email: string, password: string): Promise<Session> {
-  const loginResponse = await context.post(`${BACKEND_URL}/api/auth/login`, {
-    data: { email, password },
-  });
-  expect(loginResponse.ok(), `login failed for ${email}: ${loginResponse.status()}`).toBeTruthy();
-  const login = (await loginResponse.json()).data;
-  let jwt = login.jwt as string;
-  if (!login.tenantId) {
-    const spacesResponse = await context.get(`${BACKEND_URL}/api/tenant-selection/my-spaces`, {
-      headers: { Authorization: `Bearer ${jwt}` },
-    });
-    expect(spacesResponse.ok()).toBeTruthy();
-    const spaces = (await spacesResponse.json()).data as Array<{ tenantId: string; spaceType: string }>;
-    const businessTenant = spaces.find((space) => space.spaceType === 'business');
-    expect(businessTenant, `no business tenant for ${email}`).toBeTruthy();
-    const selectionResponse = await context.post(`${BACKEND_URL}/api/tenant-selection/process`, {
-      headers: { Authorization: `Bearer ${jwt}` },
-      data: { action: 'select', tenantId: businessTenant!.tenantId },
-    });
-    expect(selectionResponse.ok()).toBeTruthy();
-    jwt = (await selectionResponse.json()).data.jwt;
-  }
-  expect(jwt).toEqual(expect.any(String));
-  return { jwt };
-}
-
-async function installSessionCookie(page: Page, session: Session) {
-  const state = await sessionStorage.getSession();
-  state.set('jwtToken', session.jwt);
-  const set = await sessionStorage.commitSession(state, { maxAge: 604800 });
-  const value = set.match(/__session=([^;]+)/)?.[1];
-  expect(value).toBeTruthy();
-  await page.context().addCookies([
-    { name: '__session', value: value!, url: WEB_BASE_URL, httpOnly: true, sameSite: 'Lax' },
-    { name: 'locale', value: 'zh-CN', url: WEB_BASE_URL, sameSite: 'Lax' },
-  ]);
-  await page.addInitScript(() => localStorage.setItem('locale', 'zh-CN'));
-}
+type Session = OpenPlatformSession;
 
 async function loginAs(page: Page, account: { email: string; password: string }) {
-  const session = await apiLogin(page.request, account.email, account.password);
-  await installSessionCookie(page, session);
+  const session = await openPlatformSession(account);
+  await installOpenPlatformSession(page, session);
   return session;
-}
-
-function bearer(session: Session) {
-  return { Authorization: `Bearer ${session.jwt}` };
 }
 
 async function capture(page: Page, id: string) {
@@ -138,44 +83,54 @@ const readField = (source: string, type: string) => ({ source, type, readable: t
 async function verifyPublicationDenied(page: Page, session: Session, screenshotPrefix: string) {
   await expect(page.getByTestId('open-platform-publications-link')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '模型通知', exact: true })).toHaveCount(0);
-  const access = await page.request.get(`${BACKEND_URL}/api/open-platform/access`, { headers: bearer(session) });
+  const access = await page.request.get(`${WEB_BASE_URL}/api/open-platform/access`, { headers: sessionHeaders(session) });
   expect(access.status()).toBe(200);
   expect((await access.json()).data).toMatchObject({ canManageModelNotifications: false });
   const adminContext = await pwRequest.newContext();
   try {
-    const admin = await apiLogin(adminContext, ACCOUNTS.admin.email, ACCOUNTS.admin.password);
+    const admin = await openPlatformSession(ACCOUNTS.admin);
     const baseline = async () => {
       const result: unknown[] = [];
       for (const [endpoint, code] of [['publications', resourceCode], ['query-publications', queryCode]]) {
-        const response = await adminContext.get(`${BACKEND_URL}/api/open-platform/${endpoint}`, { headers: bearer(admin) });
+        const response = await adminContext.get(`${WEB_BASE_URL}/api/open-platform/${endpoint}`, { headers: sessionHeaders(admin) });
         expect(response.status()).toBe(200); const body = await response.json(); expect(String(body.code)).toBe('0');
         const row = body.data.find((entry: { code: string }) => entry.code === code);
         expect(row).toMatchObject({ code, status: 'published', activeVersion: 1, draftRevision: 1 }); result.push(row);
         for (const kind of ['openapi', 'types']) {
-          const artifact = await adminContext.get(`${BACKEND_URL}/api/open-platform/${endpoint}/${code}/${kind}`, { headers: bearer(admin) });
+          const artifact = await adminContext.get(`${WEB_BASE_URL}/api/open-platform/${endpoint}/${code}/${kind}`, { headers: sessionHeaders(admin) });
           expect(artifact.status()).toBe(200); result.push(await artifact.text());
         }
       }
-      for (const kind of ['resources', 'queries']) {
-        const grants = await adminContext.get(`${BACKEND_URL}/api/open-platform/installations/${installationPid}/${kind}`, { headers: bearer(admin) });
-        expect(grants.status()).toBe(200); result.push((await grants.json()).data);
+      for (const [kind, fixtureCode] of [['resources', resourceCode], ['queries', queryCode]]) {
+        const grants = await adminContext.get(`${WEB_BASE_URL}/api/open-platform/installations/${installationPid}/${kind}`, { headers: sessionHeaders(admin) });
+        expect(grants.status()).toBe(200);
+        const catalog = (await grants.json()).data as Array<{ code: string; policy: unknown }>;
+        expect(Array.isArray(catalog)).toBe(true);
+        expect(catalog.filter(entry => entry.code === fixtureCode)).toHaveLength(1);
+        for (const entry of catalog) expect(entry).toHaveProperty('policy');
+        // This endpoint includes every globally published definition, even when
+        // this installation has no grant. Concurrent publication journeys may
+        // add null-policy catalog entries; retain our exact fixture and ALL
+        // actual installation grants, including any unexpected added grant.
+        result.push(catalog.filter(entry => entry.code === fixtureCode || entry.policy !== null)
+          .sort((left, right) => left.code.localeCompare(right.code)));
       }
       return result;
     };
     const before = await baseline();
-    const headers = bearer(PUBLICATION_MUTATION === 'admin-principal' ? admin : session);
+    const headers = sessionHeaders(PUBLICATION_MUTATION === 'admin-principal' ? admin : session);
     for (const [endpoint, code, definition] of [['publications', resourceCode, resourceDefinition], ['query-publications', queryCode, queryDefinition]] as const) {
-      expect((await page.request.get(`${BACKEND_URL}/api/open-platform/${endpoint}`, { headers })).status()).toBe(403);
-      for (const kind of ['openapi', 'types']) expect((await page.request.get(`${BACKEND_URL}/api/open-platform/${endpoint}/${code}/${kind}`, { headers })).status()).toBe(403);
-      expect((await page.request.put(`${BACKEND_URL}/api/open-platform/${endpoint}/${code}/draft`, { headers, data: { expectedRevision: 1, definition: { ...definition, schemaVersion: 2 } } })).status()).toBe(403);
-      for (const action of ['publish', 'withdraw']) expect((await page.request.post(`${BACKEND_URL}/api/open-platform/${endpoint}/${code}/${action}`, { headers, data: { expectedRevision: 1 } })).status()).toBe(403);
+      expect((await page.request.get(`${WEB_BASE_URL}/api/open-platform/${endpoint}`, { headers })).status()).toBe(403);
+      for (const kind of ['openapi', 'types']) expect((await page.request.get(`${WEB_BASE_URL}/api/open-platform/${endpoint}/${code}/${kind}`, { headers })).status()).toBe(403);
+      expect((await page.request.put(`${WEB_BASE_URL}/api/open-platform/${endpoint}/${code}/draft`, { headers, data: { expectedRevision: 1, definition: { ...definition, schemaVersion: 2 } } })).status()).toBe(403);
+      for (const action of ['publish', 'withdraw']) expect((await page.request.post(`${WEB_BASE_URL}/api/open-platform/${endpoint}/${code}/${action}`, { headers, data: { expectedRevision: 1 } })).status()).toBe(403);
     }
     for (const source of [`publication-sources/${modelCode}`, 'query-sources', `query-sources/${namedCode}`]) {
-      expect((await page.request.get(`${BACKEND_URL}/api/open-platform/${source}`, { headers })).status()).toBe(403);
+      expect((await page.request.get(`${WEB_BASE_URL}/api/open-platform/${source}`, { headers })).status()).toBe(403);
     }
     for (const [kind, code, policy] of [['resources', resourceCode, { operations: ['get', 'list'], readableFields: ['pid'], writableFields: [], rowConstraints: [] }],
       ['queries', queryCode, { readableFields: ['pid'] }]] as const) {
-      const endpoint = `${BACKEND_URL}/api/open-platform/installations/${installationPid}/${kind}`;
+      const endpoint = `${WEB_BASE_URL}/api/open-platform/installations/${installationPid}/${kind}`;
       expect((await page.request.get(endpoint, { headers })).status()).toBe(403);
       expect((await page.request.put(`${endpoint}/${code}`, { headers, data: policy })).status()).toBe(403);
       expect((await page.request.delete(`${endpoint}/${code}`, { headers })).status()).toBe(403);
@@ -183,10 +138,15 @@ async function verifyPublicationDenied(page: Page, session: Session, screenshotP
     expect(await baseline()).toEqual(before);
     // A typed address is the denied bypass path after the normal menu hides the entry.
     for (const [pageKey, testId, kind] of [['open_platform_publications', 'publication-editor', 'resource'], ['open_platform_queries', 'query-publication-editor', 'query']] as const) {
-      await page.goto(`/p/c/${pageKey}`); const editor = page.getByTestId(testId);
-      await expect(editor.getByRole('alert')).toHaveText('当前账号没有开放平台管理权限。');
-      await expect(editor.locator('form')).toHaveCount(0);
-      await expect(editor.getByRole('button', { name: /新建|发布|停用|保存|下载/ })).toHaveCount(0);
+      await page.goto(`/p/c/${pageKey}`);
+      // Menu-level authorization rejects this actor before an editor can mount.
+      // Assert that outer denial, while the real API denials above remain mandatory.
+      const main = page.getByRole('main');
+      await expect(main.getByRole('heading', { name: '页面不可用', exact: true })).toBeVisible();
+      await expect(main.getByText('无权限访问此页面，请联系管理员。', { exact: true })).toBeVisible();
+      await expect(page.getByTestId(testId)).toHaveCount(0);
+      await expect(main.locator('form')).toHaveCount(0);
+      await expect(main.getByRole('button', { name: /新建|发布|停用|保存|下载/ })).toHaveCount(0);
       await capture(page, `${screenshotPrefix}-${kind}-denied`);
     }
     expect(await baseline()).toEqual(before);
@@ -207,15 +167,15 @@ test.describe.serial('Open Platform four-real-account authority', () => {
       const matrix = JSON.parse(await readFile(process.env.AURA_UI_ACCEPTANCE_MATRIX, 'utf8'));
       await writeFile(path.join(EVIDENCE_DIR, 'acceptance-matrix.json'), JSON.stringify(matrix, null, 2));
     }
-    const admin = await apiLogin(await pwRequest.newContext(), ACCOUNTS.admin.email, ACCOUNTS.admin.password);
+    const admin = await openPlatformSession(ACCOUNTS.admin);
     const ctx = await pwRequest.newContext();
 
     // Applications are persistent lifecycle records: DELETE disables them.
     // This run uses its own app card and never removes unrelated prior fixtures.
     for (const key of ['maintainer', 'viewer', 'nonmember', 'owner2'] as const) {
       const account = ACCOUNTS[key];
-      const create = await ctx.post(`${BACKEND_URL}/api/meta/commands/execute/admin:create_member`, {
-        headers: bearer(admin),
+      const create = await ctx.post(`${WEB_BASE_URL}/api/meta/commands/execute/admin:create_member`, {
+        headers: sessionHeaders(admin),
         data: {
           payload: { name: `OPM ${key} ${RUN_TAG}`, email: account.email, password: account.password },
         },
@@ -225,8 +185,8 @@ test.describe.serial('Open Platform four-real-account authority', () => {
       userPids[key] = created.userPid;
     }
 
-    const createApp = await ctx.post(`${BACKEND_URL}/api/open-platform/applications`, {
-      headers: bearer(admin),
+    const createApp = await ctx.post(`${WEB_BASE_URL}/api/open-platform/applications`, {
+      headers: sessionHeaders(admin),
       data: { name: APP_NAME, description: APP_DESCRIPTION },
     });
     expect(createApp.ok(), `create application failed: ${createApp.status()} ${await createApp.text()}`).toBeTruthy();
@@ -240,14 +200,14 @@ test.describe.serial('Open Platform four-real-account authority', () => {
       ['owner2', 'owner'],
     ] as const) {
       const add = await ctx.put(
-        `${BACKEND_URL}/api/open-platform/applications/${appPid}/members/${userPids[key]}`,
-        { headers: bearer(admin), data: { role } },
+        `${WEB_BASE_URL}/api/open-platform/applications/${appPid}/members/${userPids[key]}`,
+        { headers: sessionHeaders(admin), data: { role } },
       );
       expect(add.ok(), `add member ${key} failed: ${add.status()} ${await add.text()}`).toBeTruthy();
       expect((await add.json()).data.role).toBe(role);
     }
 
-    const listed = await ctx.get(`${BACKEND_URL}/api/open-platform/applications`, { headers: bearer(admin) });
+    const listed = await ctx.get(`${WEB_BASE_URL}/api/open-platform/applications`, { headers: sessionHeaders(admin) });
     expect(listed.ok()).toBeTruthy();
     const listedApp = ((await listed.json()).data as Array<{
       pid: string;
@@ -262,43 +222,43 @@ test.describe.serial('Open Platform four-real-account authority', () => {
 
     modelCode = `dop_role_${RUN_TAG.replace(/[^a-z0-9]/g, '_')}`;
     resourceCode = `roles.parts.${Date.now()}`; queryCode = `roles.query.${Date.now()}`; namedCode = `${modelCode}_query`;
-    const createdModel = await ctx.post(`${BACKEND_URL}/api/meta/models`, { headers: bearer(admin), data: {
+    const createdModel = await ctx.post(`${WEB_BASE_URL}/api/meta/models`, { headers: sessionHeaders(admin), data: {
       code: modelCode, displayName: `权限验证零件 ${RUN_TAG}`, tableName: modelCode, modelType: 'entity', sourceType: 'physical',
       capabilities: { list: true, detail: true, create: true, update: true, delete: true, filter: true, sort: true, paginate: true },
       fields: [{ code: 'dop_role_name', columnName: 'dop_role_name', displayName: '零件名称', dataType: 'string', required: true, editable: true }],
     } });
     expect(createdModel.status()).toBe(200); const model = (await createdModel.json()).data;
     expect(model.tableName).toMatch(/^[a-z][a-z0-9_]+$/);
-    const modelPublished = await ctx.post(`${BACKEND_URL}/api/meta/models/${model.pid}/publish`, { headers: bearer(admin), data: { impactAcknowledged: true } });
+    const modelPublished = await ctx.post(`${WEB_BASE_URL}/api/meta/models/${model.pid}/publish`, { headers: sessionHeaders(admin), data: { impactAcknowledged: true } });
     expect(modelPublished.status()).toBe(200);
     resourceDefinition = { code: resourceCode, modelCode, schemaVersion: 1, operations: ['get', 'list'], scopes: { get: 'op.role:read', list: 'op.role:read' },
       dataPolicy: 'tenant_wide', fields: { pid: { ...readField('pid', 'pid'), nullable: false } }, maxPageSize: 20, maxConditions: 8, timeoutMs: 5000, events: [] };
-    const resourceSaved = await ctx.put(`${BACKEND_URL}/api/open-platform/publications/${resourceCode}/draft`, { headers: bearer(admin), data: { expectedRevision: 0, definition: resourceDefinition } });
+    const resourceSaved = await ctx.put(`${WEB_BASE_URL}/api/open-platform/publications/${resourceCode}/draft`, { headers: sessionHeaders(admin), data: { expectedRevision: 0, definition: resourceDefinition } });
     expect(resourceSaved.status()).toBe(200);
-    expect((await ctx.post(`${BACKEND_URL}/api/open-platform/publications/${resourceCode}/publish`, { headers: bearer(admin), data: { expectedRevision: 1 } })).status()).toBe(200);
-    const named = await ctx.post(`${BACKEND_URL}/api/meta/named-queries`, { headers: bearer(admin), data: { code: namedCode, title: `权限验证查询 ${RUN_TAG}`, resourceCode: modelCode, actionCode: 'read',
+    expect((await ctx.post(`${WEB_BASE_URL}/api/open-platform/publications/${resourceCode}/publish`, { headers: sessionHeaders(admin), data: { expectedRevision: 1 } })).status()).toBe(200);
+    const named = await ctx.post(`${WEB_BASE_URL}/api/meta/named-queries`, { headers: sessionHeaders(admin), data: { code: namedCode, title: `权限验证查询 ${RUN_TAG}`, resourceCode: modelCode, actionCode: 'read',
       fromSql: `${model.tableName} a`, defaultOrder: [{ field: 'pid', direction: 'asc' }], fields: [{ fieldCode: 'pid', columnExpr: 'a.pid', dataType: 'string', displayName: '记录标识', sortable: true, searchable: false }] } });
     expect(named.status()).toBe(200); const namedPid = (await named.json()).data.pid;
-    for (const status of ['testing', 'published']) expect((await ctx.put(`${BACKEND_URL}/api/meta/named-queries/${namedPid}/status`, { headers: bearer(admin), data: { status } })).status()).toBe(200);
-    const described = await ctx.get(`${BACKEND_URL}/api/open-platform/query-sources/${namedCode}`, { headers: bearer(admin) });
+    for (const status of ['testing', 'published']) expect((await ctx.put(`${WEB_BASE_URL}/api/meta/named-queries/${namedPid}/status`, { headers: sessionHeaders(admin), data: { status } })).status()).toBe(200);
+    const described = await ctx.get(`${WEB_BASE_URL}/api/open-platform/query-sources/${namedCode}`, { headers: sessionHeaders(admin) });
     expect(described.status()).toBe(200); const source = (await described.json()).data;
     queryDefinition = { code: queryCode, queryCode: namedCode, schemaVersion: 1, sourceFingerprint: source.fingerprint, scopes: { execute: 'op.role:query' },
       sourceResources: { [modelCode]: resourceCode }, parameters: {}, fields: { pid: readField('pid', 'pid') }, maxPageSize: 20, maxRows: 100, timeoutMs: 5000, maxConcurrent: 2 };
-    expect((await ctx.put(`${BACKEND_URL}/api/open-platform/query-publications/${queryCode}/draft`, { headers: bearer(admin), data: { expectedRevision: 0, definition: queryDefinition } })).status()).toBe(200);
-    expect((await ctx.post(`${BACKEND_URL}/api/open-platform/query-publications/${queryCode}/publish`, { headers: bearer(admin), data: { expectedRevision: 1 } })).status()).toBe(200);
+    expect((await ctx.put(`${WEB_BASE_URL}/api/open-platform/query-publications/${queryCode}/draft`, { headers: sessionHeaders(admin), data: { expectedRevision: 0, definition: queryDefinition } })).status()).toBe(200);
+    expect((await ctx.post(`${WEB_BASE_URL}/api/open-platform/query-publications/${queryCode}/publish`, { headers: sessionHeaders(admin), data: { expectedRevision: 1 } })).status()).toBe(200);
 
-    const install = await ctx.post(`${BACKEND_URL}/api/open-platform/applications/${appPid}/installations`, {
-      headers: bearer(admin),
+    const install = await ctx.post(`${WEB_BASE_URL}/api/open-platform/applications/${appPid}/installations`, {
+      headers: sessionHeaders(admin),
       data: { environment: 'production', scopes: ['assets.read', 'op.role:read', 'op.role:query'], rateLimitPerMinute: 600 },
     });
     expect(install.ok(), `install failed: ${install.status()} ${await install.text()}`).toBeTruthy();
     installationPid = (await install.json()).data.pid;
-    const resourceGrant = await ctx.put(`${BACKEND_URL}/api/open-platform/installations/${installationPid}/resources/${resourceCode}`, {
-      headers: bearer(admin), data: { operations: ['get', 'list'], readableFields: ['pid'], writableFields: [], rowConstraints: [] },
+    const resourceGrant = await ctx.put(`${WEB_BASE_URL}/api/open-platform/installations/${installationPid}/resources/${resourceCode}`, {
+      headers: sessionHeaders(admin), data: { operations: ['get', 'list'], readableFields: ['pid'], writableFields: [], rowConstraints: [] },
     });
     expect(resourceGrant.status()).toBe(200);
-    const queryGrant = await ctx.put(`${BACKEND_URL}/api/open-platform/installations/${installationPid}/queries/${queryCode}`, {
-      headers: bearer(admin), data: { readableFields: ['pid'] },
+    const queryGrant = await ctx.put(`${WEB_BASE_URL}/api/open-platform/installations/${installationPid}/queries/${queryCode}`, {
+      headers: sessionHeaders(admin), data: { readableFields: ['pid'] },
     });
     expect(queryGrant.status()).toBe(200);
   });
@@ -335,17 +295,17 @@ test.describe.serial('Open Platform four-real-account authority', () => {
 
     const ctx = page.request;
     const denyAdd = await ctx.put(
-      `${BACKEND_URL}/api/open-platform/applications/${appPid}/members/${userPids.nonmember}`,
-      { headers: bearer(session), data: { role: 'viewer' } },
+      `${WEB_BASE_URL}/api/open-platform/applications/${appPid}/members/${userPids.nonmember}`,
+      { headers: sessionHeaders(session), data: { role: 'viewer' } },
     );
     expect(denyAdd.status(), 'maintainer must not add members').toBe(403);
     const denyDelete = await ctx.delete(
-      `${BACKEND_URL}/api/open-platform/applications/${appPid}/members/${userPids.viewer}`,
-      { headers: bearer(session) },
+      `${WEB_BASE_URL}/api/open-platform/applications/${appPid}/members/${userPids.viewer}`,
+      { headers: sessionHeaders(session) },
     );
     expect(denyDelete.status(), 'maintainer must not remove members').toBe(403);
-    const denyDisable = await ctx.delete(`${BACKEND_URL}/api/open-platform/applications/${appPid}`, {
-      headers: bearer(session),
+    const denyDisable = await ctx.delete(`${WEB_BASE_URL}/api/open-platform/applications/${appPid}`, {
+      headers: sessionHeaders(session),
     });
     expect(denyDisable.status(), 'maintainer must not disable the application').toBe(403);
     await verifyPublicationDenied(page, session, 'OPX-UI-03-maintainer');
@@ -365,18 +325,18 @@ test.describe.serial('Open Platform four-real-account authority', () => {
 
     const ctx = page.request;
     const denyListCredentials = await ctx.get(
-      `${BACKEND_URL}/api/open-platform/installations/${installationPid}/credentials`,
-      { headers: bearer(session) },
+      `${WEB_BASE_URL}/api/open-platform/installations/${installationPid}/credentials`,
+      { headers: sessionHeaders(session) },
     );
     expect(denyListCredentials.status(), 'viewer must not list credentials').toBe(403);
     const denyCreateCredential = await ctx.post(
-      `${BACKEND_URL}/api/open-platform/installations/${installationPid}/credentials`,
-      { headers: bearer(session) },
+      `${WEB_BASE_URL}/api/open-platform/installations/${installationPid}/credentials`,
+      { headers: sessionHeaders(session) },
     );
     expect(denyCreateCredential.status(), 'viewer must not create credentials').toBe(403);
     const denyWrite = await ctx.put(
-      `${BACKEND_URL}/api/open-platform/applications/${appPid}/members/${userPids.nonmember}`,
-      { headers: bearer(session), data: { role: 'viewer' } },
+      `${WEB_BASE_URL}/api/open-platform/applications/${appPid}/members/${userPids.nonmember}`,
+      { headers: sessionHeaders(session), data: { role: 'viewer' } },
     );
     expect(denyWrite.status(), 'viewer must not manage members').toBe(403);
     await verifyPublicationDenied(page, session, 'OPX-UI-04-viewer');
@@ -392,12 +352,12 @@ test.describe.serial('Open Platform four-real-account authority', () => {
     await capture(page, 'OPX-UI-05-nonmember');
 
     const ctx = page.request;
-    const apps = await ctx.get(`${BACKEND_URL}/api/open-platform/applications`, { headers: bearer(session) });
+    const apps = await ctx.get(`${WEB_BASE_URL}/api/open-platform/applications`, { headers: sessionHeaders(session) });
     expect(apps.ok()).toBeTruthy();
     expect((await apps.json()).data ?? []).toEqual([]);
     const denyWrite = await ctx.put(
-      `${BACKEND_URL}/api/open-platform/applications/${appPid}/members/${userPids.nonmember}`,
-      { headers: bearer(session), data: { role: 'owner' } },
+      `${WEB_BASE_URL}/api/open-platform/applications/${appPid}/members/${userPids.nonmember}`,
+      { headers: sessionHeaders(session), data: { role: 'owner' } },
     );
     expect(denyWrite.status(), 'non-member must not mutate the application').toBe(403);
     await verifyPublicationDenied(page, session, 'OPX-UI-05-nonmember');
@@ -405,28 +365,28 @@ test.describe.serial('Open Platform four-real-account authority', () => {
 
   test('missing and disabled applications return 404 for reads and locked member writes', async () => {
     const ctx = await pwRequest.newContext();
-    const admin = await apiLogin(ctx, ACCOUNTS.admin.email, ACCOUNTS.admin.password);
-    const missing = await ctx.post(`${BACKEND_URL}/api/open-platform/applications/missing-${RUN_TAG}/installations`, {
-      headers: bearer(admin),
+    const admin = await openPlatformSession(ACCOUNTS.admin);
+    const missing = await ctx.post(`${WEB_BASE_URL}/api/open-platform/applications/missing-${RUN_TAG}/installations`, {
+      headers: sessionHeaders(admin),
       data: { environment: 'staging', scopes: ['openapi.profile.read'], rateLimitPerMinute: 600 },
     });
     expect(missing.status()).toBe(404);
     expect((await missing.json()).code).toBe('404');
-    const create = await ctx.post(`${BACKEND_URL}/api/open-platform/applications`, {
-      headers: bearer(admin), data: { name: `停用边界验收 ${RUN_TAG}`, description: 'HTTP 404 lifecycle contract' },
+    const create = await ctx.post(`${WEB_BASE_URL}/api/open-platform/applications`, {
+      headers: sessionHeaders(admin), data: { name: `停用边界验收 ${RUN_TAG}`, description: 'HTTP 404 lifecycle contract' },
     });
     expect(create.ok()).toBeTruthy();
     const pid = (await create.json()).data.pid;
-    const disable = await ctx.delete(`${BACKEND_URL}/api/open-platform/applications/${pid}`, { headers: bearer(admin) });
+    const disable = await ctx.delete(`${WEB_BASE_URL}/api/open-platform/applications/${pid}`, { headers: sessionHeaders(admin) });
     expect(disable.ok()).toBeTruthy();
-    const listed = await ctx.get(`${BACKEND_URL}/api/open-platform/applications`, { headers: bearer(admin) });
+    const listed = await ctx.get(`${WEB_BASE_URL}/api/open-platform/applications`, { headers: sessionHeaders(admin) });
     expect(listed.ok()).toBeTruthy();
     expect((await listed.json()).data).toEqual(expect.arrayContaining([expect.objectContaining({ pid, status: 'disabled' })]));
-    const repeated = await ctx.delete(`${BACKEND_URL}/api/open-platform/applications/${pid}`, { headers: bearer(admin) });
+    const repeated = await ctx.delete(`${WEB_BASE_URL}/api/open-platform/applications/${pid}`, { headers: sessionHeaders(admin) });
     expect(repeated.status()).toBe(404);
     expect((await repeated.json()).code).toBe('404');
-    const memberWrite = await ctx.put(`${BACKEND_URL}/api/open-platform/applications/${pid}/members/${userPids.viewer}`, {
-      headers: bearer(admin), data: { role: 'viewer' },
+    const memberWrite = await ctx.put(`${WEB_BASE_URL}/api/open-platform/applications/${pid}/members/${userPids.viewer}`, {
+      headers: sessionHeaders(admin), data: { role: 'viewer' },
     });
     expect(memberWrite.status()).toBe(404);
     expect((await memberWrite.json()).code).toBe('404');
@@ -434,45 +394,45 @@ test.describe.serial('Open Platform four-real-account authority', () => {
   });
 
   test('sole owner cannot self-remove; concurrent owner deletes keep exactly one owner', async () => {
-    const admin = await apiLogin(await pwRequest.newContext(), ACCOUNTS.admin.email, ACCOUNTS.admin.password);
-    const owner2 = await apiLogin(await pwRequest.newContext(), ACCOUNTS.owner2.email, ACCOUNTS.owner2.password);
+    const admin = await openPlatformSession(ACCOUNTS.admin);
+    const owner2 = await openPlatformSession(ACCOUNTS.owner2);
     const ctxA = await pwRequest.newContext();
     const ctxB = await pwRequest.newContext();
 
     // owner2 leaves: admin becomes the sole owner, and a real request to remove
     // the last owner must be rejected.
     const leave = await ctxB.delete(
-      `${BACKEND_URL}/api/open-platform/applications/${appPid}/members/${userPids.owner2}`,
-      { headers: bearer(owner2) },
+      `${WEB_BASE_URL}/api/open-platform/applications/${appPid}/members/${userPids.owner2}`,
+      { headers: sessionHeaders(owner2) },
     );
     expect(leave.ok(), `owner2 self-removal failed: ${leave.status()} ${await leave.text()}`).toBeTruthy();
     const soleRemove = await ctxA.delete(
-      `${BACKEND_URL}/api/open-platform/applications/${appPid}/members/${adminPid}`,
-      { headers: bearer(admin) },
+      `${WEB_BASE_URL}/api/open-platform/applications/${appPid}/members/${adminPid}`,
+      { headers: sessionHeaders(admin) },
     );
     expect([400, 403, 409]).toContain(soleRemove.status());
 
     // Two owners again; concurrent deletions in both directions must keep
     // exactly one owner (row-lock serialization), not zero, not two.
     const reAdd = await ctxA.put(
-      `${BACKEND_URL}/api/open-platform/applications/${appPid}/members/${userPids.owner2}`,
-      { headers: bearer(admin), data: { role: 'owner' } },
+      `${WEB_BASE_URL}/api/open-platform/applications/${appPid}/members/${userPids.owner2}`,
+      { headers: sessionHeaders(admin), data: { role: 'owner' } },
     );
     expect(reAdd.ok(), `re-add owner2 failed: ${reAdd.status()} ${await reAdd.text()}`).toBeTruthy();
 
     const [aDeletesOwner2, bDeletesAdmin] = await Promise.all([
-      ctxA.delete(`${BACKEND_URL}/api/open-platform/applications/${appPid}/members/${userPids.owner2}`, {
-        headers: bearer(admin),
+      ctxA.delete(`${WEB_BASE_URL}/api/open-platform/applications/${appPid}/members/${userPids.owner2}`, {
+        headers: sessionHeaders(admin),
       }),
-      ctxB.delete(`${BACKEND_URL}/api/open-platform/applications/${appPid}/members/${adminPid}`, {
-        headers: bearer(owner2),
+      ctxB.delete(`${WEB_BASE_URL}/api/open-platform/applications/${appPid}/members/${adminPid}`, {
+        headers: sessionHeaders(owner2),
       }),
     ]);
     const outcomes = [aDeletesOwner2.status(), bDeletesAdmin.status()];
     expect(outcomes).toContain(200);
 
-    const finalList = await ctxA.get(`${BACKEND_URL}/api/open-platform/applications`, {
-      headers: bearer(admin),
+    const finalList = await ctxA.get(`${WEB_BASE_URL}/api/open-platform/applications`, {
+      headers: sessionHeaders(admin),
     });
     expect(finalList.ok()).toBeTruthy();
     const finalApp = ((await finalList.json()).data as Array<{

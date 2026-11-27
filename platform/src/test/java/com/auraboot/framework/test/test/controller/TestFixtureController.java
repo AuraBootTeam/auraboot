@@ -3,10 +3,10 @@ package com.auraboot.framework.test.controller;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
-import com.auraboot.framework.meta.entity.CommandDefinition;
+import com.auraboot.framework.meta.dto.CommandDefinitionDTO;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.dto.CommandExecuteResult;
-import com.auraboot.framework.meta.mapper.CommandDefinitionMapper;
+import com.auraboot.framework.meta.service.CommandService;
 import com.auraboot.framework.meta.service.CommandExecutor;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.im.service.ImMessageService;
@@ -54,7 +54,7 @@ public class TestFixtureController {
     private CommandExecutor commandExecutor;
 
     @Autowired
-    private CommandDefinitionMapper commandDefinitionMapper;
+    private CommandService commandService;
 
     @Autowired
     private DynamicDataService dynamicDataService;
@@ -415,9 +415,9 @@ public class TestFixtureController {
      * not the old "modelCode.create" format.
      */
     private String resolveCreateCommandCode(String modelCode) {
-        List<CommandDefinition> commands = commandDefinitionMapper.findByModelCode(modelCode);
+        List<CommandDefinitionDTO> commands = commandService.listByModelCode(modelCode);
         // Find a command whose code contains "create" (case-insensitive)
-        for (CommandDefinition cmd : commands) {
+        for (CommandDefinitionDTO cmd : commands) {
             String code = cmd.getCode().toLowerCase();
             if (code.contains("create") && !code.contains("update")) {
                 log.debug("Resolved create command for model {}: {}", modelCode, cmd.getCode());

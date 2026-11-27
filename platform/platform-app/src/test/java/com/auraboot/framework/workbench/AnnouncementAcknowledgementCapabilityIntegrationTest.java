@@ -54,9 +54,11 @@ class AnnouncementAcknowledgementCapabilityIntegrationTest extends BaseIntegrati
     private record Fixture(String root, String version, String hash) {}
 
     @BeforeEach void ownedRuntimeAndPermissions() {
-        assertEquals("maritime-parallel-core", System.getenv("AURA_RUNTIME_NAME"));
-        assertEquals("auraboot_26", System.getenv("POSTGRES_DB"));
-        assertEquals("auraboot_26", jdbc.queryForObject("SELECT current_database()", String.class));
+        String expected = System.getenv("TEST_EXPECTED_DATABASE");
+        assertNotNull(expected, "An explicit task-owned test database is required");
+        assertTrue(expected.matches("[a-z][a-z0-9_]{0,62}"));
+        assertEquals(expected, System.getenv("POSTGRES_DB"));
+        assertEquals(expected, jdbc.queryForObject("SELECT current_database()", String.class));
         for (String action : List.of("edit", "delete", "withdraw", "publish", "publish_all", "exempt")) {
             grantCommittedPermissionToTestRole("announcement.announcement." + action,
                     "announcement", "announcement:announcement", action, "Announcement " + action);

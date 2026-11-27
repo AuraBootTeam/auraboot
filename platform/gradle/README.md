@@ -76,3 +76,20 @@ and each publication's `jar|pom` type. BOMs have no compiled JAR; their metadata
 verified against original Gradle outputs. Schema 1 and the default Core-only entry
 remain supported. This command neither builds an application image nor publishes
 to a remote registry. Never reuse an immutable version for changed library bytes.
+
+
+## Extracted application test coverage
+
+Application tests use offline-instrumented copies of the exact application
+classes and the resolved owned Core and Agent JARs. Original owned class origins
+are replaced rather than appended; third-party artifacts and resources retain
+their original classpath. The application classpath contract checks unique
+metadata origins, instrumented application code and SQL-parser availability.
+The instrumented copies are test outputs and are never published or packaged.
+
+Application tests write a separate fresh execution file under their own build
+output. Core's original report and threshold read both Core and application test
+execution data against the unchanged Core class denominator. This includes real
+Core execution through application integration tests without changing thresholds,
+adding retries or accepting stale execution files. The original full runner owns
+both test executions before the report-only threshold phase.

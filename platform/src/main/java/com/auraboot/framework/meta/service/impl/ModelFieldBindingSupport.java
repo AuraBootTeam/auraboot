@@ -138,6 +138,7 @@ final class ModelFieldBindingSupport extends BaseMetaService {
             // Check if this is a system binding - system fields cannot be unbound
             ModelFieldBinding existingBinding = fieldBindingMapper.findByModelAndField(
                 modelId, fieldId, MetaContext.getCurrentTenantId());
+            if (existingBinding == null) return false;
             if (existingBinding != null && Boolean.TRUE.equals(existingBinding.getIsSystemBinding())) {
                 throw new MetaServiceException("Cannot unbind system field, it is required by the system");
             }

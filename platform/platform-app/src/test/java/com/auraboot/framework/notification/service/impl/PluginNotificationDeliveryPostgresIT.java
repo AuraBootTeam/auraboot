@@ -47,6 +47,10 @@ import static org.assertj.core.api.Assertions.*;
 @ActiveProfiles("integration-test")
 @Import(PluginNotificationDeliveryPostgresIT.PollerIsolation.class)
 class PluginNotificationDeliveryPostgresIT {
+    // Explicit lease/replay tests drive the real worker themselves; hold commit signals to avoid a second claimant.
+    @org.springframework.test.context.bean.override.mockito.MockitoBean(name = "reliableOutboxDispatchExecutor")
+    private org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor heldCommitDispatch;
+
     @TestConfiguration(proxyBeanMethods = false)
     static class PollerIsolation {
         @Bean static BeanFactoryPostProcessor preventTestAppAutomaticPollers() {
@@ -65,6 +69,7 @@ class PluginNotificationDeliveryPostgresIT {
     @Autowired PlatformTransactionManager transactions;
     @Autowired ReliableIntegrationAccessor reliable;
     @Autowired ReliableEventDeliveryExecutor executor;
+    @Autowired com.auraboot.framework.meta.mapper.OutboxEventMapper outbox;
     @Autowired StrictInAppDeliveryWriter writer;
     @Autowired NotificationQueryService inbox;
     @Autowired ObjectMapper json;
@@ -135,6 +140,11 @@ class PluginNotificationDeliveryPostgresIT {
     private Result queue(Plan plan) {
         return transaction(() -> host.enqueue(new Request(tenant, plan.reference(), Channel.IN_APP)));
     }
+    private void claim(IntegrationEventEnvelope event, String token) {
+        assertThat(outbox.claimKnownEvent(event.tenantId(), event.eventId(), "notification-native-fixture", token,
+                Instant.now().plusSeconds(30))).hasSize(1);
+    }
+
     private IntegrationEventEnvelope readEvent(String eventId) {
         return jdbc.queryForObject("SELECT * FROM ab_outbox WHERE tenant_id = ? AND event_id = ?", (row, index) -> {
             try {
@@ -207,6 +217,10 @@ class PluginNotificationDeliveryPostgresIT {
     }
     @Test void inboxAndReceiptRollbackTogetherThenConcurrentReplayPersistsOnce() throws Exception {
         Plan plan = plan("atomic", userPid); var result = queue(plan); var event = readEvent(result.deliveryKey());
+        assertThatThrownBy(() -> executor.deliver(event, host, "unclaimed-fence"))
+                .hasMessage("Reliable integration delivery lease is not active");
+        assertThat(counts()).isEqualTo(Map.of("outbox",1,"receipt",0,"inbox",0));
+        claim(event, "native-failure-fence");
         ReliableEventConsumerExtension failAfterPersist = new ReliableEventConsumerExtension() {
             public String consumerCode() { return host.consumerCode(); }
             public Set<String> subscribedEventTypes() { return host.subscribedEventTypes(); }
@@ -219,11 +233,26 @@ class PluginNotificationDeliveryPostgresIT {
         assertThatThrownBy(() -> executor.deliver(event,failAfterPersist,"native-failure-fence"))
                 .hasMessage("synthetic crash after persisted inbox");
         assertThat(counts()).isEqualTo(Map.of("outbox",1,"receipt",0,"inbox",0));
-        concurrent(() -> { executor.deliver(event,host,UniqueIdGenerator.generate()); return true; });
+        Long eventRow = jdbc.queryForObject("SELECT id FROM ab_outbox WHERE tenant_id=? AND event_id=?", Long.class, tenant, event.eventId());
+        assertThat(outbox.recordFailureFenced(eventRow, "native-failure-fence", Instant.now(), "synthetic consumer crash")).isEqualTo(1);
+        var winningLease = new java.util.concurrent.atomic.AtomicReference<String>();
+        // Race the production lease claim, not two dispatchers illegally sharing one active lease.
+        var winners = concurrent(() -> {
+            String token = UniqueIdGenerator.generate();
+            var claimed = outbox.claimKnownEvent(tenant, event.eventId(), "notification-native-contender", token,
+                    Instant.now().plusSeconds(30));
+            if (claimed.isEmpty()) return false;
+            assertThat(claimed).hasSize(1);
+            executor.deliver(event, host, token);
+            winningLease.set(token);
+            return true;
+        });
+        assertThat(winners).containsExactlyInAnyOrder(true, false);
+        assertThat(winningLease.get()).isNotBlank();
         assertThat(counts()).isEqualTo(Map.of("outbox",1,"receipt",1,"inbox",1));
         assertThat(jdbc.queryForObject("SELECT status FROM ab_integration_receipt WHERE tenant_id = ? AND event_id = ?",String.class,tenant,event.eventId())).isEqualTo("applied");
         var original = jdbc.queryForMap("SELECT * FROM ab_notification WHERE tenant_id = ?",tenant);
-        executor.deliver(event,host,"native-replay-fence");
+        executor.deliver(event,host,winningLease.get());
         assertThat(jdbc.queryForMap("SELECT * FROM ab_notification WHERE tenant_id = ?",tenant)).isEqualTo(original);
         assertThat(original.get("user_id")).isEqualTo(user);
         assertThat(original.get("source_id")).isEqualTo(sourceId);
@@ -245,6 +274,7 @@ class PluginNotificationDeliveryPostgresIT {
         assertThatThrownBy(() -> queue(own)).hasMessage("NOTIFICATION_RECIPIENT_UNAVAILABLE");
         jdbc.update("UPDATE ab_user SET deactivation_status = NULL WHERE id = ?",user);
         var eventId = jdbc.queryForObject("SELECT event_id FROM ab_outbox WHERE tenant_id = ?",String.class,tenant);
+        claim(readEvent(eventId), "membership-revoked-fence");
         jdbc.update("UPDATE ab_tenant_member SET status = 'inactive' WHERE tenant_id = ? AND user_id = ?",tenant,user);
         assertThatThrownBy(() -> executor.deliver(readEvent(eventId),host,"membership-revoked-fence"))
                 .hasMessage("NOTIFICATION_RECIPIENT_UNAVAILABLE");
@@ -252,6 +282,7 @@ class PluginNotificationDeliveryPostgresIT {
     }
     @Test void realInboxTenantAndRecipientReadMarkIsolation() {
         Plan own = plan("inbox-isolation",userPid); var queued = queue(own);
+        claim(readEvent(queued.deliveryKey()), "own-inbox-fence");
         executor.deliver(readEvent(queued.deliveryKey()),host,"own-inbox-fence");
         var page = inbox.listByUser(user,new NotificationQueryRequest());
         assertThat(page.getTotal()).isEqualTo(1); assertThat(page.getRecords()).hasSize(1);

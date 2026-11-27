@@ -37,9 +37,36 @@ public class RecordReadAccess {
         }
     }
 
+    /** Resolve the legacy numeric identity through the same native READ path. */
+    public String requireReadableByNumericId(String modelCode, Long recordId) {
+        if (recordId == null || recordId <= 0
+                || !permissions.canAction(MetaContext.getCurrentMemberId(), modelCode, "read"))
+            throw new AccessDeniedException("Record read permission is required");
+        var request = com.auraboot.framework.meta.dto.DynamicQueryRequest.builder()
+                .pageNum(1).pageSize(2).conditions(java.util.List.of(
+                        com.auraboot.framework.meta.dto.QueryCondition.builder().fieldName("id")
+                                .operator(com.auraboot.framework.meta.dto.QueryCondition.Operator.EQ)
+                                .value(recordId).build())).build();
+        var records = data.list(modelCode, request).getRecords();
+        if (records.size() != 1 || !(records.getFirst().get("pid") instanceof String pid) || pid.isBlank())
+            throw new AccessDeniedException("Record read permission is required");
+        requireReadable(modelCode, pid);
+        return pid;
+    }
+
     @org.springframework.transaction.annotation.Transactional(
             propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     public boolean isReadableBy(Long tenantId, Long userId, String modelCode, String recordPid) {
+        return isReadableBy(tenantId, userId, () -> requireReadable(modelCode, recordPid));
+    }
+
+    @org.springframework.transaction.annotation.Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    public boolean isReadableByNumericId(Long tenantId, Long userId, String modelCode, Long recordId) {
+        return isReadableBy(tenantId, userId, () -> requireReadableByNumericId(modelCode, recordId));
+    }
+
+    private boolean isReadableBy(Long tenantId, Long userId, Runnable read) {
         var member = members.findByTenantIdAndUserId(tenantId, userId);
         if (member == null || Boolean.TRUE.equals(member.getDeletedFlag())
                 || !"active".equalsIgnoreCase(member.getStatus())) return false;
@@ -53,7 +80,7 @@ public class RecordReadAccess {
         var readable = new AtomicBoolean();
         MetaContext.runWithSnapshot(snapshot, () -> {
             try {
-                requireReadable(modelCode, recordPid);
+                read.run();
                 readable.set(true);
             } catch (AccessDeniedException denied) {
                 // CATCH: an expected per-recipient authorization denial excludes this recipient.

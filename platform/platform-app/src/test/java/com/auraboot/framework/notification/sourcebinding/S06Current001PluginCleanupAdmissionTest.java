@@ -325,6 +325,11 @@ class S06Current001PluginCleanupAdmissionTest {
     private record Fixture(ArrayNode rows, Map<Long, S06Current001PluginCleanupAdmission.Target> targets) {}
     // BEGIN automatic cleanup contracts.
     @org.junit.jupiter.api.io.TempDir java.nio.file.Path automaticRoot;
+
+    @org.junit.jupiter.api.BeforeEach
+    void resolvePhysicalAutomaticEvidenceRoot() throws Exception {
+        automaticRoot = automaticRoot.toRealPath();
+    }
     private record AutomaticFixture(ObjectNode setup, ObjectNode binding, ArrayNode rows) {}
     private AutomaticFixture automaticFixture() throws Exception {
         var setup = json.createObjectNode().put("tenantId", 987L).put("formalImportedDirectories", 23);
@@ -387,6 +392,7 @@ class S06Current001PluginCleanupAdmissionTest {
     void futureNullRefsChangedPhysicalHashesAndEmptyCompiledMapsCannotQualifyCleanup() throws Exception {
         assertThatThrownBy(() -> S06Current001PluginCleanupAdmission.automaticRef(json.getNodeFactory().nullNode(), automaticRoot)).hasMessage("CLEANUP_SCHEMA_INVALID");
         var file = automaticRoot.resolve("proof.json"); java.nio.file.Files.writeString(file, "{}");
+        java.nio.file.Files.setPosixFilePermissions(file, java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
         var ref = json.createObjectNode().put("path", file.toString()).put("sha256", S06Current001PluginCleanupAdmission.hash(file));
         assertThat(S06Current001PluginCleanupAdmission.automaticRef(ref, automaticRoot)).isEqualTo(file.toRealPath());
         java.nio.file.Files.writeString(file, "{\"changed\":true}");
@@ -420,7 +426,7 @@ class S06Current001PluginCleanupAdmissionTest {
     }
     @Test
     void cleanupV1V2AndOfficialTransactionBodiesRemainPinnedAfterWorkspacePortability() throws Exception {
-        java.nio.file.Path root = java.nio.file.Path.of("src/test/java/com/auraboot/framework/notification/sourcebinding");
+        java.nio.file.Path root = java.nio.file.Path.of("platform-app/src/test/java/com/auraboot/framework/notification/sourcebinding");
         if (!java.nio.file.Files.isDirectory(root)) root = java.nio.file.Path.of("platform").resolve(root);
         for (var entry : Map.of("S06Current001PluginCleanupAdmission.java", "502c0816da66376c528a4fe040f3bd42859da13e601ac2604a298cc6fdbe6b14", "S06Current001PluginRegistryCleanupIT.java", "e10ecca8ce72f442a88e2a00904c0c0dd4f22afee7c81224633fc556f76823b5").entrySet()) {
             String source = java.nio.file.Files.readString(root.resolve(entry.getKey()));
@@ -442,7 +448,7 @@ class S06Current001PluginCleanupAdmissionTest {
         java.nio.file.Path javaFile = root.resolve("platform/src/main/java/Example.java"), resource = root.resolve("platform/platform-app/src/main/resources/application.yml");
         java.nio.file.Files.createDirectories(javaFile.getParent()); java.nio.file.Files.createDirectories(resource.getParent());
         java.nio.file.Files.writeString(javaFile, "class Example {}\n"); java.nio.file.Files.writeString(resource, "guard: exact\n");
-        assertThat(new ProcessBuilder("git", "-C", root.toString(), "add", "platform/src/main").start().waitFor()).isZero();
+        assertThat(new ProcessBuilder("git", "-C", root.toString(), "add", "platform/src/main", "platform/platform-app/src/main").start().waitFor()).isZero();
         var map = S06Current001PluginCleanupAdmission.automaticMainSources(root);
         assertThat(map).containsOnlyKeys("platform/src/main/java/Example.java", "platform/platform-app/src/main/resources/application.yml");
         assertThat(map.get("platform/platform-app/src/main/resources/application.yml")).isEqualTo(S06Current001PluginCleanupAdmission.hash(resource));

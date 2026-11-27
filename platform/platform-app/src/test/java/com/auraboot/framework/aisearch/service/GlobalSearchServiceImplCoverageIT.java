@@ -53,6 +53,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @SpringBootTest(classes = TestApplication.class)
 @ActiveProfiles("integration-test")
+@org.springframework.transaction.annotation.Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
 @DisplayName("GlobalSearchServiceImpl Coverage IT — readable search + preferences")
 class GlobalSearchServiceImplCoverageIT extends BaseIntegrationTest {
 
@@ -74,6 +75,10 @@ class GlobalSearchServiceImplCoverageIT extends BaseIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired private com.auraboot.framework.permission.service.UserPermissionService fixturePermissions;
+    private com.auraboot.framework.integration.NativePermissionFixture nativeAuthority;
+    @org.junit.jupiter.api.AfterEach void releaseOwnedGrants() { if (nativeAuthority != null) nativeAuthority.close(); }
+
     @Test
     @DisplayName("global search scenario — readable filtering, grouping, budget, preferences, guards")
     void globalSearchScenario() {
@@ -94,6 +99,8 @@ class GlobalSearchServiceImplCoverageIT extends BaseIntegrationTest {
         seedModel(tenantId, beta, "gsb2", null, "entity", true);
         seedModel(tenantId, ghost, "gsg2", "Ghost (no table)", "entity", false);
         seedModel(tenantId, viewLike, "gsv2", "View-like model", "view", false);
+        nativeAuthority = new com.auraboot.framework.integration.NativePermissionFixture(jdbcTemplate, fixturePermissions);
+        for (String code : List.of(alpha, beta)) nativeAuthority.grantModel(code, "create");
         seedRecord(alpha, "gsa2", "alpha-" + KEYWORD_TOKEN + "-one");
         seedRecord(alpha, "gsa2", "alpha-quiet");
         seedRecord(beta, "gsb2", "beta-" + KEYWORD_TOKEN + "-one");
@@ -102,8 +109,7 @@ class GlobalSearchServiceImplCoverageIT extends BaseIntegrationTest {
         // loop cannot be exercised here — its SQL error would abort this test's
         // transaction — and needs a non-transactional harness.
         for (String code : List.of(alpha, beta)) {
-            grantCommittedPermissionToTestRole(
-                    "model." + code + ".read", "model", code, "read", "IT read " + code);
+            nativeAuthority.grantModel(code, "read");
         }
 
         try {

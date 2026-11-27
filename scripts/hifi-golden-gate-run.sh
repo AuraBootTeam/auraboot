@@ -86,7 +86,26 @@ fi
 export AURA_EVIDENCE_ROOT="${REUSE_EVIDENCE_ROOT:-$WORKSPACE_STATE/evidence/$NAME}"
 export AURA_EVIDENCE_DIR="$AURA_EVIDENCE_ROOT/hifi-golden"
 mkdir -p "$AURA_EVIDENCE_DIR"
-trap 'log "runtime retained: name=$NAME slot=$SLOT evidence=$AURA_EVIDENCE_ROOT"' EXIT
+GATE_RECONCILED=false
+retain() {
+  local rc=$?
+  trap - EXIT
+  if [[ "$rc" == 0 && "$GATE_RECONCILED" != true ]]; then
+    log "ENVIRONMENT-INVALID: gate exited before execution reconciliation" >&2
+    rc=2
+  fi
+  if [[ -n "${AURA_CI_JOB_ID:-}" ]]; then
+    if ! python3 "$REPO_ROOT/scripts/ci/settle_runtime.py" --workspace "$WORKSPACE" --repo "$REPO_ROOT" \
+        --name "$NAME" --artifacts "${AURA_REGRESSION_ARTIFACTS:?native artifacts required}"; then
+      log "ENVIRONMENT-INVALID: native runtime resource settlement failed; original gate exit=$rc"
+      [[ "$rc" -ne 0 ]] || rc=2
+    fi
+  else
+    log "runtime retained: name=$NAME slot=$SLOT evidence=$AURA_EVIDENCE_ROOT"
+  fi
+  exit "$rc"
+}
+trap retain EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 SPEC_FILES=()
@@ -125,7 +144,7 @@ else
     parallel_args=(--parallel-reason "orchestrator weekly batch for ${AURA_CI_WORKSPACE_ROOT}")
   fi
   "$GS" up "$NAME" --slot "$SLOT" --ttl 12h --runtime-mode verification --require-new-db --plugin-profile demo \
-    "${workspace_source_args[@]}" "${renderer_args[@]}" "${parallel_args[@]}" \
+    ${workspace_source_args[@]+"${workspace_source_args[@]}"} ${renderer_args[@]+"${renderer_args[@]}"} ${parallel_args[@]+"${parallel_args[@]}"} \
     || die_env 'stack bring-up failed; inspect retained golden-stack logs'
 fi
 log '3/6 import test-fixtures'
@@ -165,5 +184,6 @@ set -e
 log '6/6 reconcile collected scope and actual results'
 node "$AUDIT" "$PROFILE" "$AURA_EVIDENCE_ROOT/results.json" execution "$REPEAT" \
   >"$AURA_EVIDENCE_ROOT/execution-ledger.json" || exit 1
+GATE_RECONCILED=true
 log "PASS: fixed profile executed with no missing/skipped/retried results; evidence=$AURA_EVIDENCE_ROOT"
 log "Review URLs: web=$PLAYWRIGHT_BASE_URL backend=$BACKEND_URL"

@@ -68,6 +68,16 @@ class FullTextSearchIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired private com.auraboot.framework.permission.service.UserPermissionService fixturePermissions;
+    private com.auraboot.framework.integration.NativePermissionFixture fixtureAuthority;
+
+    private void authorizeFixtureModel() {
+        if (fixtureAuthority == null) {
+            fixtureAuthority = new com.auraboot.framework.integration.NativePermissionFixture(jdbcTemplate, fixturePermissions);
+            fixtureAuthority.grantModel(testModelCode, "read", "create", "update", "delete");
+        }
+    }
+
 
     @Autowired
     private UserService userService;
@@ -104,6 +114,7 @@ class FullTextSearchIntegrationTest {
             createTestModel();
             createTestFields();
             createPhysicalTable();
+            authorizeFixtureModel();
             insertTestData();
             modelInitialized = true;
         }
@@ -111,6 +122,7 @@ class FullTextSearchIntegrationTest {
 
     @AfterAll
     void cleanup() {
+        if (fixtureAuthority != null) fixtureAuthority.close();
         log.info("=== FullTextSearch test cleanup ===");
         modelInitialized = false;
         createdRecordPids.clear();
@@ -120,6 +132,7 @@ class FullTextSearchIntegrationTest {
     void cleanupContext() {
         if (testTenant != null && testUser != null) {
             MetaContext.setContext(testTenant.getId(), testUser.getId(), testUser.getPid(), testUser.getUserName());
+            MetaContext.setMemberId(tenantMemberService.findByTenantIdAndUserId(testTenant.getId(), testUser.getId()).getId());
         }
     }
 
@@ -331,6 +344,7 @@ class FullTextSearchIntegrationTest {
                 tenantMemberService.addMember(testUser.getId(), testTenant.getId(), "active");
             }
             MetaContext.setContext(testTenant.getId(), testUser.getId(), testUser.getPid(), testUser.getUserName());
+            MetaContext.setMemberId(tenantMemberService.findByTenantIdAndUserId(testTenant.getId(), testUser.getId()).getId());
         } catch (Exception e) {
             throw new RuntimeException("Failed to setup tenant context", e);
         }

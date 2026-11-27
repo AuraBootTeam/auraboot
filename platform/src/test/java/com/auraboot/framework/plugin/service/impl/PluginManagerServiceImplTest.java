@@ -56,12 +56,14 @@ class PluginManagerServiceImplTest {
     @Mock private ApplicationModuleRegistry applicationModuleRegistry;
     @Mock private PluginResourceImporter pluginResourceImporter;
     @Mock private AdminEventLogService adminEventLogService;
+    @Mock private PluginPackageReplacements packageReplacements;
 
     @InjectMocks private PluginManagerServiceImpl service;
 
     @BeforeEach
     void setup() {
         MetaContext.setContext(100L, 1L, "U-1", "tester");
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "packageReplacements", packageReplacements);
     }
 
     @AfterEach

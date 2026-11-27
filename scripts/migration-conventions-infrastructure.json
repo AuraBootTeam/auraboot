@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 1,
+  "migrations": {
+    "V20261105002000__navigation_customization.sql": {
+      "sha256": "76599753850ecc4bc4b89e86eef7827be829d36ad6ac3431610197bdf5a13832",
+      "tables": {
+        "ab_navigation_customization": {
+          "scope": "internal-state",
+          "exemptMissingColumns": [
+            "created_by",
+            "updated_by",
+            "pid"
+          ],
+          "reason": "Tenant/menu composite-key configuration; the public identity is the existing menu PID, while the separate immutable audit records the authenticated actor.",
+          "evidence": [
+            "platform/src/main/java/com/auraboot/framework/menu/service/NavigationConfigurationService.java"
+          ]
+        },
+        "ab_navigation_audit": {
+          "scope": "immutable-audit",
+          "exemptMissingColumns": [
+            "created_by",
+            "updated_by"
+          ],
+          "reason": "Append-only navigation audit uses its own public PID and explicit actor_id; it has no generic creator/updater lifecycle.",
+          "evidence": [
+            "platform/src/main/java/com/auraboot/framework/menu/service/NavigationConfigurationService.java"
+          ]
+        }
+      }
+    },
+    "V20261105003000__role_navigation_assignments.sql": {
+      "sha256": "29406b94b976e867c25f1e97a6ad4531788a71b21ccc836ccc44774dd91f378d",
+      "tables": {
+        "ab_role_navigation_state": {
+          "scope": "internal-state",
+          "exemptMissingColumns": [
+            "created_by",
+            "pid"
+          ],
+          "reason": "Tenant/role composite-key navigation selection stores its last actor in updated_by; role PID remains the public resource identity.",
+          "evidence": [
+            "platform/src/main/java/com/auraboot/framework/menu/service/RoleNavigationService.java"
+          ]
+        },
+        "ab_role_navigation_menu": {
+          "scope": "internal-state",
+          "exemptMissingColumns": [
+            "created_by",
+            "updated_by",
+            "pid"
+          ],
+          "reason": "Internal tenant/role/menu relationship is identified by its composite primary key and belongs to the role selection foreign key; it is not an independently editable business record.",
+          "evidence": [
+            "platform/src/main/java/com/auraboot/framework/menu/service/RoleNavigationService.java"
+          ]
+        },
+        "ab_role_navigation_audit": {
+          "scope": "immutable-audit",
+          "exemptMissingColumns": [
+            "created_by",
+            "updated_by"
+          ],
+          "reason": "Append-only role navigation history retains its own PID and authenticated actor_id; generic update audit columns would misdescribe an immutable event.",
+          "evidence": [
+            "platform/src/main/java/com/auraboot/framework/menu/service/RoleNavigationService.java"
+          ]
+        }
+      }
+    },
+    "V20261116163000__external_ingress_defaults.sql": {
+      "sha256": "fe9f09e4c7dae7af908c8e70b599b76871a8e358b4af21106ade473496972a52",
+      "tables": {
+        "ab_external_ingress_defaults": {
+          "scope": "internal-receipt",
+          "exemptMissingColumns": [
+            "created_by",
+            "updated_by",
+            "pid"
+          ],
+          "reason": "Installation-scoped idempotency defaults use a composite natural key and tenant/installation foreign key; machine-owned request receipts are not generic user-editable records.",
+          "evidence": [
+            "platform/src/main/java/com/auraboot/framework/openplatform/mapper/ExternalIngressDefaultsMapper.java"
+          ]
+        }
+      }
+    },
+    "V20261117010000__wechat_subscription_verified_consent.sql": {
+      "sha256": "e19e45b02aca1ae6a31b8b234cbc0c962dd318fd7cb72c65f839a38c0f240083",
+      "tables": {
+        "ab_wechat_subscription_event": {
+          "scope": "global-provider-fact",
+          "exemptMissingColumns": [
+            "created_by",
+            "updated_by",
+            "tenant_id",
+            "pid"
+          ],
+          "reason": "Authenticated provider events are global to app/openid/template; a per-tenant copy would duplicate one-time consent. Immutable facts use event_key and provider occurrence identity.",
+          "evidence": [
+            "platform/src/main/java/com/auraboot/framework/notification/mapper/WechatSubscriptionConsentMapper.java"
+          ]
+        },
+        "ab_wechat_subscription_state": {
+          "scope": "global-provider-fact",
+          "exemptMissingColumns": [
+            "created_by",
+            "updated_by",
+            "tenant_id",
+            "pid"
+          ],
+          "reason": "Global provider revocation watermark is keyed by app/openid/template so another tenant cannot replenish revoked consent; it has no tenant-local business-record identity.",
+          "evidence": [
+            "platform/src/main/java/com/auraboot/framework/notification/mapper/WechatSubscriptionConsentMapper.java"
+          ]
+        },
+        "ab_wechat_subscription_grant": {
+          "scope": "global-provider-fact",
+          "exemptMissingColumns": [
+            "created_by",
+            "updated_by",
+            "tenant_id",
+            "pid"
+          ],
+          "reason": "One immutable provider-confirmed grant has a global natural grant_reference and event foreign key, preventing duplicate consent capacity across tenants.",
+          "evidence": [
+            "platform/src/main/java/com/auraboot/framework/notification/mapper/WechatSubscriptionConsentMapper.java"
+          ]
+        }
+      }
+    },
+    "V20261117020000__wechat_subscription_client_observation.sql": {
+      "sha256": "a265385d53ae3305e9473c9b3cfc69311e969bf8dfd5abc10ae49efbf394107a",
+      "tables": {
+        "ab_wechat_subscription_observation": {
+          "scope": "immutable-audit",
+          "exemptMissingColumns": [
+            "created_by",
+            "updated_by",
+            "pid"
+          ],
+          "reason": "Immutable authenticated client observation keeps tenant_id, user_id, identity_pid and an idempotency composite key; it cannot become provider consent or a mutable business record.",
+          "evidence": [
+            "platform/src/main/java/com/auraboot/framework/notification/mapper/WechatSubscriptionObservationMapper.java"
+          ]
+        }
+      }
+    },
+    "V20261117030000__wechat_subscription_delivery_reservation.sql": {
+      "sha256": "7cc906d2870f1a68c8e16147b31ffe5f07e0b30a051799dd77153e259fe43cf5",
+      "tables": {
+        "ab_wechat_subscription_reservation": {
+          "scope": "internal-receipt",
+          "exemptMissingColumns": [
+            "created_by",
+            "updated_by",
+            "pid"
+          ],
+          "reason": "Append-only tenant-bound ownership of a global one-time provider grant uses resolution/reservation references; unknown and failed deliveries never recycle this ownership.",
+          "evidence": [
+            "platform/src/main/java/com/auraboot/framework/notification/mapper/WechatSubscriptionReservationMapper.java"
+          ]
+        }
+      }
+    },
+    "V20261123203000__installed_integration_receipt_recovery.sql": {
+      "sha256": "68ce2c5858fe508174c42e67408faa5236f5d521676a65ba4bd31d725b7ff731",
+      "tables": {
+        "ab_installed_integration_recovery": {
+          "scope": "immutable-audit",
+          "exemptMissingColumns": [
+            "created_by",
+            "updated_by"
+          ],
+          "reason": "Append-only recovery authorization retains public PID, tenant, requested_by_pid, reason, version and before/after fingerprints; it is not a generic mutable audit entity.",
+          "evidence": [
+            "platform/src/main/java/com/auraboot/framework/openplatform/mapper/InstalledIntegrationRecoveryMapper.java"
+          ]
+        }
+      }
+    },
+    "V20261124101500__plugin_handover_preview_receipts.sql": {
+      "sha256": "be2a39477f3dea094b46346ce1b95c36941650ad055cdeb9edd890f20dc22812",
+      "tables": {
+        "ab_plugin_handover_batch": {
+          "scope": "immutable-audit",
+          "exemptMissingColumns": [
+            "updated_by"
+          ],
+          "reason": "Immutable PREVIEWED batch already retains public PID, tenant and created_by; it grants no mutation authority and has no updater lifecycle.",
+          "evidence": [
+            "platform/src/main/java/com/auraboot/framework/plugin/handover/HandoverPreviewBatch.java"
+          ]
+        },
+        "ab_plugin_handover_item": {
+          "scope": "internal-receipt",
+          "exemptMissingColumns": [
+            "created_by",
+            "updated_by",
+            "pid"
+          ],
+          "reason": "Immutable preview item belongs to the tenant/batch foreign key and resource/ordinal unique keys. Resource PID is the original target identity, not a separately editable item record.",
+          "evidence": [
+            "platform/src/main/java/com/auraboot/framework/plugin/handover/HandoverPreviewItem.java"
+          ]
+        }
+      }
+    }
+  }
+}

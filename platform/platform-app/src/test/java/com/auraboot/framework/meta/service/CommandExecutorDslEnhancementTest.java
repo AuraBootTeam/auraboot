@@ -573,6 +573,11 @@ class CommandExecutorDslEnhancementTest extends BaseIntegrationTest {
                 "child_name_" + suffix + ":STRING");
 
         // Insert parent record
+        for (String action : List.of("read", "delete")) {
+            grantCommittedPermissionToTestRole("model." + childModel + "." + action,
+                    "model", childModel, action, "Cascade child " + action);
+        }
+
         String parentId = insertRecord(parentModel, Map.of(
                 "name_" + suffix, "Parent Record"
         ));

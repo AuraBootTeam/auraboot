@@ -245,6 +245,7 @@ async function exerciseSemanticDataSource(page: import('@playwright/test').Page,
     await page.reload();
     await inspectQuery(await restored);
     await dp.widgets.nth(1).click();
+    await dp.openInspector();
     await expect(modelSelect).toHaveValue(code);
     for (const m of metrics) await expect(metric(m)).toBeChecked();
     for (const dim of dimensions) {
@@ -359,6 +360,7 @@ async function exerciseSemanticDataSource(page: import('@playwright/test').Page,
 
 // A golden action must not retry, force clicks, dispatch events or remove errors.
 async function addWidgetBySingleClick(page: import('@playwright/test').Page, name: string) {
+  await dp.openPalette();
   const before = await dp.widgets.count();
   const item = dp.paletteItem(name);
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
@@ -373,8 +375,8 @@ async function createFromManagement(page: import('@playwright/test').Page) {
   await page.getByTestId('toolbar-btn-create').click();
   await expect(page).toHaveURL(/\/dashboard-designer$/);
   await expect(dp.toolbar).toBeVisible();
-  await expect(dp.palette).toBeVisible();
-  await expect(dp.propertyPanel).toBeVisible();
+  await dp.openPalette();
+  await dp.openInspector();
   await expect(dp.canvas).toBeVisible({ timeout: 30000 });
 }
 

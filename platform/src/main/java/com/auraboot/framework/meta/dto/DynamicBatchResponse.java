@@ -18,22 +18,22 @@ public class DynamicBatchResponse {
     /**
      * 总数量
      */
-    private Integer total;
+    private Integer total = 0;
     
     /**
      * 成功数量
      */
-    private Integer success;
+    private Integer success = 0;
     
     /**
      * 失败数量
      */
-    private Integer failed;
+    private Integer failed = 0;
     
     /**
      * 跳过数量
      */
-    private Integer skipped;
+    private Integer skipped = 0;
     
     /**
      * 错误信息列表

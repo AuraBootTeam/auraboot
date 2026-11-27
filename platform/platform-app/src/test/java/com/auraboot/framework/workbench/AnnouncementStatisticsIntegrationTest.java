@@ -36,6 +36,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "auraboot.announcement.approval.worker-enabled=false","aura.export.domain.cleanup-initial-ms=3600000"})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
+    private final String fixtureNamespace = "announcement-statistics-"
+            + UniqueIdGenerator.generate().toLowerCase(Locale.ROOT);
+
+    @Override protected String testFixtureNamespace() {return fixtureNamespace;}
     @Autowired JdbcTemplate jdbc;
     @Autowired AnnouncementLifecycleService lifecycle;
     @Autowired AnnouncementReleaseService releases;
@@ -107,6 +111,13 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         http=MockMvcBuilders.webAppContextSetup(context).build();
     }
     @AfterEach void clearAuthentication(){reminderClock.instant=null;exportClock.instant=null;org.springframework.context.i18n.LocaleContextHolder.resetLocaleContext();SecurityContextHolder.clearContext();}
+    private void dispatchAnnouncementEvents() {
+        applyTestMetaContext();
+        outboxWorker.dispatchCurrentTenant("auraboot.announcement",Set.of(
+            AnnouncementReleaseService.RELEASED_EVENT,AnnouncementDeliveryConsumer.EXPAND,
+            AnnouncementDeliveryConsumer.DELIVER,AnnouncementDeliveryConsumer.ACK,AnnouncementReminderService.EXPAND),100);
+        applyTestMetaContext();
+    }
     private String publish() {
         String operation=UniqueIdGenerator.generate();
         var policy=Map.of("audience",Map.of("kind","selected","userPids",List.of(getTestUser().getPid())),
@@ -116,7 +127,13 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         var accepted=releases.execute("announcement:publish",pid,Map.of(),operation+"-publish",1);
         MetaContext.clear();new AnnouncementReleaseWorker(releases).tick();applyTestMetaContext();
         assertThat(jdbc.queryForObject("SELECT status FROM ab_announcement WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),pid)).isEqualTo("published");
-        return (String)accepted.get("versionPid");
+        String version=(String)accepted.get("versionPid");
+        org.awaitility.Awaitility.await().pollInSameThread().atMost(Duration.ofSeconds(15)).untilAsserted(()->{
+            dispatchAnnouncementEvents();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_notification WHERE tenant_id=? AND user_id=? AND source_type='announcement' AND source_id=?",Long.class,
+                getTestTenant().getId(),getTestUser().getId(),version)).isEqualTo(1L);
+        });
+        return version;
     }
     @Test void emptyRichHtmlCannotPublishOrLeaveAnAcceptedOperationBehind() {
         Long tenant=getTestTenant().getId();
@@ -186,7 +203,7 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
             assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_audience_estimate WHERE tenant_id=? AND version_pid=?",Long.class,tenant,version)).isEqualTo(501);
             long projections=System.nanoTime();
             org.awaitility.Awaitility.await().pollInSameThread().atMost(Duration.ofSeconds(90)).untilAsserted(()->{
-                outboxWorker.pollAndDispatch();
+                dispatchAnnouncementEvents();
                 assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_notification WHERE tenant_id=? AND source_type='announcement' AND source_id=?",Long.class,tenant,version)).isEqualTo(501);
                 assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_inbox_item WHERE tenant_id=? AND source_type='announcement' AND source_id=? AND item_type='announcement_ack' AND status='pending'",Long.class,tenant,version)).isEqualTo(501);
             });
@@ -194,7 +211,7 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
             assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_outbox WHERE tenant_id=? AND event_source='auraboot.announcement' AND event_type=? AND payload->>'versionPid'=?",Long.class,
                 tenant,AnnouncementDeliveryConsumer.EXPAND,version)).isEqualTo(1);
             assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_delivery WHERE tenant_id=? AND version_pid=? AND status='completed'",Long.class,tenant,version)).isEqualTo(501);
-            outboxWorker.pollAndDispatch();applyTestMetaContext();
+            dispatchAnnouncementEvents();applyTestMetaContext();
             long captureAt=System.nanoTime();var captured=statistics.capture(version,AnnouncementStatistics.Filters.all());
             long statisticsMs=(System.nanoTime()-captureAt)/1_000_000;String token=(String)captured.get("snapshotToken");
             assertThat(json.valueToTree(captured).path("summary").path("actualRecipients").longValue()).isEqualTo(501);
@@ -315,7 +332,7 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
     @Test void exactVersionChannelHistoryPagesPersistedPublicationAndReminderIntentionsWithoutSendingAgain() throws Exception {
         String version=publish(),record=recordOf(version);Long tenant=getTestTenant().getId();
         org.awaitility.Awaitility.await().pollInSameThread().atMost(java.time.Duration.ofSeconds(20)).untilAsserted(()->{
-            outboxWorker.pollAndDispatch();
+            dispatchAnnouncementEvents();
             assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_announcement_delivery WHERE tenant_id=? AND version_pid=? AND kind='publication'",Integer.class,tenant,version)).isEqualTo(1);
         });
         try {
@@ -505,7 +522,7 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
         assertThat(reminders.execute(AnnouncementReminderService.SUBMIT,record,payload,operation)).isEqualTo(accepted);
         String batch=(String)accepted.get("batchPid");
         org.awaitility.Awaitility.await().pollInSameThread().atMost(Duration.ofSeconds(15)).untilAsserted(()->{
-            outboxWorker.pollAndDispatch();applyTestMetaContext();
+            dispatchAnnouncementEvents();applyTestMetaContext();
             assertThat(jdbc.queryForObject("SELECT status FROM ab_announcement_delivery WHERE tenant_id=? AND batch_pid=? AND user_pid=?",String.class,
                 getTestTenant().getId(),batch,getTestUser().getPid())).isEqualTo("completed");});
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ab_notification WHERE tenant_id=? AND user_id=? AND source_type='announcement' AND source_id=?",Long.class,
@@ -539,7 +556,7 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
             readers.mark(version,mark,false);readers.mark(version,mark,true);return result;
         });
         org.awaitility.Awaitility.await().pollInSameThread().atMost(Duration.ofSeconds(15)).untilAsserted(()->{
-            outboxWorker.pollAndDispatch();applyTestMetaContext();
+            dispatchAnnouncementEvents();applyTestMetaContext();
             assertThat(jdbc.queryForMap("SELECT status,error_code FROM ab_announcement_delivery WHERE tenant_id=? AND batch_pid=?",getTestTenant().getId(),accepted.get("batchPid")))
                 .containsEntry("status","skipped").containsEntry("error_code","ALREADY_COMPLETE");});
     }
@@ -612,7 +629,7 @@ class AnnouncementStatisticsIntegrationTest extends BaseIntegrationTest {
             });
             permissions.evictRoleUsers(getTestTenant().getId(),getTestRole().getId());
             org.awaitility.Awaitility.await().pollInSameThread().atMost(Duration.ofSeconds(15)).untilAsserted(()->{
-                outboxWorker.pollAndDispatch();applyTestMetaContext();
+                dispatchAnnouncementEvents();applyTestMetaContext();
                 assertThat(jdbc.queryForMap("SELECT status,error_code FROM ab_announcement_delivery WHERE tenant_id=? AND batch_pid=?",getTestTenant().getId(),accepted.get("batchPid")))
                     .containsEntry("status","skipped").containsEntry("error_code","ACTOR_OR_VERSION_UNAVAILABLE");});
             assertThat(jdbc.queryForObject("SELECT status FROM ab_announcement_reminder_batch WHERE tenant_id=? AND pid=?",String.class,getTestTenant().getId(),accepted.get("batchPid"))).isEqualTo("blocked");

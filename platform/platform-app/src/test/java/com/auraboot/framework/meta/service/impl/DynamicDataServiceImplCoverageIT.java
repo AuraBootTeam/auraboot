@@ -93,6 +93,16 @@ class DynamicDataServiceImplCoverageIT {
     private MetaModelFieldBindingMapper fieldBindingMapper;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired private com.auraboot.framework.permission.service.UserPermissionService fixturePermissions;
+    private com.auraboot.framework.integration.NativePermissionFixture fixtureAuthority;
+
+    private void authorizeFixtureModel() {
+        if (fixtureAuthority == null) {
+            fixtureAuthority = new com.auraboot.framework.integration.NativePermissionFixture(jdbcTemplate, fixturePermissions);
+            fixtureAuthority.grantModel(modelCode, "read", "create", "update", "delete");
+        }
+    }
+
     @Autowired
     private UserService userService;
     @Autowired
@@ -123,10 +133,16 @@ class DynamicDataServiceImplCoverageIT {
             createPhysicalTable();
             modelInitialized = true;
         }
+        authorizeFixtureModel();
         if (!seeded) {
             seedData(9);
             seeded = true;
         }
+    }
+
+    @org.junit.jupiter.api.AfterAll
+    void retireOwnedFixtureGrants() {
+        if (fixtureAuthority != null) fixtureAuthority.close();
     }
 
     @AfterEach
@@ -213,11 +229,13 @@ class DynamicDataServiceImplCoverageIT {
     }
 
     @Test
-    @DisplayName("update and delete of a missing record raise MetaServiceException")
+    @DisplayName("missing update is denied by native field authorization; delete reports not found")
     void updateDeleteMissing() {
         Map<String, Object> data = new HashMap<>();
         data.put("name", "x");
-        assertThrows(MetaServiceException.class, () -> dynamicDataService.update(modelCode, "no-such-pid", data));
+        var refusal = assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> dynamicDataService.update(modelCode, "no-such-pid", data));
+        assertTrue(refusal.getMessage().contains("FIELD_WRITE_DENIED"));
         assertThrows(MetaServiceException.class, () -> dynamicDataService.delete(modelCode, "no-such-pid"));
     }
 
@@ -406,6 +424,7 @@ class DynamicDataServiceImplCoverageIT {
             tenantMemberService.addMember(testUser.getId(), testTenant.getId(), "active");
         }
         MetaContext.setContext(testTenant.getId(), testUser.getId(), testUser.getPid(), testUser.getUserName());
+        MetaContext.setMemberId(tenantMemberService.findByTenantIdAndUserId(testTenant.getId(), testUser.getId()).getId());
     }
 
     private void createTestModel() {

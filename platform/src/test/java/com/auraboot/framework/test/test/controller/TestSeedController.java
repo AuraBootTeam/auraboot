@@ -685,7 +685,7 @@ public class TestSeedController {
                     ?, ?, ?,
                     ?, ?, ?, ?,
                     ?, ?, ?, ?,
-                    ?, ?
+                    ?::jsonb, ?
                 )
                 """,
                 pid, user.getId(), user.getId(), tenant.getId(),

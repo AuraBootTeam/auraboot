@@ -24,6 +24,8 @@ This directory holds engineering-facing material that ships with the repository.
 
 ## Conventions
 
+- Migration storage: [Business records and explicit infrastructure classifications](system-reference/migration-convention-storage-scopes.md).
+
 - User engagement: [concurrent visits, tenant ownership and persistence semantics](./system-reference/user-engagement.md).
 - Command form metadata: [dynamic input sources and dispatcher boundaries](./system-reference/command-input-form-sources.md).
 - Release tooling reference: [Core Web component inputs and explicit reuse](./system-reference/core-web-component-reuse.md).

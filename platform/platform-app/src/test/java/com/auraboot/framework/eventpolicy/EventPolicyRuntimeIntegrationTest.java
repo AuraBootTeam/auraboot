@@ -53,6 +53,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * </ul>
  * matchMode=COLLECT_ALL so all three fire for the MATCHED case.
  */
+@org.springframework.transaction.annotation.Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
 class EventPolicyRuntimeIntegrationTest extends BaseIntegrationTest {
 
     @Autowired

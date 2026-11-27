@@ -757,8 +757,16 @@ class NativeDslFieldWriteIT extends BaseIntegrationTest {
         assertThatThrownBy(() -> commandExecutor.execute(code, allowed)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
         jdbc.update("UPDATE ab_role_permission SET field_scope=?::jsonb WHERE tenant_id=? AND role_id=? AND permission_id=?",
                 fieldScope, testTenant.getId(), testRole.getId(), permissionId);
-        assertThat(jdbc.queryForObject("SELECT to_jsonb(g)::text FROM ab_role_permission g WHERE tenant_id=? AND role_id=? AND permission_id=?",
-                String.class, testTenant.getId(), testRole.getId(), permissionId)).isEqualTo(originalGrant);
+        var restoredGrant = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(jdbc.queryForObject(
+                "SELECT to_jsonb(g)::text FROM ab_role_permission g WHERE tenant_id=? AND role_id=? AND permission_id=?",
+                String.class, testTenant.getId(), testRole.getId(), permissionId));
+        var originalGrantFields = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(originalGrant);
+        // The two explicit field-scope updates each advance the database-owned policy revision.
+        assertThat(restoredGrant.path("policy_revision").asLong())
+                .isEqualTo(originalGrantFields.path("policy_revision").asLong() + 2);
+        restoredGrant.remove("policy_revision");
+        originalGrantFields.remove("policy_revision");
+        assertThat(restoredGrant).isEqualTo(originalGrantFields);
     }
 
     private String derivedCommand(boolean explicitInputs,boolean preserveInput) throws Exception {

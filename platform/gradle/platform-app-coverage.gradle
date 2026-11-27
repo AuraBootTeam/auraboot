@@ -1,0 +1,46 @@
+// Keep the extracted application tests on the same offline-instrumentation model
+// as Core. Replace only owned class origins; preserve third-party dependencies.
+evaluationDependsOn(':platform-agent')
+def coverageOutput = layout.buildDirectory.dir('offline-coverage')
+def coreJar = rootProject.tasks.named('jar').flatMap { it.archiveFile }
+def agentJar = project(':platform-agent').tasks.named('jar').flatMap { it.archiveFile }
+def instrumentApplication = tasks.register('instrumentApplicationOffline') {
+    dependsOn 'classes', rootProject.tasks.named('jar'), project(':platform-agent').tasks.named('jar')
+    inputs.files(sourceSets.main.output.classesDirs, coreJar, agentJar)
+    outputs.dir coverageOutput
+    doLast {
+        def output = coverageOutput.get().asFile
+        delete output
+        ant.taskdef(name: 'jacocoApplicationInstrument', classname: 'org.jacoco.ant.InstrumentTask',
+                classpath: rootProject.configurations.jacocoAnt.asPath)
+        sourceSets.main.output.classesDirs.files.each { classes ->
+            ant.jacocoApplicationInstrument(destdir: new File(output, 'application')) {
+                fileset(dir: classes)
+            }
+        }
+        [core: coreJar.get().asFile, agent: agentJar.get().asFile].each { owner, archive ->
+            ant.jacocoApplicationInstrument(destdir: new File(output, owner)) {
+                fileset(dir: archive.parentFile) { include(name: archive.name) }
+            }
+        }
+    }
+}
+tasks.named('test', Test) {
+    dependsOn instrumentApplication
+    inputs.dir coverageOutput
+    outputs.file layout.buildDirectory.file('jacoco/test.exec')
+    systemProperty 'jacoco-agent.destfile', layout.buildDirectory.file('jacoco/test.exec').get().asFile.absolutePath
+    // The task clears stale data once below. Each sequential fork must append
+    // its own session, otherwise worker rollover erases earlier class coverage.
+    systemProperty 'jacoco-agent.append', 'true'
+    doFirst {
+        delete layout.buildDirectory.file('jacoco/test.exec')
+        def output = coverageOutput.get().asFile
+        def originalArchives = files(coreJar, agentJar)
+        classpath = files(new File(output, 'application'),
+                new File(output, 'core/' + coreJar.get().asFile.name),
+                new File(output, 'agent/' + agentJar.get().asFile.name)) +
+                (classpath - sourceSets.main.output.classesDirs - originalArchives) +
+                rootProject.configurations.jacocoRuntime
+    }
+}

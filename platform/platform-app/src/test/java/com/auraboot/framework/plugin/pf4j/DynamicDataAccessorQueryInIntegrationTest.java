@@ -50,6 +50,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ActiveProfiles("integration-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DynamicDataAccessorQueryInIntegrationTest {
+    @Autowired private com.auraboot.framework.permission.service.UserPermissionService fixturePermissions;
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate fixtureJdbc;
+
+    private <T> T asPolicyAuthor(java.util.function.Supplier<T> action) {
+        return com.auraboot.framework.integration.NativePermissionFixture.asTenantAdministrator(
+                fixtureJdbc, fixturePermissions, "meta.permission.update", "meta", "permission", "update", action);
+    }
+    private <T> T asRoleAuthor(java.util.function.Supplier<T> action) {
+        return com.auraboot.framework.integration.NativePermissionFixture.asTenantAdministrator(
+                fixtureJdbc, fixturePermissions, "org.role.update", "org", "role", "update", action);
+    }
+
 
     @Autowired
     private DynamicDataService dynamicDataService;
@@ -76,6 +88,7 @@ class DynamicDataAccessorQueryInIntegrationTest {
     @Autowired
     private DataPermissionPolicyService policyService;
 
+    private com.auraboot.framework.integration.NativePermissionFixture nativeAuthority;
     private DynamicDataAccessorImpl accessor;
     private String modelCode;
     private String tableName;
@@ -100,11 +113,16 @@ class DynamicDataAccessorQueryInIntegrationTest {
             modelInitialized = true;
         }
         ensureRoleBinding();
+        if (nativeAuthority == null) {
+            nativeAuthority = new com.auraboot.framework.integration.NativePermissionFixture(jdbcTemplate, fixturePermissions);
+            nativeAuthority.grantModel(modelCode, "read", "create", "delete");
+        }
     }
 
     @AfterAll
     void cleanup() {
         try {
+            if (nativeAuthority != null) nativeAuthority.close();
             purgeTestArtifacts();
         } finally {
             MetaContext.clear();
@@ -272,7 +290,7 @@ class DynamicDataAccessorQueryInIntegrationTest {
         }
         if (userRoleService.findByMemberIdAndRoleIdAndTenantId(
                 testMember.getId(), testRole.getId(), testTenant.getId()) == null) {
-            userRoleService.assignRolesToMember(testMember.getId(), List.of(testRole.getId()), testTenant.getId(), null);
+            asRoleAuthor(() -> userRoleService.assignRolesToMember(testMember.getId(), List.of(testRole.getId()), testTenant.getId(), null));
         }
     }
 
@@ -283,8 +301,8 @@ class DynamicDataAccessorQueryInIntegrationTest {
         request.setPolicyType("row");
         request.setScopeType("self");
         request.setPriority(10);
-        DataPermissionPolicy policy = policyService.create(request);
-        policyService.bindToRole(policy.getPid(), testRole.getPid());
+        DataPermissionPolicy policy = asPolicyAuthor(() -> policyService.create(request));
+        asPolicyAuthor(() -> { policyService.bindToRole(policy.getPid(), testRole.getPid()); return null; });
         return policy;
     }
 

@@ -38,7 +38,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @Slf4j
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DisplayName("SqlViewModelExecutor Integration Test - P1-T8")
+@org.springframework.transaction.annotation.Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
 class SqlViewModelExecutorIntegrationTest extends BaseIntegrationTest {
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate fixtureJdbc;
+    @Autowired private com.auraboot.framework.permission.service.UserPermissionService fixturePermissions;
+    private com.auraboot.framework.integration.NativePermissionFixture nativeAuthority;
+    @org.junit.jupiter.api.BeforeEach void prepareNativeReadActor() {
+        nativeAuthority = new com.auraboot.framework.integration.NativePermissionFixture(fixtureJdbc, fixturePermissions);
+    }
+    @org.junit.jupiter.api.AfterEach void releaseNativeReadActor() { if (nativeAuthority != null) nativeAuthority.close(); }
+
 
     private static final String VIEW_NAME = "v_p1_t8_test";
 
@@ -211,6 +220,7 @@ class SqlViewModelExecutorIntegrationTest extends BaseIntegrationTest {
             .status("published")
             .build();
         metaModelService.saveDefinition(def);
+        nativeAuthority.grantModel(modelCode, "read");
 
         DynamicQueryRequest req = DynamicQueryRequest.builder().pageNum(1).pageSize(1).build();
         MetaServiceException ex = assertThrows(
@@ -256,6 +266,7 @@ class SqlViewModelExecutorIntegrationTest extends BaseIntegrationTest {
             .status("published")
             .build();
         ModelDefinition saved = metaModelService.saveDefinition(def);
+        nativeAuthority.grantModel(modelCode, "read");
         assertThat(saved.getSourceType()).isEqualTo("sqlView");
         assertThat(saved.getSourceRef()).isEqualTo(VIEW_NAME);
         return modelCode;

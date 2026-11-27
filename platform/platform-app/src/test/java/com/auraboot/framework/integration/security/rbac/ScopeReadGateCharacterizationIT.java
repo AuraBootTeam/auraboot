@@ -84,6 +84,12 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
     private final String sharedTable = "mt_" + sharedModel;
     private final List<Long> fieldIds = new ArrayList<>();
 
+    @Autowired private com.auraboot.framework.user.service.UserService fixtureUsers;
+    @Autowired private com.auraboot.framework.permission.service.UserPermissionService fixturePermissions;
+    private com.auraboot.framework.user.dao.entity.User selfUser;
+    private com.auraboot.framework.user.dao.entity.User openUser;
+    private com.auraboot.framework.integration.NativePermissionFixture selfAuthority;
+    private com.auraboot.framework.integration.NativePermissionFixture openAuthority;
     private Long tenantId;
     private Long selfUserId;      // member bound to a SELF policy
     private Long selfMemberId;
@@ -99,8 +105,10 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void setUp() {
         tenantId = TestIdGenerator.uniqueTenantId();
-        selfUserId = TestIdGenerator.uniqueUserId();
-        openUserId = selfUserId + 4_000_001L;
+        selfUser = fixtureUsers.signUp("scope-self-" + suffix + "@example.test", "test-password-123");
+        openUser = fixtureUsers.signUp("scope-open-" + suffix + "@example.test", "test-password-123");
+        selfUserId = selfUser.getId();
+        openUserId = openUser.getId();
 
         jdbc.update("INSERT INTO ab_tenant (id, pid, name, status, deleted_flag) "
                         + "VALUES (?, ?, ?, 'active', FALSE) ON CONFLICT (id) DO NOTHING",
@@ -127,13 +135,24 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
         rolePid = UniqueIdGenerator.generate();
         jdbc.update("INSERT INTO ab_role (id, pid, tenant_id, name, code, type, scope_type, status, "
                         + "deleted_flag, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, ?, ?, 'CUSTOM', 'TENANT', 'ACTIVE', FALSE, now(), now())",
+                        + "VALUES (?, ?, ?, ?, ?, 'custom', 'tenant', 'active', FALSE, now(), now())",
                 roleId, rolePid, tenantId, "scope char role", "char_role_" + suffix);
         jdbc.update("INSERT INTO ab_user_role (id, pid, tenant_id, member_id, role_id, assign_type, "
                         + "status, deleted_flag, created_at) "
-                        + "VALUES (?, ?, ?, ?, ?, 'DIRECT', 'ACTIVE', FALSE, now())",
+                        + "VALUES (?, ?, ?, ?, ?, 'direct', 'active', FALSE, now())",
                 System.nanoTime() & 0x7fffffffffffffffL, UniqueIdGenerator.generate(), tenantId,
                 selfMemberId, roleId);
+
+        MetaContext.setContext(tenantId, selfUserId, selfUser.getPid(), selfUser.getUserName());
+        MetaContext.setMemberId(selfMemberId);
+        selfAuthority = new com.auraboot.framework.integration.NativePermissionFixture(jdbc, fixturePermissions);
+        selfAuthority.grantModel(model, "read", "update", "delete");
+        selfAuthority.grantModel(sharedModel, "read");
+        MetaContext.setContext(tenantId, openUserId, openUser.getPid(), openUser.getUserName());
+        MetaContext.setMemberId(openMemberId);
+        openAuthority = new com.auraboot.framework.integration.NativePermissionFixture(jdbc, fixturePermissions);
+        openAuthority.grantModel(model, "read");
+        openAuthority.grantModel(sharedModel, "read");
 
         // A SELF row policy on the model, bound to that role.
         DataPermissionPolicyCreateRequest req = new DataPermissionPolicyCreateRequest();
@@ -141,11 +160,16 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
         req.setModelCode(model);
         req.setPolicyType("row");
         req.setScopeType("self");
-        MetaContext.setContext(tenantId, selfUserId, "u-" + selfUserId, "scope-char-setup");
+        MetaContext.setContext(tenantId, selfUserId, selfUser.getPid(), "scope-char-setup");
+        MetaContext.setMemberId(selfMemberId);
         try {
-            DataPermissionPolicy policy = dataPermissionPolicyService.create(req);
-            policyPid = policy.getPid();
-            dataPermissionPolicyService.bindToRole(policyPid, rolePid);
+            com.auraboot.framework.integration.NativePermissionFixture.asTenantAdministrator(
+                    jdbc, fixturePermissions, "meta.permission.update", "meta", "permission", "update", () -> {
+                        DataPermissionPolicy policy = dataPermissionPolicyService.create(req);
+                        policyPid = policy.getPid();
+                        dataPermissionPolicyService.bindToRole(policyPid, rolePid);
+                        return null;
+                    });
         } finally {
             MetaContext.clear();
         }
@@ -155,6 +179,8 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void tearDown() {
         try {
+            if (selfAuthority != null) selfAuthority.close();
+            if (openAuthority != null) openAuthority.close();
             jdbc.execute("DROP TABLE IF EXISTS " + table);
             jdbc.execute("DROP TABLE IF EXISTS " + sharedTable);
             jdbc.update("DELETE FROM ab_data_permission_role_binding WHERE policy_pid = ?", policyPid);
@@ -186,7 +212,7 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
     @Test
     @DisplayName("a SELF-scoped member may reach a record they own, but not one another user owns")
     void selfScopedMemberReachesOwnNotOthers() {
-        MetaContext.setContext(tenantId, selfUserId, "u-" + selfUserId, "self-member");
+        MetaContext.setContext(tenantId, selfUserId, selfUser.getPid(), "self-member");
         MetaContext.setMemberId(selfMemberId);
         try {
             assertThat(dataPermissionEngine.canAccessRecord(tenantId, model, selfUserId, ownedBy(selfUserId)))
@@ -203,7 +229,7 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
     @Test
     @DisplayName("a member with no policy reaches any record — the SELF policy is what discriminates")
     void memberWithNoPolicyReachesAnyRecord() {
-        MetaContext.setContext(tenantId, openUserId, "u-" + openUserId, "open-member");
+        MetaContext.setContext(tenantId, openUserId, openUser.getPid(), "open-member");
         MetaContext.setMemberId(openMemberId);
         try {
             assertThat(dataPermissionEngine.canAccessRecord(tenantId, model, openUserId, ownedBy(openUserId))).isTrue();
@@ -218,7 +244,7 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
     @Test
     @DisplayName("the real DynamicDataService read gate executes SELF/ALL from the command plan")
     void dynamicReadGateExecutesPlanGrade() {
-        MetaContext.setContext(tenantId, selfUserId, "u-" + selfUserId, "self-member");
+        MetaContext.setContext(tenantId, selfUserId, selfUser.getPid(), "self-member");
         MetaContext.setMemberId(selfMemberId);
         try {
             MetaContext.runWithCommandPermitScope("SELF", () -> {
@@ -241,7 +267,7 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
     @Test
     @DisplayName("the real list data-scope executes SELF/ALL from the command plan")
     void dynamicListExecutesPlanGrade() {
-        MetaContext.setContext(tenantId, selfUserId, "u-" + selfUserId, "self-member");
+        MetaContext.setContext(tenantId, selfUserId, selfUser.getPid(), "self-member");
         MetaContext.setMemberId(selfMemberId);
         DynamicQueryRequest request = DynamicQueryRequest.builder()
                 .pageNum(1)
@@ -268,7 +294,7 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
     @Test
     @DisplayName("a root-model plan never leaks its SELF or ALL grade into another model")
     void commandPlanScopeIsBoundToItsRootModel() {
-        MetaContext.setContext(tenantId, selfUserId, "u-" + selfUserId, "self-member");
+        MetaContext.setContext(tenantId, selfUserId, selfUser.getPid(), "self-member");
         MetaContext.setMemberId(selfMemberId);
         DynamicQueryRequest request = DynamicQueryRequest.builder()
                 .pageNum(1)
@@ -302,7 +328,7 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
     @Test
     @DisplayName("a target version change after authorization makes the real update refuse")
     void serverCapturedVersionRejectsTargetDrift() {
-        MetaContext.setContext(tenantId, selfUserId, "u-" + selfUserId, "self-member");
+        MetaContext.setContext(tenantId, selfUserId, selfUser.getPid(), "self-member");
         MetaContext.setMemberId(selfMemberId);
         try {
             jdbc.update("UPDATE " + table + " SET row_version = 2 WHERE pid = ?", ownRecordPid);
@@ -324,7 +350,7 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
     @Test
     @DisplayName("successive real target writes advance the in-flight server version")
     void successfulTargetWritesAdvancePlanVersion() {
-        MetaContext.setContext(tenantId, selfUserId, "u-" + selfUserId, "self-member");
+        MetaContext.setContext(tenantId, selfUserId, selfUser.getPid(), "self-member");
         MetaContext.setMemberId(selfMemberId);
         try {
             MetaContext.runWithCommandPermitPlan(
@@ -347,7 +373,7 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
     @Test
     @DisplayName("a target version change after authorization makes the real delete refuse")
     void serverCapturedVersionRejectsDeleteDrift() {
-        MetaContext.setContext(tenantId, selfUserId, "u-" + selfUserId, "self-member");
+        MetaContext.setContext(tenantId, selfUserId, selfUser.getPid(), "self-member");
         MetaContext.setMemberId(selfMemberId);
         try {
             jdbc.update("UPDATE " + table + " SET row_version = 2 WHERE pid = ?", ownRecordPid);
@@ -369,7 +395,7 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
     @Test
     @DisplayName("the real FIELD_MAP write also asserts the server-captured target version")
     void fieldMapWriteRejectsTargetDrift() {
-        MetaContext.setContext(tenantId, selfUserId, "u-" + selfUserId, "self-member");
+        MetaContext.setContext(tenantId, selfUserId, selfUser.getPid(), "self-member");
         MetaContext.setMemberId(selfMemberId);
         try {
             jdbc.update("UPDATE " + table + " SET row_version = 2 WHERE pid = ?", ownRecordPid);
@@ -414,7 +440,8 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
     }
 
     private void createDynamicModel() {
-        MetaContext.setContext(tenantId, selfUserId, "u-" + selfUserId, "scope-char-model");
+        MetaContext.setContext(tenantId, selfUserId, selfUser.getPid(), "scope-char-model");
+        MetaContext.setMemberId(selfMemberId);
         try {
             Model entity = insertModel(model, "Scope read gate characterization");
 
@@ -432,7 +459,8 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
     }
 
     private void createSharedModel() {
-        MetaContext.setContext(tenantId, selfUserId, "u-" + selfUserId, "scope-char-shared-model");
+        MetaContext.setContext(tenantId, selfUserId, selfUser.getPid(), "scope-char-shared-model");
+        MetaContext.setMemberId(selfMemberId);
         try {
             Model entity = insertModel(sharedModel, "Shared configuration characterization");
             for (int index = 0; index < fieldIds.size(); index++) {

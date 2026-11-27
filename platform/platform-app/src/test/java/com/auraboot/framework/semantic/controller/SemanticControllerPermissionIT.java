@@ -477,12 +477,20 @@ class SemanticControllerPermissionIT extends BaseIntegrationTest {
         var policy = new com.auraboot.framework.meta.dto.DataPermissionPolicyCreateRequest();
         policy.setName("Semantic protected language"); policy.setModelCode("ab_object_alias");
         policy.setPolicyType("column"); policy.setFieldCode("sensitive_language"); policy.setMaskType("HIDE");
-        var created = columnPolicies.create(policy);
-        columnPolicies.bindToRole(created.getPid(), role.getPid());
+        var created = com.auraboot.framework.integration.NativePermissionFixture.asTenantAdministrator(
+                jdbc, userPermissions, MetaPermission.PERMISSION_MANAGE, "operation", "permission", "update",
+                () -> columnPolicies.create(policy));
+        com.auraboot.framework.integration.NativePermissionFixture.asTenantAdministrator(
+                jdbc, userPermissions, MetaPermission.PERMISSION_MANAGE, "operation", "permission", "update", () -> {
+                    columnPolicies.bindToRole(created.getPid(), role.getPid()); return null;
+                });
         Map<String, String> before = semanticSnapshot();
         queryProtected(request, false);
         assertThat(semanticSnapshot()).isEqualTo(before);
-        columnPolicies.unbindFromRole(created.getPid(), role.getPid());
+        com.auraboot.framework.integration.NativePermissionFixture.asTenantAdministrator(
+                jdbc, userPermissions, MetaPermission.PERMISSION_MANAGE, "operation", "permission", "update", () -> {
+                    columnPolicies.unbindFromRole(created.getPid(), role.getPid()); return null;
+                });
         queryProtected(request, true);
     }
 

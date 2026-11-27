@@ -647,12 +647,12 @@ class RoleAuthorizationDraftTransactionIT extends BaseIntegrationTest {
 
     @Test void concurrentDraftsHaveOneWinnerAndOneStaleRevision() throws Exception {
         var baseline = drafts.snapshot(rolePid);
+        var actor = MetaContext.snapshot();
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
         try (var pool = Executors.newFixedThreadPool(2)) {
             var results = List.of(readCapability, editCapability).stream().map(capability -> pool.submit(() -> {
-                MetaContext.setContext(getTestTenant().getId(), getTestUser().getId(), getTestUser().getPid(), "draft-test");
-                MetaContext.setMemberId(getTestTenantMember().getId());
+                MetaContext.restore(actor);
                 ready.countDown();
                 try {
                     if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Concurrent draft did not start");

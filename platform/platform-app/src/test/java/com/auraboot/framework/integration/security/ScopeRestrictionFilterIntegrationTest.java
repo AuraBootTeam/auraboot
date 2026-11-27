@@ -35,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * calls {@code UnifiedUserDetailsService.loadUserByUsername} outside a try/catch and a visitor is
  * not a platform user. These tests pin the corrected answer: 401, a policy decision.
  */
+@org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate
 @SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("integration-test")
 @org.springframework.context.annotation.Import(ScopeRestrictionFilterIntegrationTest.TestScopePolicy.class)

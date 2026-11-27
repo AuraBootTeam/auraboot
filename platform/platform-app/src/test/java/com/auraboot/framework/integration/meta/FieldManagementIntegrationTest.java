@@ -51,6 +51,8 @@ public class FieldManagementIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private MetaModelFieldBindingMapper bindingMapper;
 
+    @Autowired private com.auraboot.framework.meta.service.SchemaManagementService fixtureSchema;
+
     private Model testModel;
     private Field testField1;
     private Field testField2;
@@ -73,6 +75,8 @@ public class FieldManagementIntegrationTest extends BaseIntegrationTest {
         bindingService.bindFieldToModel(testModel.getPid(), testField2.getPid(), 2, false, false, true);
         bindingService.bindFieldToModel(testModel.getPid(), testField3.getPid(), 3, false, false, true);
         
+        assertTrue(fixtureSchema.createTableByModel(testModel.getCode()).isSuccess());
+
         log.info("Test data setup complete: model={}, fields=[{}, {}, {}]", 
             testModel.getCode(), testField1.getCode(), testField2.getCode(), testField3.getCode());
     }

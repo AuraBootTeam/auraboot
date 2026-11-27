@@ -2,7 +2,7 @@
 type: system-reference
 status: active
 created: 2026-10-23
-updated: 2026-11-26
+updated: 2026-11-27
 ---
 
 # Command transaction isolation
@@ -229,3 +229,32 @@ a private PostgreSQL table. A second physical connection commits completion afte
 proxy establishes its snapshot. The poll reads the prior accepted state without locking, and a
 subsequent transaction reads completed. Binding denial remains an explicit seam after that read;
 this case proves concurrent observation, not a successful installed machine response.
+
+
+## Decision virtual-source read snapshots
+
+Decision evaluation starts its owning transaction at REPEATABLE READ so current
+virtual-source data and its native read grants share a coherent snapshot. Each
+virtual-source lookup keeps the existing read-only NESTED transaction boundary
+and explicitly requests the same isolation. A lookup SQL error rolls back to its
+savepoint; the owning evaluation can still retain its original failure/unknown
+log. Authorization denials remain denials and do not become missing facts.
+
+An existing weaker caller transaction is not upgraded or escaped. The native
+field authorization boundary continues to reject that incoherent carrier. This
+contract changes only decision evaluation and its source lookup, rather than
+changing shared database defaults or unrelated command transactions.
+
+## Record subscriptions and member visibility
+
+Watch creation and removal own a REPEATABLE READ transaction so the native
+record-read grant and subscription write share one coherent snapshot. Delivery
+recipient checks retain their existing independently refreshed subject context.
+Legacy numeric watch identities resolve through the native authorized list
+query to their canonical PID, followed by the existing record-read boundary.
+
+Member detail, member teams, offboarding impact and offboarding candidate reads
+own read-only REPEATABLE READ transactions. The native member-record READ and
+the action-specific preflight decision remain mandatory; these boundaries grant
+no administrator role or additional member action. A weaker existing caller
+transaction is still rejected by native field authorization rather than escaped.

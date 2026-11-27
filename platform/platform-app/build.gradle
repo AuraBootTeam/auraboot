@@ -182,6 +182,21 @@ check {
 apply from: rootProject.file('gradle/platform-testing.gradle')
 apply from: rootProject.file('gradle/platform-app-test-dependencies.gradle')
 
+tasks.withType(Test).configureEach {
+    // Bound framework/static test state over the complete application suite.
+    // Gradle preserves every class/result and disposes each completed worker;
+    // maxParallelForks and the original admitted heap remain unchanged.
+    def classesPerWorker = providers.gradleProperty('auraAppTestForkEvery')
+            .map { Long.parseLong(it) }.getOrElse(64L)
+    if (classesPerWorker < 1 || classesPerWorker > 64) {
+        throw new GradleException('Application test workers must execute between 1 and 64 classes per lifecycle')
+    }
+    forkEvery = classesPerWorker
+    doFirst {
+        logger.lifecycle("Application test worker lifecycle: ${path} classesPerWorker=${forkEvery} maxParallelForks=${maxParallelForks}")
+    }
+}
+
 // Native E2E identity preparation explicitly opts into test-only HTTP fixtures.
 // Keep this artifact out of normal tests, application runtime and publication.
 if (providers.gradleProperty('includeE2eFixtureSupport').map { it.toBoolean() }.getOrElse(false)) {
@@ -195,6 +210,9 @@ dependencies {
     testImplementation testFixtures(project(':'))
     testImplementation testFixtures(project(':platform-agent'))
     testImplementation project(':platform-plugin-api')
+    // The seed/reset ITs explicitly activate the test profile. Its controllers
+    // belong to the opt-in classifier, not Core's ordinary library or this app.
+    testRuntimeOnly files(rootProject.tasks.named('testApiJar'))
 }
 sourceSets {
     integrationTest {
@@ -338,3 +356,5 @@ tasks.register('verifyBaseApplicationAssembly') {
 check {
     dependsOn 'verifyBaseApplicationAssembly'
 }
+
+apply from: rootProject.file('gradle/platform-app-coverage.gradle')

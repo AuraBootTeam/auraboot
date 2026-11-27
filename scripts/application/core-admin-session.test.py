@@ -4,6 +4,9 @@ import copy
 import importlib.util
 from pathlib import Path
 import unittest
+import json
+import os
+import tempfile
 
 spec = importlib.util.spec_from_file_location("core_admin", Path(__file__).with_name("core-admin-session.py"))
 module = importlib.util.module_from_spec(spec)
@@ -69,6 +72,89 @@ class CoreAdminSessionTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "unsuccessful API envelope") as failure:
             module.response_data({"code": "401", "data": {"jwt": "private-token"}}, "login")
         self.assertNotIn("private-token", str(failure.exception))
+
+
+
+class CachedCoreAdminSessionTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.path = Path(self.directory.name) / "admin-session.json"
+        self.calls = []
+        self.identity = {"user": {"id": "7", "tenantId": "9007199254740993", "email": "admin@example.test"}}
+
+    def request(self, path, **kwargs):
+        self.calls.append((path, kwargs))
+        if path == "/api/auth/login":
+            data = {"jwt": "login-token"}
+        elif path == "/api/tenant-selection/my-spaces":
+            data = [{"spaceType": "business", "tenantId": "9007199254740993"}]
+        elif path == "/api/tenant-selection/process":
+            data = {"jwt": "business-token", "tenantId": "9007199254740993"}
+        elif path == "/api/auth/me":
+            data = self.identity
+        else:
+            self.fail("Unexpected API request")
+        return {"code": "0", "data": data}
+
+    def session(self, request=None):
+        return module.cached_business_session(request or self.request, "admin@example.test", "private-password",
+                str(self.path), "http://127.0.0.1:6605")
+
+    def test_repeated_import_reuses_private_session_and_verifies_live_identity_without_another_login(self):
+        self.assertEqual(self.session(), "business-token")
+        self.assertEqual(self.path.stat().st_mode & 0o777, 0o600)
+        original = self.path.read_bytes()
+        self.calls.clear()
+        self.assertEqual(self.session(), "business-token")
+        self.assertEqual([call[0] for call in self.calls], ["/api/auth/me"])
+        self.assertEqual(self.path.read_bytes(), original)
+
+    def test_foreign_runtime_cache_is_rejected_before_network_io(self):
+        self.session()
+        saved = json.loads(self.path.read_text()); saved["backendUrl"] = "http://127.0.0.1:6606"
+        self.path.write_text(json.dumps(saved)); self.calls.clear()
+        with self.assertRaisesRegex(RuntimeError, "does not match"):
+            self.session()
+        self.assertEqual(self.calls, [])
+
+    def test_shared_or_symlink_cache_is_rejected_before_network_io(self):
+        self.session()
+        for state in ["shared", "symlink"]:
+            if state == "shared":
+                self.path.chmod(0o640)
+            else:
+                target = self.path.with_name("actual.json"); self.path.rename(target); self.path.symlink_to(target)
+            self.calls.clear()
+            with self.assertRaisesRegex(RuntimeError, "owned private regular"):
+                self.session()
+            self.assertEqual(self.calls, [])
+
+    def test_revoked_session_fails_without_login_fallback_or_cache_rewrite(self):
+        self.session(); original = self.path.read_bytes(); self.calls.clear()
+        def revoked(path, **kwargs):
+            self.calls.append((path, kwargs))
+            return {"code": "401", "data": {"jwt": "must-not-be-printed"}}
+        with self.assertRaisesRegex(RuntimeError, "unsuccessful API envelope") as failure:
+            self.session(revoked)
+        self.assertNotIn("must-not-be-printed", str(failure.exception))
+        self.assertEqual([call[0] for call in self.calls], ["/api/auth/me"])
+        self.assertEqual(self.path.read_bytes(), original)
+
+    def test_changed_user_or_tenant_cannot_reuse_saved_session(self):
+        self.session(); original = self.path.read_bytes()
+        for key, value in [("id", "8"), ("tenantId", "99")]:
+            previous = self.identity["user"][key]; self.identity["user"][key] = value
+            with self.assertRaisesRegex(RuntimeError, "identity changed"):
+                self.session()
+            self.identity["user"][key] = previous
+            self.assertEqual(self.path.read_bytes(), original)
+
+    def test_wrong_account_cannot_create_session(self):
+        self.identity["user"]["email"] = "other@example.test"
+        with self.assertRaisesRegex(RuntimeError, "does not match"):
+            self.session()
+        self.assertFalse(self.path.exists())
 
 
 if __name__ == "__main__":

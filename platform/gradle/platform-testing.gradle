@@ -46,7 +46,9 @@ tasks.withType(Test).configureEach {
     }
     systemProperty 'allure.results.directory', providers.environmentVariable('AURA_ALLURE_RESULTS')
             .getOrElse(layout.buildDirectory.dir('allure-results').get().asFile.absolutePath)
-    systemProperty 'spring.test.context.cache.maxSize', project.findProperty('springTestContextCacheMaxSize') ?: '8'
+    // Full application contexts each own the complete mapper/metadata graph and pools.
+    // Bound retained contexts rather than raising the admitted 6 GiB worker budget.
+    systemProperty 'spring.test.context.cache.maxSize', project.findProperty('springTestContextCacheMaxSize') ?: '2'
     def store = layout.buildDirectory.dir("archunit/${name}").get().asFile
     def baseline = rootProject.file('src/testFixtures/resources/archunit_store')
     inputs.dir baseline

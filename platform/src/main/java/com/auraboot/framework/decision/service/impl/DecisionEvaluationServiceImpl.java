@@ -106,7 +106,7 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
 
     // ─── public API ──────────────────────────────────────────────────────────
 
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     @Override
     public DecisionResult evaluate(DrtEvaluateRequest request) {
         Long tid = requireTenant();
@@ -446,6 +446,7 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
                                                         String recordId) {
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
         tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_NESTED);
+        tx.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
         tx.setReadOnly(true);
         return tx.execute(status -> dynamicDataService.getById(modelCode, recordId));
     }

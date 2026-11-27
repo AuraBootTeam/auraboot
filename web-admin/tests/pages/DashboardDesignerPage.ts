@@ -35,9 +35,31 @@ export class DashboardDesignerPage extends BasePage {
     await this.waitForLoad();
     // Wait for the primary UI regions that indicate the designer shell is usable.
     await expect(this.toolbar).toBeVisible({ timeout: 15000 });
-    await expect(this.palette).toBeVisible({ timeout: 15000 });
+    await this.openPalette();
     await expect(this.canvas).toBeVisible({ timeout: 15000 });
-    await expect(this.propertyPanel).toBeVisible({ timeout: 15000 });
+    await this.openInspector();
+  }
+
+  async openPalette(): Promise<void> {
+    await this.openPanel('palette');
+    await expect(this.palette).toBeVisible();
+  }
+
+  async openInspector(): Promise<void> {
+    await this.openPanel('inspector');
+    await expect(this.propertyPanel).toBeVisible();
+  }
+
+  private async openPanel(panel: 'palette' | 'inspector'): Promise<void> {
+    const workspace = this.page.getByTestId('dashboard-designer-workspace');
+    await expect(workspace).toHaveAttribute('data-layout', /^(compact|wide)$/);
+    if (await workspace.getAttribute('data-layout') === 'compact') {
+      const shell = this.page.getByTestId(`dashboard-${panel}-shell`);
+      if (await shell.getAttribute('data-open') === 'false') {
+        await this.page.getByTestId(`dashboard-toggle-${panel}`).click();
+      }
+      await expect(shell).toHaveAttribute('data-open', 'true');
+    }
   }
 
   // --- Top-level layout ---

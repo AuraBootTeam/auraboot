@@ -74,6 +74,16 @@ class DynamicDataServiceIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired private com.auraboot.framework.permission.service.UserPermissionService fixturePermissions;
+    private com.auraboot.framework.integration.NativePermissionFixture fixtureAuthority;
+
+    private void authorizeFixtureModel() {
+        if (fixtureAuthority == null) {
+            fixtureAuthority = new com.auraboot.framework.integration.NativePermissionFixture(jdbcTemplate, fixturePermissions);
+            fixtureAuthority.grantModel(testModelCode, "read", "create", "update", "delete");
+        }
+    }
+
 
     @Autowired
     private UserService userService;
@@ -121,6 +131,7 @@ class DynamicDataServiceIntegrationTest {
                 createTestModel();
                 createTestFields();
                 createPhysicalTable();
+                authorizeFixtureModel();
                 modelInitialized = true;
             } catch (Exception e) {
                 log.error("Failed to initialize test model", e);
@@ -168,6 +179,7 @@ class DynamicDataServiceIntegrationTest {
 
     @AfterAll
     void cleanup() {
+        if (fixtureAuthority != null) fixtureAuthority.close();
         log.info("=== Test cleanup ===");
         modelInitialized = false;
         createdRecordPids.clear();
@@ -178,6 +190,7 @@ class DynamicDataServiceIntegrationTest {
         // Ensure tenant context is set for cleanup
         if (testTenant != null && testUser != null) {
             MetaContext.setContext(testTenant.getId(), testUser.getId(), testUser.getPid(), testUser.getUserName());
+            MetaContext.setMemberId(tenantMemberService.findByTenantIdAndUserId(testTenant.getId(), testUser.getId()).getId());
         }
 
         // Clean up records created in this test using pid
@@ -232,6 +245,7 @@ class DynamicDataServiceIntegrationTest {
 
             // Set MetaContext
             MetaContext.setContext(testTenant.getId(), testUser.getId(), testUser.getPid(), testUser.getUserName());
+            MetaContext.setMemberId(tenantMemberService.findByTenantIdAndUserId(testTenant.getId(), testUser.getId()).getId());
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to setup tenant context", e);
@@ -585,9 +599,13 @@ class DynamicDataServiceIntegrationTest {
         Map<String, Object> updateData = new HashMap<>();
         updateData.put("name", "尝试更新");
 
-        assertThrows(MetaServiceException.class, () -> {
+        var refusal = assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> {
             dynamicDataService.update(testModelCode, otherPid, updateData);
         }, "Updating other tenant's record should throw exception");
+
+        assertTrue(refusal.getMessage().contains("FIELD_WRITE_DENIED"));
+        assertEquals("其他租户记录", jdbcTemplate.queryForObject(
+                "SELECT name FROM " + testTableName + " WHERE pid=?", String.class, otherPid));
 
         // Cleanup
         cleanupOtherTenantRecord(otherPid);

@@ -637,9 +637,14 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     @Override
-    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public Optional<Long> incrementWithinCap(String modelCode, String recordId,
                                               String counterCode, long delta, String capCode) {
+        return applicationContext.getBean(AtomicMutationTransaction.class).execute(() ->
+                incrementWithinCapInTransaction(modelCode, recordId, counterCode, delta, capCode));
+    }
+
+    private Optional<Long> incrementWithinCapInTransaction(String modelCode, String recordId,
+                                                          String counterCode, long delta, String capCode) {
         requireDomainAction(modelCode, "update");
         BusinessResourceDataScope.unsupported();
         assertWritable(modelCode);

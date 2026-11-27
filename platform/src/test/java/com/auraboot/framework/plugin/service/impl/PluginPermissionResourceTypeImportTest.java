@@ -28,7 +28,7 @@ class PluginPermissionResourceTypeImportTest {
         var previous = new PermissionDTO(); previous.setCode(dto.getCode()); previous.setPid("existing-permission");
         previous.setResourceType(previousType);
         when(facade.checkPermissionExists(42L,dto.getCode())).thenReturn(true);
-        when(permissions.findByCode(dto.getCode())).thenReturn(previous);
+        when(permissions.findByTenantIdAndCode(42L,dto.getCode())).thenReturn(previous);
         var ledger = importer.importPermission(dto,"plugin","import",42L,ImportRequest.ConflictStrategy.OVERWRITE);
         var type = ArgumentCaptor.forClass(String.class);
         verify(definitions).updateForPluginImport(eq("Read projects"),isNull(),isNull(),type.capture(),
@@ -60,7 +60,7 @@ class PluginPermissionResourceTypeImportTest {
         var previous = new PermissionDTO(); previous.setCode(dto.getCode()); previous.setPid("existing-permission");
         previous.setResourceType("data"); previous.setResourceCode("project"); previous.setAction("read");
         when(facade.checkPermissionExists(42L,dto.getCode())).thenReturn(true);
-        when(permissions.findByCode(dto.getCode())).thenReturn(previous);
+        when(permissions.findByTenantIdAndCode(42L,dto.getCode())).thenReturn(previous);
         var ledger = importer.importPermission(dto,"plugin","import",42L,ImportRequest.ConflictStrategy.OVERWRITE);
         verify(definitions).updateForPluginImport(eq("Read projects"),isNull(),isNull(),eq("data"),
                 eq("project"),eq("read"),isNull(),isNull(),isNull(),isNull(),isNull(),eq("plugin"),eq(42L),eq(dto.getCode()));

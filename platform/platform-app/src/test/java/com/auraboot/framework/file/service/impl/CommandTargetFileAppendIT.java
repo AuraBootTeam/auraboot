@@ -34,8 +34,20 @@ import static org.assertj.core.api.Assertions.*;
 @SpringBootTest(classes=TestApplication.class)
 @ActiveProfiles("integration-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
 class CommandTargetFileAppendIT {
-    private static final long TENANT=991_940_001L, USER=991_940_002L;
+    @Autowired private com.auraboot.framework.user.service.UserService fixtureUsers;
+    @Autowired private com.auraboot.framework.tenant.service.TenantService fixtureTenants;
+    @Autowired private com.auraboot.framework.tenant.service.TenantMemberService fixtureMembers;
+    private com.auraboot.framework.user.dao.entity.User fixtureUser;
+    private com.auraboot.framework.tenant.dao.entity.TenantMember fixtureMember;
+    @Autowired private com.auraboot.framework.permission.service.UserPermissionService fixturePermissions;
+    private com.auraboot.framework.integration.NativePermissionFixture nativeAuthority;
+    @AfterAll void releaseOwnedAuthority() { if (nativeAuthority != null) nativeAuthority.close(); }
+
+    private Long TENANT, USER, FOREIGN_TENANT, OTHER_USER;
+    @Autowired private javax.sql.DataSource fixtureDataSource;
+    @Autowired private org.springframework.boot.data.redis.autoconfigure.DataRedisProperties fixtureRedis;
     @Autowired CommandTargetFileAccessorFactory factory;
     @Autowired FileService files;
     @Autowired MetaModelService models;
@@ -47,10 +59,23 @@ class CommandTargetFileAppendIT {
     private final AtomicLong seq=new AtomicLong(System.currentTimeMillis());
     private String model, table, command;
 
-    @BeforeAll void publishFixture() {
-        String database=System.getenv("POSTGRES_DB");
-        assertThat(database).as("An owned aura runtime is required").startsWith("auraboot_");
-        assertThat(jdbc.queryForObject("SELECT current_database()",String.class)).isEqualTo(database);
+    @BeforeAll void publishFixture() throws Exception {
+        com.auraboot.framework.integration.DeclaredTestInfrastructure.assertSelected(fixtureDataSource, fixtureRedis);
+        String suffix=com.auraboot.framework.common.util.UniqueIdGenerator.generate().toLowerCase();
+        fixtureUser=fixtureUsers.signUp("file-append-"+suffix+"@example.test","test-password-123");
+        var tenant=new com.auraboot.framework.tenant.dao.entity.Tenant();
+        tenant.setPid(com.auraboot.framework.common.util.UniqueIdGenerator.generate());
+        tenant.setName("file-append-"+suffix);tenant.setDisplayName("Owned file append fixture");
+        tenant.setStatus("active");tenant.setDeletedFlag(false);
+        tenant.setCreatedAt(Instant.now());tenant.setUpdatedAt(Instant.now());
+        tenant=fixtureTenants.createTenant(tenant);TENANT=tenant.getId();USER=fixtureUser.getId();
+        fixtureMember=fixtureMembers.addMember(USER,TENANT,"active");
+        var otherUser = fixtureUsers.signUp("file-append-other-" + suffix + "@example.test", "test-password-123");
+        OTHER_USER = otherUser.getId();
+        fixtureMembers.addMember(OTHER_USER, TENANT, "active");
+        FOREIGN_TENANT = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        jdbc.update("INSERT INTO ab_tenant (id,pid,name,status,deleted_flag) VALUES (?,?,?,'active',FALSE)",
+                FOREIGN_TENANT, com.auraboot.framework.common.util.UniqueIdGenerator.generate(), "Foreign append tenant " + suffix);
         actor();
         model="file_append_"+Long.toString(System.currentTimeMillis(),36); table="mt_"+model; command=model+":repair";
         var photos=FieldDefinition.builder().code("photos").columnName("photos").dataType("file").length(32768).maxLength(32768)
@@ -66,11 +91,16 @@ class CommandTargetFileAppendIT {
         assertThat(result.isSuccess()).as(result.getErrorMessage()).isTrue();
         assertThat(models.getModelDefinition(model).orElseThrow().getFields()).anyMatch(f->f.getCode().equals("photos"));
         assertThat(jdbc.queryForObject("SELECT data_type FROM information_schema.columns WHERE table_name=? AND column_name='photos'",
-                String.class,table)).isEqualTo("character varying");
+                String.class,table)).isEqualTo("jsonb");
+        nativeAuthority = new com.auraboot.framework.integration.NativePermissionFixture(jdbc, fixturePermissions);
+        nativeAuthority.grantModel(model, "create", "read", "update", "delete");
         MetaContext.clear();
     }
     @AfterEach void clear() { MetaContext.clear(); }
-    private void actor() { MetaContext.setContext(TENANT,USER,"file-append-user","file-append-user"); MetaContext.setMemberId(USER+1); }
+    private void actor() {
+        MetaContext.setContext(TENANT,USER,fixtureUser.getPid(),fixtureUser.getUserName());
+        MetaContext.setMemberId(fixtureMember.getId());
+    }
     private String parent() {
         actor();
         return MetaContext.runWithCommandPermitPlan("ALL",null,model,null,()->
@@ -95,7 +125,11 @@ class CommandTargetFileAppendIT {
     private void command(String pid,Consumer<FileAccessor> action) {
         actor();
         try {
-            new TransactionTemplate(transactions).executeWithoutResult(status->{
+            var commandTransaction = new TransactionTemplate(transactions);
+            // This capability owns row locks and a TARGET permit; its transaction contract is writable,
+            // not an ordinary human projection. Recheck the locked row after each competing commit.
+            commandTransaction.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_READ_COMMITTED);
+            commandTransaction.executeWithoutResult(status->{
                 // This is the caller's parent lock/CAS, ahead of every file lock. It serializes
                 // same-parent append calls and commits projection/evidence in the same transaction.
                 Long version=jdbc.queryForObject("SELECT row_version FROM "+table+" WHERE tenant_id=? AND pid=? FOR UPDATE",Long.class,TENANT,pid);
@@ -121,7 +155,8 @@ class CommandTargetFileAppendIT {
         command(parent,a->{data.update(model,parent,Map.of("photos",firstProjection)); a.appendAndRetainExistingToTarget(first,"photos");});
         command(parent,a->{data.update(model,parent,Map.of("photos",bothProjection));
             a.appendAndRetainExistingToTarget(first,"photos"); a.appendAndRetainExistingToTarget(second,"photos"); a.appendAndRetainExistingToTarget(first,"photos");});
-        assertThat(jdbc.queryForObject("SELECT photos FROM "+table+" WHERE pid=?",String.class,parent)).isEqualTo(bothProjection);
+        assertThat(jdbc.queryForObject("SELECT photos = ?::jsonb FROM " + table + " WHERE tenant_id=? AND pid=?",
+                Boolean.class, bothProjection, TENANT, parent)).isTrue();
         assertThat(relationCount(parent)).isEqualTo(2); assertThat(retained(first)).isTrue(); assertThat(retained(second)).isTrue();
         assertThat(evidence(parent)).isEqualTo("after");
         actor(); assertThatThrownBy(()->files.deleteFile(first,USER)).hasMessageContaining("retention");
@@ -135,14 +170,14 @@ class CommandTargetFileAppendIT {
         assertThat(jdbc.queryForObject("SELECT photos FROM "+table+" WHERE pid=?",String.class,parent)).isNull();
     }
     @Test void aCaughtAppendFailureStillPreventsPartialCommit() {
-        String parent=parent(), good=upload(TENANT,USER,"success"), foreign=upload(TENANT,USER+9,"success");
+        String parent=parent(), good=upload(TENANT,USER,"success"), foreign=upload(TENANT,OTHER_USER,"success");
         assertThatThrownBy(()->command(parent,a->{a.appendAndRetainExistingToTarget(good,"photos");
             assertThatThrownBy(()->a.appendAndRetainExistingToTarget(foreign,"photos")).isInstanceOf(AccessDeniedException.class);}))
                 .isInstanceOf(org.springframework.transaction.UnexpectedRollbackException.class);
         assertThat(relationCount(parent)).isZero(); assertThat(retained(good)).isFalse(); assertThat(evidence(parent)).isEqualTo("before");
     }
     @Test void foreignTenantOwnerAndUnfinalizedUploadsLeaveNoWrites() {
-        for(String file:List.of(upload(TENANT+1,USER,"success"),upload(TENANT,USER+1,"success"),upload(TENANT,USER,"uploading"))) {
+        for(String file:List.of(upload(FOREIGN_TENANT,USER,"success"),upload(TENANT,OTHER_USER,"success"),upload(TENANT,USER,"uploading"))) {
             String parent=parent();
             assertThatThrownBy(()->command(parent,a->a.appendAndRetainExistingToTarget(file,"photos"))).isInstanceOf(AccessDeniedException.class);
             assertThat(retained(file)).isFalse(); assertThat(relationCount(parent)).isZero(); assertThat(evidence(parent)).isEqualTo("before");

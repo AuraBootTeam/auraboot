@@ -28,9 +28,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ActiveProfiles("integration-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DisplayName("Capability registry IT — save/read round-trip + upsert")
-class CapabilityRegistryServiceIT {
+class CapabilityRegistryServiceIT extends com.auraboot.framework.integration.BaseIntegrationTest {
 
-    private static final long TENANT_ID = 990_300_031L;
+    private Long tenantId;
+    private final String suffix = com.auraboot.framework.common.util.UniqueIdGenerator.generate().toLowerCase();
+    private final String accountCode = "cap_it_account_" + suffix;
+    private final String upsertCode = "cap_it_upsert_" + suffix;
 
     @Autowired
     private CapabilityRegistryService capabilityRegistryService;
@@ -39,13 +42,15 @@ class CapabilityRegistryServiceIT {
 
     @BeforeEach
     void setUp() {
-        MetaContext.setContext(TENANT_ID, 990_000_031L, "cap-pid", "cap-user");
+        applyTestMetaContext();
+        tenantId = getTestTenant().getId();
     }
 
     @AfterAll
     void cleanup() {
         try {
-            jdbcTemplate.update("DELETE FROM ab_permission_capability WHERE tenant_id = ?", TENANT_ID);
+            jdbcTemplate.update("DELETE FROM ab_permission_capability WHERE tenant_id = ? AND code IN (?,?)",
+                    tenantId, accountCode, upsertCode);
         } finally {
             MetaContext.clear();
         }
@@ -59,11 +64,11 @@ class CapabilityRegistryServiceIT {
     @DisplayName("saveDefinition persists and listDeclarations reads it back (includes round-trip)")
     void savesAndReadsBackDeclaration() {
         capabilityRegistryService.saveDefinition(CapabilityDefinitionDTO.builder()
-                .code("crm.cap.account").group("客户管理").nameZhCN("维护客户资料")
+                .code(accountCode).group("客户管理").nameZhCN("维护客户资料")
                 .includes(List.of("crm.account.read", "crm.account.manage"))
                 .tier("editor").sensitive(false).order(10).displayGroupOrder(90).build());
 
-        CapabilityDefinitionDTO read = find(capabilityRegistryService.listDeclarations(TENANT_ID), "crm.cap.account");
+        CapabilityDefinitionDTO read = find(capabilityRegistryService.listDeclarations(tenantId), accountCode);
         assertThat(read.getGroup()).isEqualTo("客户管理");
         assertThat(read.getNameZhCN()).isEqualTo("维护客户资料");
         assertThat(read.getIncludes()).containsExactly("crm.account.read", "crm.account.manage");
@@ -76,16 +81,16 @@ class CapabilityRegistryServiceIT {
     @DisplayName("re-import upserts by (tenant, code) instead of duplicating")
     void reimportUpsertsByCode() {
         capabilityRegistryService.saveDefinition(CapabilityDefinitionDTO.builder()
-                .code("crm.cap.up").group("g1").includes(List.of("crm.account.read")).build());
+                .code(upsertCode).group("g1").includes(List.of("crm.account.read")).build());
         capabilityRegistryService.saveDefinition(CapabilityDefinitionDTO.builder()
-                .code("crm.cap.up").group("g2-updated")
+                .code(upsertCode).group("g2-updated")
                 .includes(List.of("crm.account.read", "crm.account.manage")).build());
 
-        List<CapabilityDefinitionDTO> decls = capabilityRegistryService.listDeclarations(TENANT_ID);
-        long count = decls.stream().filter(d -> "crm.cap.up".equals(d.getCode())).count();
+        List<CapabilityDefinitionDTO> decls = capabilityRegistryService.listDeclarations(tenantId);
+        long count = decls.stream().filter(d -> upsertCode.equals(d.getCode())).count();
         assertThat(count).isEqualTo(1);
 
-        CapabilityDefinitionDTO read = find(decls, "crm.cap.up");
+        CapabilityDefinitionDTO read = find(decls, upsertCode);
         assertThat(read.getGroup()).isEqualTo("g2-updated");
         assertThat(read.getIncludes()).containsExactly("crm.account.read", "crm.account.manage");
     }

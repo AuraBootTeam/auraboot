@@ -347,6 +347,16 @@ class DynamicControllerPublicRecordSanitizerTest {
 
         assertPublicRecord(createResponse.getData().getSuccessItems().get(0), "p6");
         assertPublicRecord(updateResponse.getData().getSuccessItems().get(0), "p7");
+        for (var response : List.of(createResponse, updateResponse)) {
+            var data = response.getData();
+            assertThat(data.getTotal()).isEqualTo(1);
+            assertThat(data.getSuccess()).isEqualTo(1);
+            assertThat(data.getFailed()).isZero();
+            assertThat(data.getSkipped()).isZero();
+            var json = new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(response);
+            assertThat(json.path("data").path("skipped").isIntegralNumber()).isTrue();
+            assertThat(json.path("data").path("skipped").intValue()).isZero();
+        }
     }
 
     @Test

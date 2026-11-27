@@ -60,8 +60,7 @@
 #                  contend for the browser. Use --workers 1 for those.
 #     -h, --help   show this help
 #
-# Crontab example (nightly 02:00):
-#   0 2 * * *  cd /path/to/auraboot && ./scripts/oss-e2e-gate-run.sh >> /var/log/oss-e2e-gate.log 2>&1
+# Scheduled CI runs are owned by the fixed Jenkins profile. Do not add a cron/timer owner.
 #
 set -uo pipefail
 
@@ -219,8 +218,22 @@ fi
 fi
 log "retaining verification runtime '$NAME' and its database on every exit"
 
+GATE_RECONCILED=false
 retain() {
   local rc=$?
+  if [[ -n "${AURA_CI_JOB_ID:-}" ]]; then
+    trap - EXIT
+    if [[ "$rc" == 0 && "$GATE_RECONCILED" != true ]]; then
+      log "ENVIRONMENT-INVALID: gate exited before execution reconciliation" >&2
+      rc=2
+    fi
+    if ! python3 "$SCRIPT_DIR/ci/settle_runtime.py" --workspace "$WORKSPACE" --repo "$REPO_ROOT" \
+        --name "$NAME" --artifacts "${AURA_REGRESSION_ARTIFACTS:?native artifacts required}"; then
+      log "ENVIRONMENT-INVALID: native runtime resource settlement failed; original gate exit=$rc"
+      [[ "$rc" -ne 0 ]] || rc=2
+    fi
+    exit "$rc"
+  fi
   local allocation
   allocation="$("$DEV" runtime show "$NAME" --json)" || allocation=""
   if printf '%s' "$allocation" | node -e 'let s="";process.stdin.on("data",v=>s+=v);process.stdin.on("end",()=>{try{process.exit(JSON.parse(s).allocation===null?0:1)}catch{process.exit(1)}})'; then
@@ -402,4 +415,5 @@ else
   log "  retained stack: $GS status $NAME"
 fi
 echo "=============================================================="
+GATE_RECONCILED=true
 exit "$GATE_RC"

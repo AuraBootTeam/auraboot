@@ -59,6 +59,22 @@ import static org.mockito.Mockito.when;
 @DisplayName("TenantMemberApplicationServiceImpl")
 class TenantMemberApplicationServiceImplTest {
 
+    @Test
+    void memberReadAndOffboardingPreflightOwnARepeatableReadSnapshot() {
+        var expected = Set.of("getMemberById", "getMemberTeams", "inspectOffboardingImpact", "listOffboardingCandidates");
+        var actual = new java.util.HashSet<String>();
+        for (var method : TenantMemberApplicationServiceImpl.class.getDeclaredMethods()) {
+            if (!expected.contains(method.getName())) continue;
+            var boundary = method.getAnnotation(org.springframework.transaction.annotation.Transactional.class);
+            assertNotNull(boundary, method.getName());
+            assertTrue(boundary.readOnly(), method.getName());
+            assertEquals(org.springframework.transaction.annotation.Isolation.REPEATABLE_READ,
+                    boundary.isolation(), method.getName());
+            actual.add(method.getName());
+        }
+        assertEquals(expected, actual);
+    }
+
     @Mock private TenantMemberService tenantMemberService;
     @Mock private UserService userService;
     @Mock private PasswordManagementService passwordManagementService;

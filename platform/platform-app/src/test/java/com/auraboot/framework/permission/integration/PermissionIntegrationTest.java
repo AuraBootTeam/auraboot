@@ -52,6 +52,8 @@ import static org.assertj.core.api.Assertions.*;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class PermissionIntegrationTest {
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate fixtureJdbc;
+    @Autowired private com.auraboot.framework.permission.service.UserPermissionService fixturePermissions;
 
     @Autowired
     private PermissionService permissionService;
@@ -95,8 +97,6 @@ class PermissionIntegrationTest {
         localUser = ensureTestUser();
         localTenant = ensureTestTenant();
         localTenantMember = ensureTestTenantMember();
-        localRole = createFreshRole();
-        ensureUserRoleBinding();
         
         // Set MetaContext
         MetaContext.setContext(
@@ -106,6 +106,8 @@ class PermissionIntegrationTest {
             localUser.getUserName()
         );
         MetaContext.setMemberId(localTenantMember.getId());
+        localRole = createFreshRole();
+        ensureUserRoleBinding();
     }
     
     private User ensureTestUser() {
@@ -170,12 +172,14 @@ class PermissionIntegrationTest {
         UserRole existing = userRoleService.findByMemberIdAndRoleIdAndTenantId(
             localTenantMember.getId(), localRole.getId(), localTenant.getId());
         if (existing == null) {
-            userRoleService.assignRolesToMember(
+            com.auraboot.framework.integration.NativePermissionFixture.asTenantAdministrator(
+                fixtureJdbc, fixturePermissions, "org.role.update", "org", "role", "update",
+                () -> userRoleService.assignRolesToMember(
                 localTenantMember.getId(),
                 Arrays.asList(localRole.getId()),
                 localTenant.getId(),
                 null
-            );
+            ));
         }
     }
     

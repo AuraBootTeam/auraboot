@@ -38,6 +38,7 @@ import static org.mockito.Mockito.when;
  * {@code MetaContext}, the collect service enqueues through the memory MQ provider, and the
  * consumer persists/quarantines against Postgres.
  */
+@org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate
 @SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("integration-test")
 @TestPropertySource(properties = "aura.mq.type=memory")
@@ -45,9 +46,9 @@ import static org.mockito.Mockito.when;
 class BehaviorCollectControllerIT {
 
     private static final long TENANT_ID = 990_301L;
-    private static final long USER_ID = 880_301L;
-    private static final String USER_PID = "collect-it-user-pid";
-    private static final String USERNAME = "collect-it-user";
+    private Long USER_ID;
+    private String USER_PID;
+    private String USERNAME;
 
     @Autowired
     private TestRestTemplate restTemplate;
@@ -56,13 +57,14 @@ class BehaviorCollectControllerIT {
     @Autowired
     private JwtUtil jwtUtil;
 
-    @MockitoBean
+    @Autowired
     private UnifiedUserDetailsService userDetailsService;
-    @MockitoBean
+    @Autowired
     private UserService userService;
     @MockitoBean
     private SessionManagementService sessionManagementService;
 
+    @Autowired private com.auraboot.framework.tenant.service.TenantMemberService fixtureMembers;
     private CustomUserDetails userDetails;
 
     @BeforeAll
@@ -78,6 +80,9 @@ class BehaviorCollectControllerIT {
             ON CONFLICT (id) DO NOTHING
             """, TENANT_ID, "collect-it-tenant-pid", "collect-it-tenant",
                 "Collect IT Tenant", "BehaviorCollectControllerIT seeded tenant");
+        User actor = userService.signUp("collect-it-" + System.nanoTime() + "@example.test", "test-password-123");
+        USER_ID = actor.getId(); USER_PID = actor.getPid(); USERNAME = actor.getUserName();
+        fixtureMembers.addMember(USER_ID, TENANT_ID, "active");
         jdbc.execute("""
             CREATE TABLE IF NOT EXISTS ab_behavior_event (
                 id BIGSERIAL PRIMARY KEY,
@@ -145,15 +150,7 @@ class BehaviorCollectControllerIT {
     @BeforeEach
     void setUpIdentity() {
         cleanup();
-        userDetails = new CustomUserDetails(USERNAME, "irrelevant", USER_ID, USER_PID,
-                Collections.emptyList(), true, true, true, true);
-        User user = new User();
-        user.setId(USER_ID);
-        user.setPid(USER_PID);
-        user.setUserName(USERNAME);
-        user.setSecurityVersion(0);
-        when(userDetailsService.loadUserByPid(USER_PID)).thenReturn(userDetails);
-        when(userService.findByPid(USER_PID)).thenReturn(user);
+        userDetails = userDetailsService.loadUserByPid(USER_PID);
         when(sessionManagementService.isSessionValid(anyString())).thenReturn(true);
     }
 
@@ -163,6 +160,7 @@ class BehaviorCollectControllerIT {
         // Remove the seeded tenant row (and its auto-created default environment) so the
         // shared CI database stays pristine for the rest of the suite.
         jdbc.update("DELETE FROM ab_environment WHERE tenant_id = ?", TENANT_ID);
+        jdbc.update("DELETE FROM ab_tenant_member WHERE tenant_id = ? AND user_id = ?", TENANT_ID, USER_ID);
         jdbc.update("DELETE FROM ab_tenant WHERE id = ?", TENANT_ID);
     }
 

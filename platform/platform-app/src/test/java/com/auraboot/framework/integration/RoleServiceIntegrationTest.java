@@ -22,6 +22,22 @@ import static org.assertj.core.api.Assertions.*;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class RoleServiceIntegrationTest extends BaseIntegrationTest {
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate authoringJdbc;
+    private TenantAdministrationFixture authoringAdministrator;
+
+    @BeforeEach
+    void authorizeOwnedRoleAuthoring() {
+        applyTestMetaContext();
+        authoringAdministrator = TenantAdministrationFixture.grant(authoringJdbc,
+                getTestTenant().getId(), com.auraboot.framework.application.tenant.MetaContext.getCurrentMemberId());
+        grantCommittedPermissionToTestRole("org.role.update", "org", "role", "update", "Author integration-test roles");
+    }
+
+    @AfterEach
+    void retireOwnedRoleAuthoring() {
+        if (authoringAdministrator != null) authoringAdministrator.close();
+    }
+
 
     @Autowired
     private RoleService roleService;

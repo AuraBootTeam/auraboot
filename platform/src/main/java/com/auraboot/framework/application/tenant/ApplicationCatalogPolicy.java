@@ -106,7 +106,7 @@ public class ApplicationCatalogPolicy {
                 boolean customized = extension != null && (Boolean.TRUE.equals(extension.get("navigationCustom"))
                         || Boolean.TRUE.equals(extension.get("navigationCustomized")));
                 if (!customized) {
-                    if (menuCodes.contains(menu.getCode())) kept.add(menu);
+                    if (menu.getCode() != null && menuCodes.contains(menu.getCode())) kept.add(menu);
                     continue;
                 }
                 Menu current = menu;

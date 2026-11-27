@@ -48,6 +48,7 @@ class MultiPluginEvalCaseCoexistenceIT extends BaseIntegrationTest {
     private static final String UNAVAILABLE_TOOL = "nonexistent.plugin.tool.xyz";
 
     @Autowired private PluginResourceImporter resourceImporter;
+    @Autowired private com.auraboot.framework.plugin.mapper.PluginResourceMapper resourceTracking;
     @Autowired private CapabilityEvalService  capabilityEvalService;
     @Autowired private JdbcTemplate           jdbcTemplate;
 
@@ -68,6 +69,7 @@ class MultiPluginEvalCaseCoexistenceIT extends BaseIntegrationTest {
 
     private void deleteTestData() {
         for (String agentCode : List.of(AGENT_A_CODE, AGENT_B_CODE)) {
+            jdbcTemplate.update("DELETE FROM ab_plugin_resource WHERE tenant_id=? AND resource_type='agent_definition' AND resource_code=?", tenantId, agentCode);
             jdbcTemplate.update(
                     "DELETE FROM ab_agent_eval_case WHERE tenant_id = ? AND agent_code = ?",
                     tenantId, agentCode);
@@ -152,6 +154,8 @@ class MultiPluginEvalCaseCoexistenceIT extends BaseIntegrationTest {
 
         // ── Step 4: rollback agent_a → a-1 inactive; b-1 STILL active ────────
         // This is the multi-plugin isolation proof: rollback must be scoped to (tenant_id, agent_code).
+        resourceTracking.insert(prA);
+        assertNotNull(prA.getId());
         resourceImporter.rollbackResource(prA);
 
         int aActiveAfterRollback = countActive(AGENT_A_CODE);

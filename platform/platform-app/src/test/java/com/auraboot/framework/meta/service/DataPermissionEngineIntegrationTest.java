@@ -199,12 +199,12 @@ class DataPermissionEngineIntegrationTest {
         UserRole existing = userRoleService.findByMemberIdAndRoleIdAndTenantId(
             localTenantMember.getId(), localRole.getId(), localTenant.getId());
         if (existing == null) {
-            userRoleService.assignRolesToMember(
+            asRoleAuthor(() -> userRoleService.assignRolesToMember(
                 localTenantMember.getId(),
                 Arrays.asList(localRole.getId()),
                 localTenant.getId(),
                 null
-            );
+            ));
         }
     }
 
@@ -220,7 +220,7 @@ class DataPermissionEngineIntegrationTest {
         request.setScopeType("self");
         request.setPriority(10);
 
-        DataPermissionPolicy policy = policyService.create(request);
+        DataPermissionPolicy policy = asPolicyAuthor(() -> policyService.create(request));
 
         assertNotNull(policy);
         assertNotNull(policy.getPid());
@@ -242,7 +242,7 @@ class DataPermissionEngineIntegrationTest {
         request.setMaskType("partial");
         request.setPriority(5);
 
-        DataPermissionPolicy policy = policyService.create(request);
+        DataPermissionPolicy policy = asPolicyAuthor(() -> policyService.create(request));
 
         assertNotNull(policy);
         assertEquals("column", policy.getPolicyType());
@@ -254,7 +254,7 @@ class DataPermissionEngineIntegrationTest {
     @DisplayName("Get policy by PID")
     void testGetByPid() {
         DataPermissionPolicy created = createTestRowPolicy("test-get", "product");
-        DataPermissionPolicy found = policyService.getByPid(created.getPid());
+        DataPermissionPolicy found = asPolicyAuthor(() -> policyService.getByPid(created.getPid()));
 
         assertNotNull(found);
         assertEquals(created.getPid(), found.getPid());
@@ -268,7 +268,7 @@ class DataPermissionEngineIntegrationTest {
         createTestRowPolicy("policy-b", "invoice");
         createTestRowPolicy("policy-c", "order");
 
-        List<DataPermissionPolicy> invoicePolicies = policyService.listByModelCode("invoice");
+        List<DataPermissionPolicy> invoicePolicies = asPolicyAuthor(() -> policyService.listByModelCode("invoice"));
         assertTrue(invoicePolicies.size() >= 2);
         invoicePolicies.forEach(p -> assertEquals("invoice", p.getModelCode()));
     }
@@ -285,7 +285,7 @@ class DataPermissionEngineIntegrationTest {
         updateReq.setScopeType("all");
         updateReq.setPriority(20);
 
-        DataPermissionPolicy updated = policyService.update(created.getPid(), updateReq);
+        DataPermissionPolicy updated = asPolicyAuthor(() -> policyService.update(created.getPid(), updateReq));
 
         assertEquals("Updated Name", updated.getName());
         assertEquals("all", updated.getScopeType());
@@ -296,11 +296,11 @@ class DataPermissionEngineIntegrationTest {
     @DisplayName("Delete policy removes bindings")
     void testDeletePolicy() {
         DataPermissionPolicy created = createTestRowPolicy("delete-me", "product");
-        policyService.bindToRole(created.getPid(), localRole.getPid());
+        asPolicyAuthor(() -> { policyService.bindToRole(created.getPid(), localRole.getPid()); return null; });
 
-        policyService.delete(created.getPid());
+        asPolicyAuthor(() -> { policyService.delete(created.getPid()); return null; });
 
-        assertNull(policyService.getByPid(created.getPid()));
+        assertNull(asPolicyAuthor(() -> policyService.getByPid(created.getPid())));
     }
 
     @Test
@@ -308,12 +308,12 @@ class DataPermissionEngineIntegrationTest {
     void testEnableDisable() {
         DataPermissionPolicy created = createTestRowPolicy("toggle-me", "product");
 
-        policyService.disable(created.getPid());
-        DataPermissionPolicy disabled = policyService.getByPid(created.getPid());
+        asPolicyAuthor(() -> { policyService.disable(created.getPid()); return null; });
+        DataPermissionPolicy disabled = asPolicyAuthor(() -> policyService.getByPid(created.getPid()));
         assertFalse(disabled.getEnabled());
 
-        policyService.enable(created.getPid());
-        DataPermissionPolicy enabled = policyService.getByPid(created.getPid());
+        asPolicyAuthor(() -> { policyService.enable(created.getPid()); return null; });
+        DataPermissionPolicy enabled = asPolicyAuthor(() -> policyService.getByPid(created.getPid()));
         assertTrue(enabled.getEnabled());
     }
 
@@ -324,9 +324,9 @@ class DataPermissionEngineIntegrationTest {
     void testBindUnbindRole() {
         DataPermissionPolicy policy = createTestRowPolicy("bind-test", "order");
 
-        assertDoesNotThrow(() -> policyService.bindToRole(policy.getPid(), localRole.getPid()));
-        assertDoesNotThrow(() -> policyService.bindToRole(policy.getPid(), localRole.getPid()));
-        assertDoesNotThrow(() -> policyService.unbindFromRole(policy.getPid(), localRole.getPid()));
+        assertDoesNotThrow(() -> asPolicyAuthor(() -> { policyService.bindToRole(policy.getPid(), localRole.getPid()); return null; }));
+        assertDoesNotThrow(() -> asPolicyAuthor(() -> { policyService.bindToRole(policy.getPid(), localRole.getPid()); return null; }));
+        assertDoesNotThrow(() -> asPolicyAuthor(() -> { policyService.unbindFromRole(policy.getPid(), localRole.getPid()); return null; }));
     }
 
     // ==================== Engine: Row Filter ====================
@@ -335,8 +335,8 @@ class DataPermissionEngineIntegrationTest {
     @DisplayName("Engine: buildRowFilter returns empty for ALL scope")
     void testBuildRowFilterAll() {
         DataPermissionPolicy policy = createTestRowPolicy("all-scope", "test_model");
-        policy = policyService.update(policy.getPid(), buildRowRequest("all-scope", "test_model", "all"));
-        policyService.bindToRole(policy.getPid(), localRole.getPid());
+        asPolicyAuthor(() -> policyService.update(policy.getPid(), buildRowRequest("all-scope", "test_model", "all")));
+        asPolicyAuthor(() -> { policyService.bindToRole(policy.getPid(), localRole.getPid()); return null; });
 
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
@@ -349,8 +349,8 @@ class DataPermissionEngineIntegrationTest {
     @DisplayName("Engine: buildRowFilter returns created_by condition for SELF scope")
     void testBuildRowFilterSelf() {
         DataPermissionPolicyCreateRequest req = buildRowRequest("self-scope", "self_model", "self");
-        DataPermissionPolicy policy = policyService.create(req);
-        policyService.bindToRole(policy.getPid(), localRole.getPid());
+        DataPermissionPolicy policy = asPolicyAuthor(() -> policyService.create(req));
+        asPolicyAuthor(() -> { policyService.bindToRole(policy.getPid(), localRole.getPid()); return null; });
 
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
@@ -405,7 +405,7 @@ class DataPermissionEngineIntegrationTest {
             assertNotNull(permission, "Registered action missing: " + action);
             permissionIds.add(permission.getId());
         }
-        assertTrue(roleService.assignPermissions(localRole.getId(), permissionIds));
+        assertTrue(asRoleAuthor(() -> roleService.assignPermissions(localRole.getId(), permissionIds)));
         Long tenantId = localTenant.getId();
         dataScopeService.setScope(tenantId, localRole.getId(), modelCode, "create", "all", "MAX");
         dataScopeService.setScope(tenantId, localRole.getId(), modelCode, "read", "all", "MAX");
@@ -419,8 +419,8 @@ class DataPermissionEngineIntegrationTest {
         assertNotEquals(actor.getId(), other.getId());
         assertNotEquals(actorMember.getId(), otherMember.getId());
         for (TenantMember member : List.of(actorMember, otherMember)) {
-            assertTrue(userRoleService.assignRolesToMember(
-                    member.getId(), List.of(localRole.getId()), tenantId, localUser.getId()));
+            assertTrue(asRoleAuthor(() -> userRoleService.assignRolesToMember(
+                    member.getId(), List.of(localRole.getId()), tenantId, localUser.getId())));
             assertEquals(Set.of(localRole.getId()), userRoleService
                     .findByMemberIdAndTenantId(member.getId(), tenantId).stream()
                     .map(UserRole::getRoleId).collect(java.util.stream.Collectors.toSet()));
@@ -449,12 +449,12 @@ class DataPermissionEngineIntegrationTest {
 
             dynamicDataService.update(modelCode, ownedPid, Map.of(fieldCode, "own-updated"));
             assertScopeValue(modelCode, ownedPid, fieldCode, "own-updated");
-            assertThrows(MetaServiceException.class, () -> dynamicDataService.update(
+            assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> dynamicDataService.update(
                     modelCode, otherPid, Map.of(fieldCode, "forbidden-update")));
             assertScopeValue(modelCode, otherPid, fieldCode, "other-before");
             assertTrue(dynamicDataService.compareAndSet(
                     modelCode, ownedPid, fieldCode, "own-updated", "own-cas"));
-            assertFalse(dynamicDataService.compareAndSet(
+            assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> dynamicDataService.compareAndSet(
                     modelCode, otherPid, fieldCode, "other-before", "forbidden-cas"));
             assertScopeValue(modelCode, ownedPid, fieldCode, "own-cas");
             assertScopeValue(modelCode, otherPid, fieldCode, "other-before");
@@ -471,9 +471,9 @@ class DataPermissionEngineIntegrationTest {
             // HTTP action revocation is a separate boundary contract, not claimed by this test.
             dataScopeService.setScope(tenantId, localRole.getId(), modelCode, "update", "none", "MAX");
             assertEquals("none", dataScopeService.resolveScope(actorMember.getId(), modelCode, "update").scopeType());
-            assertThrows(MetaServiceException.class, () -> dynamicDataService.update(
+            assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> dynamicDataService.update(
                     modelCode, ownedPid, Map.of(fieldCode, "forbidden-after-revoke")));
-            assertFalse(dynamicDataService.compareAndSet(
+            assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> dynamicDataService.compareAndSet(
                     modelCode, ownedPid, fieldCode, "own-cas", "forbidden-after-revoke"));
             assertScopeValue(modelCode, ownedPid, fieldCode, "own-cas");
             assertScopeValue(modelCode, otherPid, fieldCode, "other-before");
@@ -545,7 +545,7 @@ class DataPermissionEngineIntegrationTest {
             action.setResourceCode("query_builder"); action.setAction("execute");
             queryId = permissionService.create(action).getId();
         } else { queryId = queryPermission.getId(); }
-        assertTrue(roleService.assignPermissions(localRole.getId(), List.of(readId, createId, queryId)));
+        assertTrue(asRoleAuthor(() -> roleService.assignPermissions(localRole.getId(), List.of(readId, createId, queryId))));
         dataScopeService.setScope(tenantId, localRole.getId(), modelCode, "create", "all", "MAX");
         dataScopeService.setScope(tenantId, localRole.getId(), modelCode, "read", "self", "MAX");
         User actor = userService.signUp("query-actor-" + marker + "@auraboot.com", "test-password-123");
@@ -553,8 +553,8 @@ class DataPermissionEngineIntegrationTest {
         TenantMember actorMember = tenantMemberService.addMember(actor.getId(), tenantId, "active");
         TenantMember otherMember = tenantMemberService.addMember(other.getId(), tenantId, "active");
         for (TenantMember member : List.of(actorMember, otherMember)) {
-            assertTrue(userRoleService.assignRolesToMember(member.getId(), List.of(localRole.getId()),
-                    tenantId, localUser.getId()));
+            assertTrue(asRoleAuthor(() -> userRoleService.assignRolesToMember(member.getId(), List.of(localRole.getId()),
+                    tenantId, localUser.getId())));
             assertEquals(Set.of(localRole.getId()), userRoleService.findByMemberIdAndTenantId(member.getId(), tenantId)
                     .stream().map(UserRole::getRoleId).collect(java.util.stream.Collectors.toSet()));
         }
@@ -654,11 +654,11 @@ class DataPermissionEngineIntegrationTest {
                     .map(row -> row.get("pid").asText()).collect(java.util.stream.Collectors.toSet()));
             assertTrue(roleService.removePermissions(localRole.getId(), List.of(readId)));
             queryFixtureResult(mvc, projection, 403);
-                assertTrue(roleService.assignPermissions(localRole.getId(), List.of(readId, createId, queryId)));
+                assertTrue(asRoleAuthor(() -> roleService.assignPermissions(localRole.getId(), List.of(readId, createId, queryId))));
             assertTrue(roleService.removePermissions(localRole.getId(), List.of(queryId)));
             assertTrue(scoringPermissions.canAction(actorMember.getId(), modelCode, "read"));
             queryFixtureResult(mvc, projection, 403);
-            assertTrue(roleService.assignPermissions(localRole.getId(), List.of(readId, createId, queryId)));
+            assertTrue(asRoleAuthor(() -> roleService.assignPermissions(localRole.getId(), List.of(readId, createId, queryId))));
             dataScopeService.setScope(tenantId, localRole.getId(), modelCode, "read", "none", "MAX");
             assertEquals(0, queryFixtureResult(mvc, projection, 200).size());
             assertEquals(0L, queryFixtureResult(mvc, countRequest, 200).get(0).get("field_count").asLong());
@@ -671,33 +671,16 @@ class DataPermissionEngineIntegrationTest {
         } finally { applyScopeActor(localUser, localTenantMember); }
     }
 
+    @Autowired private com.auraboot.framework.permission.service.UserPermissionService fixturePermissions;
+
     private <T> T asPolicyAuthor(java.util.function.Supplier<T> action) {
-        var previous = MetaContext.snapshot();
-        try {
-            applyScopeActor(localUser, localTenantMember);
-            var author = userService.signUp("policy-author-" + System.nanoTime() + "@auraboot.com", "test-password-123");
-            var member = tenantMemberService.addMember(author.getId(), localTenant.getId(), "active");
-            var admin = roleService.findByTenantId(localTenant.getId()).stream()
-                    .filter(role -> "tenant_admin".equals(role.getCode())).findFirst().orElseGet(() -> {
-                        Role role = new Role();
-                        org.springframework.beans.BeanUtils.copyProperties(localRole, role, "id", "pid", "code", "name");
-                        role.setPid(UniqueIdGenerator.generate()); role.setCode("tenant_admin");
-                        role.setName("Policy author"); return roleService.createRole(role);
-                    });
-            var permission = queryPermissionMapper.findByCode("meta.permission.update");
-            Long permissionId;
-            if (permission == null) {
-                var request = new PermissionCreateRequest(); request.setCode("meta.permission.update");
-                request.setName("Policy management"); request.setResourceType("meta");
-                request.setResourceCode("permission"); request.setAction("update");
-                permissionId = permissionService.create(request).getId();
-            } else { permissionId = permission.getId(); }
-            assertTrue(roleService.assignPermissions(admin.getId(), List.of(permissionId)));
-            assertTrue(userRoleService.assignRolesToMember(member.getId(), List.of(admin.getId()),
-                    localTenant.getId(), localUser.getId()));
-            applyScopeActor(author, member);
-            return action.get();
-        } finally { MetaContext.restore(previous); }
+        return com.auraboot.framework.integration.NativePermissionFixture.asTenantAdministrator(
+                jdbcTemplate, fixturePermissions, "meta.permission.update", "meta", "permission", "update", action);
+    }
+
+    private <T> T asRoleAuthor(java.util.function.Supplier<T> action) {
+        return com.auraboot.framework.integration.NativePermissionFixture.asTenantAdministrator(
+                jdbcTemplate, fixturePermissions, "org.role.update", "org", "role", "update", action);
     }
 
     private com.fasterxml.jackson.databind.JsonNode queryFixtureResult(MockMvc mvc, Object request, int status) throws Exception {
@@ -754,7 +737,7 @@ class DataPermissionEngineIntegrationTest {
         Long createId = permissionService.findByCode("model." + modelCode + ".create").getId();
         Long updateId = permissionService.findByCode("model." + modelCode + ".update").getId();
         List<Long> grants = List.of(readId, createId, updateId);
-        assertTrue(roleService.assignPermissions(localRole.getId(), grants));
+        assertTrue(asRoleAuthor(() -> roleService.assignPermissions(localRole.getId(), grants)));
         dataScopeService.setScope(tenantId, localRole.getId(), modelCode, "create", "all", "MAX");
         dataScopeService.setScope(tenantId, localRole.getId(), modelCode, "read", "all", "MAX");
         dataScopeService.setScope(tenantId, localRole.getId(), modelCode, "update", "self", "MAX");
@@ -763,8 +746,8 @@ class DataPermissionEngineIntegrationTest {
         TenantMember actorMember = tenantMemberService.addMember(actor.getId(), tenantId, "active");
         TenantMember otherMember = tenantMemberService.addMember(other.getId(), tenantId, "active");
         for (TenantMember member : List.of(actorMember, otherMember)) {
-            assertTrue(userRoleService.assignRolesToMember(member.getId(), List.of(localRole.getId()),
-                    tenantId, localUser.getId()));
+            assertTrue(asRoleAuthor(() -> userRoleService.assignRolesToMember(member.getId(), List.of(localRole.getId()),
+                    tenantId, localUser.getId())));
             assertEquals(Set.of(localRole.getId()), userRoleService.findByMemberIdAndTenantId(member.getId(), tenantId)
                     .stream().map(UserRole::getRoleId).collect(java.util.stream.Collectors.toSet()));
         }
@@ -863,7 +846,7 @@ class DataPermissionEngineIntegrationTest {
                         () -> service.score(request, tenantId));
                 assertEquals(providerCalls, prompts.size());
                 assertScoringStored(tableName, scoreField, ownPid, otherPid, 87, 22);
-                assertTrue(roleService.assignPermissions(localRole.getId(), grants));
+                assertTrue(asRoleAuthor(() -> roleService.assignPermissions(localRole.getId(), grants)));
             }
             for (String mask : List.of("hide", "partial")) {
                 var policyRequest = new DataPermissionPolicyCreateRequest();
@@ -872,13 +855,13 @@ class DataPermissionEngineIntegrationTest {
                 policyRequest.setPolicyType("column");
                 policyRequest.setFieldCode(contextField);
                 policyRequest.setMaskType(mask);
-                var policy = policyService.create(policyRequest);
-                policyService.bindToRole(policy.getPid(), localRole.getPid());
+                var policy = asPolicyAuthor(() -> policyService.create(policyRequest));
+                asPolicyAuthor(() -> { policyService.bindToRole(policy.getPid(), localRole.getPid()); return null; });
                 assertThrows(org.springframework.security.access.AccessDeniedException.class,
                         () -> service.score(request, tenantId));
                 assertEquals(providerCalls, prompts.size());
                 assertScoringStored(tableName, scoreField, ownPid, otherPid, 87, 22);
-                policyService.disable(policy.getPid());
+                asPolicyAuthor(() -> { policyService.disable(policy.getPid()); return null; });
             }
             request.setScoreField(readOnlyScore);
             assertThrows(org.springframework.security.access.AccessDeniedException.class,
@@ -907,7 +890,7 @@ class DataPermissionEngineIntegrationTest {
             // A parseable prefix of a truncated provider reply must not mutate either row.
             // Restore the actor's original permission so a denial cannot falsely prove this boundary.
             revokeAtProvider.set(false);
-            assertTrue(roleService.assignPermissions(localRole.getId(), grants));
+            assertTrue(asRoleAuthor(() -> roleService.assignPermissions(localRole.getId(), grants)));
             assertTrue(scoringPermissions.canAction(actorMember.getId(), modelCode, "update"));
             providerStopReason.set("max_tokens");
             providerJson.set(objectMapper.writeValueAsString(List.of(Map.of("id", ownPid, "score", 96))));
@@ -962,8 +945,8 @@ class DataPermissionEngineIntegrationTest {
         req.setPolicyType("column");
         req.setFieldCode("email");
         req.setMaskType("partial");
-        DataPermissionPolicy policy = policyService.create(req);
-        policyService.bindToRole(policy.getPid(), localRole.getPid());
+        DataPermissionPolicy policy = asPolicyAuthor(() -> policyService.create(req));
+        asPolicyAuthor(() -> { policyService.bindToRole(policy.getPid(), localRole.getPid()); return null; });
 
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
@@ -982,8 +965,8 @@ class DataPermissionEngineIntegrationTest {
         req.setModelCode("write_model");
         req.setPolicyType("field_write");
         req.setFieldCode("credit_limit");
-        DataPermissionPolicy policy = policyService.create(req);
-        policyService.bindToRole(policy.getPid(), localRole.getPid());
+        DataPermissionPolicy policy = asPolicyAuthor(() -> policyService.create(req));
+        asPolicyAuthor(() -> { policyService.bindToRole(policy.getPid(), localRole.getPid()); return null; });
 
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
@@ -1193,8 +1176,8 @@ class DataPermissionEngineIntegrationTest {
         req.setScopeType("custom");
         req.setConditionAst(toWire(ast));
         req.setPriority(10);
-        DataPermissionPolicy policy = policyService.create(req);
-        policyService.bindToRole(policy.getPid(), localRole.getPid());
+        DataPermissionPolicy policy = asPolicyAuthor(() -> policyService.create(req));
+        asPolicyAuthor(() -> { policyService.bindToRole(policy.getPid(), localRole.getPid()); return null; });
         return policy;
     }
 
@@ -1225,7 +1208,7 @@ class DataPermissionEngineIntegrationTest {
 
     private DataPermissionPolicy createTestRowPolicy(String name, String modelCode) {
         DataPermissionPolicyCreateRequest req = buildRowRequest(name, modelCode, "self");
-        return policyService.create(req);
+        return asPolicyAuthor(() -> policyService.create(req));
     }
 
     private DataPermissionPolicyCreateRequest buildRowRequest(String name, String modelCode, String scopeType) {

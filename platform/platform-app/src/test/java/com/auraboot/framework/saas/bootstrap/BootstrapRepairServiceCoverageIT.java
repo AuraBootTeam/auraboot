@@ -40,26 +40,33 @@ class BootstrapRepairServiceCoverageIT extends BaseIntegrationTest {
 
     @Test
     @DisplayName("every ordered step repairs its prerequisite and reaches a stable state")
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     void everyStepIdempotent() {
-        // Run in production order so this test establishes its own prerequisites instead
-        // of depending on seed rows left by another test or CI setup phase.
-        for (String step : BootstrapRepairService.ORDERED_STEPS) {
-            var first = bootstrapRepairService.repair(step, opts());
-            assertNotNull(first, step);
-            assertEquals(step, first.stepName(), step);
-            org.assertj.core.api.Assertions.assertThat(first.status())
-                    .as("%s first repair must establish or confirm the invariant; detail=%s",
-                            step, first.detail())
-                    .isNotEqualTo(RepairStepResult.Status.ERROR);
+        var actor = com.auraboot.framework.application.tenant.MetaContext.snapshot();
+        com.auraboot.framework.application.tenant.MetaContext.clear();
+        try {
+            // Run in production order so this test establishes its own prerequisites instead
+            // of depending on seed rows left by another test or CI setup phase.
+            for (String step : BootstrapRepairService.ORDERED_STEPS) {
+                var first = bootstrapRepairService.repair(step, opts());
+                assertNotNull(first, step);
+                assertEquals(step, first.stepName(), step);
+                org.assertj.core.api.Assertions.assertThat(first.status())
+                        .as("%s first repair must establish or confirm the invariant; detail=%s",
+                                step, first.detail())
+                        .isNotEqualTo(RepairStepResult.Status.ERROR);
 
-            var second = bootstrapRepairService.repair(step, opts());
-            List<RepairStepResult.Status> acceptableSteadyState =
-                    step.equals(BootstrapRepairService.STEP_BUILTIN_PLUGINS)
-                            ? List.of(RepairStepResult.Status.PRESENT, RepairStepResult.Status.REPAIRED)
-                            : List.of(RepairStepResult.Status.PRESENT);
-            org.assertj.core.api.Assertions.assertThat(second.status())
-                    .as("%s second repair must be idempotent; detail=%s", step, second.detail())
-                    .isIn(acceptableSteadyState);
+                var second = bootstrapRepairService.repair(step, opts());
+                List<RepairStepResult.Status> acceptableSteadyState =
+                        step.equals(BootstrapRepairService.STEP_BUILTIN_PLUGINS)
+                                ? List.of(RepairStepResult.Status.PRESENT, RepairStepResult.Status.REPAIRED)
+                                : List.of(RepairStepResult.Status.PRESENT);
+                org.assertj.core.api.Assertions.assertThat(second.status())
+                        .as("%s second repair must be idempotent; detail=%s", step, second.detail())
+                        .isIn(acceptableSteadyState);
+            }
+        } finally {
+            com.auraboot.framework.application.tenant.MetaContext.restore(actor);
         }
     }
 

@@ -316,20 +316,32 @@ test('cleanup does not claim release or touch a network when allocation never su
 
 test('cleanup retains stop and release errors without turning them into a successful release claim', t => {
   const result = cleanupWithDocker(t, { created: true, stopFails: true, releaseFails: true, initialStatus: 0 });
-  assert.equal(result.status, 0, 'cleanup must preserve the original suite result');
+  assert.equal(result.status, 2, 'a successful test run cannot hide incomplete owned cleanup');
   assert.match(result.stdout, /stop_status=stop-failed network_status=release-failed/);
   assert.match(readFileSync(path.join(result.artifacts, 'compose-stop.log'), 'utf8'), /stop failure fixture/);
   assert.match(readFileSync(path.join(result.artifacts, 'network-release.log'), 'utf8'), /active endpoints fixture/);
   assert.doesNotMatch(result.stdout, /network_status=released|network released/);
 });
 
+for (const [initialStatus, stopFails, releaseFails, expected] of [
+  [0, true, false, 2], [0, false, true, 2], [1, true, true, 1], [2, true, true, 2],
+]) {
+  test(`owned cleanup preserves failure ${initialStatus}, stop=${stopFails}, release=${releaseFails}`, t => {
+    const result = cleanupWithDocker(t, { created: true, initialStatus, stopFails, releaseFails });
+    assert.equal(result.status, expected);
+    assert.match(result.stderr, /owned infrastructure cleanup incomplete/);
+    assert.doesNotMatch(result.commands, /down|prune|foreign/);
+  });
+}
+
 for (const [sharedStatus, bootstrapStatus, expected] of [[0, 0, 0], [1, 0, 1], [0, 1, 1], [2, 1, 2]]) {
   test(`independent bootstrap preserves statuses ${sharedStatus}/${bootstrapStatus}`, t => {
     const artifacts = mkdtempSync(path.join(tmpdir(), 'oss-ci-status-contract-'));
     t.after(() => rmSync(artifacts, { recursive: true, force: true }));
-    const calls = source.slice(source.indexOf('run_backend_gradle aura_boot --continue cleanTest test'), source.indexOf('# Both task exit codes'));
+    const calls = source.slice(source.indexOf('if (( ${#FOCUSED_TEST_ARGUMENTS[@]} > 0 )); then'), source.indexOf('# Both task exit codes'));
     const result = spawnSync('bash', ['-c', `
       BOOTSTRAP_DATABASE=aura_boot_bootstrap_contract
+      FOCUSED_TEST_ARGUMENTS=()
       run_backend_gradle() {
         printf '%s\\n' "$*"
         if [[ "$*" == *bootstrapBillingAccountTest ]]; then return "$BOOTSTRAP_STATUS"; fi
@@ -437,25 +449,45 @@ test('both original Gradle tasks receive the admitted argument vector without ch
   const root=mkdtempSync(path.join(tmpdir(),'backend-jvm-arguments-'));
   t.after(()=>rmSync(root,{recursive:true,force:true}));mkdirSync(path.join(root,'platform'));
   const wrapper=path.join(root,'platform/gradlew');
-  writeFileSync(wrapper,'#!/usr/bin/env node\nconsole.log(JSON.stringify({args:process.argv.slice(2),database:process.env.TEST_EXPECTED_DATABASE,redis:process.env.TEST_REDIS_DATABASE,springRedis:process.env.SPRING_DATA_REDIS_DATABASE}));process.exit(process.argv.includes("bootstrapBillingAccountTest")?23:0);\n',{mode:0o755});
+  writeFileSync(wrapper,'#!/usr/bin/env node\nconsole.log(JSON.stringify({args:process.argv.slice(2),database:process.env.TEST_EXPECTED_DATABASE,redis:process.env.TEST_REDIS_DATABASE,springRedis:process.env.SPRING_DATA_REDIS_DATABASE,storage:process.env.AURA_FILE_STORAGE_PATH,evidence:process.env.AURA_EVIDENCE_ROOT}));process.exit(process.argv.includes("bootstrapBillingAccountTest")?23:0);\n',{mode:0o755});
   const run=source.match(/run_backend_gradle\(\) \{[\s\S]*?\n\}/)?.[0];assert.ok(run);
+  const parser=source.slice(source.indexOf('RESOURCE_ARGUMENTS=()'),source.indexOf('\nrun_backend_gradle()'));
+  assert.ok(parser.includes('incomplete bounded JVM arguments'));
   const argv=resourceArguments();
   const quoted=value=>"'"+value.replaceAll("'","'\\''")+"'";
   const result=spawnSync('bash',['-c',`set -uo pipefail
     AURA_OSS_CI_POSTGRES_PORT=25000 AURA_OSS_CI_REDIS_PORT=26000 AURA_OSS_CI_KAFKA_PORT=27000
     BOOTSTRAP_DATABASE=aura_boot_bootstrap_contract ARTIFACTS=${quoted(root)}
-    RESOURCE_ARGUMENTS=(${argv.map(quoted).join(' ')})
+    environment_invalid() { echo \"$1\" >&2; exit 2; }
+    resource_arguments=${quoted(argv.join('\n'))}
+    ${parser}
     ${run}
     run_backend_gradle aura_boot --continue cleanTest test
     run_backend_gradle aura_boot --continue bootstrapBillingAccountTest
   `],{cwd:root,encoding:'utf8',env:{PATH:process.env.PATH}});
+  for(const invalid of [argv.slice(0,-1),[...argv,'-Pforeign=1']]) {
+    const rejected=spawnSync('bash',['-c',`set -uo pipefail
+      environment_invalid() { echo "$1" >&2; exit 2; }
+      resource_arguments=${quoted(invalid.join('\n'))}
+      ${parser}
+      echo forbidden-gradle-start
+    `],{encoding:'utf8',env:{PATH:process.env.PATH}});
+    assert.equal(rejected.status,2,'incomplete or extra arguments must stop before Gradle');
+    assert.doesNotMatch(rejected.stdout,/forbidden-gradle-start/);
+  }
   assert.equal(result.status,23,result.stderr);
   const invocations=result.stdout.trim().split('\n').map(line=>JSON.parse(line));assert.equal(invocations.length,2);
-  for(const row of invocations) {assert.equal(row.database,'aura_boot');assert.equal(row.redis,'0');assert.equal(row.springRedis,'0');}
+  for(const row of invocations) {
+    assert.equal(row.database,'aura_boot');assert.equal(row.redis,'0');assert.equal(row.springRedis,'0');
+    assert.equal(row.storage,path.join(root,'test-runtime/aura_boot/files'));
+    assert.equal(row.evidence,path.join(root,'test-runtime/aura_boot/evidence'));
+    for(const directory of [row.storage,row.evidence])assert.equal(statSync(directory).mode&0o777,0o700);
+  }
   const rows=invocations.map(row=>row.args);
-  for(const row of rows){assert.deepEqual(row.slice(3,8),argv);assert.deepEqual(row.slice(0,3),['--no-daemon','-p','platform']);}
-  assert.deepEqual(rows[0].slice(8),['--continue','cleanTest','test']);
-  assert.deepEqual(rows[1].slice(8),['--continue','bootstrapBillingAccountTest']);
+  for(const row of rows){assert.deepEqual(row.slice(3,3+argv.length),argv);assert.deepEqual(row.slice(0,3),['--no-daemon','-p','platform']);}
+  assert.ok(argv.includes('-PauraAppTestForkEvery=64'),'the admitted worker lifetime must reach every original Gradle invocation');
+  assert.deepEqual(rows[0].slice(3+argv.length),['--continue','cleanTest','test']);
+  assert.deepEqual(rows[1].slice(3+argv.length),['--continue','bootstrapBillingAccountTest']);
   assert.doesNotMatch(rows.flat().join('\n'),/--tests|exclude|retry|ContextCache/);
 });
 

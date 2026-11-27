@@ -69,19 +69,40 @@ class AtomicIncrementConcurrencyIT extends BaseIntegrationTest {
 
     // ── Setup ────────────────────────────────────────────────────────────────
 
+    @Autowired private com.auraboot.framework.tenant.service.TenantService fixtureTenants;
+    @Autowired private com.auraboot.framework.tenant.service.TenantMemberService fixtureMembers;
+    @Autowired private com.auraboot.framework.permission.service.UserPermissionService fixturePermissions;
+    private com.auraboot.framework.tenant.dao.entity.Tenant fixtureTenant;
+    private com.auraboot.framework.tenant.dao.entity.TenantMember fixtureMember;
+    private com.auraboot.framework.integration.NativePermissionFixture nativeAuthority;
+    private void atomicActor() {
+        MetaContext.setContext(fixtureTenant.getId(),getTestUser().getId(),getTestUser().getPid(),getTestUser().getUserName());
+        MetaContext.setMemberId(fixtureMember.getId());
+    }
+    @AfterAll void releaseOwnedAuthority() { if (nativeAuthority != null) nativeAuthority.close(); }
+
     @BeforeAll
     void initModelCode() {
+        String suffix=UniqueIdGenerator.generate().toLowerCase();
+        fixtureTenant=new com.auraboot.framework.tenant.dao.entity.Tenant();
+        fixtureTenant.setPid(UniqueIdGenerator.generate());fixtureTenant.setName("atomic-fixture-"+suffix);
+        fixtureTenant.setDisplayName("Owned atomic kernel fixture");fixtureTenant.setStatus("active");
+        fixtureTenant.setDeletedFlag(false);fixtureTenant.setCreatedAt(Instant.now());fixtureTenant.setUpdatedAt(Instant.now());
+        fixtureTenant=fixtureTenants.createTenant(fixtureTenant);
+        fixtureMember=fixtureMembers.addMember(getTestUser().getId(),fixtureTenant.getId(),"active");
         modelCode = "ai_ctr_" + System.currentTimeMillis();
     }
 
     @BeforeEach
     void ensureModel() {
-        setupTenantContext();
+        atomicActor();
         if (!modelReady) {
             dropIfExists();
             createModel();
             createFields();
             createPhysicalTable();
+            nativeAuthority=new com.auraboot.framework.integration.NativePermissionFixture(jdbcTemplate,fixturePermissions);
+            nativeAuthority.grantModel(modelCode,"create","read","update","delete");
             modelReady = true;
             log.info("[atomic-it] model={} ready", modelCode);
         }
@@ -109,7 +130,7 @@ class AtomicIncrementConcurrencyIT extends BaseIntegrationTest {
     @Test
     @DisplayName("incrementWithinCap never exceeds cap under concurrency (200 threads, cap=100)")
     void incrementWithinCap_never_exceeds_cap_under_concurrency() throws Exception {
-        setupTenantContext();
+        atomicActor();
 
         Map<String, Object> row = new HashMap<>();
         row.put("counter", 0);
@@ -123,27 +144,34 @@ class AtomicIncrementConcurrencyIT extends BaseIntegrationTest {
         CountDownLatch start = new CountDownLatch(1);
         AtomicInteger granted = new AtomicInteger();
         List<Future<?>> futures = new ArrayList<>();
-        long tenantId = getTestTenant().getId();
+        long tenantId = fixtureTenant.getId();
 
-        for (int i = 0; i < threads; i++) {
-            futures.add(pool.submit(() -> {
-                start.await();
-                MetaContext.setContext(tenantId, 0L, null, "system");
-                try {
-                    if (dynamicDataService.incrementWithinCap(modelCode, pid, "counter", 1L, "cap").isPresent()) {
-                        granted.incrementAndGet();
-                    }
-                } finally {
+        try {
+            for (int i = 0; i < threads; i++) {
+                futures.add(pool.submit(() -> {
+                    start.await();
                     MetaContext.clear();
-                }
-                return null;
-            }));
+                    MetaContext.setSystemTenantContext(tenantId);
+                    try {
+                        if (dynamicDataService.incrementWithinCap(modelCode, pid, "counter", 1L, "cap").isPresent()) {
+                            granted.incrementAndGet();
+                        }
+                    } finally {
+                        MetaContext.clear();
+                    }
+                    return null;
+                }));
+            }
+            start.countDown();
+            for (Future<?> f : futures) f.get(30, java.util.concurrent.TimeUnit.SECONDS);
+        } finally {
+            start.countDown();
+            pool.shutdownNow();
+            assertThat(pool.awaitTermination(30, java.util.concurrent.TimeUnit.SECONDS))
+                    .as("All owned counter workers must terminate").isTrue();
         }
-        start.countDown();
-        for (Future<?> f : futures) f.get();
-        pool.shutdown();
 
-        MetaContext.setContext(tenantId, 0L, null, "system");
+        atomicActor();
         Map<String, Object> reloaded = MetaContext.runWithCommandPermitScope("ALL",
                 () -> dynamicDataService.getById(modelCode, pid));
         long finalCounter = ((Number) reloaded.get("counter")).longValue();
@@ -164,7 +192,7 @@ class AtomicIncrementConcurrencyIT extends BaseIntegrationTest {
     @Test
     @DisplayName("increment has no lost updates under concurrency (200 threads, unbounded)")
     void increment_has_no_lost_updates_under_concurrency() throws Exception {
-        setupTenantContext();
+        atomicActor();
 
         Map<String, Object> row = new HashMap<>();
         row.put("counter", 0);
@@ -177,25 +205,32 @@ class AtomicIncrementConcurrencyIT extends BaseIntegrationTest {
         ExecutorService pool = Executors.newFixedThreadPool(32);
         CountDownLatch start = new CountDownLatch(1);
         List<Future<?>> futures = new ArrayList<>();
-        long tenantId = getTestTenant().getId();
+        long tenantId = fixtureTenant.getId();
 
-        for (int i = 0; i < threads; i++) {
-            futures.add(pool.submit(() -> {
-                start.await();
-                MetaContext.setContext(tenantId, 0L, null, "system");
-                try {
-                    dynamicDataService.increment(modelCode, pid, "counter", 1L);
-                } finally {
+        try {
+            for (int i = 0; i < threads; i++) {
+                futures.add(pool.submit(() -> {
+                    start.await();
                     MetaContext.clear();
-                }
-                return null;
-            }));
+                    MetaContext.setSystemTenantContext(tenantId);
+                    try {
+                        dynamicDataService.increment(modelCode, pid, "counter", 1L);
+                    } finally {
+                        MetaContext.clear();
+                    }
+                    return null;
+                }));
+            }
+            start.countDown();
+            for (Future<?> f : futures) f.get(30, java.util.concurrent.TimeUnit.SECONDS);
+        } finally {
+            start.countDown();
+            pool.shutdownNow();
+            assertThat(pool.awaitTermination(30, java.util.concurrent.TimeUnit.SECONDS))
+                    .as("All owned counter workers must terminate").isTrue();
         }
-        start.countDown();
-        for (Future<?> f : futures) f.get();
-        pool.shutdown();
 
-        MetaContext.setContext(tenantId, 0L, null, "system");
+        atomicActor();
         long finalCounter = ((Number) MetaContext.runWithCommandPermitScope("ALL",
                 () -> dynamicDataService.getById(modelCode, pid)).get("counter")).longValue();
         log.info("[atomic-it] increment: finalCounter={}", finalCounter);
@@ -211,7 +246,7 @@ class AtomicIncrementConcurrencyIT extends BaseIntegrationTest {
     @Test
     @DisplayName("null cap denies increment (safe-by-default)")
     void null_cap_denies() {
-        setupTenantContext();
+        atomicActor();
 
         Map<String, Object> created = dynamicDataService.create(modelCode, Map.of("counter", 0, "cap", 5));
         String pid = Objects.toString(created.get("pid"));
@@ -220,8 +255,8 @@ class AtomicIncrementConcurrencyIT extends BaseIntegrationTest {
         // Force cap to NULL via raw JDBC (bypasses any application-level NOT NULL defaults)
         jdbcTemplate.update("UPDATE mt_" + modelCode + " SET cap = NULL WHERE pid = ?", pid);
 
-        long tenantId = getTestTenant().getId();
-        MetaContext.setContext(tenantId, 0L, null, "system");
+        long tenantId = fixtureTenant.getId();
+        atomicActor();
         try {
             assertThat(dynamicDataService.incrementWithinCap(modelCode, pid, "counter", 1L, "cap"))
                     .as("NULL cap must deny (safe-by-default)")
@@ -240,7 +275,7 @@ class AtomicIncrementConcurrencyIT extends BaseIntegrationTest {
             log.debug("[atomic-it] dropIfExists table: {}", e.getMessage());
         }
         try {
-            Long tenantId = getTestTenant().getId();
+            Long tenantId = fixtureTenant.getId();
             // Remove bindings first (FK), then orphaned fields, then the model
             jdbcTemplate.update(
                     "DELETE FROM ab_meta_model_field_binding WHERE model_id IN "
@@ -261,7 +296,7 @@ class AtomicIncrementConcurrencyIT extends BaseIntegrationTest {
     private void createModel() {
         Model m = new Model();
         m.setPid(UniqueIdGenerator.generate());
-        m.setTenantId(getTestTenant().getId());
+        m.setTenantId(fixtureTenant.getId());
         m.setCode(modelCode);
         m.setVersion(1);
         m.setIsCurrent(true);
@@ -293,7 +328,7 @@ class AtomicIncrementConcurrencyIT extends BaseIntegrationTest {
      * residue before inserting; live non-ai_ctr fields with those codes are kept.
      */
     private void purgeFieldResidue() {
-        Long tenantId = getTestTenant().getId();
+        Long tenantId = fixtureTenant.getId();
         jdbcTemplate.update(
                 "DELETE FROM ab_meta_field WHERE tenant_id = ? AND code IN ('pid', 'counter', 'cap') "
                 + "AND (deleted_flag = TRUE "
@@ -307,7 +342,7 @@ class AtomicIncrementConcurrencyIT extends BaseIntegrationTest {
     private void bindField(String code, String dataType, boolean primaryKey, boolean required, int order) {
         Field f = new Field();
         f.setPid(UniqueIdGenerator.generate());
-        f.setTenantId(getTestTenant().getId());
+        f.setTenantId(fixtureTenant.getId());
         f.setCode(code);
         f.setDataType(dataType);
         f.setVersion(1);
@@ -331,7 +366,7 @@ class AtomicIncrementConcurrencyIT extends BaseIntegrationTest {
 
         metaFieldMapper.insert(f);
 
-        Long tenantId = getTestTenant().getId();
+        Long tenantId = fixtureTenant.getId();
         Long modelId = metaModelMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<Model>()
                         .eq("code", modelCode).eq("tenant_id", tenantId)

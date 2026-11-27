@@ -30,12 +30,15 @@ import static org.mockito.Mockito.when;
 class FieldRoleQualificationIT extends BaseIntegrationTest {
     @Autowired private RoleMapper roles;
     @Autowired private JdbcTemplate jdbc;
-    private Long user, member, role, assignment;
+    private Long user, member, role, assignment, foreignTenant;
     private FieldPermissionServiceImpl fields;
     private final AtomicReference<List<Long>> contributed = new AtomicReference<>(List.of());
 
     @BeforeEach
     void actor() {
+        foreignTenant = TestIdGenerator.uniqueUserId();
+        jdbc.update("INSERT INTO ab_tenant (id,pid,name,status,deleted_flag) VALUES (?,?,?,'active',FALSE)",
+                foreignTenant, UniqueIdGenerator.generate(), "Foreign qualification tenant");
         user = TestIdGenerator.uniqueUserId();
         member = TestIdGenerator.uniqueUserId();
         role = TestIdGenerator.uniqueUserId();
@@ -83,15 +86,15 @@ class FieldRoleQualificationIT extends BaseIntegrationTest {
         switch (state) {
             case "role-disabled" -> jdbc.update("UPDATE ab_role SET status='disabled' WHERE id=?", role);
             case "role-deleted" -> jdbc.update("UPDATE ab_role SET deleted_flag=TRUE WHERE id=?", role);
-            case "role-tenant" -> jdbc.update("UPDATE ab_role SET tenant_id=1 WHERE id=?", role);
+            case "role-tenant" -> jdbc.update("UPDATE ab_role SET tenant_id=? WHERE id=?", foreignTenant, role);
             case "assignment-disabled" -> jdbc.update("UPDATE ab_user_role SET status='disabled' WHERE id=?", assignment);
             case "assignment-deleted" -> jdbc.update("UPDATE ab_user_role SET deleted_flag=TRUE WHERE id=?", assignment);
-            case "assignment-tenant" -> jdbc.update("UPDATE ab_user_role SET tenant_id=1 WHERE id=?", assignment);
+            case "assignment-tenant" -> jdbc.update("UPDATE ab_user_role SET tenant_id=? WHERE id=?", foreignTenant, assignment);
             case "future" -> jdbc.update("UPDATE ab_user_role SET effective_date=CURRENT_DATE+1 WHERE id=?", assignment);
             case "expired" -> jdbc.update("UPDATE ab_user_role SET expiry_date=CURRENT_DATE-1 WHERE id=?", assignment);
             case "member-disabled" -> jdbc.update("UPDATE ab_tenant_member SET status='disabled' WHERE id=?", member);
             case "member-deleted" -> jdbc.update("UPDATE ab_tenant_member SET deleted_flag=TRUE WHERE id=?", member);
-            case "member-tenant" -> jdbc.update("UPDATE ab_tenant_member SET tenant_id=1 WHERE id=?", member);
+            case "member-tenant" -> jdbc.update("UPDATE ab_tenant_member SET tenant_id=? WHERE id=?", foreignTenant, member);
             case "member-user" -> {
                 Long other = TestIdGenerator.uniqueUserId();
                 jdbc.update("INSERT INTO ab_user (id,pid,is_enabled,deleted_flag) VALUES (?,?,TRUE,FALSE)",
@@ -121,7 +124,7 @@ class FieldRoleQualificationIT extends BaseIntegrationTest {
         hidden();
         contributed.set(List.of(role));
         allowed();
-        jdbc.update("UPDATE ab_role SET tenant_id=1 WHERE id=?", role);
+        jdbc.update("UPDATE ab_role SET tenant_id=? WHERE id=?", foreignTenant, role);
         hidden();
         jdbc.update("UPDATE ab_role SET tenant_id=? WHERE id=?", testTenant.getId(), role);
         allowed();
@@ -142,7 +145,7 @@ class FieldRoleQualificationIT extends BaseIntegrationTest {
     void assignedGlobalTemplateStillUsesCurrentTenantMembership() {
         jdbc.update("UPDATE ab_role SET tenant_id=NULL WHERE id=?", role);
         allowed();
-        jdbc.update("UPDATE ab_user_role SET tenant_id=1 WHERE id=?", assignment);
+        jdbc.update("UPDATE ab_user_role SET tenant_id=? WHERE id=?", foreignTenant, assignment);
         hidden();
     }
 }

@@ -32,20 +32,36 @@ public class WatchServiceIntegrationTest extends BaseIntegrationTest {
 
     private final String testRunId = String.valueOf(System.currentTimeMillis());
     private final String modelCode = "test_watch_" + System.currentTimeMillis();
-    private final Long recordId1 = 10001L;
-    private final Long recordId2 = 10002L;
-    private final String recordPid1 = "watch_pid_" + testRunId + "_1";
-    private final String recordPid2 = "watch_pid_" + testRunId + "_2";
+    private Long recordId1;
+    private Long recordId2;
+    private String recordPid1;
+    private String recordPid2;
+
+    @Autowired private com.auraboot.framework.meta.service.MetaModelService fixtureModels;
+    @Autowired private com.auraboot.framework.meta.service.SchemaManagementService fixtureSchema;
+    @Autowired private com.auraboot.framework.meta.service.DynamicDataService fixtureData;
+
+    @BeforeEach
+    void prepareReadableWatchRecords() {
+        grantCommittedPermissionToTestRole("model." + modelCode + ".create", "model", modelCode, "create", "Seed owned watch records");
+        grantCommittedPermissionToTestRole("model." + modelCode + ".read", "model", modelCode, "read", "Read owned watch records");
+        if (recordId1 != null) return;
+        fixtureModels.saveDefinition(com.auraboot.framework.meta.dto.ModelDefinition.builder()
+                .code(modelCode).tableName("mt_" + modelCode).modelType("entity").status("published")
+                .fields(List.of(com.auraboot.framework.meta.dto.FieldDefinition.builder()
+                        .code("name").columnName("name").dataType("string").build())).build());
+        assertThat(fixtureSchema.createTableByModel(modelCode).isSuccess()).isTrue();
+        var first = fixtureData.create(modelCode, java.util.Map.of("name", "numeric first"));
+        var second = fixtureData.create(modelCode, java.util.Map.of("name", "numeric second"));
+        recordId1 = ((Number) first.get("id")).longValue();
+        recordId2 = ((Number) second.get("id")).longValue();
+        recordPid1 = fixtureData.create(modelCode, java.util.Map.of("name", "pid first")).get("pid").toString();
+        recordPid2 = fixtureData.create(modelCode, java.util.Map.of("name", "pid second")).get("pid").toString();
+    }
 
     @AfterAll
     void cleanupTestData() {
-        // Restore MetaContext — @AfterEach clears it, but mapper needs tenant_id
-        MetaContext.setContext(
-                getTestTenant().getId(),
-                getTestUser().getId(),
-                getTestUser().getPid(),
-                getTestUser().getUserName()
-        );
+        applyTestMetaContext();
         // Clean up test records to avoid polluting DB across runs
         watchMapper.delete(new LambdaQueryWrapper<AbWatch>()
                 .eq(AbWatch::getModelCode, modelCode));
@@ -58,6 +74,14 @@ public class WatchServiceIntegrationTest extends BaseIntegrationTest {
 
         assertThat(result).isTrue();
         assertThat(watchService.isWatching(modelCode, recordId1)).isTrue();
+    }
+
+    @Test
+    @Order(13)
+    void missingNumericRecordCannotCreateSubscription() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> watchService.toggleWatch(modelCode, Long.MAX_VALUE))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(watchService.isWatching(modelCode, Long.MAX_VALUE)).isFalse();
     }
 
     @Test

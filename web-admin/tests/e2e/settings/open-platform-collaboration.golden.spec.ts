@@ -1,65 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createCookieSessionStorage } from 'react-router';
+import { openPlatformSession, installOpenPlatformSession } from '../../helpers/open-platform-session';
 import path from 'node:path';
-import { BACKEND_URL, BASE_URL as WEB_BASE_URL } from '../../helpers/environments';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 
 const EVIDENCE_DIR = path.join(
   process.env.AURA_EVIDENCE_ROOT || '/tmp',
   'open-platform-collaboration-20260927',
 );
-const sessionStorage = createCookieSessionStorage({
-  cookie: {
-    name: '__session',
-    httpOnly: true,
-    path: '/',
-    sameSite: 'lax',
-    secrets: [process.env.SESSION_SECRET || 'dev-only-secret-do-not-use-in-production'],
-    secure: false,
-  },
-});
-
 type Role = 'owner' | 'maintainer' | 'viewer';
 
 async function authenticate(page: Page) {
-  const loginResponse = await page.request.post(`${BACKEND_URL}/api/auth/login`, {
-    data: { email: DEFAULT_TEST_ACCOUNT.email, password: DEFAULT_TEST_ACCOUNT.password },
-  });
-  expect(loginResponse.ok()).toBeTruthy();
-  const login = (await loginResponse.json()).data;
-  let jwt = login.jwt as string;
-  if (!login.tenantId) {
-    const spacesResponse = await page.request.get(`${BACKEND_URL}/api/tenant-selection/my-spaces`, {
-      headers: { Authorization: `Bearer ${jwt}` },
-    });
-    expect(spacesResponse.ok()).toBeTruthy();
-    const spaces = (await spacesResponse.json()).data as Array<{
-      tenantId: string;
-      spaceType: string;
-    }>;
-    const businessTenant = spaces.find((space) => space.spaceType === 'business');
-    expect(businessTenant).toBeTruthy();
-    const selectionResponse = await page.request.post(
-      `${BACKEND_URL}/api/tenant-selection/process`,
-      {
-        headers: { Authorization: `Bearer ${jwt}` },
-        data: { action: 'select', tenantId: businessTenant!.tenantId },
-      },
-    );
-    expect(selectionResponse.ok()).toBeTruthy();
-    jwt = (await selectionResponse.json()).data.jwt;
-  }
-  expect(jwt).toEqual(expect.any(String));
-  const session = await sessionStorage.getSession();
-  session.set('jwtToken', jwt);
-  const setCookie = await sessionStorage.commitSession(session, { maxAge: 604800 });
-  const value = setCookie.match(/__session=([^;]+)/)?.[1];
-  expect(value).toBeTruthy();
-  await page.context().addCookies([
-    { name: '__session', value: value!, url: WEB_BASE_URL, httpOnly: true, sameSite: 'Lax' },
-    { name: 'locale', value: 'zh-CN', url: WEB_BASE_URL, sameSite: 'Lax' },
-  ]);
-  await page.addInitScript(() => localStorage.setItem('locale', 'zh-CN'));
+  await installOpenPlatformSession(page, await openPlatformSession(DEFAULT_TEST_ACCOUNT));
 }
 
 async function capture(page: Page, id: string) {

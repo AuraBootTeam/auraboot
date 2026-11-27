@@ -76,6 +76,8 @@ class DynamicDataJsonReadShapeIT extends BaseIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired private com.auraboot.framework.permission.service.UserPermissionService fixturePermissions;
+    private com.auraboot.framework.integration.NativePermissionFixture nativeAuthority;
     private String modelCode;
     private String nameField;
     private String jsonArrayField;   // declared dataType "json"  — the quote/BOM spelling
@@ -100,6 +102,8 @@ class DynamicDataJsonReadShapeIT extends BaseIntegrationTest {
             createModel();
             createFields();
             createPhysicalTable();
+            nativeAuthority = new com.auraboot.framework.integration.NativePermissionFixture(jdbcTemplate, fixturePermissions);
+            nativeAuthority.grantModel(modelCode, "create", "read", "update", "delete");
             modelReady = true;
             log.info("[json-shape-it] model={} ready", modelCode);
         }
@@ -115,6 +119,7 @@ class DynamicDataJsonReadShapeIT extends BaseIntegrationTest {
 
     @AfterAll
     void teardown() {
+        if (nativeAuthority != null) nativeAuthority.close();
         dropIfExists();
     }
 

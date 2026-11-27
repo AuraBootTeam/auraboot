@@ -6,6 +6,7 @@ import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,10 +14,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Arrays;
 import java.util.List;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -25,9 +28,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("TenantMemberServiceImpl")
@@ -182,14 +187,29 @@ class TenantMemberServiceImplTest {
     }
 
     @Test
-    @DisplayName("activateMember sets ACTIVE status")
+    @DisplayName("activateMember restores ACTIVE presence for the same member")
     void activateOk() {
-        TenantMember m = member(1L, 10L, 7L, StatusConstants.PENDING);
+        com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(
+                new org.apache.ibatis.builder.MapperBuilderAssistant(
+                        new com.baomidou.mybatisplus.core.MybatisConfiguration(), ""), TenantMember.class);
+        TenantMember m = member(1L, 10L, 7L, StatusConstants.INACTIVE);
+        m.setLeaveDate(Instant.parse("2026-01-01T00:00:00Z"));
         doReturn(m).when(spyService).getById(1L);
-        doReturn(true).when(spyService).updateById(m);
+        when(tenantMemberMapper.update(isNull(), any())).thenReturn(1);
 
         assertTrue(spyService.activateMember(1L));
-        assertEquals(StatusConstants.ACTIVE, m.getStatus());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<LambdaUpdateWrapper<TenantMember>> update = ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
+        verify(tenantMemberMapper).update(isNull(), update.capture());
+        LambdaUpdateWrapper<TenantMember> statement = update.getValue();
+        assertEquals("status=#{ew.paramNameValuePairs.MPGENVAL1},leave_date=#{ew.paramNameValuePairs.MPGENVAL2},updated_at=#{ew.paramNameValuePairs.MPGENVAL3}",
+                statement.getSqlSet());
+        assertEquals("(id = #{ew.paramNameValuePairs.MPGENVAL4})", statement.getSqlSegment());
+        assertEquals(StatusConstants.ACTIVE, statement.getParamNameValuePairs().get("MPGENVAL1"));
+        assertTrue(statement.getParamNameValuePairs().containsKey("MPGENVAL2"));
+        assertNull(statement.getParamNameValuePairs().get("MPGENVAL2"));
+        assertTrue(statement.getParamNameValuePairs().get("MPGENVAL3") instanceof Instant);
+        assertEquals(1L, statement.getParamNameValuePairs().get("MPGENVAL4"));
     }
 
     @Test

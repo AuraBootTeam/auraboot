@@ -78,6 +78,8 @@ class AggregateBindingGuardWiringTest {
     @Mock private MetaModelMapper metaModelMapper;
     @Mock private ApplicationContext applicationContext;
     @Mock private PayloadTemporalNormalizer payloadTemporalNormalizer;
+    @Mock private NativeRecordFieldAuthorization nativeRecordFieldAuthorization;
+    @Mock private NativeReadFieldProjection nativeReadFields;
     @Mock private FieldPermissionService fieldPermissionService;
     @Mock private ExecutorRegistry executorRegistry;
     @Mock private PermissionFacade permissionFacade;
@@ -131,6 +133,13 @@ class AggregateBindingGuardWiringTest {
         lenient().when(applicationContext.getBean(PermissionFacade.class)).thenReturn(permissionFacade);
         lenient().when(applicationContext.getBean(WorkflowCapabilityRegistry.class))
                 .thenReturn(workflowCapabilityRegistry);
+        lenient().when(applicationContext.getBean(NativeRecordFieldAuthorization.class))
+                .thenReturn(nativeRecordFieldAuthorization);
+        lenient().when(nativeReadFields.readWithinSnapshot(anyString(), any()))
+                .thenAnswer(call -> ((java.util.function.Supplier<?>) call.getArgument(1)).get());
+        lenient().when(nativeReadFields.project(any(), anyList())).thenAnswer(call -> call.getArgument(1));
+        lenient().when(nativeReadFields.publicWriteResult(any(), anyMap(), any()))
+                .thenAnswer(call -> call.getArgument(1));
         allowRead();
     }
 

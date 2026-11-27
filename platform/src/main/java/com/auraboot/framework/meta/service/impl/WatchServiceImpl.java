@@ -29,7 +29,7 @@ public class WatchServiceImpl implements WatchService {
     private final com.auraboot.framework.meta.service.RecordReadAccess recordReadAccess;
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public boolean toggleWatch(String modelCode, Long recordId) {
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
@@ -41,13 +41,13 @@ public class WatchServiceImpl implements WatchService {
             return false;
         }
 
-        recordReadAccess.requireReadable(modelCode, String.valueOf(recordId));
+        String recordPid = recordReadAccess.requireReadableByNumericId(modelCode, recordId);
         AbWatch watch = new AbWatch();
         watch.setTenantId(tenantId);
         watch.setUserId(userId);
         watch.setModelCode(modelCode);
         watch.setRecordId(recordId);
-        watch.setRecordPid(recordId != null ? String.valueOf(recordId) : null);
+        watch.setRecordPid(recordPid);
         watch.setCreatedAt(Instant.now());
         watchMapper.insert(watch);
         log.debug("User {} now watching {}/{}", userId, modelCode, recordId);
@@ -55,7 +55,7 @@ public class WatchServiceImpl implements WatchService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public boolean toggleWatchByRecordPid(String modelCode, String recordPid) {
         if (!StringUtils.hasText(recordPid)) {
             return false;
@@ -105,7 +105,7 @@ public class WatchServiceImpl implements WatchService {
     public List<Long> getWatchers(String modelCode, Long recordId) {
         Long tenantId = MetaContext.getCurrentTenantId();
         return watchMapper.findWatcherUserIds(tenantId, modelCode, recordId).stream()
-                .filter(userId -> recordReadAccess.isReadableBy(tenantId, userId, modelCode, String.valueOf(recordId)))
+                .filter(userId -> recordReadAccess.isReadableByNumericId(tenantId, userId, modelCode, recordId))
                 .toList();
     }
 

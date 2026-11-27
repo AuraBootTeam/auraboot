@@ -26,11 +26,7 @@ import com.auraboot.framework.meta.mapper.MetaModelMapper;
 import com.auraboot.framework.meta.service.CommandService;
 import com.auraboot.framework.meta.service.SchemaManagementService;
 import com.auraboot.framework.tenant.dao.entity.Tenant;
-import com.auraboot.framework.tenant.dao.entity.TenantMember;
-import com.auraboot.framework.tenant.service.TenantMemberService;
-import com.auraboot.framework.tenant.service.TenantService;
 import com.auraboot.framework.user.dao.entity.User;
-import com.auraboot.framework.user.service.UserService;
 import java.time.Instant;
 import java.util.*;
 import lombok.extern.slf4j.Slf4j;
@@ -68,7 +64,8 @@ import org.springframework.test.context.ActiveProfiles;
 @SpringBootTest(classes = TestApplication.class)
 @ActiveProfiles("integration-test")
 @DisplayName("Agent write command → agent tool path → real command pipeline → DB (gap 1)")
-class AgentWriteCommandPipelineIT {
+@org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+class AgentWriteCommandPipelineIT extends com.auraboot.framework.integration.BaseIntegrationTest {
 
     @Autowired private ToolProviderRegistry toolProviderRegistry;
     @Autowired private CommandService commandService;
@@ -78,25 +75,26 @@ class AgentWriteCommandPipelineIT {
     @Autowired private MetaModelFieldBindingMapper fieldBindingMapper;
     @Autowired private DynamicDataMapper dynamicDataMapper;
     @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
-    @Autowired private UserService userService;
-    @Autowired private TenantService tenantService;
-    @Autowired private TenantMemberService tenantMemberService;
 
     private User testUser;
     private Tenant testTenant;
     private final List<String> createdTables = new ArrayList<>();
+    private final List<String> createdCommands = new ArrayList<>();
     private final List<Model> createdModels = new ArrayList<>();
     private final List<Field> createdFields = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
-        ensureTestDataExists();
-        MetaContext.setContext(testTenant.getId(), testUser.getId(), testUser.getPid(), testUser.getUserName());
+        testUser = getTestUser();
+        testTenant = getTestTenant();
+        applyTestMetaContext();
     }
 
     @AfterEach
     void tearDown() {
         try {
+            for (String pid : createdCommands) commandService.delete(pid);
+            createdCommands.clear();
             for (String table : createdTables) {
                 try { dynamicDataMapper.alterTable("DROP TABLE IF EXISTS " + table); } catch (Exception ignore) {}
             }
@@ -124,7 +122,10 @@ class AgentWriteCommandPipelineIT {
         String nameField = "name_" + suffix;
         String modelCode = createModel(suffix, nameField + ":STRING");
         String tableName = "mt_" + modelCode.toLowerCase();
-        String commandCode = createCommand(modelCode, "{}", Map.of("name", nameField));
+        String authority = "model." + modelCode + ".create";
+        grantCommittedPermissionToTestRole(authority, "model", modelCode, "create", "Create agent write fixture");
+        grantCommittedPermissionToTestRole("model." + modelCode + ".read", "model", modelCode, "read", "Read agent write fixture");
+        String commandCode = createCommand(modelCode, "{\"permissions\":[\"" + authority + "\"]}", Map.of("name", nameField));
 
         String toolCode = "cmd:" + commandCode;
         String recordName = "gap1-write-" + suffix;
@@ -168,32 +169,6 @@ class AgentWriteCommandPipelineIT {
         Long n = jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM " + tableName + " WHERE " + field + " = ?", Long.class, value);
         return n != null ? n : 0L;
-    }
-
-    private void ensureTestDataExists() {
-        String testEmail = "agent-write-pipeline-test@auraboot.com";
-        testUser = userService.findByEmail(testEmail);
-        if (testUser == null) {
-            testUser = userService.signUp(testEmail, "test-password-123");
-        }
-        String tenantName = "agent-write-pipeline-test-tenant";
-        testTenant = tenantService.findByName(tenantName);
-        if (testTenant == null) {
-            Tenant tenant = new Tenant();
-            tenant.setPid(UniqueIdGenerator.generate());
-            tenant.setName(tenantName);
-            tenant.setDisplayName("Agent Write Pipeline Test Tenant");
-            tenant.setStatus("active");
-            tenant.setContactEmail("admin@agent-write-pipeline-test.com");
-            tenant.setDeletedFlag(false);
-            tenant.setCreatedAt(Instant.now());
-            tenant.setUpdatedAt(Instant.now());
-            testTenant = tenantService.createTenant(tenant);
-        }
-        TenantMember member = tenantMemberService.findByTenantIdAndUserId(testTenant.getId(), testUser.getId());
-        if (member == null) {
-            tenantMemberService.addMember(testUser.getId(), testTenant.getId(), "active");
-        }
     }
 
     private String createModel(String suffix, String... fieldDefs) {
@@ -273,6 +248,7 @@ class AgentWriteCommandPipelineIT {
         request.setExecutionConfig(executionConfigJson);
         CommandDefinitionDTO created = commandService.create(request);
         assertNotNull(created, "Command creation should succeed");
+        createdCommands.add(created.getPid());
         int seq = 1;
         for (Map.Entry<String, String> mapping : fieldMappings.entrySet()) {
             BindingRuleDTO rule = new BindingRuleDTO();

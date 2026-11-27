@@ -66,9 +66,15 @@ class QueryResultCacheRevocationIT {
                         .code("secret").columnName("secret").dataType("string").build())).build());
         assertTrue(schema.createTableByModel(model).isSuccess());
         // This row belongs to somebody else, so a committed ALL -> SELF change revokes its READ.
-        MetaContext.setContext(tenant.getId(), user.getId() + 100000L, "fixture-other", "fixture-other");
-        record = MetaContext.runWithCommandPermitScope("ALL", () -> data.create(model, Map.of("secret", "private-result")))
-                .get("pid").toString();
+        var owner = users.signUp("query-owner-" + suffix + "@example.test", "test-password-123");
+        var ownerMember = members.addMember(owner.getId(), tenant.getId(), "active");
+        MetaContext.setContext(tenant.getId(), owner.getId(), owner.getPid(), owner.getUserName());
+        MetaContext.setMemberId(ownerMember.getId());
+        try (var authority = new com.auraboot.framework.integration.NativePermissionFixture(jdbc, userPermissions)) {
+            authority.grantModel(model, "create");
+            record = MetaContext.runWithCommandPermitScope("ALL", () -> data.create(model, Map.of("secret", "private-result")))
+                    .get("pid").toString();
+        }
         actor();
         String role = UniqueIdGenerator.generate(); policy = UniqueIdGenerator.generate();
         long roleId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
@@ -148,7 +154,9 @@ class QueryResultCacheRevocationIT {
             }
         };
         var pipeline = new CommandPipeline(List.of(new IdempotencyPhase(store)), List.of(query, completion));
-        return new TransactionTemplate(transactions).execute(status -> {
+        var transaction = new TransactionTemplate(transactions);
+        transaction.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        return transaction.execute(status -> {
             var replay = pipeline.executePreGuardPhases(context);
             return replay == null ? pipeline.executeGuardedPhases(context) : replay;
         });

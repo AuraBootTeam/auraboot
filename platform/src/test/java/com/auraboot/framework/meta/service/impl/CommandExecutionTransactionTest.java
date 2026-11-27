@@ -531,6 +531,35 @@ class CommandExecutionTransactionTest {
             "{\"postActions\":[{\"type\":\"create_record\",\"targetModel\":\"m\"}]}",
             "{\"postActions\":[{\"action\":\"create_children\",\"childModel\":\"m\"}]}");
 
+    @Test void aCascadeDeleteOpensTheCoherentTransactionBeforeReadingChildren() {
+        declares(transaction, "orders:delete", "{\"cascadeDelete\":[{\"childModel\":\"order_line\",\"parentField\":\"order_pid\"}]}");
+        when(manager.getTransaction(any())).thenReturn(status);
+        assertThat(transaction.execute("orders:delete", false,
+                TransactionSynchronizationManager::getCurrentTransactionIsolationLevel))
+                .isEqualTo(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        verify(manager).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_REPEATABLE_READ));
+        assertThat(TransactionSynchronizationManager.getCurrentTransactionIsolationLevel()).isNull();
+    }
+
+    @Test void anEmptyCascadeDoesNotAddAReadRequirement() {
+        declares(transaction, "orders:delete", "{\"cascadeDelete\":[]}");
+        when(manager.getTransaction(any())).thenReturn(status);
+        transaction.execute("orders:delete", false, () -> "deleted");
+        verify(manager).getTransaction(argThat(definition -> definition.getIsolationLevel() == TransactionDefinition.ISOLATION_DEFAULT));
+    }
+
+    @Test void aCascadeNeverReplacesTheCallersWeakerAtomicUnit() {
+        declares(transaction, "orders:delete", "{\"cascadeDelete\":[{\"childModel\":\"order_line\",\"parentField\":\"order_pid\"}]}");
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        when(manager.getTransaction(any())).thenReturn(status);
+        assertThat(transaction.execute("orders:delete", false,
+                TransactionSynchronizationManager::getCurrentTransactionIsolationLevel))
+                .isEqualTo(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        verify(manager).getTransaction(argThat(definition -> definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_REQUIRED
+                && definition.getIsolationLevel() == TransactionDefinition.ISOLATION_DEFAULT));
+    }
+
     @Test void aDeclaredCreateSideEffectOpensARepeatableReadTransactionForAHandlerlessCommand() {
         declares(transaction,"crm:log_lead_activity",
                 "{\"sideEffects\":[{\"actions\":[{\"type\":\"create_record\",\"modelCode\":\"crm_activity_relation_common\"}]}]}");

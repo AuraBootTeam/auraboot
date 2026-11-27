@@ -38,9 +38,11 @@ class AgentEvalCaseImportIT extends BaseIntegrationTest {
 
     private String agentCode;
     private static final String CASE_ID = "eval-it-1";
-    private static final String PLUGIN_PID = "test-eval-plugin-pid";
+    private final String PLUGIN_PID = com.auraboot.framework.common.util.UniqueIdGenerator.generate();
 
     @Autowired private PluginResourceImporter resourceImporter;
+    @Autowired private com.auraboot.framework.plugin.mapper.PluginResourceMapper resourceTracking;
+    @Autowired private com.auraboot.framework.plugin.mapper.PluginRecordMapper pluginRecords;
     @Autowired private AgentEvalCaseMapper evalCaseMapper;
     @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private CapabilityEvalService capabilityEvalService;
@@ -50,6 +52,13 @@ class AgentEvalCaseImportIT extends BaseIntegrationTest {
     @BeforeEach
     void cleanSlate() {
         tenantId = getTestTenant().getId();
+        pluginRecords.insert(com.auraboot.framework.plugin.entity.PluginRecord.builder()
+                .pid(PLUGIN_PID).tenantId(tenantId).pluginId("com.test.eval." + PLUGIN_PID).namespace("eval_" + PLUGIN_PID.toLowerCase())
+                .version("1.0.0").status("enabled").deletedFlag(false)
+                .manifest(com.auraboot.framework.plugin.dto.PluginManifest.builder()
+                        .pluginId("com.test.eval." + PLUGIN_PID).namespace("eval_" + PLUGIN_PID.toLowerCase())
+                        .version("1.0.0").build())
+                .createdAt(java.time.Instant.now()).updatedAt(java.time.Instant.now()).build());
         agentCode = "eval_it_agent_" + com.auraboot.framework.common.util.UniqueIdGenerator
                 .generate().toLowerCase();
         jdbcTemplate.update(
@@ -63,6 +72,8 @@ class AgentEvalCaseImportIT extends BaseIntegrationTest {
     @AfterEach
     void cleanup() {
         if (tenantId != null) {
+            jdbcTemplate.update("DELETE FROM ab_plugin_resource WHERE tenant_id=? AND plugin_pid=?", tenantId, PLUGIN_PID);
+            jdbcTemplate.update("DELETE FROM ab_plugin WHERE tenant_id=? AND pid=?", tenantId, PLUGIN_PID);
             jdbcTemplate.update(
                     "DELETE FROM ab_agent_eval_case WHERE tenant_id = ? AND agent_code = ?",
                     tenantId, agentCode);
@@ -148,8 +159,8 @@ class AgentEvalCaseImportIT extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("rollback soft-deletes eval cases; restore un-deletes them")
-    void rollbackAndRestoreFollowsAgentLifecycle() {
+    @DisplayName("tracked create withdrawal soft-deletes eval cases and cannot invent a previous revision")
+    void trackedWithdrawalFollowsAgentLifecycle() {
         // Import agent with one eval case; capture the returned PluginResource
         CapabilityEvalCase evalCase = CapabilityEvalCase.builder()
                 .caseId(CASE_ID)
@@ -177,7 +188,10 @@ class AgentEvalCaseImportIT extends BaseIntegrationTest {
                 Integer.class, tenantId, agentCode);
         assertEquals(1, activeBeforeRollback, "precondition: 1 active eval case before rollback");
 
-        // Rollback: should soft-delete eval cases
+        // The import orchestrator persists this exact ledger before lifecycle operations.
+        resourceTracking.insert(pr);
+        assertNotNull(pr.getId());
+        // Rollback of CREATE withdraws the imported definition.
         resourceImporter.rollbackResource(pr);
 
         int activeAfterRollback = jdbcTemplate.queryForObject(
@@ -186,14 +200,46 @@ class AgentEvalCaseImportIT extends BaseIntegrationTest {
         assertEquals(0, activeAfterRollback,
                 "after rollback, eval cases must be soft-deleted (deleted_flag = TRUE)");
 
-        // Restore: should un-delete eval cases
-        resourceImporter.restoreResource(pr);
+        org.junit.jupiter.api.Assertions.assertThrows(
+                com.auraboot.framework.plugin.exception.PluginException.class,
+                () -> resourceImporter.restoreResource(pr));
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ab_agent_eval_case WHERE tenant_id=? AND agent_code=? AND deleted_flag=FALSE",
+                Integer.class, tenantId, agentCode));
+    }
 
-        int activeAfterRestore = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM ab_agent_eval_case WHERE tenant_id = ? AND agent_code = ? AND deleted_flag = FALSE",
-                Integer.class, tenantId, agentCode);
-        assertEquals(1, activeAfterRestore,
-                "after restore, eval cases must be active again (deleted_flag = FALSE)");
+    @Test
+    @DisplayName("tracked update restores the exact previous agent and eval cases")
+    void trackedUpdateRestoresPreviousSnapshot() {
+        var beforeCase = CapabilityEvalCase.builder().caseId("before")
+                .taskDescription("Query original alarms").expectedToolCodes(List.of("dsl.query"))
+                .forbiddenToolCodes(List.of()).category("test").build();
+        var before = AgentDefinitionDTO.builder().agentCode(agentCode).name("Original agent")
+                .agentType("reactive").status("active").evalCases(List.of(beforeCase)).build();
+        var original = resourceImporter.importAgentDefinition(before, PLUGIN_PID, "before", tenantId,
+                ImportRequest.ConflictStrategy.OVERWRITE);
+        resourceTracking.insert(original);
+        var afterCase = CapabilityEvalCase.builder().caseId("after")
+                .taskDescription("Query replacement alarms").expectedToolCodes(List.of("dsl.query"))
+                .forbiddenToolCodes(List.of()).category("test").build();
+        var after = AgentDefinitionDTO.builder().agentCode(agentCode).name("Replacement agent")
+                .agentType("reactive").status("active").evalCases(List.of(afterCase)).build();
+        var replacement = resourceImporter.importAgentDefinition(after, PLUGIN_PID, "after", tenantId,
+                ImportRequest.ConflictStrategy.OVERWRITE);
+        replacement.setId(original.getId());
+        replacement.setPid(original.getPid());
+        resourceTracking.updateById(replacement);
+        assertEquals(List.of("after"), jdbcTemplate.queryForList(
+                "SELECT case_id FROM ab_agent_eval_case WHERE tenant_id=? AND agent_code=? AND deleted_flag=FALSE",
+                String.class, tenantId, agentCode));
+        resourceImporter.restoreResource(replacement);
+        assertEquals("Original agent", jdbcTemplate.queryForObject(
+                "SELECT name FROM ab_agent_definition WHERE tenant_id=? AND agent_code=? AND deleted_flag=FALSE",
+                String.class, tenantId, agentCode));
+        assertEquals(List.of("before"), jdbcTemplate.queryForList(
+                "SELECT case_id FROM ab_agent_eval_case WHERE tenant_id=? AND agent_code=? AND deleted_flag=FALSE",
+                String.class, tenantId, agentCode));
+        assertEquals("before", resourceTracking.selectById(original.getId()).getImportId());
     }
 
     @Test
