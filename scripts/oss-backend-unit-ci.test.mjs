@@ -451,16 +451,30 @@ test('both original Gradle tasks receive the admitted argument vector without ch
   const wrapper=path.join(root,'platform/gradlew');
   writeFileSync(wrapper,'#!/usr/bin/env node\nconsole.log(JSON.stringify({args:process.argv.slice(2),database:process.env.TEST_EXPECTED_DATABASE,redis:process.env.TEST_REDIS_DATABASE,springRedis:process.env.SPRING_DATA_REDIS_DATABASE}));process.exit(process.argv.includes("bootstrapBillingAccountTest")?23:0);\n',{mode:0o755});
   const run=source.match(/run_backend_gradle\(\) \{[\s\S]*?\n\}/)?.[0];assert.ok(run);
+  const parser=source.slice(source.indexOf('RESOURCE_ARGUMENTS=()'),source.indexOf('\nrun_backend_gradle()'));
+  assert.ok(parser.includes('incomplete bounded JVM arguments'));
   const argv=resourceArguments();
   const quoted=value=>"'"+value.replaceAll("'","'\\''")+"'";
   const result=spawnSync('bash',['-c',`set -uo pipefail
     AURA_OSS_CI_POSTGRES_PORT=25000 AURA_OSS_CI_REDIS_PORT=26000 AURA_OSS_CI_KAFKA_PORT=27000
     BOOTSTRAP_DATABASE=aura_boot_bootstrap_contract ARTIFACTS=${quoted(root)}
-    RESOURCE_ARGUMENTS=(${argv.map(quoted).join(' ')})
+    environment_invalid() { echo \"$1\" >&2; exit 2; }
+    resource_arguments=${quoted(argv.join('\n'))}
+    ${parser}
     ${run}
     run_backend_gradle aura_boot --continue cleanTest test
     run_backend_gradle aura_boot --continue bootstrapBillingAccountTest
   `],{cwd:root,encoding:'utf8',env:{PATH:process.env.PATH}});
+  for(const invalid of [argv.slice(0,-1),[...argv,'-Pforeign=1']]) {
+    const rejected=spawnSync('bash',['-c',`set -uo pipefail
+      environment_invalid() { echo "$1" >&2; exit 2; }
+      resource_arguments=${quoted(invalid.join('\n'))}
+      ${parser}
+      echo forbidden-gradle-start
+    `],{encoding:'utf8',env:{PATH:process.env.PATH}});
+    assert.equal(rejected.status,2,'incomplete or extra arguments must stop before Gradle');
+    assert.doesNotMatch(rejected.stdout,/forbidden-gradle-start/);
+  }
   assert.equal(result.status,23,result.stderr);
   const invocations=result.stdout.trim().split('\n').map(line=>JSON.parse(line));assert.equal(invocations.length,2);
   for(const row of invocations) {assert.equal(row.database,'aura_boot');assert.equal(row.redis,'0');assert.equal(row.springRedis,'0');}

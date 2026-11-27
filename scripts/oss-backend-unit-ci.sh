@@ -308,7 +308,7 @@ resource_arguments="$(node "$SCRIPT_DIR/lib/backend-ci-resources.mjs" "$ARTIFACT
   || environment_invalid 'JVM memory admission failed; inspect jvm-resource-plan.json before retry'
 RESOURCE_ARGUMENTS=()
 while IFS= read -r option; do RESOURCE_ARGUMENTS+=("$option"); done <<< "$resource_arguments"
-[[ ${#RESOURCE_ARGUMENTS[@]} == 5 ]] || environment_invalid 'incomplete bounded JVM arguments'
+[[ ${#RESOURCE_ARGUMENTS[@]} == 6 ]] || environment_invalid 'incomplete bounded JVM arguments'
 
 run_backend_gradle() {
   local database="$1"
