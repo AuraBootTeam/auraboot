@@ -362,12 +362,13 @@ class AnnouncementSealedContentRichCommandIT {
     }
 
     private void assertOwnedDatabase() throws Exception {
-        assertEquals("maritime-parallel-core", environment("AURA_RUNTIME_NAME"));
-        assertEquals("auraboot_26", environment("POSTGRES_DB"));
-        assertEquals("auraboot_26", jdbc.queryForObject("SELECT current_database()", String.class));
+        String expected = environment("TEST_EXPECTED_DATABASE");
+        assertTrue(expected.matches("[a-z][a-z0-9_]{0,62}"));
+        assertEquals(expected, environment("POSTGRES_DB"));
+        assertEquals(expected, jdbc.queryForObject("SELECT current_database()", String.class));
         try (var connection = Objects.requireNonNull(jdbc.getDataSource()).getConnection()) {
             assertEquals("PostgreSQL", connection.getMetaData().getDatabaseProductName());
-            assertEquals("/auraboot_26", URI.create(connection.getMetaData().getURL().substring(5)).getPath());
+            assertEquals("/" + expected, URI.create(connection.getMetaData().getURL().substring(5)).getPath());
         }
     }
 

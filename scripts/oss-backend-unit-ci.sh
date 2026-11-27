@@ -313,6 +313,11 @@ while IFS= read -r option; do RESOURCE_ARGUMENTS+=("$option"); done <<< "$resour
 run_backend_gradle() {
   local database="$1"
   shift
+  local test_root="$ARTIFACTS/test-runtime/$database"
+  mkdir -p "$test_root/files" "$test_root/evidence" || return 2
+  chmod 700 "$test_root" "$test_root/files" "$test_root/evidence" || return 2
+AURA_FILE_STORAGE_PATH="$test_root/files" \
+AURA_EVIDENCE_ROOT="$test_root/evidence" \
 TEST_DATABASE_URL="jdbc:postgresql://127.0.0.1:${AURA_OSS_CI_POSTGRES_PORT}/${database}?charSet=UTF8" \
 TEST_EXPECTED_DATABASE="$database" \
 TEST_REDIS_DATABASE='0' \

@@ -148,10 +148,14 @@ public class TenantMemberServiceImpl extends ServiceImpl<TenantMemberMapper, Ten
             throw BusinessException.i18n("tenant.member.not_found", memberId);
         }
         
-        member.setStatus(StatusConstants.ACTIVE);
-        member.setUpdatedAt(Instant.now());
-        
-        return updateById(member);
+        // Re-enabling this membership must also restore its current-presence
+        // fact. Entity updates omit nulls, so clear the old departure explicitly.
+        return lambdaUpdate()
+                .eq(TenantMember::getId, memberId)
+                .set(TenantMember::getStatus, StatusConstants.ACTIVE)
+                .set(TenantMember::getLeaveDate, null)
+                .set(TenantMember::getUpdatedAt, Instant.now())
+                .update();
     }
 
     @Override

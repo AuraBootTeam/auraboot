@@ -449,7 +449,7 @@ test('both original Gradle tasks receive the admitted argument vector without ch
   const root=mkdtempSync(path.join(tmpdir(),'backend-jvm-arguments-'));
   t.after(()=>rmSync(root,{recursive:true,force:true}));mkdirSync(path.join(root,'platform'));
   const wrapper=path.join(root,'platform/gradlew');
-  writeFileSync(wrapper,'#!/usr/bin/env node\nconsole.log(JSON.stringify({args:process.argv.slice(2),database:process.env.TEST_EXPECTED_DATABASE,redis:process.env.TEST_REDIS_DATABASE,springRedis:process.env.SPRING_DATA_REDIS_DATABASE}));process.exit(process.argv.includes("bootstrapBillingAccountTest")?23:0);\n',{mode:0o755});
+  writeFileSync(wrapper,'#!/usr/bin/env node\nconsole.log(JSON.stringify({args:process.argv.slice(2),database:process.env.TEST_EXPECTED_DATABASE,redis:process.env.TEST_REDIS_DATABASE,springRedis:process.env.SPRING_DATA_REDIS_DATABASE,storage:process.env.AURA_FILE_STORAGE_PATH,evidence:process.env.AURA_EVIDENCE_ROOT}));process.exit(process.argv.includes("bootstrapBillingAccountTest")?23:0);\n',{mode:0o755});
   const run=source.match(/run_backend_gradle\(\) \{[\s\S]*?\n\}/)?.[0];assert.ok(run);
   const parser=source.slice(source.indexOf('RESOURCE_ARGUMENTS=()'),source.indexOf('\nrun_backend_gradle()'));
   assert.ok(parser.includes('incomplete bounded JVM arguments'));
@@ -477,7 +477,12 @@ test('both original Gradle tasks receive the admitted argument vector without ch
   }
   assert.equal(result.status,23,result.stderr);
   const invocations=result.stdout.trim().split('\n').map(line=>JSON.parse(line));assert.equal(invocations.length,2);
-  for(const row of invocations) {assert.equal(row.database,'aura_boot');assert.equal(row.redis,'0');assert.equal(row.springRedis,'0');}
+  for(const row of invocations) {
+    assert.equal(row.database,'aura_boot');assert.equal(row.redis,'0');assert.equal(row.springRedis,'0');
+    assert.equal(row.storage,path.join(root,'test-runtime/aura_boot/files'));
+    assert.equal(row.evidence,path.join(root,'test-runtime/aura_boot/evidence'));
+    for(const directory of [row.storage,row.evidence])assert.equal(statSync(directory).mode&0o777,0o700);
+  }
   const rows=invocations.map(row=>row.args);
   for(const row of rows){assert.deepEqual(row.slice(3,3+argv.length),argv);assert.deepEqual(row.slice(0,3),['--no-daemon','-p','platform']);}
   assert.ok(argv.includes('-PauraAppTestForkEvery=64'),'the admitted worker lifetime must reach every original Gradle invocation');
