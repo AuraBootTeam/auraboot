@@ -52,6 +52,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @ActiveProfiles("integration-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DisplayName("DynamicDataServiceImpl Coverage IT — aggregate/stats/CAS/export")
+@org.springframework.transaction.annotation.Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
 class DynamicDataAnalyticsCoverageIT extends BaseIntegrationTest {
 
     private static final String MODEL = "ddan_it_" + System.currentTimeMillis();

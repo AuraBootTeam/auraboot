@@ -992,6 +992,9 @@ def jacocoExcludes = [
 
 jacocoTestReport {
     dependsOn test
+    // When the extracted application test task is selected, read its exec file only after
+    // its worker has closed it. Ordering must not pull native app tests into a root unit run.
+    mustRunAfter ':platform-app:test'
     // Offline instrumentation writes here (jacoco-agent.destfile on the test task); the report
     // reads the ORIGINAL on-disk classes (build/classes) — coverage was recorded against their
     // stable IDs, so no runtime classdump of CGLIB proxies is needed.

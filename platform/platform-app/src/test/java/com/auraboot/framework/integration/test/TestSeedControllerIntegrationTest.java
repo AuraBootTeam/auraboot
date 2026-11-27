@@ -649,7 +649,7 @@ class TestSeedControllerIntegrationTest extends BaseIntegrationTest {
         JsonNode repeatedIdentity = objectMapper.readTree(repeated.getResponse().getContentAsString());
         org.assertj.core.api.Assertions.assertThat(repeatedIdentity.get("tenantId")).isEqualTo(identity.get("tenantId"));
         org.assertj.core.api.Assertions.assertThat(repeatedIdentity.get("userId")).isEqualTo(identity.get("userId"));
-        Long defaultTenant = jdbcTemplate.queryForObject("SELECT id FROM ab_tenant WHERE name='e2e_test'", Long.class);
+        Long defaultTenant = jdbcTemplate.queryForObject("SELECT id FROM ab_tenant WHERE name='e2e_test' AND deleted_flag=FALSE", Long.class);
         org.assertj.core.api.Assertions.assertThat(identity.get("tenantId").asLong()).isNotEqualTo(defaultTenant);
         org.assertj.core.api.Assertions.assertThat(jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM ab_plugin WHERE tenant_id=? AND plugin_id='com.auraboot.inventory' AND deleted_flag=false",

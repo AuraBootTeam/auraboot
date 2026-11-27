@@ -88,6 +88,9 @@ class DynamicDataServiceAtomicIncrementGuardTest {
         ReflectionTestUtils.setField(service, "dynamicDataMapper", mapper);
         ReflectionTestUtils.setField(service, "virtualFieldEngine", virtualFields);
         ReflectionTestUtils.setField(service, "applicationContext", applicationContext);
+        var atomicTransactions = mock(AtomicMutationTransaction.class);
+        lenient().when(applicationContext.getBean(AtomicMutationTransaction.class)).thenReturn(atomicTransactions);
+        lenient().when(atomicTransactions.execute(any())).thenAnswer(call -> ((java.util.function.Supplier<?>) call.getArgument(0)).get());
         lenient().when(applicationContext.getBean(NativeRecordFieldAuthorization.class))
                 .thenReturn(mock(NativeRecordFieldAuthorization.class));
         ReflectionTestUtils.setField(service, "dataPermissionEngine", mock(com.auraboot.framework.meta.service.DataPermissionEngine.class));
@@ -237,7 +240,7 @@ class DynamicDataServiceAtomicIncrementGuardTest {
                 anyString(), anyLong(), anyString(), anyLong(), any(), anyBoolean(), anyString(), anyMap()))
                 .thenReturn(List.of(Map.of("new_value", 5L)));
 
-        Optional<Long> result = service.incrementWithinCap("cr_cj_profile", "rec-1", "cr_cj_followed_count", 1L, null);
+        Optional<Long> result = service.increment("cr_cj_profile", "rec-1", "cr_cj_followed_count", 1L);
 
         assertTrue(result.isPresent());
         assertEquals(5L, result.get());

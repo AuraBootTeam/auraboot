@@ -146,25 +146,32 @@ class AtomicIncrementConcurrencyIT extends BaseIntegrationTest {
         List<Future<?>> futures = new ArrayList<>();
         long tenantId = fixtureTenant.getId();
 
-        for (int i = 0; i < threads; i++) {
-            futures.add(pool.submit(() -> {
-                start.await();
-                MetaContext.setSystemTenantContext(tenantId);
-                try {
-                    if (dynamicDataService.incrementWithinCap(modelCode, pid, "counter", 1L, "cap").isPresent()) {
-                        granted.incrementAndGet();
-                    }
-                } finally {
+        try {
+            for (int i = 0; i < threads; i++) {
+                futures.add(pool.submit(() -> {
+                    start.await();
                     MetaContext.clear();
-                }
-                return null;
-            }));
+                    MetaContext.setSystemTenantContext(tenantId);
+                    try {
+                        if (dynamicDataService.incrementWithinCap(modelCode, pid, "counter", 1L, "cap").isPresent()) {
+                            granted.incrementAndGet();
+                        }
+                    } finally {
+                        MetaContext.clear();
+                    }
+                    return null;
+                }));
+            }
+            start.countDown();
+            for (Future<?> f : futures) f.get(30, java.util.concurrent.TimeUnit.SECONDS);
+        } finally {
+            start.countDown();
+            pool.shutdownNow();
+            assertThat(pool.awaitTermination(30, java.util.concurrent.TimeUnit.SECONDS))
+                    .as("All owned counter workers must terminate").isTrue();
         }
-        start.countDown();
-        for (Future<?> f : futures) f.get();
-        pool.shutdown();
 
-        MetaContext.setSystemTenantContext(tenantId);
+        atomicActor();
         Map<String, Object> reloaded = MetaContext.runWithCommandPermitScope("ALL",
                 () -> dynamicDataService.getById(modelCode, pid));
         long finalCounter = ((Number) reloaded.get("counter")).longValue();
@@ -200,23 +207,30 @@ class AtomicIncrementConcurrencyIT extends BaseIntegrationTest {
         List<Future<?>> futures = new ArrayList<>();
         long tenantId = fixtureTenant.getId();
 
-        for (int i = 0; i < threads; i++) {
-            futures.add(pool.submit(() -> {
-                start.await();
-                MetaContext.setSystemTenantContext(tenantId);
-                try {
-                    dynamicDataService.increment(modelCode, pid, "counter", 1L);
-                } finally {
+        try {
+            for (int i = 0; i < threads; i++) {
+                futures.add(pool.submit(() -> {
+                    start.await();
                     MetaContext.clear();
-                }
-                return null;
-            }));
+                    MetaContext.setSystemTenantContext(tenantId);
+                    try {
+                        dynamicDataService.increment(modelCode, pid, "counter", 1L);
+                    } finally {
+                        MetaContext.clear();
+                    }
+                    return null;
+                }));
+            }
+            start.countDown();
+            for (Future<?> f : futures) f.get(30, java.util.concurrent.TimeUnit.SECONDS);
+        } finally {
+            start.countDown();
+            pool.shutdownNow();
+            assertThat(pool.awaitTermination(30, java.util.concurrent.TimeUnit.SECONDS))
+                    .as("All owned counter workers must terminate").isTrue();
         }
-        start.countDown();
-        for (Future<?> f : futures) f.get();
-        pool.shutdown();
 
-        MetaContext.setSystemTenantContext(tenantId);
+        atomicActor();
         long finalCounter = ((Number) MetaContext.runWithCommandPermitScope("ALL",
                 () -> dynamicDataService.getById(modelCode, pid)).get("counter")).longValue();
         log.info("[atomic-it] increment: finalCounter={}", finalCounter);
@@ -242,7 +256,7 @@ class AtomicIncrementConcurrencyIT extends BaseIntegrationTest {
         jdbcTemplate.update("UPDATE mt_" + modelCode + " SET cap = NULL WHERE pid = ?", pid);
 
         long tenantId = fixtureTenant.getId();
-        MetaContext.setSystemTenantContext(tenantId);
+        atomicActor();
         try {
             assertThat(dynamicDataService.incrementWithinCap(modelCode, pid, "counter", 1L, "cap"))
                     .as("NULL cap must deny (safe-by-default)")

@@ -29,6 +29,8 @@ import static org.assertj.core.api.Assertions.*;
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class DocGenerationServiceIntegrationTest extends BaseIntegrationTest {
+    @Autowired private com.auraboot.framework.tenant.service.TenantMemberService fixtureMembers;
+    @Autowired private com.auraboot.framework.environment.service.EnvironmentService fixtureEnvironments;
 
     @Autowired
     private DocGenerationService docGenerationService;
@@ -178,8 +180,11 @@ class DocGenerationServiceIntegrationTest extends BaseIntegrationTest {
         other.setCreatedAt(Instant.now());
         other.setUpdatedAt(Instant.now());
         other = tenantService.createTenant(other);
+        var otherMembership = fixtureMembers.addMember(getTestUser().getId(), other.getId(), "active");
         try {
             MetaContext.setContext(other.getId(), getTestUser().getId(), getTestUser().getPid(), getTestUser().getUserName());
+            MetaContext.setMemberId(otherMembership.getId());
+            MetaContext.setEnvironmentId(fixtureEnvironments.findOrCreateDefaultId(other.getId()));
             GenerationResult empty = docGenerationService.generate(output.toString());
             assertThat(empty.models()).isZero();
             assertThat(empty.commands()).isZero();

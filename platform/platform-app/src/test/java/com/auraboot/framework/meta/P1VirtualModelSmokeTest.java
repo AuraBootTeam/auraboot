@@ -51,7 +51,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * model backend plan. No separate unit assertions — the whole path is the test.
  */
 @DisplayName("P1 Virtual Model - End-to-End Smoke Test (T12)")
-@org.springframework.transaction.annotation.Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+@org.springframework.transaction.annotation.Transactional(isolation = org.springframework.transaction.annotation.Isolation.SERIALIZABLE)
 class P1VirtualModelSmokeTest extends BaseIntegrationTest {
 
     @Autowired private WebApplicationContext webApplicationContext;

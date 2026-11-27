@@ -45,7 +45,7 @@ class CommandTargetFileAppendIT {
     private com.auraboot.framework.integration.NativePermissionFixture nativeAuthority;
     @AfterAll void releaseOwnedAuthority() { if (nativeAuthority != null) nativeAuthority.close(); }
 
-    private Long TENANT, USER;
+    private Long TENANT, USER, FOREIGN_TENANT, OTHER_USER;
     @Autowired private javax.sql.DataSource fixtureDataSource;
     @Autowired private org.springframework.boot.data.redis.autoconfigure.DataRedisProperties fixtureRedis;
     @Autowired CommandTargetFileAccessorFactory factory;
@@ -70,6 +70,12 @@ class CommandTargetFileAppendIT {
         tenant.setCreatedAt(Instant.now());tenant.setUpdatedAt(Instant.now());
         tenant=fixtureTenants.createTenant(tenant);TENANT=tenant.getId();USER=fixtureUser.getId();
         fixtureMember=fixtureMembers.addMember(USER,TENANT,"active");
+        var otherUser = fixtureUsers.signUp("file-append-other-" + suffix + "@example.test", "test-password-123");
+        OTHER_USER = otherUser.getId();
+        fixtureMembers.addMember(OTHER_USER, TENANT, "active");
+        FOREIGN_TENANT = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        jdbc.update("INSERT INTO ab_tenant (id,pid,name,status,deleted_flag) VALUES (?,?,?,'active',FALSE)",
+                FOREIGN_TENANT, com.auraboot.framework.common.util.UniqueIdGenerator.generate(), "Foreign append tenant " + suffix);
         actor();
         model="file_append_"+Long.toString(System.currentTimeMillis(),36); table="mt_"+model; command=model+":repair";
         var photos=FieldDefinition.builder().code("photos").columnName("photos").dataType("file").length(32768).maxLength(32768)
@@ -85,7 +91,7 @@ class CommandTargetFileAppendIT {
         assertThat(result.isSuccess()).as(result.getErrorMessage()).isTrue();
         assertThat(models.getModelDefinition(model).orElseThrow().getFields()).anyMatch(f->f.getCode().equals("photos"));
         assertThat(jdbc.queryForObject("SELECT data_type FROM information_schema.columns WHERE table_name=? AND column_name='photos'",
-                String.class,table)).isEqualTo("character varying");
+                String.class,table)).isEqualTo("jsonb");
         nativeAuthority = new com.auraboot.framework.integration.NativePermissionFixture(jdbc, fixturePermissions);
         nativeAuthority.grantModel(model, "create", "read", "update", "delete");
         MetaContext.clear();
@@ -120,8 +126,8 @@ class CommandTargetFileAppendIT {
         actor();
         try {
             var commandTransaction = new TransactionTemplate(transactions);
-        commandTransaction.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
-        commandTransaction.executeWithoutResult(status->{
+            commandTransaction.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
+            commandTransaction.executeWithoutResult(status->{
                 // This is the caller's parent lock/CAS, ahead of every file lock. It serializes
                 // same-parent append calls and commits projection/evidence in the same transaction.
                 Long version=jdbc.queryForObject("SELECT row_version FROM "+table+" WHERE tenant_id=? AND pid=? FOR UPDATE",Long.class,TENANT,pid);
@@ -147,7 +153,8 @@ class CommandTargetFileAppendIT {
         command(parent,a->{data.update(model,parent,Map.of("photos",firstProjection)); a.appendAndRetainExistingToTarget(first,"photos");});
         command(parent,a->{data.update(model,parent,Map.of("photos",bothProjection));
             a.appendAndRetainExistingToTarget(first,"photos"); a.appendAndRetainExistingToTarget(second,"photos"); a.appendAndRetainExistingToTarget(first,"photos");});
-        assertThat(jdbc.queryForObject("SELECT photos FROM "+table+" WHERE pid=?",String.class,parent)).isEqualTo(bothProjection);
+        assertThat(jdbc.queryForObject("SELECT photos = ?::jsonb FROM " + table + " WHERE tenant_id=? AND pid=?",
+                Boolean.class, bothProjection, TENANT, parent)).isTrue();
         assertThat(relationCount(parent)).isEqualTo(2); assertThat(retained(first)).isTrue(); assertThat(retained(second)).isTrue();
         assertThat(evidence(parent)).isEqualTo("after");
         actor(); assertThatThrownBy(()->files.deleteFile(first,USER)).hasMessageContaining("retention");
@@ -161,14 +168,14 @@ class CommandTargetFileAppendIT {
         assertThat(jdbc.queryForObject("SELECT photos FROM "+table+" WHERE pid=?",String.class,parent)).isNull();
     }
     @Test void aCaughtAppendFailureStillPreventsPartialCommit() {
-        String parent=parent(), good=upload(TENANT,USER,"success"), foreign=upload(TENANT,USER+9,"success");
+        String parent=parent(), good=upload(TENANT,USER,"success"), foreign=upload(TENANT,OTHER_USER,"success");
         assertThatThrownBy(()->command(parent,a->{a.appendAndRetainExistingToTarget(good,"photos");
             assertThatThrownBy(()->a.appendAndRetainExistingToTarget(foreign,"photos")).isInstanceOf(AccessDeniedException.class);}))
                 .isInstanceOf(org.springframework.transaction.UnexpectedRollbackException.class);
         assertThat(relationCount(parent)).isZero(); assertThat(retained(good)).isFalse(); assertThat(evidence(parent)).isEqualTo("before");
     }
     @Test void foreignTenantOwnerAndUnfinalizedUploadsLeaveNoWrites() {
-        for(String file:List.of(upload(TENANT+1,USER,"success"),upload(TENANT,USER+1,"success"),upload(TENANT,USER,"uploading"))) {
+        for(String file:List.of(upload(FOREIGN_TENANT,USER,"success"),upload(TENANT,OTHER_USER,"success"),upload(TENANT,USER,"uploading"))) {
             String parent=parent();
             assertThatThrownBy(()->command(parent,a->a.appendAndRetainExistingToTarget(file,"photos"))).isInstanceOf(AccessDeniedException.class);
             assertThat(retained(file)).isFalse(); assertThat(relationCount(parent)).isZero(); assertThat(evidence(parent)).isEqualTo("before");
