@@ -27,7 +27,7 @@ class CIRuntimeSettlementTest(unittest.TestCase):
         self.identity = {'allocation':{'name':'owned-gate','repo':'auraboot'},
             'metadata':{'lifecycle':'open'},'processes':[{'pid':1}],
             'ports':{key:{'status':'listening'} for key in ('backend','web','bff')},
-            'sources':[{'key':'auraboot','expected':{'root':str(self.repo),'commit':head},
+            'sources':[{'key':'core','expected':{'root':str(self.repo),'commit':head},
                 'actual':{'root':str(self.repo),'commit':head,'dirtyFingerprint':'clean'}}]}
         self.config = self.root/'identity.json'; self.config.write_text(json.dumps(self.identity))
         self.calls = self.root/'calls.txt'; self.calls.write_text('')
@@ -70,6 +70,23 @@ elif args[1]=='explain':
         self.config.write_text(json.dumps(bad))
         with self.assertRaises(ValueError):self.invoke()
         self.assertNotIn('runtime suspend',self.calls.read_text())
+
+    def test_supported_registry_generation_alias_still_requires_the_exact_owned_source(self):
+        changed = copy.deepcopy(self.identity); changed['sources'][0]['key'] = 'auraboot'
+        self.config.write_text(json.dumps(changed))
+        self.assertEqual(self.invoke()['status'], 'suspended')
+
+    def test_ambiguous_primary_identities_cannot_reach_suspend(self):
+        bad = copy.deepcopy(self.identity); alias = copy.deepcopy(bad['sources'][0]); alias['key'] = 'auraboot'
+        bad['sources'].append(alias); self.config.write_text(json.dumps(bad))
+        with self.assertRaises(ValueError): self.invoke()
+        self.assertNotIn('runtime suspend', self.calls.read_text())
+
+    def test_a_foreign_source_role_cannot_borrow_the_primary_root(self):
+        bad = copy.deepcopy(self.identity); bad['sources'][0]['key'] = 'workspace'
+        self.config.write_text(json.dumps(bad))
+        with self.assertRaises(ValueError): self.invoke()
+        self.assertNotIn('runtime suspend', self.calls.read_text())
 
     def test_missing_admitted_context_cannot_reach_runtime_cli(self):
         with self.assertRaises(ValueError):self.invoke(AURA_CI_FROZEN_CONTEXT='/missing/frozen.json')

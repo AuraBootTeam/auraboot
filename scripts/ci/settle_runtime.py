@@ -48,7 +48,9 @@ def settle(workspace, repo, name, artifacts, environment):
         before = document('explain', 'identity-before.json')
         head = subprocess.check_output(['git', '-C', str(repo), 'rev-parse', 'HEAD'],
                                        env=environment, text=True, timeout=30).strip()
-        sources = [row for row in before['sources'] if row['key'] == 'auraboot']
+        # The deployed registry generations support core and auraboot source keys.
+        # Validate the recorded identity, not the spelling passed to migrate.
+        sources = [row for row in before['sources'] if row['key'] in ('core', 'auraboot')]
         require(before['allocation']['name'] == name and before['allocation']['repo'] == 'auraboot'
                 and len(sources) == 1 and sources[0]['expected']['root'] == str(repo)
                 and sources[0]['actual']['root'] == str(repo)
