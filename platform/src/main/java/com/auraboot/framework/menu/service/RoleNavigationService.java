@@ -43,6 +43,45 @@ public class RoleNavigationService {
                 role.getTenantId(),role.getId(),MetaContext.getCurrentUserId());
     }
 
+    /** Initializes navigation for a role created by the current plugin import transaction. */
+    public void seedPluginDefaults(Role role, String pluginPid, List<String> menuCodes) {
+        Long tenantId = role.getTenantId();
+        if (!org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
+                || tenantId == null || !Objects.equals(tenantId, MetaContext.getCurrentTenantId())
+                || pluginPid == null || pluginPid.isBlank()) {
+            throw new AccessDeniedException("Owned plugin import transaction required for navigation defaults");
+        }
+        Integer owned = jdbc.queryForObject(
+                "SELECT count(*) FROM ab_role WHERE tenant_id=? AND id=? AND plugin_pid=? AND deleted_flag=FALSE",
+                Integer.class, tenantId, role.getId(), pluginPid);
+        if (!Integer.valueOf(1).equals(owned)) {
+            throw new AccessDeniedException("Navigation defaults require a role owned by the importing plugin");
+        }
+        Set<String> grants = roleCodes(role);
+        List<String> menuPids = new ArrayList<>(menuCodes.size());
+        for (String code : menuCodes) {
+            var matches = jdbc.query(
+                    """
+                    SELECT pid, permission_code FROM ab_menu
+                    WHERE tenant_id=? AND plugin_pid=? AND code=?
+                      AND type=1 AND status='active' AND visible=TRUE AND deleted_flag=FALSE
+                    """,
+                    (row, index) -> grants.contains(row.getString("permission_code")) ? row.getString("pid") : null,
+                    tenantId, pluginPid, code);
+            if (matches.size() != 1 || matches.getFirst() == null) {
+                throw new IllegalArgumentException("Unavailable or unauthorized default menu '" + code
+                        + "' for imported role '" + role.getCode() + "'");
+            }
+            menuPids.add(matches.getFirst());
+        }
+
+        initialize(role);
+        jdbc.batchUpdate("""
+                INSERT INTO ab_role_navigation_menu(tenant_id,role_id,menu_pid) VALUES(?,?,?)
+                ON CONFLICT DO NOTHING
+                """, menuPids.stream().map(pid -> new Object[]{tenantId, role.getId(), pid}).toList());
+    }
+
     @Transactional
     public Selection read(String rolePid) { writes.lock();requireManager();return selection(owned(rolePid)); }
 

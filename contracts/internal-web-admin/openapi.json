@@ -48120,6 +48120,12 @@
           "defaultDataScopeType": {
             "type": "string"
           },
+          "defaultMenuCodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "description": {
             "type": "string"
           },

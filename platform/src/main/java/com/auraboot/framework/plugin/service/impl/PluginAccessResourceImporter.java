@@ -38,6 +38,8 @@ final class PluginAccessResourceImporter {
 
     private final RolePermissionMapper rolePermissionMapper;
 
+    private final com.auraboot.framework.menu.service.RoleNavigationService roleNavigationService;
+
     private final GenerateMenuI18nRecordsOperation0 generateMenuI18nRecordsOperation0;
 
     private final GeneratePermissionI18nRecordsOperation1 generatePermissionI18nRecordsOperation1;
@@ -201,6 +203,26 @@ final class PluginAccessResourceImporter {
         if (anyBound) {
             userPermissionService.evictPermissionDefinitions(tenantId);
             userPermissionService.evictRoleUsers(tenantId, tenantAdminRole.getId());
+        }
+    }
+
+    void initializeRoleNavigationDefaults(PluginManifestExtended manifest, Long tenantId,
+                                          String pluginPid, Set<String> createdRolePids) {
+        if (createdRolePids.isEmpty() || manifest.getRoles() == null) {
+            return;
+        }
+        Map<String, RoleDefinitionDTO> defaults = manifest.getRoles().stream()
+                .filter(role -> role != null && role.isValid()
+                        && role.getDefaultMenuCodes() != null && !role.getDefaultMenuCodes().isEmpty())
+                .collect(Collectors.toMap(RoleDefinitionDTO::getCode, role -> role));
+        if (defaults.isEmpty()) {
+            return;
+        }
+        for (Role role : roleService.findByTenantId(tenantId)) {
+            RoleDefinitionDTO declaration = defaults.get(role.getCode());
+            if (declaration != null && createdRolePids.contains(role.getPid())) {
+                roleNavigationService.seedPluginDefaults(role, pluginPid, declaration.getDefaultMenuCodes());
+            }
         }
     }
 

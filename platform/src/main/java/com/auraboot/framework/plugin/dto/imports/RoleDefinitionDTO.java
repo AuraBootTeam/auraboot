@@ -58,6 +58,9 @@ public class RoleDefinitionDTO {
      */
     private List<String> permissions;
 
+    /** Leaf menu codes from this plugin, selected only when this role is first created. */
+    private List<String> defaultMenuCodes;
+
     /**
      * Optional policy values attached to specific role-permission bindings.
      */

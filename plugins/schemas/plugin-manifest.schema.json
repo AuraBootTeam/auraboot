@@ -2076,6 +2076,16 @@
             "additionalProperties": false
           }
         },
+        "defaultMenuCodes": {
+          "type": "array",
+          "description": "Visible, permission-gated leaf menu codes declared by this plugin. Selected only when importing a new role.",
+          "uniqueItems": true,
+          "maxItems": 5000,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
         "seedMembers": {
           "type": "array",
           "description": "Optional seed member refs assigned during plugin import. Supported value: CURRENT_MEMBER.",

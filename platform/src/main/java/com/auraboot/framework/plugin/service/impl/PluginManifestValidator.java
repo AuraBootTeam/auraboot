@@ -212,6 +212,23 @@ final class PluginManifestValidator {
                         : role.getPermissions().stream()
                         .filter(code -> !isBlank(code))
                         .collect(Collectors.toCollection(LinkedHashSet::new));
+                if (role.getDefaultMenuCodes() != null) {
+                    var defaults = new HashSet<String>();
+                    var menus = Optional.ofNullable(manifest.getMenus()).orElseGet(List::of);
+                    for (String code : role.getDefaultMenuCodes()) {
+                        boolean valid = !isBlank(code) && defaults.add(code)
+                                && menus.stream().anyMatch(menu -> menu != null && code.equals(menu.getCode())
+                                && Integer.valueOf(1).equals(menu.getType()) && Boolean.TRUE.equals(menu.getVisible())
+                                && rolePermissionCodes.contains(menu.getPermissionCode()));
+                        if (!valid) {
+                            errors.add("Role '" + role.getCode() + "' default menu '" + code
+                                    + "' must be a distinct visible leaf declared by this plugin with a role permission");
+                        }
+                    }
+                    if (defaults.size() > 5000) {
+                        errors.add("Role '" + role.getCode() + "' declares more than 5000 default menus");
+                    }
+                }
                 for (String permissionCode : rolePermissionCodes) {
                     if (isBlank(permissionCode)) {
                         continue;
