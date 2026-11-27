@@ -128,10 +128,15 @@ async function verifyPublicationDenied(page: Page, session: Session, screenshotP
     expect(await baseline()).toEqual(before);
     // A typed address is the denied bypass path after the normal menu hides the entry.
     for (const [pageKey, testId, kind] of [['open_platform_publications', 'publication-editor', 'resource'], ['open_platform_queries', 'query-publication-editor', 'query']] as const) {
-      await page.goto(`/p/c/${pageKey}`); const editor = page.getByTestId(testId);
-      await expect(editor.getByRole('alert')).toHaveText('当前账号没有开放平台管理权限。');
-      await expect(editor.locator('form')).toHaveCount(0);
-      await expect(editor.getByRole('button', { name: /新建|发布|停用|保存|下载/ })).toHaveCount(0);
+      await page.goto(`/p/c/${pageKey}`);
+      // Menu-level authorization rejects this actor before an editor can mount.
+      // Assert that outer denial, while the real API denials above remain mandatory.
+      const main = page.getByRole('main');
+      await expect(main.getByRole('heading', { name: '页面不可用', exact: true })).toBeVisible();
+      await expect(main.getByText('无权限访问此页面，请联系管理员。', { exact: true })).toBeVisible();
+      await expect(page.getByTestId(testId)).toHaveCount(0);
+      await expect(main.locator('form')).toHaveCount(0);
+      await expect(main.getByRole('button', { name: /新建|发布|停用|保存|下载/ })).toHaveCount(0);
       await capture(page, `${screenshotPrefix}-${kind}-denied`);
     }
     expect(await baseline()).toEqual(before);
