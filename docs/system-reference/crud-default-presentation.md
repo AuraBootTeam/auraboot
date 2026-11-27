@@ -2,7 +2,7 @@
 type: system-reference
 status: active
 created: 2026-10-27
-updated: 2026-11-20
+updated: 2026-11-27
 ---
 
 # Generated CRUD default presentation
@@ -30,6 +30,8 @@ A list can set `extension.filterFormInitiallyVisible: true` to show its ordinary
 A list can opt into `extension.filterLayout: "inline"` to place its existing filter fields and query/reset actions beside keyword search. This reuses submitted-filter serialization and field renderers; other pages retain the expanded filter panel. Tabs with counts use the configured API list source and submitted query, including date ranges and keywords; native lists retain their native count endpoint.
 
 A detail can pair `extension.headerStatusField` with `extension.headerStatusDictCode` when an API projection has a business status that differs from the model dictionary. The explicit dictionary is preloaded and used by the existing header badge. Without an override, the field metadata dictionary is used. These properties affect presentation only.
+
+Record-bound body toolbars subscribe to runtime context updates. A completed command's form state may replace the bound parent facts only when it has the same public record identity and a strictly newer nonnegative native `row_version`. Older, unrelated and unversioned form contexts retain the loaded parent. Availability checks, command invocation and input-dialog summaries use that same resolved record; local draft arrays remain available in form context. This is shared renderer behavior, not a business-specific page implementation or an authorization bypass.
 
 ## User journey
 
