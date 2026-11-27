@@ -41,13 +41,13 @@ public class WatchServiceImpl implements WatchService {
             return false;
         }
 
-        recordReadAccess.requireReadable(modelCode, String.valueOf(recordId));
+        String recordPid = recordReadAccess.requireReadableByNumericId(modelCode, recordId);
         AbWatch watch = new AbWatch();
         watch.setTenantId(tenantId);
         watch.setUserId(userId);
         watch.setModelCode(modelCode);
         watch.setRecordId(recordId);
-        watch.setRecordPid(recordId != null ? String.valueOf(recordId) : null);
+        watch.setRecordPid(recordPid);
         watch.setCreatedAt(Instant.now());
         watchMapper.insert(watch);
         log.debug("User {} now watching {}/{}", userId, modelCode, recordId);
@@ -105,7 +105,7 @@ public class WatchServiceImpl implements WatchService {
     public List<Long> getWatchers(String modelCode, Long recordId) {
         Long tenantId = MetaContext.getCurrentTenantId();
         return watchMapper.findWatcherUserIds(tenantId, modelCode, recordId).stream()
-                .filter(userId -> recordReadAccess.isReadableBy(tenantId, userId, modelCode, String.valueOf(recordId)))
+                .filter(userId -> recordReadAccess.isReadableByNumericId(tenantId, userId, modelCode, recordId))
                 .toList();
     }
 

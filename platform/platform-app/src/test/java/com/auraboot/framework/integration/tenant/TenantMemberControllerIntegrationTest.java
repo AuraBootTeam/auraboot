@@ -79,6 +79,17 @@ class TenantMemberControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired private RolePermissionMapper grants;
     @Autowired private UserPermissionService userPermissions;
     @Autowired private DataScopeService scopes;
+    @Autowired @org.springframework.beans.factory.annotation.Qualifier("permissionCacheManager")
+    private org.springframework.cache.CacheManager scopeCaches;
+
+    private void setMemberReadScope(String scope) {
+        scopes.setScope(getTestTenant().getId(), getTestRole().getId(), "tenant_member", "read", scope, "MAX");
+        // This test rolls back. The production invalidation intentionally runs
+        // after commit, so remove only this fixture subject's cached condition.
+        java.util.Objects.requireNonNull(scopeCaches.getCache("dataScopeCondition")).evict(
+                com.auraboot.framework.meta.cache.DataAccessCacheEpoch.current() + ":"
+                        + testTenantMember.getId() + ":tenant_member:read");
+    }
     @Autowired private MetaModelMapper models;
     @Autowired private MetaModelService modelService;
     @Autowired private FieldMapPhase fieldMapPhase;
@@ -216,13 +227,18 @@ class TenantMemberControllerIntegrationTest extends BaseIntegrationTest {
         assertThat(userPermissions.getUserPermissionCodes(getTestUser().getId()))
                 .contains("model.tenant_member.read", "model.tenant_member." + verb)
                 .doesNotContain("admin_tenant_member", "org.role.update", "model.tenant_member." + otherVerb);
+        assertThat(scopes.resolveScope(testTenantMember.getId(), "tenant_member", "read").scopeType()).isEqualTo("all");
         String api = "/api/tenant/members/" + target.getPid();
         mockMvc.perform(get(api + "/offboarding-impact").param("action", action))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"))
+                .andExpect(result -> assertThat(result.getResponse().getStatus())
+                        .as("member preflight response=%s; resolved=%s", result.getResponse().getContentAsString(), result.getResolvedException())
+                        .isEqualTo(200)).andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.memberPid").value(target.getPid()))
                 .andExpect(jsonPath("$.data.resources").isArray());
         mockMvc.perform(get(api + "/offboarding-candidates").param("action", action))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
+                .andExpect(result -> assertThat(result.getResponse().getStatus())
+                        .as("member preflight response=%s; resolved=%s", result.getResponse().getContentAsString(), result.getResolvedException())
+                        .isEqualTo(200)).andExpect(jsonPath("$.code").value("0"));
         mockMvc.perform(get(api + "/offboarding-impact").param("action", otherAction))
                 .andExpect(status().isForbidden());
         mockMvc.perform(get(api + "/offboarding-candidates").param("action", otherAction))
@@ -247,7 +263,7 @@ class TenantMemberControllerIntegrationTest extends BaseIntegrationTest {
         grantMemberAction(verb);
         TenantMember owned = createMemberFixture(true);
         TenantMember hidden = createMemberFixture(false);
-        scopes.setScope(getTestTenant().getId(), getTestRole().getId(), "tenant_member", "read", "self", "MAX");
+        setMemberReadScope("self");
         assertThat(scopes.resolveScope(testTenantMember.getId(), "tenant_member", "read").scopeType())
                 .isEqualTo("self");
         mockMvc.perform(get("/api/tenant/members/" + owned.getPid() + "/offboarding-impact").param("action", action))
@@ -268,7 +284,7 @@ class TenantMemberControllerIntegrationTest extends BaseIntegrationTest {
         grantMemberAction("read");
         TenantMember owned = createMemberFixture(true);
         TenantMember hidden = createMemberFixture(false);
-        scopes.setScope(getTestTenant().getId(), getTestRole().getId(), "tenant_member", "read", "self", "MAX");
+        setMemberReadScope("self");
         assertThat(userPermissions.getUserPermissionCodes(getTestUser().getId()))
                 .contains("model.tenant_member.read").doesNotContain("admin_tenant_member");
         mockMvc.perform(get("/api/tenant/members/" + owned.getPid()))
@@ -295,7 +311,7 @@ class TenantMemberControllerIntegrationTest extends BaseIntegrationTest {
         grantMemberAction("read");
         TenantMember owned = createMemberFixture(true);
         TenantMember hidden = createMemberFixture(false);
-        scopes.setScope(getTestTenant().getId(), getTestRole().getId(), "tenant_member", "read", "self", "MAX");
+        setMemberReadScope("self");
         mockMvc.perform(get("/api/tenant/members/" + owned.getPid() + "/teams"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data").isArray());
@@ -308,7 +324,7 @@ class TenantMemberControllerIntegrationTest extends BaseIntegrationTest {
         prepareMemberModel();
         grantMemberPermission("admin_tenant_member", "manage");
         TenantMember target = createMemberFixture(false);
-        scopes.setScope(getTestTenant().getId(), getTestRole().getId(), "tenant_member", "read", "self", "MAX");
+        setMemberReadScope("self");
         assertThat(userPermissions.getUserPermissionCodes(getTestUser().getId()))
                 .contains("admin_tenant_member").doesNotContain("model.tenant_member.read");
         mockMvc.perform(get("/api/tenant/members/" + target.getPid()))
@@ -342,7 +358,7 @@ class TenantMemberControllerIntegrationTest extends BaseIntegrationTest {
         modelService.refreshModelCache("tenant_member");
         // Reset the real scope and its cache before each case; rolled-back rows alone
         // do not invalidate the previous case's cached self condition.
-        scopes.setScope(getTestTenant().getId(), getTestRole().getId(), "tenant_member", "read", "all", "MAX");
+        setMemberReadScope("all");
     }
 
     private TenantMember createMemberFixture(boolean owned) {

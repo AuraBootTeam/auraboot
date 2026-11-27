@@ -250,6 +250,8 @@ changing shared database defaults or unrelated command transactions.
 Watch creation and removal own a REPEATABLE READ transaction so the native
 record-read grant and subscription write share one coherent snapshot. Delivery
 recipient checks retain their existing independently refreshed subject context.
+Legacy numeric watch identities resolve through the native authorized list
+query to their canonical PID, followed by the existing record-read boundary.
 
 Member detail, member teams, offboarding impact and offboarding candidate reads
 own read-only REPEATABLE READ transactions. The native member-record READ and

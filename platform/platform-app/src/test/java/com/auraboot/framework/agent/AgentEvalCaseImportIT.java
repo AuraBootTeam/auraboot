@@ -55,6 +55,9 @@ class AgentEvalCaseImportIT extends BaseIntegrationTest {
         pluginRecords.insert(com.auraboot.framework.plugin.entity.PluginRecord.builder()
                 .pid(PLUGIN_PID).tenantId(tenantId).pluginId("com.test.eval." + PLUGIN_PID).namespace("eval_" + PLUGIN_PID.toLowerCase())
                 .version("1.0.0").status("enabled").deletedFlag(false)
+                .manifest(com.auraboot.framework.plugin.dto.PluginManifest.builder()
+                        .pluginId("com.test.eval." + PLUGIN_PID).namespace("eval_" + PLUGIN_PID.toLowerCase())
+                        .version("1.0.0").build())
                 .createdAt(java.time.Instant.now()).updatedAt(java.time.Instant.now()).build());
         agentCode = "eval_it_agent_" + com.auraboot.framework.common.util.UniqueIdGenerator
                 .generate().toLowerCase();

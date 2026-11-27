@@ -77,6 +77,14 @@ public class WatchServiceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @Order(13)
+    void missingNumericRecordCannotCreateSubscription() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> watchService.toggleWatch(modelCode, Long.MAX_VALUE))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(watchService.isWatching(modelCode, Long.MAX_VALUE)).isFalse();
+    }
+
+    @Test
     @Order(2)
     void toggleWatch_shouldRemoveWatchOnSecondCall() {
         // First call created it in test Order(1)
