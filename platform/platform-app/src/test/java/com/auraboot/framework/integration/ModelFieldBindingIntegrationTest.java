@@ -50,6 +50,8 @@ public class ModelFieldBindingIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private ModelFieldBindingService bindingService;
 
+    @Autowired private com.auraboot.framework.meta.service.SchemaManagementService fixtureSchema;
+
     private Model testModel;
     private Field testField1;
     private Field testField2;
@@ -65,7 +67,8 @@ public class ModelFieldBindingIntegrationTest extends BaseIntegrationTest {
         testModel = new Model();
         testModel.setPid("test_model_" + System.currentTimeMillis());
         testModel.setTenantId(getTestTenant().getId());
-        testModel.setCode("TestModel");
+        testModel.setCode("bind_model_" + System.nanoTime());
+        testModel.setTableName("mt_" + testModel.getCode());
         
         Map<String, Object> extensionData = new HashMap<>();
         extensionData.put("displayName", "Test Model");
@@ -220,6 +223,8 @@ public class ModelFieldBindingIntegrationTest extends BaseIntegrationTest {
             false,
             true
         );
+
+        assertTrue(fixtureSchema.createTableByModel(testModel.getCode()).isSuccess());
 
         // Execute unbind
         boolean success = bindingService.unbindFieldFromModel(

@@ -448,7 +448,11 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
 
     @Override
     public List<NamedQueryFieldDTO> getFields(String queryCode) {
-        List<NamedQueryField> fields = readFields(readDefinition(queryCode));
+        var definition = readDefinition(queryCode);
+        // A deleted/unknown parent has no field collection. Do not dereference
+        // an absent definition or read orphaned live fields under its code.
+        if (definition == null) return List.of();
+        List<NamedQueryField> fields = readFields(definition);
         return fields.stream()
                 .map(this::toFieldDTO)
                 .collect(Collectors.toList());

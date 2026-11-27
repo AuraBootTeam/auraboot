@@ -20,8 +20,15 @@ class ModelFieldUnbindProtectionTest {
         var model=new Model();model.setId(10L);model.setCode("invoice");model.setStatus("published");
         var field=new Field();field.setId(20L);field.setCode("amount");
         when(models.selectById(10L)).thenReturn(model);when(fields.selectById(20L)).thenReturn(field);
+        when(bindings.findByModelAndField(10L,20L,42L)).thenReturn(new ModelFieldBinding());
     }
     @AfterEach void clear() { MetaContext.clear(); }
+    @Test void absentBindingCannotIssueDestructiveDdlOrDeleteMetadata() {
+        when(bindings.findByModelAndField(10L,20L,42L)).thenReturn(null);
+        assertThat(support.unbindFieldFromModel(10L,20L)).isFalse();
+        verifyNoInteractions(schema);
+        verify(bindings,never()).deleteByModelAndField(anyLong(),anyLong());
+    }
     @Test void schemaRefusalMustRetainTheBinding() {
         when(schema.removeFieldFromModel("invoice","amount")).thenReturn(SchemaOperationResult.builder().success(false).message("Field contains data").build());
         assertThatThrownBy(() -> support.unbindFieldFromModel(10L,20L)).isInstanceOf(RuntimeException.class).hasMessageContaining("binding retained");

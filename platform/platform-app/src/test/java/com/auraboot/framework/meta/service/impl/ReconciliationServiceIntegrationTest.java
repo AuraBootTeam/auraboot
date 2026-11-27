@@ -82,6 +82,18 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles("integration-test")
 @DisplayName("ReconciliationService Real-Stack Integration Test")
 class ReconciliationServiceIntegrationTest {
+    @Autowired private com.auraboot.framework.permission.service.UserPermissionService fixturePermissions;
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate fixtureJdbc;
+
+    private <T> T asPolicyAuthor(java.util.function.Supplier<T> action) {
+        return com.auraboot.framework.integration.NativePermissionFixture.asTenantAdministrator(
+                fixtureJdbc, fixturePermissions, "meta.permission.update", "meta", "permission", "update", action);
+    }
+    private <T> T asRoleAuthor(java.util.function.Supplier<T> action) {
+        return com.auraboot.framework.integration.NativePermissionFixture.asTenantAdministrator(
+                fixtureJdbc, fixturePermissions, "org.role.update", "org", "role", "update", action);
+    }
+
 
     private static final String CODE_PREFIX = "recon";
     /** Stable per-class-run nonce (alnum only, LIKE-safe) to avoid unique-constraint collisions. */
@@ -497,7 +509,8 @@ class ReconciliationServiceIntegrationTest {
         role.setPriority(100);
         role.setCreatedAt(Instant.now());
         role.setUpdatedAt(Instant.now());
-        role = roleService.createRole(role);
+        Role authoredRole = roleService.createRole(role);
+        role = authoredRole;
         List<Long> grants = new ArrayList<>();
         for (SourceFixture source : List.of(sourceA, sourceB)) {
             for (String action : List.of("create", "read")) {
@@ -508,15 +521,15 @@ class ReconciliationServiceIntegrationTest {
             dataScopeService.setScope(testTenant.getId(), role.getId(), source.code(), "create", "all", "MAX");
             dataScopeService.setScope(testTenant.getId(), role.getId(), source.code(), "read", "self", "MAX");
         }
-        assertTrue(roleService.assignPermissions(role.getId(), grants));
+        assertTrue(asRoleAuthor(() -> roleService.assignPermissions(authoredRole.getId(), grants)));
         User actor = userService.signUp("recon-actor-" + suffix + "@auraboot.com", "test-password-123");
         User other = userService.signUp("recon-other-" + suffix + "@auraboot.com", "test-password-123");
         TenantMember actorMember = tenantMemberService.addMember(actor.getId(), testTenant.getId(), "active");
         TenantMember otherMember = tenantMemberService.addMember(other.getId(), testTenant.getId(), "active");
         assertNotEquals(actor.getId(), other.getId());
         for (TenantMember member : List.of(actorMember, otherMember)) {
-            assertTrue(userRoleService.assignRolesToMember(member.getId(), List.of(role.getId()),
-                    testTenant.getId(), testUser.getId()));
+            assertTrue(asRoleAuthor(() -> userRoleService.assignRolesToMember(member.getId(), List.of(authoredRole.getId()),
+                    testTenant.getId(), testUser.getId())));
             assertEquals(Set.of(role.getId()), userRoleService.findByMemberIdAndTenantId(
                     member.getId(), testTenant.getId()).stream().map(UserRole::getRoleId)
                     .collect(java.util.stream.Collectors.toSet()));
@@ -561,16 +574,16 @@ class ReconciliationServiceIntegrationTest {
         assertEquals(0, new BigDecimal("42.50").compareTo(matched.getSourceBAmount()));
 
         var readB = permissionService.findByCode("model." + sourceB.code() + ".read");
-        assertTrue(roleService.removePermissions(role.getId(), List.of(readB.getId())));
+        assertTrue(asRoleAuthor(() -> roleService.removePermissions(authoredRole.getId(), List.of(readB.getId()))));
         assertFailedSourceRun(runRequest, profile.getId(), 1);
-        assertTrue(roleService.assignPermissions(role.getId(), grants));
+        assertTrue(asRoleAuthor(() -> roleService.assignPermissions(authoredRole.getId(), grants)));
 
         var hiddenReference = comparisonMask(sourceB, sourceB.reference(), "hide", role);
         assertFailedSourceRun(runRequest, profile.getId(), 2);
-        policyService.disable(hiddenReference.getPid());
+        asPolicyAuthor(() -> { policyService.disable(hiddenReference.getPid()); return null; });
         var maskedAmount = comparisonMask(sourceA, sourceA.amount(), "partial", role);
         assertFailedSourceRun(runRequest, profile.getId(), 3);
-        policyService.disable(maskedAmount.getPid());
+        asPolicyAuthor(() -> { policyService.disable(maskedAmount.getPid()); return null; });
         var restored = reconciliationService.startReconciliation(runRequest);
         assertEquals(ReconciliationRun.STATUS_COMPLETED, restored.getStatus());
         assertEquals(1, restored.getTotalSourceA());
@@ -620,8 +633,8 @@ class ReconciliationServiceIntegrationTest {
         request.setPolicyType("column");
         request.setFieldCode(fieldCode);
         request.setMaskType(maskType);
-        var policy = policyService.create(request);
-        policyService.bindToRole(policy.getPid(), role.getPid());
+        var policy = asPolicyAuthor(() -> policyService.create(request));
+        asPolicyAuthor(() -> { policyService.bindToRole(policy.getPid(), role.getPid()); return null; });
         return policy;
     }
 

@@ -260,11 +260,11 @@ class SecureQueryExecutorImplIntegrationTest {
                 perm.setCode(permCode);
                 perm.setName("Test model read permission");
                 perm.setDescription("Created by SecureQueryExecutorImplIntegrationTest");
-                perm.setResourceType("MODEL");
+                perm.setResourceType("model");
                 perm.setResourceCode(testModelCode);
                 perm.setAction("read");
-                perm.setSource("MANUAL");
-                perm.setStatus("ACTIVE");
+                perm.setSource("manual");
+                perm.setStatus("active");
                 perm.setLevel(3);
                 perm.setDeletedFlag(false);
                 perm.setCreatedAt(Instant.now());
@@ -294,7 +294,7 @@ class SecureQueryExecutorImplIntegrationTest {
                 role.setCode(roleCode);
                 role.setDescription("Coverage IT role for SecureQueryExecutorImpl");
                 role.setType("CUSTOM");
-                role.setStatus("ACTIVE");
+                role.setStatus("active");
                 role.setPriority(100);
                 role.setIsDefault(false);
                 role.setIsSystem(false);
@@ -351,7 +351,9 @@ class SecureQueryExecutorImplIntegrationTest {
             }
 
             // 5. Evict permission cache so changes take effect immediately
-            userPermissionService.evictUserPermissions(testUser.getId());
+            userPermissionService.evictPermissionDefinitions(testTenant.getId());
+            userPermissionService.evictRoleUsers(testTenant.getId(), testRoleId);
+            userPermissionService.evictUserPermissions(testTenant.getId(), testUser.getId());
 
             permissionSetupDone = true;
             log.info("✓ Permission chain set up: permCode={}, roleId={}, permId={}, memberId={}",

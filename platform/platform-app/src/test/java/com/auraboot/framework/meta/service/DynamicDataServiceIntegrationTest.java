@@ -599,9 +599,13 @@ class DynamicDataServiceIntegrationTest {
         Map<String, Object> updateData = new HashMap<>();
         updateData.put("name", "尝试更新");
 
-        assertThrows(MetaServiceException.class, () -> {
+        var refusal = assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> {
             dynamicDataService.update(testModelCode, otherPid, updateData);
         }, "Updating other tenant's record should throw exception");
+
+        assertTrue(refusal.getMessage().contains("FIELD_WRITE_DENIED"));
+        assertEquals("其他租户记录", jdbcTemplate.queryForObject(
+                "SELECT name FROM " + testTableName + " WHERE pid=?", String.class, otherPid));
 
         // Cleanup
         cleanupOtherTenantRecord(otherPid);

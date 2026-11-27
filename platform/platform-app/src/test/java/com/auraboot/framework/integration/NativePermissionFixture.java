@@ -12,6 +12,17 @@ import java.util.Objects;
 
 /** Explicit real-DB grants for one fixture actor; no administrator role or production registration. */
 public final class NativePermissionFixture implements AutoCloseable {
+    /** Scope the actual administrator authoring identity to one service call. */
+    public static <T> T asTenantAdministrator(JdbcTemplate jdbc, UserPermissionService permissions,
+            String code, String type, String resource, String action, java.util.function.Supplier<T> operation) {
+        try (var grants = new NativePermissionFixture(jdbc, permissions);
+             var administration = TenantAdministrationFixture.grant(jdbc,
+                     MetaContext.getCurrentTenantId(), MetaContext.getCurrentMemberId())) {
+            grants.grant(code, type, resource, action);
+            return operation.get();
+        }
+    }
+
     private final JdbcTemplate jdbc;
     private final UserPermissionService permissions;
     private final Long tenant;

@@ -229,11 +229,13 @@ class DynamicDataServiceImplCoverageIT {
     }
 
     @Test
-    @DisplayName("update and delete of a missing record raise MetaServiceException")
+    @DisplayName("missing update is denied by native field authorization; delete reports not found")
     void updateDeleteMissing() {
         Map<String, Object> data = new HashMap<>();
         data.put("name", "x");
-        assertThrows(MetaServiceException.class, () -> dynamicDataService.update(modelCode, "no-such-pid", data));
+        var refusal = assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> dynamicDataService.update(modelCode, "no-such-pid", data));
+        assertTrue(refusal.getMessage().contains("FIELD_WRITE_DENIED"));
         assertThrows(MetaServiceException.class, () -> dynamicDataService.delete(modelCode, "no-such-pid"));
     }
 

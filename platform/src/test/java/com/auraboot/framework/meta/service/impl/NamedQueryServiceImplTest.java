@@ -121,6 +121,15 @@ class NamedQueryServiceImplTest {
     }
 
     @Test
+    void deletedOrUnknownQueryHasNoFieldCollectionAndDoesNotReadOrphans() {
+        MetaContext.setContext(10L, 20L, "tester", "Tester");
+        when(namedQueryMapper.findByCode("deleted-query")).thenReturn(null);
+        assertThat(service.getFields("deleted-query")).isEmpty();
+        verify(namedQueryMapper).findByCode("deleted-query");
+        org.mockito.Mockito.verifyNoInteractions(namedQueryFieldMapper);
+    }
+
+    @Test
     void boundQueryExecutionUsesReleaseWhitelistAndPreservesResourceAuthorization() {
         MetaContext.setContext(10L, 20L, "tester", "Tester");
         var catalog = mock(com.auraboot.framework.application.release.ApplicationRuntimeDefinitionCatalog.class);

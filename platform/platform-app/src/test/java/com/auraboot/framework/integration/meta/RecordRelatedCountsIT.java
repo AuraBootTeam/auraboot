@@ -65,21 +65,14 @@ class RecordRelatedCountsIT extends com.auraboot.framework.integration.BaseInteg
     @BeforeAll
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void setUp() {
-        tenantId = TestIdGenerator.uniqueTenantId();
-        userId = TestIdGenerator.uniqueUserId();
-        jdbc.update("INSERT INTO ab_tenant (id, pid, name, status, deleted_flag) "
-                        + "VALUES (?, ?, ?, 'active', FALSE) ON CONFLICT (id) DO NOTHING",
-                tenantId, "tn_" + tenantId, "related_counts_" + tenantId);
-
-        long memberId = System.nanoTime() & 0x7fffffffffffffffL;
-        jdbc.update("INSERT INTO ab_tenant_member (id, pid, tenant_id, user_id, status, deleted_flag) "
-                + "VALUES (?, ?, ?, ?, 'active', FALSE)",
-                memberId, UniqueIdGenerator.generate(), tenantId, userId);
+        applyTestMetaContext();
+        tenantId = getTestTenant().getId();
+        userId = getTestUser().getId();
 
         createModelWithReference(parentModel, childModel);
 
         parentPid = "relp_parent_" + suffix;
-        MetaContext.setContext(tenantId, userId, "u-" + userId, "related-counts");
+        applyTestMetaContext();
         try {
             jdbc.update("INSERT INTO mt_" + parentModel + " (pid, tenant_id, name, row_version, created_by, updated_by) "
                     + "VALUES (?, ?, 'parent row', 1, ?, ?)", parentPid, tenantId, userId, userId);
@@ -92,10 +85,16 @@ class RecordRelatedCountsIT extends com.auraboot.framework.integration.BaseInteg
         }
     }
 
+    @org.junit.jupiter.api.BeforeEach
+    void grantOwnedRelatedReads() {
+        grantCommittedPermissionToTestRole("model." + parentModel + ".read", "model", parentModel, "read", "Read owned parent");
+        grantCommittedPermissionToTestRole("model." + childModel + ".read", "model", childModel, "read", "Read owned children");
+    }
+
     @Test
     @DisplayName("counts referencing models for a record")
     void countsReferencingModels() {
-        MetaContext.setContext(tenantId, userId, "u-" + userId, "related-counts");
+        applyTestMetaContext();
         try {
             Map<String, Long> counts = relatedCountsService.relatedCounts(parentModel, parentPid);
             assertThat(counts).containsEntry(childModel, 2L);
@@ -107,7 +106,7 @@ class RecordRelatedCountsIT extends com.auraboot.framework.integration.BaseInteg
     @Test
     @DisplayName("record without references yields empty counts")
     void emptyCountsForUnreferencedRecord() {
-        MetaContext.setContext(tenantId, userId, "u-" + userId, "related-counts");
+        applyTestMetaContext();
         try {
             Map<String, Long> counts = relatedCountsService.relatedCounts(childModel, "no_such_ref_" + suffix);
             assertThat(counts.values()).allMatch(v -> v == 0L);
@@ -117,7 +116,7 @@ class RecordRelatedCountsIT extends com.auraboot.framework.integration.BaseInteg
     }
 
     private void createModelWithReference(String parentCode, String childCode) {
-        MetaContext.setContext(tenantId, userId, "u-" + userId, "related-counts-model");
+        applyTestMetaContext();
         try {
             Model parent = insertModel(parentCode);
             bindField(parent.getId(), "pid", "string", true, 0);

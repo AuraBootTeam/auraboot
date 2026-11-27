@@ -30,7 +30,20 @@ import static org.junit.jupiter.api.Assertions.*;
 @Slf4j
 @DisplayName("GAP-010: Data Permission Integration Tests")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@org.springframework.transaction.annotation.Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
 class DataPermissionIntegrationTest extends BaseIntegrationTest {
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate fixtureJdbc;
+    @Autowired private com.auraboot.framework.permission.service.UserPermissionService fixturePermissions;
+    private NativePermissionFixture nativeGrants;
+
+    @BeforeEach void prepareNativeActor() { nativeGrants = new NativePermissionFixture(fixtureJdbc, fixturePermissions); }
+    @AfterEach void releaseNativeActor() { if (nativeGrants != null) nativeGrants.close(); }
+
+    private <T> T asPolicyAuthor(java.util.function.Supplier<T> action) {
+        return NativePermissionFixture.asTenantAdministrator(fixtureJdbc, fixturePermissions,
+                "meta.permission.update", "meta", "permission", "update", action);
+    }
+
 
     @Autowired
     private DataPermissionEngine dataPermissionEngine;
@@ -56,6 +69,7 @@ class DataPermissionIntegrationTest extends BaseIntegrationTest {
         try {
             var model = metaModelService.findByCode(TEST_MODEL);
             if (model != null) {
+                nativeGrants.grantModel(TEST_MODEL, "read");
                 return TEST_MODEL;
             }
         } catch (Exception e) {
@@ -91,6 +105,7 @@ class DataPermissionIntegrationTest extends BaseIntegrationTest {
                 null
         );
         metaModelService.publish(created.getPid(), "integration-test");
+        nativeGrants.grantModel(modelCode, "read");
         return modelCode;
     }
 
@@ -120,11 +135,11 @@ class DataPermissionIntegrationTest extends BaseIntegrationTest {
         req.setScopeType("self");
         req.setPriority(10);
 
-        DataPermissionPolicy policy = policyService.create(req);
+        DataPermissionPolicy policy = asPolicyAuthor(() -> policyService.create(req));
         assertNotNull(policy, "Policy should be created");
 
         // Bind to the test role so it becomes effective
-        policyService.bindToRole(policy.getPid(), getTestRole().getPid());
+        asPolicyAuthor(() -> { policyService.bindToRole(policy.getPid(), getTestRole().getPid()); return null; });
 
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
@@ -148,8 +163,8 @@ class DataPermissionIntegrationTest extends BaseIntegrationTest {
         req.setScopeType("all");
         req.setPriority(10);
 
-        DataPermissionPolicy policy = policyService.create(req);
-        policyService.bindToRole(policy.getPid(), getTestRole().getPid());
+        DataPermissionPolicy policy = asPolicyAuthor(() -> policyService.create(req));
+        asPolicyAuthor(() -> { policyService.bindToRole(policy.getPid(), getTestRole().getPid()); return null; });
 
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
@@ -170,11 +185,11 @@ class DataPermissionIntegrationTest extends BaseIntegrationTest {
         req.setScopeType("self");
         req.setPriority(10);
 
-        DataPermissionPolicy policy = policyService.create(req);
-        policyService.bindToRole(policy.getPid(), getTestRole().getPid());
+        DataPermissionPolicy policy = asPolicyAuthor(() -> policyService.create(req));
+        asPolicyAuthor(() -> { policyService.bindToRole(policy.getPid(), getTestRole().getPid()); return null; });
 
         // Disable the policy
-        policyService.disable(policy.getPid());
+        asPolicyAuthor(() -> { policyService.disable(policy.getPid()); return null; });
 
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
@@ -325,7 +340,7 @@ class DataPermissionIntegrationTest extends BaseIntegrationTest {
         createReq.setScopeType("self");
         createReq.setPriority(10);
 
-        DataPermissionPolicy created = policyService.create(createReq);
+        DataPermissionPolicy created = asPolicyAuthor(() -> policyService.create(createReq));
         assertNotNull(created, "Create should return a policy");
         assertNotNull(created.getPid(), "Created policy should have a PID");
         assertEquals("CRUD Test Policy", created.getName());
@@ -333,7 +348,7 @@ class DataPermissionIntegrationTest extends BaseIntegrationTest {
         assertTrue(created.getEnabled(), "Newly created policy should be enabled by default");
 
         // READ
-        DataPermissionPolicy found = policyService.getByPid(created.getPid());
+        DataPermissionPolicy found = asPolicyAuthor(() -> policyService.getByPid(created.getPid()));
         assertNotNull(found, "Should find policy by PID");
         assertEquals(created.getPid(), found.getPid());
         assertEquals("CRUD Test Policy", found.getName());
@@ -346,23 +361,23 @@ class DataPermissionIntegrationTest extends BaseIntegrationTest {
         updateReq.setScopeType("all");
         updateReq.setPriority(20);
 
-        DataPermissionPolicy updated = policyService.update(created.getPid(), updateReq);
+        DataPermissionPolicy updated = asPolicyAuthor(() -> policyService.update(created.getPid(), updateReq));
         assertEquals("Updated CRUD Policy", updated.getName());
         assertEquals("all", updated.getScopeType());
         assertEquals(20, updated.getPriority());
 
         // DISABLE / ENABLE
-        policyService.disable(created.getPid());
-        DataPermissionPolicy disabled = policyService.getByPid(created.getPid());
+        asPolicyAuthor(() -> { policyService.disable(created.getPid()); return null; });
+        DataPermissionPolicy disabled = asPolicyAuthor(() -> policyService.getByPid(created.getPid()));
         assertFalse(disabled.getEnabled(), "Policy should be disabled");
 
-        policyService.enable(created.getPid());
-        DataPermissionPolicy enabled = policyService.getByPid(created.getPid());
+        asPolicyAuthor(() -> { policyService.enable(created.getPid()); return null; });
+        DataPermissionPolicy enabled = asPolicyAuthor(() -> policyService.getByPid(created.getPid()));
         assertTrue(enabled.getEnabled(), "Policy should be re-enabled");
 
         // DELETE
-        policyService.delete(created.getPid());
-        DataPermissionPolicy deleted = policyService.getByPid(created.getPid());
+        asPolicyAuthor(() -> { policyService.delete(created.getPid()); return null; });
+        DataPermissionPolicy deleted = asPolicyAuthor(() -> policyService.getByPid(created.getPid()));
         assertNull(deleted, "Deleted policy should not be found");
     }
 
@@ -374,7 +389,7 @@ class DataPermissionIntegrationTest extends BaseIntegrationTest {
     void testPreviewFilter_ReturnsString() {
         Long userId = MetaContext.getCurrentUserId();
 
-        String preview = policyService.previewRowFilter("any_model", userId);
+        String preview = asPolicyAuthor(() -> policyService.previewRowFilter("any_model", userId));
 
         assertNotNull(preview, "previewRowFilter should return a non-null string");
         // The result may be empty if no policies are bound, but it should not be null
