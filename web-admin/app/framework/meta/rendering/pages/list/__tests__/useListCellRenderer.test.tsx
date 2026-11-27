@@ -121,6 +121,36 @@ describe('list cell renderer', () => {
     expect(registry.render).not.toHaveBeenCalled();
   });
 
+  it.each([true, false])(
+    'honors dictionary multiline=%s without changing its translated label or tone',
+    (multiline) => {
+      const label =
+        'The provider rejected creation. Correct the required purchasing fields before retrying the original order.';
+      const opts = options({
+        dictDataCache: {
+          current: new Map([
+            ['guidance', [{ value: 'rejected', label, extension: { color: 'error' } }]],
+          ]),
+        },
+      });
+      const { result } = renderHook(() => useListCellRenderer(opts));
+      render(
+        <>
+          {result.current(
+            { field: 'guidance', dictCode: 'guidance', multiline, ellipsis: false },
+            { guidance: 'rejected' },
+            0,
+          )}
+        </>,
+      );
+      const text = screen.getByText(label);
+      expect(text.classList.contains('whitespace-normal')).toBe(multiline);
+      expect(text.parentElement?.classList.contains('max-w-full')).toBe(multiline);
+      expect(text.previousElementSibling).toHaveClass('bg-status-red');
+      expect(registry.render).not.toHaveBeenCalled();
+    },
+  );
+
   it.each([new Map(), new Map([['stage', [{ value: 'approved', label: 'Approved' }]]])])(
     'keeps an unknown dictionary value visible when metadata is missing or unmatched',
     (current) => {
@@ -284,6 +314,25 @@ describe('list cell renderer', () => {
     expect(registry.render).toHaveBeenCalledWith(
       'currency',
       expect.objectContaining({ column: expect.objectContaining({ timezone: 'UTC' }) }),
+    );
+  });
+});
+
+describe('authored multiline list text', () => {
+  it('passes the existing multiline and width contract with the exact source text', () => {
+    const { result } = renderHook(() => useListCellRenderer(options()));
+    const value = '000123\nCapacitor\n4.7uF ±10% 50V';
+    result.current(
+      { field: 'materialSummary', valueType: 'text', multiline: true, width: 250 },
+      { materialSummary: value },
+      0,
+    );
+    expect(registry.render).toHaveBeenCalledWith(
+      'text',
+      expect.objectContaining({
+        value,
+        column: expect.objectContaining({ multiline: true, width: 250 }),
+      }),
     );
   });
 });

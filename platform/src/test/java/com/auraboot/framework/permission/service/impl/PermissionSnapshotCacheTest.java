@@ -9,12 +9,15 @@ import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
 import com.auraboot.framework.rbac.service.MemberRoleContributor;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
 import java.time.LocalDate;
@@ -39,6 +42,11 @@ import static org.mockito.ArgumentMatchers.eq;
 /** Unit coverage for cache keys, negative entries, invalidation, and concurrent miss collapse. */
 @ExtendWith(MockitoExtension.class)
 class PermissionSnapshotCacheTest {
+
+    @AfterEach
+    void noTransactionIsLeftOnTheThread() {
+        TransactionSynchronizationManager.clear();
+    }
 
     @Mock
     private PermissionMapper permissionMapper;
@@ -489,6 +497,82 @@ class PermissionSnapshotCacheTest {
         verify(permissionMapper, times(1)).findByTenantIdAndCode(100L, "missing");
         verify(permissionMapper, times(1)).findByTenantIdAndCode(200L, "read");
         verify(permissionMapper, never()).findResolvableDefinitions(any());
+    }
+
+    /** Binds what Spring binds for a transaction with the given read-only flag and isolation level. */
+    private static void beginTransaction(boolean readOnly, int isolation) {
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        TransactionSynchronizationManager.setCurrentTransactionReadOnly(readOnly);
+        TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(isolation);
+        TransactionSynchronizationManager.initSynchronization();
+    }
+
+    @Test
+    void separateFreshCallbacksEachReadAgainOutsideATransaction() {
+        when(permissionMapper.findByTenantIdAndCode(100L, "read")).thenReturn(permission(50L, "read"));
+        cache.withFreshReads(() -> cache.resolvePermissionId(100L, "read"));
+        cache.withFreshReads(() -> cache.resolvePermissionId(100L, "read"));
+        verify(permissionMapper, times(2)).findByTenantIdAndCode(100L, "read");
+    }
+
+    @Test
+    void separateFreshCallbacksReadAgainInsideAWritableTransaction() {
+        when(permissionMapper.findByTenantIdAndCode(100L, "read")).thenReturn(permission(50L, "read"));
+        beginTransaction(false, TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        try {
+            cache.withFreshReads(() -> cache.resolvePermissionId(100L, "read"));
+            cache.withFreshReads(() -> cache.resolvePermissionId(100L, "read"));
+        } finally {
+            TransactionSynchronizationManager.clear();
+        }
+        verify(permissionMapper, times(2)).findByTenantIdAndCode(100L, "read");
+    }
+
+    @Test
+    void separateFreshCallbacksShareOneReadInsideOneReadOnlySnapshotTransaction() {
+        // A read-only REST route runs many record authorizations in one such transaction; each of them
+        // opens its own fresh callback and used to load the same definitions again.
+        when(permissionMapper.findByTenantIdAndCode(100L, "read")).thenReturn(permission(50L, "read"));
+        beginTransaction(true, TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        try {
+            assertThat(cache.withFreshReads(() -> cache.resolvePermissionId(100L, "read"))).isEqualTo(50L);
+            assertThat(cache.withFreshReads(() -> cache.resolvePermissionId(100L, "read"))).isEqualTo(50L);
+        } finally {
+            TransactionSynchronizationManager.clear();
+        }
+        verify(permissionMapper, times(1)).findByTenantIdAndCode(100L, "read");
+    }
+
+    @Test
+    void aDefinitionThatDoesNotExistIsNotLookedUpAgainInTheSameReadOnlySnapshotTransaction() {
+        when(permissionMapper.findByTenantIdAndCode(100L, "missing")).thenReturn(null);
+        beginTransaction(true, TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        try {
+            assertThat(cache.withFreshReads(() -> cache.resolvePermissionId(100L, "missing"))).isNull();
+            assertThat(cache.withFreshReads(() -> cache.resolvePermissionId(100L, "missing"))).isNull();
+        } finally {
+            TransactionSynchronizationManager.clear();
+        }
+        verify(permissionMapper, times(1)).findByTenantIdAndCode(100L, "missing");
+    }
+
+    @Test
+    void theNextReadOnlySnapshotTransactionReadsAgain() {
+        when(permissionMapper.findByTenantIdAndCode(100L, "read"))
+                .thenReturn(permission(50L, "read"), permission(60L, "read"));
+        beginTransaction(true, TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        try {
+            assertThat(cache.withFreshReads(() -> cache.resolvePermissionId(100L, "read"))).isEqualTo(50L);
+        } finally {
+            TransactionSynchronizationManager.clear();
+        }
+        beginTransaction(true, TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        try {
+            assertThat(cache.withFreshReads(() -> cache.resolvePermissionId(100L, "read"))).isEqualTo(60L);
+        } finally {
+            TransactionSynchronizationManager.clear();
+        }
+        verify(permissionMapper, times(2)).findByTenantIdAndCode(100L, "read");
     }
 
     @Test

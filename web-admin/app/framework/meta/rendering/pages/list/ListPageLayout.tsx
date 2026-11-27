@@ -2,6 +2,7 @@ import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext'
 import { AsyncTaskModalHost } from '~/framework/meta/rendering/components/AsyncTaskModalContext';
 import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
+import { isCustomListDataReady } from './listSchemaPolicy';
 import { ListErrorState } from './ListErrorState';
 import { BulkActionResultDialog } from './BulkActionResultDialog';
 import { renderListPageFeedback } from './ListPageFeedback';
@@ -183,13 +184,15 @@ export function renderListPage(model: ListPageModel) {
         style={workspace ? { backgroundColor: '#F7F7F8' } : undefined}
         data-testid="dynamic-list"
         data-model-code={modelCode}
-        data-ready={dataReady && !loading && !viewsLoading && listQuerySettled}
-        aria-busy={!dataReady || loading || viewsLoading || !listQuerySettled}
+        data-ready={(skipListData ? Boolean(model.runtime) && isCustomListDataReady(schema, dataSourceManager) : dataReady) && !loading && !viewsLoading && listQuerySettled}
+        aria-busy={!(skipListData ? Boolean(model.runtime) && isCustomListDataReady(schema, dataSourceManager) : dataReady) || loading || viewsLoading || !listQuerySettled}
         data-ab-testid={deriveTestId('list', modelCode, 'container')}
       >
         {pageHeader}
         <div
-          className={`rounded-card border-border bg-panel relative overflow-hidden border ${workspace ? '' : 'shadow-sm'}`}
+          className={skipListData && schema.extension?.resultsSurface === 'canvas'
+            ? 'relative min-w-0'
+            : `rounded-card border-border bg-panel relative overflow-hidden border ${workspace ? '' : 'shadow-sm'}`}
         >
           {renderListPageFeedback(model, pageHeader)}
 

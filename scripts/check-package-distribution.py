@@ -110,8 +110,8 @@ def main():
     if json.loads((packages[-1] / "package.json").read_text()).get("private") is not True:
         raise ValueError("AuraQR SDK must remain private")
     for name, absent_section, patent_section, no_section_ten in (
-        ("LICENSE-FAQ-en.md", "### Q11.", "### Q19.", "There is no §10"),
-        ("LICENSE-FAQ.md", "### Q11.", "### Q19.", "协议没有 §10"),
+        ("LICENSE-FAQ-LEGACY-en.md", "### Q11.", "### Q19.", "There is no §10"),
+        ("LICENSE-FAQ-LEGACY.md", "### Q11.", "### Q19.", "协议没有 §10"),
     ):
         faq = (core / name).read_text()
         if not all(package in faq for package in required):
@@ -122,6 +122,12 @@ def main():
         q19 = faq.split(patent_section, 1)[1].split("### Q20.", 1)[0]
         if "§3" not in q19 or no_section_ten not in q19:
             raise ValueError(f"{name}: patent license citation correction missing")
+    for name in ("LICENSE-FAQ.md", "LICENSE-FAQ-en.md"):
+        faq = (core / name).read_text()
+        if not all(package in faq for package in required) or "source-available" not in faq or "RC11" not in faq:
+            raise ValueError(f"{name}: current 1.0 scope or independent license inventory missing")
+    if "not OSI" not in (core / "LICENSE-SCOPE.md").read_text():
+        raise ValueError("1.0 platform scope must not be mislabeled as OSI open source")
     args.out.mkdir(parents=True, exist_ok=False)
     results = []
     for package in packages:

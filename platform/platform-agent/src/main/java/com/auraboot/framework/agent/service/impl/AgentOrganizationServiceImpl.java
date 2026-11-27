@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 import java.util.HashMap;
 import java.util.List;
@@ -63,7 +64,7 @@ public class AgentOrganizationServiceImpl implements AgentOrganizationService {
     private final AgentReleaseDeploymentService releaseDeploymentService;
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public void enrollAsEmployee(Long agentId, String departmentPid, String positionPid) {
         AgentDefinition agent = agentDefinitionMapper.selectById(agentId);
         if (agent == null) {
@@ -75,6 +76,14 @@ public class AgentOrganizationServiceImpl implements AgentOrganizationService {
 
         Long tenantId = MetaContext.getCurrentTenantId();
 
+        // Enrollment binds the immutable runtime deployment as well as the blueprint.
+        // Refuse an unpublished template before creating any user or employee rows.
+        try {
+            releaseDeploymentService.requireActive(tenantId, agent.getAgentCode());
+        } catch (IllegalStateException e) {
+            throw new BusinessException("Publish an active Agent release before enrolling as an employee");
+        }
+
         // 1. Resolve user for the service member, provisioning one if the agent has none.
         //    Only AgentTemplateSeeder used to set system_user_id, and only for the system tenant,
         //    so every tenant-created agent arrived here with null and was refused — the enrollment
@@ -83,8 +92,13 @@ public class AgentOrganizationServiceImpl implements AgentOrganizationService {
         if (systemUserId == null) {
             systemUserId = systemAgentUserProvisioner.ensureSystemAgentUser(
                     agent.getAgentCode(), agent.getName());
-            agent.setSystemUserId(systemUserId);
-            agentDefinitionMapper.updateById(agent);
+            // Association writes must not serialize unrelated nullable blueprint fields.
+            if (agentDefinitionMapper.update(null, new LambdaUpdateWrapper<AgentDefinition>()
+                    .eq(AgentDefinition::getId, agentId)
+                    .eq(AgentDefinition::getTenantId, tenantId)
+                    .set(AgentDefinition::getSystemUserId, systemUserId)) != 1) {
+                throw new BusinessException("Agent association changed; reload before enrollment");
+            }
         }
 
         // 2. Create or find service tenant_member for this agent's system user
@@ -118,8 +132,13 @@ public class AgentOrganizationServiceImpl implements AgentOrganizationService {
         tenantMemberService.updateMember(serviceMember);
 
         // 5. Update agent_definition.employee_id
-        agent.setEmployeeId(employeeId);
-        agentDefinitionMapper.updateById(agent);
+        if (agentDefinitionMapper.update(null, new LambdaUpdateWrapper<AgentDefinition>()
+                .eq(AgentDefinition::getId, agentId)
+                .eq(AgentDefinition::getTenantId, tenantId)
+                .isNull(AgentDefinition::getEmployeeId)
+                .set(AgentDefinition::getEmployeeId, employeeId)) != 1) {
+            throw new BusinessException("Agent association changed; reload before enrollment");
+        }
         releaseDeploymentService.bindEmployee(
                 tenantId,
                 agent.getAgentCode(),
@@ -131,7 +150,7 @@ public class AgentOrganizationServiceImpl implements AgentOrganizationService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public void removeFromOrg(Long agentId) {
         AgentDefinition agent = agentDefinitionMapper.selectById(agentId);
         if (agent == null) {

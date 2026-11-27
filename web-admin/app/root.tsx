@@ -242,7 +242,7 @@ async function loadRoot(
     }
 
     const i18nData = await stage('i18n-public', () => getI18nData(locale, request, false));
-    const edition = process.env.EDITION || 'enterprise';
+    const edition = process.env.EDITION?.trim() || 'community';
     const result: RootLoaderData = {
       runtimeProfile,
       user: null,
@@ -325,7 +325,7 @@ async function loadRoot(
     return redirect('/');
   }
 
-  const edition = process.env.EDITION || 'enterprise';
+  const edition = process.env.EDITION?.trim() || 'community';
   const traceCarrier: Record<string, string> = {};
   tracePropagation.inject(traceContext.active(), traceCarrier);
   const rootData: RootLoaderData = {

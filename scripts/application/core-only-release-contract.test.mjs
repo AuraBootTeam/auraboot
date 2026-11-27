@@ -12,6 +12,7 @@ import {canonicalJson,readStructuredFile,resolveApplication,sha256Path} from './
 import {captureCoreWebInputs,coreWebEnvironment,createCoreWebComponent,copyCoreWebComponent,verifyCoreWebComponent,readCoreWebSelection}
   from './core-web-component.mjs';
 import test from 'node:test';
+import { distributionLicenseFiles, copyDistributionLicenses, copyPackageLicense } from './distribution-licenses.mjs';
 
 const root = resolve(import.meta.dirname, '../..');
 const stage = readFileSync(resolve(root, 'scripts/application/stage-core-only-artifacts.mjs'), 'utf8');
@@ -336,7 +337,9 @@ test('core schema audit keeps provider-neutral automation storage in core', () =
 
 test('release OCI is built on a pinned Linux JRE and requires a real image builder', () => {
   assert.match(oci, /eclipse-temurin:21-jre-alpine@sha256:b6ea71e690a72ba240b3d1b5c477410014862f9ea2cc73ab40e41ff21b03ba1c/);
-  assert.match(oci, /apk add --no-cache zlib=1\.4-r0 && apk info -v zlib/);
+  assert.match(oci, /apk add --no-cache zlib=1\.4-r0 openssl=3\.5\.9-r1 libssl3=3\.5\.9-r1 libcrypto3=3\.5\.9-r1 gnutls=3\.8\.14-r0 && apk info -v zlib openssl libssl3 libcrypto3 gnutls/);
+  assert.match(oci, /apk add --no-cache[^\n]*gnutls=3\.8\.14-r0/);
+  assert.match(readFileSync(resolve(root, 'platform/Dockerfile'), 'utf8'), /apk add --no-cache[^\n]*gnutls=3\.8\.14-r0/);
   assert.doesNotMatch(oci, /--allow-unauthenticated|--allow-untrusted|trusted=yes/);
   assert.doesNotMatch(oci, /execFileSync\('container'/);
   assert.match(oci, /self-hosted Linux CI Docker builder \(linux\/amd64\)/);
@@ -520,7 +523,9 @@ function platformFixture(t) {
 function webComponentFixture(t) {
   const f=platformFixture(t),repo=join(f.directory,'source');mkdirSync(repo);
   const put=(name,body)=>{mkdirSync(path.dirname(join(repo,name)),{recursive:true});writeFileSync(join(repo,name),body);};
-  for(const name of ['VERSION','LICENSE.txt','package.json','pnpm-lock.yaml','pnpm-workspace.yaml',
+  for(const name of ['VERSION','LICENSE.txt','NOTICE','LICENSE-SCOPE.md','LICENSE-LEGACY-2.0.txt',
+    'platform/platform-mybatis-compat/NOTICE.auraboot',
+    'platform/platform-mybatis-compat/licenses/ognl-3.4.17/LICENSE.txt','package.json','pnpm-lock.yaml','pnpm-workspace.yaml',
     'web-admin/package.json','web-admin/app/view.ts','packages/sdk/package.json',
     'scripts/application/stage-core-only-artifacts.mjs','scripts/application/core-web-component.mjs',
     'scripts/application/application-contract.mjs','distribution/application/manifest.json','platform/Backend.java'])put(name,name+'\n');
@@ -785,4 +790,71 @@ test('platform consumer uses the original frozen dataset selection and never res
     writeFileSync(inputs,JSON.stringify({files}));const destination=join(f.directory,name);
     await assert.rejects(consumePlatformArtifacts({...f,inputs,destination}));assert.equal(existsSync(destination),false);
   }
+});
+
+
+test('1.0 distribution retains byte-identical scope, historical and independent third-party licenses', t => {
+  const destination = mkdtempSync(join(tmpdir(), 'aura-license-envelope-'));
+  t.after(() => rmSync(destination, { recursive: true, force: true }));
+  copyDistributionLicenses(root, destination);
+  assert.ok(distributionLicenseFiles.length >= 14);
+  for (const name of distributionLicenseFiles) {
+    assert.deepEqual(readFileSync(join(destination, name)), readFileSync(join(root, name)), name);
+  }
+  assert.match(readFileSync(join(destination, 'LICENSE.txt'), 'utf8'), /source-available/);
+  assert.match(readFileSync(join(destination, 'packages/plugin-sdk/LICENSE'), 'utf8'), /Apache License/);
+});
+
+test('SDK staging and actual npm packing retain the independent Apache license', t => {
+  const destination = mkdtempSync(join(tmpdir(), 'aura-sdk-license-'));
+  t.after(() => rmSync(destination, { recursive: true, force: true }));
+  const source = join(root, 'packages/plugin-sdk');
+  copyPackageLicense(source, destination);
+  const manifest = JSON.parse(readFileSync(join(source, 'package.json'), 'utf8'));
+  writeFileSync(join(destination, 'package.json'), JSON.stringify({
+    name: manifest.name, version: manifest.version, license: manifest.license, files: ['index.js'],
+  }));
+  writeFileSync(join(destination, 'index.js'), 'export const licenseFixture = true;\n');
+  execFileSync('pnpm', ['pack', '--pack-destination', destination], { cwd: destination, stdio: 'pipe' });
+  const archive = readdirSync(destination).filter(name => name.endsWith('.tgz'));
+  assert.equal(archive.length, 1);
+  const bytes = execFileSync('tar', ['-xOf', join(destination, archive[0]), 'package/LICENSE']);
+  assert.deepEqual(bytes, readFileSync(join(source, 'LICENSE')));
+  const packedManifest = JSON.parse(execFileSync('tar', ['-xOf', join(destination, archive[0]), 'package/package.json']));
+  assert.equal(packedManifest.license, 'Apache-2.0');
+  assert.ok(!bytes.toString().includes('AURABOOT COMMUNITY LICENSE'));
+});
+
+test('independent license staging refuses a missing package license rather than borrowing platform terms', t => {
+  const directory = mkdtempSync(join(tmpdir(), 'aura-license-missing-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  assert.throws(() => copyPackageLicense(join(directory, 'missing-sdk'), join(directory, 'out')), /ENOENT/);
+});
+
+
+test('frozen v1 Web receipts remain readable while new capture requires the 1.0 legal envelope', t => {
+  const f = webComponentFixture(t);
+  const historical = structuredClone(f.receipt);
+  const additions = new Set(['NOTICE', 'LICENSE-SCOPE.md', 'LICENSE-LEGACY-2.0.txt',
+    'platform/platform-mybatis-compat/NOTICE.auraboot',
+    'platform/platform-mybatis-compat/licenses/ognl-3.4.17/LICENSE.txt']);
+  const component = historical.webComponent;
+  component.inputs.files = component.inputs.files.filter(entry => !additions.has(entry.path));
+  component.inputDigest = 'sha256:' + createHash('sha256').update(canonicalJson(component.inputs)).digest('hex');
+  assert.equal(verifyCoreWebComponent({ root: f.root, catalog: f.catalog, receipt: historical }).source.commit, f.before.source.commit);
+  // Old provenance remains internally bound; omitting an original required recipe still fails.
+  const incomplete = structuredClone(historical);
+  incomplete.webComponent.inputs.files = incomplete.webComponent.inputs.files.filter(entry => entry.path !== 'pnpm-lock.yaml');
+  incomplete.webComponent.inputDigest = 'sha256:' + createHash('sha256').update(canonicalJson(incomplete.webComponent.inputs)).digest('hex');
+  assert.throws(() => verifyCoreWebComponent({ root: f.root, catalog: f.catalog, receipt: incomplete }), /Complete Web recipe/);
+  rmSync(join(f.repo, 'LICENSE-SCOPE.md'));
+  assert.throws(() => f.commit(), error => error.code === 'ENOENT' && error.path === join(f.repo, 'LICENSE-SCOPE.md'));
+});
+
+test('a changed 1.0 license scope invalidates the current Web input identity', t => {
+  const f = webComponentFixture(t);
+  f.put('LICENSE-SCOPE.md', 'Changed covered license scope\n');
+  const changed = f.commit();
+  assert.notEqual(changed.inputDigest, f.before.inputDigest);
+  assert.ok(changed.inputs.files.some(entry => entry.path === 'LICENSE-SCOPE.md'));
 });

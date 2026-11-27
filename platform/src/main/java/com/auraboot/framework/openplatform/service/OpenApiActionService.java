@@ -39,7 +39,7 @@ public class OpenApiActionService {
     private static final TypeReference<Map<String, Object>> OBJECT = new TypeReference<>() { };
     private static final TypeReference<Map<String, String>> HEADERS = new TypeReference<>() { };
 
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public OpenApiResourceService.Result execute(MachinePrincipal principal, String code, String key, String ifMatch,
                                                  String targetPid, Map<String, Object> input) {
         if (principal == null || principal.tenantId() == null || principal.installationPid() == null)

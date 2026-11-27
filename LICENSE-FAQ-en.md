@@ -1,167 +1,98 @@
----
-type: system-reference
-status: active
-updated: 2026-10-02
----
+# AuraBoot 1.0 license FAQ
 
-# AuraBoot License FAQ
+This checkout prepares **AuraBoot 1.0 / v1.0.0**. A review branch is not a
+published stable release. The published RC11 keeps its original LICENSE,
+NOTICE, tag and assets. The [license](LICENSE.txt), [scope](LICENSE-SCOPE.md)
+and named written commercial order govern their respective subjects.
 
-> **Disclaimer:** This FAQ is an informal guide to help you understand [`LICENSE.txt`](./LICENSE.txt). It is **not a legal document** and has no legal effect. If anything in this FAQ conflicts with `LICENSE.txt`, **the English original of `LICENSE.txt` controls**. For binding interpretations or material business decisions, consult a lawyer or contact us through https://www.auraboot.com/contact.
->
-> Last updated: 2026-10-02 (LICENSE v2.0)
+## Is this OSI open source?
 
----
+No. The covered platform uses the custom source-available Community License
+3.0, with platform-branding and general competing-platform restrictions.
+Previously granted Apache rights remain valid. See the
+[historical FAQ](LICENSE-FAQ-LEGACY-en.md) for older distributions.
 
-## 1. Nature of the License
+## What is free?
 
-### Q1. Is AuraBoot open source?
-**Yes.** As of v2.0 the community distribution is licensed under the **Apache License 2.0** (LICENSE.txt Part 1, reproduced in full), supplemented only by trademark and commercial-contact provisions (Part 2, which restrict nothing granted by Part 1). The v1.x "field-of-use restriction" model is retired.
+Internal use, commercial Business Applications, customer delivery,
+industry SaaS, multi-tenancy and private business code are permitted with
+platform branding retained. Models, fields, business page titles, layouts,
+workflows, rules, SLA, reports, Agents and original extensions remain
+customizable. Mentioning a capability does not include missing proprietary
+modules in a particular distribution.
 
-### Q2. Why aren't you worried about cloud vendors? Where is the moat?
-- **The moat is the product, not license restrictions**: enterprise capabilities (advanced designers, industry plugins, governance components) live in a separate proprietary codebase licensed under commercial agreements — open code being resold as a service doesn't diminish proprietary code that was never open.
-- **Brand protection** moved to trademark terms (Part 2 S3): reselling under the "AuraBoot" brand requires a trademark license; **running it under your own brand** is entirely free.
-- Apache-2.0 has the highest enterprise-legal acceptance rate — the shortest path for self-hosted customers and ISVs alike.
+## Can Community replace the logo or theme?
 
-### Q3. Will the license change unexpectedly?
-Future versions may be revised, but **published versions remain valid in perpetuity for the code released under them**. New versions only apply to newly released code. We will not pull an "ElasticSearch / Redis" — no retroactive license changes on already-released code. This is a baseline community trust commitment.
+Retain the platform logo, name, platform brand theme and designated
+attribution. Do not conceal them through CSS or equivalent changes.
+Business titles, layouts, field colors, custom domains and built-in
+light/dark mode are not white-label permissions. Commercial white-label
+never removes source/distribution legal notices.
 
----
+## What does Standard cover?
 
-## 2. Self-Hosting & Internal Use
+Perpetual internal-use white-label for one named actual using entity,
+including its internal applications and own business portals. No charge
+per application, node or environment and no mandatory renewal. Available
+updates of the same covered community platform scope remain white-label;
+future proprietary modules and human services are not automatically included.
+Other legal entities, independent customers and product operation are not
+included. An ISV may buy Standard for a named final customer.
 
-### Q4. Can I deploy AuraBoot internally for my company employees? Do I need to pay?
-**No payment needed.** Apache-2.0 permits any commercial use. Modifications are permitted too — the only obligations are preserving LICENSE/NOTICE copyright statements on distribution (Apache §4) and not packaging the product under the "AuraBoot" brand (Part 2 S3, trademark).
+## What happens when annual Business ends?
 
-### Q5. Can I modify the source? Do I have to open-source my changes?
-**Yes, you can modify. No, you don't have to open-source your changes.** Whether you deploy internally or deliver to customers, this license never requires you to publish your source — fundamentally different from AGPL/GPL.
+Its 12 months are a period to acquire new rights. Actually delivered named
+customers and actually launched named products form permanent rights in
+the agreed scope. Expiry does not shut down systems, delete data, require
+rebranding or force support renewal. New independent customers or products
+then require new authorization or lawful branded Community use. Prospects
+and reserved names do not form delivered rights. Perpetual Business covers
+agreed future compliant delivery and product operation, not unlimited service.
 
-You may keep modifications private even when deploying for customers. We encourage but do not require contributing general bug fixes / improvements upstream via PR.
+## Are more SaaS subscribers charged?
 
-### Q6. I'm an ISV delivering a project to a customer's own infrastructure. Does that count as distribution?
-**Yes, it's distribution — but it's fully permitted, with no obligation to ship source code.** All you need to do:
-- Preserve LICENSE/NOTICE and source copyright/license statements (Apache §4)
-- Do not offer the product or service under the "AuraBoot" brand — deliver under your own brand (Part 2 S3)
+Not for the same licensed industry product, including agreed same-product
+private deployments. Record the operating entity, product and scope in
+the order; independent products are distinct from subscriber growth.
 
-Your modifications, your business code, your plugins — **all may remain closed source**. This ISV / system integrator scenario is exactly what Apache-2.0 supports.
+## What is a prohibited competitor?
 
-### Q7. Can I keep a private long-term fork in my own repository?
-**Yes.** A private fork is not distribution. As long as you don't publish it externally, you have no obligation to make the source public.
+Using restricted code or derivatives to operate a general-purpose arbitrary
+application/AI development platform for outside third-party developers.
+Internal builders, industry configuration, business Agents, original plugins
+and connectors are not automatically prohibited. Independently implemented
+software using no restricted code is outside the restriction.
 
----
+## Do original frontends or Agent output need attribution?
 
-## 3. Branding & White-Labeling
+An original frontend containing no copied or substantially adapted AuraBoot
+UI is not subject to UI branding merely because it calls backend APIs.
+Headless distributions retain legal notices without inventing a new screen.
+Original Agent output is not automatically branded; copied code, templates
+and components retain their own terms.
 
-### Q8. Can I remove AuraBoot's logo and name?
-**Yes — whitelabeling freedom is explicitly protected in v2.0.** The restriction runs in the opposite direction: **trademark terms cover the "AuraBoot" name itself** (Part 2 S3):
-- Replacing/removing AuraBoot branding, logo, footer, about page: fully permitted — use your own brand
-- Copyright and license statements in code and distributions (LICENSE/NOTICE, source attributions): preserve per Apache §4
-- Marketing or operating a product/service **under the "AuraBoot" brand**: requires a trademark license (Part 2 S3)
+## Which packages keep independent licenses?
 
-### Q9. My product is built on AuraBoot, but customers shouldn't see "AuraBoot" anywhere. Is that allowed?
-**Yes.** You configure business applications (ERP/CRM/internal systems) on AuraBoot; end users see **your business UI under your brand** — exactly the model v2.0 supports. Descriptive mentions ("Powered by AuraBoot") are fair use: keep or remove, your choice.
+These retain their Apache-2.0 license: designer-sdk, dsl-runtime, dsl-types,
+nav-model, open-platform-sdk, plugin-sdk, ui and web-testkit. The enterprise
+repository's auraqr-sdk has its own terms and distribution boundary; this FAQ
+does not distribute its source. MyBatis/OGNL, JAR/npm dependencies and inline
+third-party notices retain their terms. The exact scope and SBOM accompany
+the distribution; the platform root license does not override them.
 
----
+## What are the prices and support terms?
 
-## 4. SaaS / Hosting Services
+Promotional suggested prices: Standard RMB 3,000 or US$499 once; Business
+RMB 6,000 / 12 months or RMB 24,000 once, alternatively US$999 / 12 months
+or US$3,999 once. Currency prices are separate offers, not automatic exchange
+rates. Future new-purchase adjustments do not retroactively reduce formed
+perpetual rights. Taxes, invoicing, credits, implementation and support
+require the named written order. No support response SLA is implied.
 
-### Q10. Is it allowed to run the community edition as a low-code/AI platform SaaS?
-**Under your own brand: yes, including multi-tenant.** Apache-2.0 has no field-of-use restrictions; trademark is the only boundary:
+## Why preserve the previous license?
 
-| Scenario | Allowed? |
-|---|---|
-| ERP / PM / vertical-industry SaaS built on AuraBoot | ✅ community edition |
-| Form-builder / low-code platform SaaS under your own brand | ✅ allowed |
-| Shared multi-tenant instance, tenants configuring apps (your brand) | ✅ allowed |
-| Offering hosting/platform **under the "AuraBoot" brand** | ❌ requires trademark license (Part 2 S3) |
-| Enterprise capabilities (advanced designers/plugins/governance) | Commercial License (separate proprietary codebase, see Q12) |
-
-**Bottom line:** the v2.0 monetization boundary = the AuraBoot trademark + the proprietary enterprise codebase — not field-of-use restrictions on open code.
-
-### Q11. Can I run a vertical-industry or multi-tenant low-code SaaS under my own brand?
-**Yes.** Part 1 grants Apache-2.0 rights without field-of-use restrictions, including when tenants configure their own workflows. Enterprise code and use of AuraBoot trademarks remain subject to their separate agreements.
-
-### Q12. Does a commercial license unlock multi-tenant low-code SaaS?
-Two different things are often conflated here:
-- **The community edition** (this repository, Apache-2.0 + trademark supplements): turning it into a multi-tenant SaaS **under your own brand** is permitted by Part 1 outright — no paid license needed. The only restriction is that you may not trade under the "AuraBoot" brand (Part 2 S3, trademark).
-- **The commercial/enterprise edition** (a separate proprietary codebase): the advanced designers, industry plugins, and governance components are not in this repository and are available only under a Commercial License and separate SaaS / OEM agreements.
-
-In short: selling a rebranded SaaS built on the community edition is Apache-2.0 freedom; selling AuraBoot commercial capabilities or using the AuraBoot brand is what requires an agreement with us. Contact: https://www.auraboot.com/contact
-
----
-
-## 5. Development & Contribution
-
-### Q13. What do I need to sign to submit a PR?
-A **CLA (Contributor License Agreement)**. The CLA grants The AuraBoot Project the rights needed to legally distribute your contribution under both the community and commercial licenses.
-
-The CLA does not require you to surrender copyright — it grants the project a long-term, irrevocable license to use your contribution. A CLA bot will guide you on your first PR.
-
-### Q14. Will my PR be used in the commercial version?
-**Yes.** That's one of the purposes of the CLA. Your contribution will appear in both community and commercial editions. If you don't accept this, please don't submit PRs.
-
-### Q15. Can I build and sell plugins for AuraBoot?
-**Yes.** Plugins are independent works and may use any license you choose, including closed-source commercial. AuraBoot's license does not propagate to plugin code.
-
-If your plugin **directly copies AuraBoot core code**, that copied portion remains under this license. We recommend integrating via our extension points / SPI / DSL rather than forking core code.
-
----
-
-## 6. Commercial License
-
-### Q16. When do I need a commercial license?
-A commercial license unlocks **enterprise capabilities and services** — not permission to use the community edition (Apache-2.0 already grants that):
-- ✅ Enterprise features: advanced designers, industry plugins, governance components
-- ✅ Official support / SLA / priority bug fixes / custom development
-- ✅ Offering products or services under the "AuraBoot" brand (trademark license)
-- ✅ Third-party commercial warranties for your legal team
-
-Self-hosting, project delivery, own-brand SaaS (including multi-tenant low-code platforms) — **none of these require a commercial license**.
-
-### Q17. How do I obtain a commercial license?
-Use the website contact form at https://www.auraboot.com/contact.
-
-### Q18. Is the commercial license perpetual or subscription-based?
-Specific terms are governed by the commercial agreement signed between parties. Generally we offer two options: perpetual buy-out and annual subscription (the latter includes upgrades and support).
-
----
-
-## 7. Compliance & Enforcement
-
-### Q19. What happens if I violate the license?
-Apache-2.0 §3 terminates the **patent licenses for the Work** when the recipient institutes the patent litigation described there; it does not state that all copyright rights terminate. Apache-2.0 §4 states redistribution conditions, while §9 covers accepting additional liability. There is no §10. The v2.0 supplement does not add a general breach-based termination clause; its S6 accurately refers to the patent-license termination specified in Part 1 §3. Trademark misuse is addressed separately. This FAQ does not amend LICENSE.txt.
-
-### Q20. Which jurisdiction governs?
-Apache-2.0 does not designate an exclusive governing law, court, arbitration institution, or dispute-resolution forum. If the parties sign a Commercial License or another written agreement, that agreement may specify the governing law and dispute-resolution mechanism.
-
-### Q21. Can commercial customers agree on a different forum?
-Yes. For cross-border commercial customers, a commercial contract may specify the governing law and dispute-resolution forum (e.g., Singapore / Hong Kong / the customer's jurisdiction). The commercial contract controls for the covered parties and scope.
-
----
-
-## 8. Comparison with Other Projects
-
-### Q22. How does AuraBoot's license compare to Appsmith / ToolJet / Budibase?
-
-| Project | License | Multi-tenant SaaS Restriction | Branding Removable? |
-|---|---|---|---|
-| **AuraBoot v2.0** | Apache-2.0 (trademark supplement) | None (own brand) | ✅ yes (must drop AuraBoot marks) |
-| Appsmith | Apache-2.0 | None | Fully removable |
-| ToolJet | AGPLv3 | Must open-source all modifications | Fully removable |
-| Budibase | GPL v3 + Commercial | Must open-source all modifications (GPL) | Commercial version only |
-
-**Summary:** as of v2.0 the AuraBoot community edition sits in the same domain as pure Apache projects (zero enterprise-legal friction, no forced open-sourcing, no SaaS restrictions) — the differentiation moved to the product layer: enterprise capabilities in a proprietary codebase, plus AuraBoot trademark protection.
-
----
-
-## 9. Still Have Questions?
-
-- **Legal questions:** https://www.auraboot.com/contact
-- **Contribution questions:** see CONTRIBUTING.md
-- **Security disclosure:** see SECURITY.md
-- **Commercial / OEM partnerships:** https://www.auraboot.com/contact
-
-This FAQ is updated based on community feedback. Open a GitHub Issue if you have a question — frequently asked ones get added here.
-
-## Package licenses
-
-Of the current OSS workspace packages (`designer-sdk`, `dsl-runtime`, `dsl-types`, `nav-model`, `plugin-sdk`, `open-platform-sdk`, `ui`, the eight public ones declare Apache-2.0 and include its full text in a package-level `LICENSE`; a ninth, `wechat-mini-runtime`, is `private: true` — internal use only, not distributed with the OSS workspace, hence no package-level LICENSE). Do not apply the retired v1.3 platform-package metadata plan to v2.0 code. The Enterprise `@auraboot/auraqr-sdk` client also has an explicit package-level Apache-2.0 license; that exception does not relicense other Enterprise code. Package licenses grant no AuraBoot trademark rights. Package availability is separate: `auraqr-sdk` remains private, and registry publication must be checked independently.
+It records historical grants and notices, without automatically licensing
+new work under Apache or withdrawing earlier rights. The
+[historical FAQ](LICENSE-FAQ-LEGACY-en.md) concerns those older distributions.
+A new 1.0 candidate requires its own exact source, package, checksum and
+verification evidence; renaming RC11 does not qualify it.

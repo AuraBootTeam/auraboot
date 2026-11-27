@@ -164,9 +164,13 @@ final class ProductQuoteReminderNativeFacet {
     }
     // BEGIN additive PF4J automatic fixture.
     record AutomaticFixture(TickFixture quote, String orderPid, String linePid, String productPid,
-                            Binding shipmentBinding, Path setupEvidence, String setupSha256) {}
+                            Binding shipmentBinding, Instant quoteCutoff, Path setupEvidence, String setupSha256) {}
 
     static AutomaticFixture prepareAutomaticFixture(Services services, Path parent) throws Exception {
+        return prepareAutomaticFixture(services, parent, SLOT.plusSeconds(3600));
+    }
+
+    static AutomaticFixture prepareAutomaticFixture(Services services, Path parent, Instant quoteCutoff) throws Exception {
         var previous = MetaContext.snapshot();
         try {
             var f = new ProductQuoteReminderNativeFacet(services, parent);
@@ -186,7 +190,7 @@ final class ProductQuoteReminderNativeFacet {
                     "s2p_se_status", "bidding", "s2p_se_collaboration_managed", true));
             String quote = f.create("s2p_bid", "qo_procurement_task_common:dispatch", Map.of(
                     "s2p_bid_sourcing_event_id", task, "s2p_bid_supplier_id", supplier, "s2p_bid_status", "draft",
-                    "s2p_bid_collaboration_managed", true, "qo_pr_quote_cutoff_at", SLOT.plusSeconds(3600)));
+                    "s2p_bid_collaboration_managed", true, "qo_pr_quote_cutoff_at", quoteCutoff));
             String product = f.automaticCreate("prod_product", Map.of("prod_name", "Synthetic S06 automatic material",
                     "prod_unit", "pcs", "prod_type", "raw_material", "prod_status", "planned"));
             String order = f.automaticCreate("pr_purchase_order", Map.of("pr_po_code", f.namespace + "-auto",
@@ -206,6 +210,7 @@ final class ProductQuoteReminderNativeFacet {
             f.trace.put("namespace", f.namespace);
             f.trace.put("supplierPid", supplier);
             f.trace.put("quotePid", quote);
+            f.trace.put("quoteCutoff", quoteCutoff.toString());
             f.trace.put("orderPid", order);
             f.trace.put("orderLinePid", line);
             f.trace.put("productPid", product);
@@ -225,7 +230,7 @@ final class ProductQuoteReminderNativeFacet {
             var q = new TickFixture(f.tenant.getId(), f.namespace, supplier, task, quote,
                     List.of(f.first.getId(), f.second.getId()), quotation, f.tables,
                     Path.of(input.path("productJarPath").asText()).toRealPath(), sealed, sha(sealed));
-            return new AutomaticFixture(q, order, line, product, shipment, sealed, sha(sealed));
+            return new AutomaticFixture(q, order, line, product, shipment, quoteCutoff, sealed, sha(sealed));
         } finally { MetaContext.clear(); MetaContext.restore(previous); }
     }
 
@@ -531,8 +536,8 @@ final class ProductQuoteReminderNativeFacet {
         assertThat(sha(file)).isEqualTo(required("S06_NATIVE_PRODUCT_INPUT_SHA256"));
         JsonNode input = s.json.readTree(file.toFile());
         assertThat(input.path("runtime").asText()).isEqualTo(NativeProcurementWorkspace.runtime());
-        assertThat(input.path("database").asText()).isEqualTo("enterprise_22");
-        assertThat(input.path("redisDatabase").asInt()).isEqualTo(13);
+        assertThat(input.path("database").asText()).isEqualTo(NativeProcurementWorkspace.profile().database());
+        assertThat(input.path("redisDatabase").asInt()).isEqualTo(NativeProcurementWorkspace.profile().redisDatabase());
         assertThat(input.path("orderedImportDirectories").isArray()).isTrue();
         assertThat(input.path("orderedImportDirectories").size()).isEqualTo(23);
         JsonNode identities = input.path("verifiedSourceIdentities");

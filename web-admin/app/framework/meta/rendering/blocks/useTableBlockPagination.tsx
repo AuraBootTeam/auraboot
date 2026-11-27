@@ -31,7 +31,11 @@ export function useTableBlockPagination(
     }
     const previous = remembered.get(signatureKey);
     remembered.set(signatureKey, signature);
-    if (previous !== undefined && previous !== signature && Number(context.state?.[binding.pageState] ?? 1) !== 1) {
+    if (
+      previous !== undefined &&
+      previous !== signature &&
+      Number(context.state?.[binding.pageState] ?? 1) !== 1
+    ) {
       writeRuntimeState(runtime, binding.pageState, 1);
     }
   }, [runtime, binding, signatureKey, signature, context.state]);
@@ -66,6 +70,7 @@ export function useTableBlockPagination(
       </div>
     );
   }
+  if (config?.hideOnSinglePage && page.current === 1 && page.total <= page.pageSize) return null;
   return (
     <fieldset
       disabled={Boolean(state.loading || state.error)}

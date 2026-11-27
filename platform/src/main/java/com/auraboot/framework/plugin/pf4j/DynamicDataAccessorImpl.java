@@ -97,6 +97,12 @@ public class DynamicDataAccessorImpl implements DataAccessor {
                 .fieldName(field).operator(value == null ? QueryCondition.Operator.IS_NULL : QueryCondition.Operator.EQ).value(value).build()));
         query.anyOfFilters().forEach((field, values) -> conditions.add(QueryCondition.builder()
                 .fieldName(field).operator(QueryCondition.Operator.IN).values(values).build()));
+        query.timeRanges().forEach((field, range) -> {
+            conditions.add(QueryCondition.builder().fieldName(field).operator(QueryCondition.Operator.GE)
+                    .value(range.fromInclusive().toString()).build());
+            conditions.add(QueryCondition.builder().fieldName(field).operator(QueryCondition.Operator.LT)
+                    .value(range.untilExclusive().toString()).build());
+        });
         List<SortField> sorts = new ArrayList<>();
         for (DataPageQuery.Sort sort : query.sorts()) {
             sorts.add(SortField.builder().fieldName(sort.field())

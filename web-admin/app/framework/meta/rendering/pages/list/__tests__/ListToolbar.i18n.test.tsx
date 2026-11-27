@@ -291,3 +291,10 @@ describe('ListToolbar i18n', () => {
     expect(screen.getByTestId('column-settings-btn')).toHaveTextContent('Fields');
   });
 });
+
+describe('inline filter alignment', () => {
+  it('aligns an unlabeled search with the control edge of labeled filters', () => {
+    renderToolbar({ inlineFilters: <label>Created date<input type="date" /></label> });
+    expect(screen.getByTestId('list-toolbar')).toHaveClass('items-end');
+  });
+});

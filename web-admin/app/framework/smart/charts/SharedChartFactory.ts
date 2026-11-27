@@ -23,6 +23,8 @@ const ActivitiesWidget = (props: Record<string, unknown>) =>
   React.createElement(LazyContributedComponent, { contributionId: 'sales-activities-widget', ...props });
 
 const CHART_REGISTRY = new Map<string, LazyComponent>();
+const REGISTRY_LISTENERS = new Set<() => void>();
+let registrationVersion = 0;
 
 // Register all 23 chart types (lazy imports with named export resolution)
 function reg(type: string, loader: () => Promise<{ default: React.ComponentType<any> }>) {
@@ -33,9 +35,32 @@ function reg(type: string, loader: () => Promise<{ default: React.ComponentType<
  * Registers a plugin-owned widget under a chart/widget type. Plugins own
  * their workbench widgets; the framework factory must not import them
  * (2026-11-14 boundary cleanup). Same wrapping semantics as the built-ins.
+ * Notifies subscribers: a plugin's entry module can be evaluated after a
+ * surface has already rendered its type as unknown (plugin boot is async).
  */
 export function registerChartComponent(type: string, component: React.ComponentType<any>) {
   regSync(type, component);
+  registrationVersion += 1;
+  REGISTRY_LISTENERS.forEach((listener) => listener());
+}
+
+/**
+ * Changes each time a plugin registers a component. Read it with
+ * useSyncExternalStore together with subscribeChartRegistry to render again
+ * when a type arrives after the first lookup.
+ */
+export function getChartRegistryVersion(): number {
+  return registrationVersion;
+}
+
+/**
+ * Subscribe to plugin registrations. Returns the unsubscribe function.
+ */
+export function subscribeChartRegistry(listener: () => void): () => void {
+  REGISTRY_LISTENERS.add(listener);
+  return () => {
+    REGISTRY_LISTENERS.delete(listener);
+  };
 }
 
 function regSync(type: string, component: React.ComponentType<any>) {

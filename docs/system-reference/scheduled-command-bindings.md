@@ -2,6 +2,7 @@
 type: system-reference
 status: active
 created: 2026-10-23
+updated: 2026-11-20
 ---
 
 # Scheduled command bindings
@@ -27,3 +28,11 @@ Delegation is not a replacement for command-specific result/recovery semantics. 
 Products supply their own approved target and command metadata. For an account-wide synchronization command a stable successful execution may serve as its existing authority anchor; the command must still validate connection/account and the complete business scope. Cron and IANA timezone are ordinary task fields, independent of server JVM timezone. Nightly order closure must preserve shipping/receipt facts and treat incomplete or failed provider reads as failure, never inferred closure.
 
 Implementation and per-source validation belong in the product acceptance report. Unit tests of this handler do not certify actual scheduler dispatch, IAM, database transactions or external provider reads.
+
+## Local scheduler trigger claims
+
+The Redis duplicate guard belongs to one deployment environment. Its prefix defaults to `${REDIS_KEY_PREFIX}sched:claim:`; when the environment variable is absent, the existing `aura:sched:claim:` prefix remains. `aura.scheduler.claim-key-prefix` explicitly overrides this default. Nodes in the same deployment must use the same prefix; independent development/test environments must use different prefixes even when they share a Redis database.
+
+An interval task claims its PID for at most its configured interval, capped at 60 seconds. This prevents a five-second recovery task from being throttled by a minute-long duplicate guard. Cron and one-time tasks retain the existing 60-second claim. The guard suppresses competing triggers; business transactions and durable event leases remain responsible for idempotency and recovery. It is not an exactly-once business guarantee.
+
+Changing an existing deployment's prefix requires a coordinated node restart, or an explicit shared prefix throughout a staged rollout. Old and new nodes using different prefixes do not coordinate with one another. Do not delete another environment's live claims to make a test pass.

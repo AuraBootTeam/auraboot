@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, redirect, useSearchParams, type LoaderFunctionArgs } from 'react-router';
+import OpenPlatformOperationsWorkspace, { OpenPlatformOperationsTabs } from './OpenPlatformOperationsWorkspace';
 import {
   ArrowPathIcon,
   ArrowTopRightOnSquareIcon,
@@ -21,6 +22,16 @@ import { IntegrationTokenPanel } from '~/ui/smart/admin/IntegrationTokenPanel';
 import { OpenApiInstallationNotificationEditor } from '~/ui/smart/admin/OpenApiInstallationNotificationEditor';
 import { openPlatformApiFetch as apiFetch } from './open-platform-api';
 import { MemberPicker } from '~/ui/smart/picker/MemberPicker';
+
+// Retired standalone diagnostics bookmarks return to the existing application entry.
+export function loader({ request }: LoaderFunctionArgs) {
+  const url = new URL(request.url);
+  if (url.searchParams.get('view') === 'calls') {
+    url.searchParams.set('view', 'applications');
+    return redirect(`${url.pathname}?${url.searchParams}`);
+  }
+  return null;
+}
 
 interface Capability {
   code: string;
@@ -92,6 +103,7 @@ interface CredentialSecret {
 
 export default function OpenPlatformPage() {
   const { t, locale } = useI18n();
+  const [viewParams] = useSearchParams();
   const { showToast } = useToastContext();
   const [applications, setApplications] = useState<ExternalApplication[]>([]);
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
@@ -417,11 +429,16 @@ export default function OpenPlatformPage() {
     }
   };
 
+  if (viewParams.get('view') === 'webhooks') {
+    return <OpenPlatformOperationsWorkspace applications={applications} loading={loading && applications.length === 0} error={error} onRetry={() => void load()} />;
+  }
+
   return (
     <main
       className="mx-auto w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] min-w-0 space-y-6 p-4 sm:w-auto sm:max-w-6xl sm:p-6"
       data-testid="open-platform-page"
     >
+      <OpenPlatformOperationsTabs view="applications" />
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
@@ -676,9 +693,7 @@ export default function OpenPlatformPage() {
                             <button
                               type="button"
                               onClick={() =>
-                                setOperationsInstallation((current) =>
-                                  current === installation.pid ? null : installation.pid,
-                                )
+                                setOperationsInstallation((current) => current === installation.pid ? null : installation.pid)
                               }
                               className="inline-flex min-w-0 items-center justify-center gap-1 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200"
                               data-testid={`open-platform-operations-${installation.pid}`}
@@ -821,7 +836,7 @@ export default function OpenPlatformPage() {
                       )}
                       {application.permissions.readOperations &&
                         operationsInstallation === installation.pid && (
-                          <OpenPlatformOperationsPanel installationPid={installation.pid} />
+                          <OpenPlatformOperationsPanel installationPid={installation.pid} canReadBodies={application.permissions.manageRuntime} />
                         )}
                       {access.platformAdmin &&
                         application.permissions.manageRuntime &&

@@ -404,7 +404,10 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
   // Dict labels for dict-coded dimension values. Resolved here rather than in each
   // chart so every component gets them for free — the aggregate response only ever
   // carries raw codes, and a dozen components were each rendering them verbatim.
-  const dimensionLabels = useDimensionLabels(dataSource, resolved?.meta?.dimensions);
+  const dimensionLabels = useDimensionLabels(
+    enabled ? dataSource : undefined,
+    enabled ? resolved?.meta?.dimensions : undefined,
+  );
 
   const dataWithLabels = useMemo<AggregateQueryResponse | null>(() => {
     if (!resolved) return null;

@@ -274,6 +274,8 @@ export function renderSubTableView({
                       getDictLabel,
                       timezone,
                       formats,
+                      undefined,
+                      locale,
                     )}
                   </span>
                 )}
@@ -286,6 +288,8 @@ export function renderSubTableView({
                     getDictLabel,
                     timezone,
                     formats,
+                    undefined,
+                    locale,
                   )}
                 </span>
                 {configuredRowActions
@@ -310,6 +314,13 @@ export function renderSubTableView({
     );
   }
 
+  const firstColumn = effectiveColumns[0];
+  const firstColumnType = (firstColumn?.valueType || firstColumn?.dataType || '').toLowerCase();
+  const firstColumnFits = firstColumn?.width == null ||
+    (typeof firstColumn.width === 'number' && firstColumn.width <= 192);
+  const pinByDefault = !config.treeConfig && effectiveColumns.length >= 4 && firstColumnFits &&
+    ['text', 'string', 'varchar', 'reference'].includes(firstColumnType);
+  const pinnedColumn = !isEditable && (config.pinFirstColumn ?? pinByDefault) ? firstColumn?.field : undefined;
   const tableHeader = (
     <thead className="bg-subtle">
       <tr>
@@ -323,14 +334,14 @@ export function renderSubTableView({
                 : col.align === 'center'
                   ? 'text-center'
                   : 'text-left'
-            }`}
+            } ${col.field === pinnedColumn ? 'bg-subtle sticky left-0 z-10' : ''}`}
             style={
               col.width
                 ? {
                     width: typeof col.width === 'number' ? `${col.width}px` : col.width,
                     minWidth: typeof col.width === 'number' ? `${col.width}px` : col.width,
                   }
-                : undefined
+                : col.field === pinnedColumn ? { minWidth: '8rem', width: '10rem' } : undefined
             }
           >
             {col.label ? getLocalizedText(col.label, locale, t) : resolveColumnLabel(col.field)}
@@ -461,6 +472,7 @@ export function renderSubTableView({
                                 timezone,
                                 formats,
                                 referenceDisplayValue,
+                                locale,
                               )}
                               isEditing={editable}
                               error={editErrors[col.field]}
@@ -490,7 +502,7 @@ export function renderSubTableView({
                           key={col.field}
                           className={`text-text-2 px-4 py-2 text-sm ${cellAlign}${
                             canInlineEdit ? 'hover:bg-hover cursor-pointer' : ''
-                          }`}
+                          } ${col.field === pinnedColumn ? 'bg-panel sticky left-0 z-10 break-words' : ''}`}
                           onDoubleClick={canInlineEdit ? () => handleStartEdit(row) : undefined}
                         >
                           {formatCellValue(
@@ -500,6 +512,7 @@ export function renderSubTableView({
                             timezone,
                             formats,
                             referenceDisplayValue,
+                            locale,
                           )}
                         </td>
                       );

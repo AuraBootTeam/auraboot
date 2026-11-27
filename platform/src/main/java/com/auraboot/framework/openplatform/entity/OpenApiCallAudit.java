@@ -27,4 +27,7 @@ public class OpenApiCallAudit {
     @com.baomidou.mybatisplus.annotation.TableField(typeHandler = com.auraboot.framework.application.typehandler.JsonNodeTypeHandler.class,
             jdbcType = org.apache.ibatis.type.JdbcType.OTHER)
     private com.fasterxml.jackson.databind.JsonNode businessDetails;
+    @com.baomidou.mybatisplus.annotation.TableField(typeHandler = com.auraboot.framework.application.typehandler.JsonNodeTypeHandler.class,
+            jdbcType = org.apache.ibatis.type.JdbcType.OTHER)
+    private com.fasterxml.jackson.databind.JsonNode httpDetails;
 }

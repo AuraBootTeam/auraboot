@@ -167,6 +167,38 @@ const tableConfigSchema = z
     density: z.enum(['default', 'compact']).optional(),
     pagination: paginationConfigSchema.optional(),
     selection: selectionConfigSchema.optional(),
+    rowExpansion: z
+      .object({
+        endpoint: z.string().startsWith('/api/'),
+        titleField: z.string().optional(),
+        label: localizedTextSchema.optional(),
+        rowKey: z.string().optional(),
+        pageParam: z
+          .string()
+          .regex(/^[A-Za-z][A-Za-z0-9_]*$/)
+          .optional(),
+        sizeParam: z
+          .string()
+          .regex(/^[A-Za-z][A-Za-z0-9_]*$/)
+          .optional(),
+        pageIndexBase: z.union([z.literal(0), z.literal(1)]).optional(),
+        pageSize: z.number().int().min(1).max(100).optional(),
+        columns: z
+          .array(
+            z
+              .object({
+                field: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/),
+                label: localizedTextSchema,
+                multiline: z.boolean().optional(),
+                width: z.number().min(40).max(1200).optional(),
+              })
+              .strict(),
+          )
+          .min(1)
+          .max(12),
+      })
+      .strict()
+      .optional(),
     treeConfig: z
       .object({
         parentField: z.string(),
@@ -265,7 +297,17 @@ export const blockSchema: z.ZodType<any> = z
     visibleWhen: z.string().optional(),
     className: z.string().optional(),
     fields: z.array(fieldSchema).optional(),
-    rowSelection: z.object({identityField:z.string().min(1),selectedField:z.string().min(1),positiveField:z.string().min(1),defaultSelected:z.boolean().optional(),label:localizedTextSchema.optional(),emptyText:localizedTextSchema.optional()}).strict().optional(),
+    rowSelection: z
+      .object({
+        identityField: z.string().min(1),
+        selectedField: z.string().min(1),
+        positiveField: z.string().min(1),
+        defaultSelected: z.boolean().optional(),
+        label: localizedTextSchema.optional(),
+        emptyText: localizedTextSchema.optional(),
+      })
+      .strict()
+      .optional(),
     buttons: z.array(buttonSchema).optional(),
     table: tableConfigSchema.optional(),
     columns: z.union([z.number(), z.array(columnSchema)]).optional(),

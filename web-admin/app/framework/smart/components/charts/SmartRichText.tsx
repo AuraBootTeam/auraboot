@@ -89,8 +89,15 @@ export const SmartRichText: React.FC<SmartRichTextProps> = ({
           {title}
         </div>
       )}
+      {/* The typography plugin is not part of the CSS build, so `prose` leaves anchors unstyled and a
+          link reads as plain body text. Anchors get the same accent + underline convention as links
+          elsewhere in the app; they are set from outside because the HTML is sanitised markup. */}
       <div
-        className="prose prose-sm max-w-none text-gray-700"
+        className={cn(
+          'prose prose-sm max-w-none text-gray-700',
+          '[&_a]:text-accent [&_a]:underline [&_a]:underline-offset-2 [&_a]:hover:text-accent-hover dark:[&_a]:text-blue-400',
+        )}
+        data-testid="smart-rich-text-content"
         dangerouslySetInnerHTML={{ __html: renderedHtml }}
       />
     </div>

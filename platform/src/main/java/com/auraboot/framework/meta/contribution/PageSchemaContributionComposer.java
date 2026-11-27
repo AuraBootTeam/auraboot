@@ -133,6 +133,12 @@ public class PageSchemaContributionComposer {
         switch (slot.target) {
             case TAB_BLOCKS -> appendToTab(block, slot, contribution.payload());
             case BLOCK_ACTIONS -> appendAction(block, "actions", contribution.payload(), slot);
+            case TABLE_ROW_ACTIONS -> {
+                if (!"table".equals(block.get("blockType"))) {
+                    throw invalid("row action anchor must be a table: " + slot.blockId);
+                }
+                appendAction(block, "rowActions", contribution.payload(), slot);
+            }
             case SUB_TABLE_ACTIONS -> {
                 Object rawSubTable = block.get("subTable");
                 if (!(rawSubTable instanceof Map<?, ?>)) {
@@ -324,6 +330,7 @@ public class PageSchemaContributionComposer {
     private enum AnchorTarget {
         TAB_BLOCKS,
         BLOCK_ACTIONS,
+        TABLE_ROW_ACTIONS,
         SUB_TABLE_ACTIONS,
         SUB_TABLE_TOOLBAR_ACTIONS
     }

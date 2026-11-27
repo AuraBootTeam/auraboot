@@ -11,9 +11,10 @@ import { useI18n } from '~/contexts/I18nContext';
 interface PrintButtonProps {
   /** Page title — used only as tooltip context */
   title?: string;
+  showLabel?: boolean;
 }
 
-export function PrintButton({ title }: PrintButtonProps) {
+export function PrintButton({ title, showLabel = false }: PrintButtonProps) {
   const { t } = useI18n();
   const label = t('action.print') || 'Print';
 
@@ -23,10 +24,11 @@ export function PrintButton({ title }: PrintButtonProps) {
       onClick={() => window.print()}
       className="print-hide rounded-control border-border-strong bg-panel text-text-2 hover:bg-subtle focus-visible:shadow-focus inline-flex items-center gap-1.5 border px-3 py-1.5 text-sm font-medium focus:outline-none"
       data-print="hide"
+      aria-label={label}
       title={title ? `${label}: ${title}` : label}
     >
       <PrinterIcon className="h-4 w-4" />
-      <span className="hidden sm:inline">{label}</span>
+      <span className={showLabel ? undefined : 'hidden sm:inline'}>{label}</span>
     </button>
   );
 }

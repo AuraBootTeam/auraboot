@@ -41,6 +41,7 @@ export async function resolveDeploymentBranding(
   }
 
   const cacheKey = [
+    environment.EDITION?.trim().toLowerCase(),
     configPath,
     orderReference,
     enforcement,

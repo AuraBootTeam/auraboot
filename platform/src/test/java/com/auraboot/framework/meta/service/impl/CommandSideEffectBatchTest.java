@@ -4,6 +4,8 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelDefinition;
+import com.auraboot.framework.meta.entity.CommandDefinition;
+import com.auraboot.framework.meta.entity.payload.DocumentFlowConfig;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.DataDomainService;
 import com.auraboot.framework.meta.service.DataPermissionEngine;
@@ -330,7 +332,9 @@ class CommandSideEffectBatchTest {
             assertEquals("order-001", captured.get(0).get("order_pid"));
             assertEquals("SKU-1", captured.get(0).get("product_code"));
             assertEquals(10, captured.get(0).get("quantity"));
-            assertEquals(TENANT_ID, captured.get(0).get("tenant_id"));
+            // tenant_id is left to the data service; a payload that carries it is refused
+            // by the native field authorization outside the command's permit scope.
+            assertNull(captured.get(0).get("tenant_id"));
 
             // Second item
             assertEquals("order-001", captured.get(1).get("order_pid"));
@@ -801,8 +805,8 @@ class CommandSideEffectBatchTest {
     class DirectBatchCreateTests {
 
         @Test
-        @DisplayName("Sets tenant_id on each created record")
-        void testTenantIdSetOnEachRecord() {
+        @DisplayName("Leaves tenant_id to the data service")
+        void testTenantIdLeftToTheDataService() {
             Map<String, Object> currentRecord = new HashMap<>();
             currentRecord.put("id", "order-001");
             currentRecord.put("lines", List.of(
@@ -819,8 +823,11 @@ class CommandSideEffectBatchTest {
             ArgumentCaptor<Map<String, Object>> dataCaptor = ArgumentCaptor.forClass(Map.class);
             verify(dynamicDataService, times(2)).create(eq("order_line"), dataCaptor.capture());
 
+            // The data service sets tenant_id from the authenticated tenant. A payload that
+            // carries it is a caller-submitted system field, which the native field
+            // authorization refuses outside the command's permit scope.
             for (Map<String, Object> data : dataCaptor.getAllValues()) {
-                assertEquals(TENANT_ID, data.get("tenant_id"));
+                assertFalse(data.containsKey("tenant_id"), "created payload must not carry tenant_id");
             }
         }
     }
@@ -1113,6 +1120,80 @@ class CommandSideEffectBatchTest {
             }
             assertEquals("inv-001", paramsCaptor.getAllValues().get(0).get("recordId"));
             assertEquals("inv-002", paramsCaptor.getAllValues().get(1).get("recordId"));
+        }
+    }
+
+    @Nested
+    @DisplayName("DOCUMENT_FLOW — the target is named inside documentFlow")
+    class DocumentFlowTests {
+
+        private final Map<String, Object> flow = Map.of(
+                "targetModelCode", "inv_outbound_order",
+                "fieldMapping", Map.of("ioo_source_order", "${recordPid}"));
+
+        private CommandDefinition command() {
+            var command = new CommandDefinition();
+            command.setModelCode("sales_order");
+            return command;
+        }
+
+        private Map<String, Object> run(Map<String, Object> effect) {
+            executor.executeSideEffectPhase(Map.of("sideEffects", List.of(effect)),
+                    new HashMap<>(Map.of("id", "order-001")), TENANT_ID, USER_ID, command(), null, null);
+            return effect;
+        }
+
+        @Test
+        @DisplayName("A flat document_flow runs without a target model on the effect")
+        void testFlatDocumentFlow() {
+            Map<String, Object> effect = new HashMap<>();
+            effect.put("action", "document_flow");
+            effect.put("documentFlow", flow);
+
+            run(effect);
+
+            verify(documentFlowService, times(1)).executeFlow(eq("sales_order"), eq("order-001"), eq(TENANT_ID),
+                    argThat(config -> "inv_outbound_order".equals(config.getTargetModelCode())));
+        }
+
+        @Test
+        @DisplayName("A flat document_flow that also names its target on the effect runs once")
+        void testFlatDocumentFlowWithTargetRunsOnce() {
+            Map<String, Object> effect = new HashMap<>();
+            effect.put("action", "document_flow");
+            effect.put("targetModel", "inv_outbound_order");
+            effect.put("documentFlow", flow);
+
+            run(effect);
+
+            verify(documentFlowService, times(1)).executeFlow(anyString(), anyString(), anyLong(), any(DocumentFlowConfig.class));
+        }
+
+        @Test
+        @DisplayName("A nested document_flow runs without a model on the action")
+        void testNestedDocumentFlow() {
+            Map<String, Object> action = new HashMap<>();
+            action.put("type", "document_flow");
+            action.put("documentFlow", flow);
+            Map<String, Object> effect = new HashMap<>();
+            effect.put("actions", List.of(action));
+
+            run(effect);
+
+            verify(documentFlowService, times(1)).executeFlow(eq("sales_order"), eq("order-001"), eq(TENANT_ID),
+                    argThat(config -> "inv_outbound_order".equals(config.getTargetModelCode())));
+        }
+
+        @Test
+        @DisplayName("Any other kind without a target model is still skipped")
+        void testOtherKindWithoutTargetIsSkipped() {
+            Map<String, Object> effect = new HashMap<>();
+            effect.put("action", "create_record");
+            effect.put("fieldMapping", Map.of("code", "${recordPid}"));
+
+            run(effect);
+
+            verifyNoInteractions(dynamicDataService, documentFlowService);
         }
     }
 

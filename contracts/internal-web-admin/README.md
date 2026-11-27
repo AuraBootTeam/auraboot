@@ -264,3 +264,13 @@ This integrity check does not judge visual quality or replace individual origina
 Functional and visual receipts preserve the actual executed commit. They do not
 certify unregistered domain branches, global absence of session residue, JSON
 formats, or the separate admitted Linux release-image gate.
+
+## Retired GE validation surface
+
+The dedicated GE create/run/history operations under `/api/dataquality/expectations`
+and the `AbDataQualityValidationRun` transport schema are retired together with the
+optional `dataquality-observability` UI package. They have no replacement or redirect.
+Historical native tables, migration SQL and stored results are retained; removal
+does not uninstall tenant-owned UI resources. `/api/dataquality/dbt/ingest`, shared
+query authorization and behavior collection remain independent supported surfaces.
+Generated catalogs and TypeScript declarations must reflect the actual producer.

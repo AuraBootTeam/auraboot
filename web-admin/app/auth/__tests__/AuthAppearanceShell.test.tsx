@@ -39,8 +39,8 @@ describe('authentication appearance presentation', () => {
   );
   it('uses English default brand copy when English translations are unavailable', () => {
     render(<AuthAppearanceShell branding={COMMUNITY_BRANDING} appearance={base}><form /></AuthAppearanceShell>);
-    expect(screen.getByText('AI-native enterprise application runtime')).toBeVisible();
-    expect(screen.getByText('Turn business capabilities into commands that teams and AI can use across every client.')).toBeVisible();
+    expect(screen.getByText('Business application platform')).toBeVisible();
+    expect(screen.getByText('Engineering experience, built into the foundation. Let people and AI focus on the business.')).toBeVisible();
   });
   it('renders legacy story and the real form inside split mode', () => {
     show(base);
@@ -105,4 +105,24 @@ describe('authentication appearance presentation', () => {
     expect(document.querySelector('.auth-fx')).toBeNull();
   });
 
+});
+
+describe('default login capability coverage', () => {
+  it('renders all six capabilities with explanations when default content is selected', () => {
+    render(<AuthAppearanceShell branding={COMMUNITY_BRANDING} appearance={{ ...base, content: { features: { mode: 'default' } } }}><form /></AuthAppearanceShell>);
+    const capabilities = screen.getByTestId('login-capabilities');
+    expect(capabilities.querySelectorAll('li')).toHaveLength(6);
+    expect(screen.getByRole('heading', { name: 'Build faster, adapt easily' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Control access, trace actions' })).toBeVisible();
+    expect(capabilities.querySelectorAll('p')).toHaveLength(6);
+  });
+  it('keeps explicitly hidden capabilities hidden', () => {
+    render(<AuthAppearanceShell branding={COMMUNITY_BRANDING} appearance={{ ...base, content: { features: { mode: 'hidden' } } }}><form /></AuthAppearanceShell>);
+    expect(screen.queryByTestId('login-capabilities')).not.toBeInTheDocument();
+  });
+  it('preserves customer capability copy instead of appending default cards', () => {
+    show({ ...base, content: { features: { mode: 'custom', values: { 'en-US': ['Customer-specific capability'] } } } });
+    expect(screen.getByText('Customer-specific capability')).toBeVisible();
+    expect(screen.queryByTestId('login-capabilities')).not.toBeInTheDocument();
+  });
 });

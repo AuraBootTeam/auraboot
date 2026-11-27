@@ -6,15 +6,27 @@
  * future dates render with no urgency class. Falls back to em-dash for invalid
  * inputs.
  *
- * NOTE: english labels are demo-stage placeholders pending i18n wrapping.
- * TODO(i18n): swap to LocalizedText keys (`kanban.field.dateRelative.*`).
+ * The three labels follow the reader's language: Chinese for a Chinese locale,
+ * English otherwise. A Chinese opportunity board read `139d ago` on every card
+ * until the locale was passed in (CRM journey walkthrough, 2026-11-26).
  */
 
 export interface DateRelativeFieldProps {
   value: string | Date | null | undefined;
+  /** The reader's language, e.g. `zh-CN`. Omitted: English. */
+  locale?: string;
 }
 
-export function DateRelativeField({ value }: DateRelativeFieldProps) {
+/** The label for a date that is `diffDays` days away from today (negative: past). */
+export function relativeDayLabel(diffDays: number, locale?: string): string {
+  const chinese = String(locale ?? '').toLowerCase().startsWith('zh');
+  const days = Math.abs(diffDays);
+  if (diffDays === 0) return chinese ? '今天' : 'today';
+  if (diffDays > 0) return chinese ? `${days} 天后` : `in ${days}d`;
+  return chinese ? `${days} 天前` : `${days}d ago`;
+}
+
+export function DateRelativeField({ value, locale }: DateRelativeFieldProps) {
   if (value === null || value === undefined || value === '') {
     return <span data-field-type="date-relative">—</span>;
   }
@@ -33,18 +45,9 @@ export function DateRelativeField({ value }: DateRelativeFieldProps) {
     cls = 'text-red-600 font-medium';
   }
 
-  let label: string;
-  if (diffDays === 0) {
-    label = 'today';
-  } else if (diffDays > 0) {
-    label = `in ${diffDays}d`;
-  } else {
-    label = `${Math.abs(diffDays)}d ago`;
-  }
-
   return (
     <span data-field-type="date-relative" className={cls}>
-      {label}
+      {relativeDayLabel(diffDays, locale)}
     </span>
   );
 }

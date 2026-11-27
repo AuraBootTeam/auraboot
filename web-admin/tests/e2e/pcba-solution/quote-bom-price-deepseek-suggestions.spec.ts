@@ -255,6 +255,11 @@ test.describe('QuoteOps DeepSeek BOM price suggestions', () => {
         /java\.lang|IllegalStateException|MetaContext not initialized/i,
         { timeout: 20_000 },
       );
+      await page.getByTestId(`table-row-${created.lineId}`).click();
+      await expect(page.getByTestId('review-drawer')).toBeVisible();
+      await expect(page.getByTestId('review-drawer').getByRole('row').filter({ hasText: /DeepSeek/ }).first()).toBeVisible();
+      await expect(page.getByTestId('review-drawer')).not.toContainText('正在加载候选物料');
+      await test.info().attach('deepseek-governed-price-result', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     } finally {
       await provider.close();
       await cleanupRows(page, created);

@@ -4,35 +4,29 @@ import { openQuoteDetailFromList, seedFixedCountQuote, queryDynamicRecords } fro
 
 const drill = 'M48\nMETRIC\nT01C0.800\n%\nT01\nX0.000Y0.000\nX1.500Y0.000\nM30\n';
 
-/** Wait for a compute_process_fee dispatch this page initiated and return the terminal task. */
-async function waitForComputeTask(page: Page) {
-  const response = await page.waitForResponse((r) => r.request().method() === 'POST'
-    && r.url().includes('/api/meta/commands/execute/qo_quote_common:compute_process_fee'));
-  expect(response.ok()).toBe(true);
-  expect(response.request().postDataJSON().payload.count_hole_mode).toBe('default');
-  const body = await response.json();
-  expect(String(body.code)).toBe('0');
-  const receipt = body.data?.data ?? body.data;
-  expect(receipt.taskCode).toBeTruthy();
-  let terminal: any;
-  await expect.poll(async () => {
-    const result = await page.request.get(`/api/async-tasks/${receipt.taskCode}`);
-    expect(result.ok()).toBe(true);
-    terminal = (await result.json()).data;
-    return ['completed', 'failed', 'cancelled'].includes(terminal.status);
-  }, { timeout: 60_000 }).toBe(true);
-  await expect(page.getByRole('button', { name: '关闭', exact: true })).toBeVisible({ timeout: 15_000 });
-  await page.getByRole('button', { name: '关闭', exact: true }).click();
-  return terminal;
-}
-
-/** Explicit-scope dispatches exercise the backend contract: the fixed-count lane bills
- * paste openings × 0.5 (SMT) + pad-verified THT holes × 1 (DIP). */
+/** Execute the existing count-scope form; API reads only observe the resulting task. */
 async function dispatchCompute(page: Page, quoteId: string, payload: Record<string, unknown>) {
-  const response = await page.request.post('/api/meta/commands/execute/qo_quote_common:compute_process_fee', {
-    data: { payload, targetRecordPid: quoteId, targetRecordId: quoteId, operationType: 'update' },
-  });
-  expect(response.ok(), await response.text()).toBe(true);
+  const mode = payload.count_hole_mode === 'default' ? 'pads' : String(payload.count_hole_mode);
+  await page.getByTestId('toolbar-btn-count_process').click();
+  await expect(page.getByTestId('form-dialog')).toBeVisible();
+  await page.getByTestId('form-dialog-field-count_hole_mode').selectOption(mode);
+  if (mode === 'selected') {
+    await page.getByTestId('form-dialog-field-count_drill_text').setInputFiles({
+      name: 'billing-holes.drl', mimeType: 'text/plain', buffer: Buffer.from(String(payload.count_drill_text)),
+    });
+  }
+  const requested = page.waitForResponse(response => response.request().method() === 'POST'
+    && response.url().includes('/api/meta/commands/execute/qo_quote_common:compute_process_fee'));
+  await page.getByTestId('form-dialog-submit').click();
+  const response = await requested;
+  expect(response.ok()).toBe(true);
+  const request = response.request().postDataJSON();
+  expect(request.targetRecordPid ?? request.targetRecordId).toBe(quoteId);
+  expect(request.payload.count_hole_mode).toBe(mode);
+  if (mode === 'selected') {
+    expect(request.payload.count_drill_text).toBe(payload.count_drill_text);
+    expect(request.payload.count_drill_filename).toBe('billing-holes.drl');
+  }
   const body = await response.json();
   expect(String(body.code)).toBe('0');
   const receipt = body.data?.data ?? body.data;
@@ -44,6 +38,9 @@ async function dispatchCompute(page: Page, quoteId: string, payload: Record<stri
     terminal = (await result.json()).data;
     return ['completed', 'failed', 'cancelled'].includes(terminal.status);
   }, { timeout: 60_000 }).toBe(true);
+  const close = page.getByRole('button', { name: '关闭', exact: true });
+  await expect(close).toBeVisible();
+  await close.click();
   return terminal;
 }
 
@@ -92,8 +89,7 @@ test('whole-board count: pads default口径, explicit scope semantics, reuse and
   expect(String(firstTerminal.errorMessage ?? '')).toContain('包内未找到钻孔文件');
   expect(await saved(page, quote.quoteId)).toEqual([]);
 
-  // 显式 none:仅焊膏开孔计点(3 × 0.5 = 1.5)。API 派发不改页面数据,
-  // 显示断言统一在 reload 后做。
+  // The user excludes holes in the existing scope dialog: three paste openings × 0.5.
   const none = await dispatchCompute(page, quote.quoteId, { count_hole_mode: 'none' });
   expect(none.status).toBe('completed');
   const noneRows = await saved(page, quote.quoteId);
@@ -101,6 +97,7 @@ test('whole-board count: pads default口径, explicit scope semantics, reuse and
   await page.reload();
   await page.getByRole('tab', { name: /加工点数|Process Points/ }).click();
   await assertDisplayedCounts(page, quote.quoteId);
+  await info.attach('process-count-paste-only', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
 
   // 显式 selected + 钻孔文本:焊膏 1.5 + 圆孔 2 = 3.5
   const selected = await dispatchCompute(page, quote.quoteId, { count_hole_mode: 'selected', count_drill_text: drill });
@@ -114,6 +111,7 @@ test('whole-board count: pads default口径, explicit scope semantics, reuse and
   await page.reload();
   await page.getByRole('tab', { name: /加工点数|Process Points/ }).click();
   await assertDisplayedCounts(page, quote.quoteId);
+  await info.attach('process-count-selected-drill', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
 
   // reuse:沿用上次成功口径,不重复计孔
   const reuse = await dispatchCompute(page, quote.quoteId, { count_hole_mode: 'reuse' });
@@ -123,6 +121,7 @@ test('whole-board count: pads default口径, explicit scope semantics, reuse and
   await page.reload();
   await page.getByRole('tab', { name: /加工点数|Process Points/ }).click();
   await assertDisplayedCounts(page, quote.quoteId);
+  await info.attach('process-count-reused-scope', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
 
   // 坏钻孔文件:任务失败且保留上次成功结果
   const bad = await dispatchCompute(page, quote.quoteId, { count_hole_mode: 'selected', count_drill_text: 'not a drill file' });

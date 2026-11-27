@@ -269,10 +269,12 @@ public class CommandTargetScopePhase implements CommandPhase {
     private Boolean evaluateReadableInIsolatedTransaction(CommandPipelineContext ctx) {
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
         transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-        if (businessTargetAuthorization(ctx)) {
-            transaction.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
-            transaction.setReadOnly(true);
-        }
+        // Every boundary evaluation is a pure authorization read. A weak write-capable snapshot
+        // here cannot serve the human native-read projection (the boundary suspends the command's
+        // own transaction), so every boundary reads one coherent read-only MVCC view — the
+        // business-owner path previously had this; ordinary plugin commands need it just as much.
+        transaction.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        transaction.setReadOnly(true);
         return transaction.execute(status -> evaluateReadable(ctx));
     }
 
@@ -342,6 +344,10 @@ public class CommandTargetScopePhase implements CommandPhase {
             ctx.setBusinessGrantDecision(result);
             ctx.setBusinessTargetAuthorization(new CommandPipelineContext.BusinessTargetAuthorization(
                     ctx.getCommandCode(), modelCode, recordId, action, ctx.getTenantId(), ctx.getUserId(), member));
+            if(owner!=null) {
+                ctx.setBusinessTenantSecrets(com.auraboot.framework.plugin.pf4j.BusinessTenantSecretContract.references(owner));
+                com.auraboot.framework.meta.service.impl.CommandBusinessActorAuthorization.require(ctx,owner,dynamicDataService,record);
+            }
             if (resultProjection != null) ctx.setBusinessResultProjection(nativeContract != null
                     ? resultProjection.prepareNative(ctx, nativeContract) : resultProjection.prepare(ctx,owner));
             if (ctx.getBusinessResultProjection()!=null && ctx.getBusinessResultProjection().requiresRootDocuments())

@@ -11,5 +11,6 @@ export function useActionTriggerFocus(busy: boolean) {
   }, [busy]);
   return useCallback(() => {
     trigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    return trigger.current;
   }, []);
 }

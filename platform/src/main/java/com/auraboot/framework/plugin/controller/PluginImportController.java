@@ -302,6 +302,7 @@ public class PluginImportController {
                 .autoPublishPages(request.getAutoPublishPages())
                 .createResourcePermissions(request.getCreateResourcePermissions())
                 .identifierMappingPath(request.getIdentifierMappingPath())
+                .agentTemplateCodes(request.getAgentTemplateCodes())
                 .build();
 
         if (request.getTargetTenantIds() != null && !request.getTargetTenantIds().isEmpty()) {
@@ -375,6 +376,7 @@ public class PluginImportController {
                         .autoPublishPages(request.getAutoPublishPages())
                         .createResourcePermissions(request.getCreateResourcePermissions())
                         .identifierMappingPath(request.getIdentifierMappingPath())
+                        .agentTemplateCodes(request.getAgentTemplateCodes())
                         .build();
                 ImportExecuteResult result = importService.execute(preview.getImportId(), importRequest);
                 Map<String, Object> row = new java.util.LinkedHashMap<>();
@@ -428,6 +430,7 @@ public class PluginImportController {
     @lombok.NoArgsConstructor
     @lombok.AllArgsConstructor
     public static class DirectoryImportRequest {
+        private java.util.List<String> agentTemplateCodes;
         private String path;
         private ImportRequest.ConflictStrategy conflictStrategy;
         // Use Boolean wrappers so null = "not set by caller" (allows manifest defaults to apply)
@@ -511,6 +514,7 @@ public class PluginImportController {
             @RequestParam(value = "autoPublishFields", defaultValue = "true") boolean autoPublishFields,
             @RequestParam(value = "autoPublishCommands", defaultValue = "true") boolean autoPublishCommands,
             @RequestParam(value = "autoPublishPages", defaultValue = "true") boolean autoPublishPages,
+            @RequestParam(value = "agentTemplateCodes", required = false) List<String> agentTemplateCodes,
             @RequestParam(value = "dryRun", defaultValue = "false") boolean dryRun) {
 
         // Dry-run: validate + conflict check without persisting anything
@@ -530,6 +534,7 @@ public class PluginImportController {
 
         ImportRequest request = ImportRequest.builder()
                 .conflictStrategy(conflictStrategy)
+                .agentTemplateCodes(agentTemplateCodes)
                 .autoDeployProcesses(autoDeployProcesses)
                 .autoPublishModels(autoPublishModels)
                 .autoPublishFields(autoPublishFields)

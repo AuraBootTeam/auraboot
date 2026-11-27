@@ -2,7 +2,7 @@
 type: system-reference
 status: active
 created: 2026-08-23
-updated: 2026-10-25
+updated: 2026-11-12
 ---
 
 # Reliable Integration Runtime v1
@@ -27,6 +27,19 @@ effects; they do not copy the dispatcher, receipt, lease, DLQ, or replay tables.
   transaction. A thrown failure rolls both back.
 - Compatibility: legacy rows with `schema_version IS NULL` retain the former JVM-event path.
   New cross-domain contracts must use a stable `.v1` event type and must not use JVM class names.
+
+## Commit-triggered dispatch and recovery
+
+Successful reliable enqueue publishes an application event inside the source transaction.
+`ReliableOutboxDispatchListener` handles it only after commit, on the dedicated bounded
+`reliableOutboxDispatchExecutor`. This is a Spring transaction listener, not CDC or binlog capture.
+Rollback produces no wakeup, and an exact idempotent enqueue that inserts nothing produces no
+second wakeup. Changed content under the same event identity fails instead of replacing its envelope.
+
+The executor has one worker and one queued task. Saturation defers the signal without running
+business handlers on the accepting thread or turning a committed acceptance into failure. Durable
+rows remain recoverable. The existing `sys-outbox-poll` five-second task calls the same worker as a
+fallback for missed signals, restart and due retries; a signal is not an alternative receipt or lease.
 
 ## Lease, retry, and terminal failure
 
@@ -62,7 +75,8 @@ The claim binds the current tenant, exact source and allowed types, excludes unv
 rows and preserves tenant-local ordering. Its result contains claimed/delivered/failed/lost-lease
 counts and terminal public event ids; it exposes no payload or internal numeric ids. Fenced-out
 terminal writes are reported as lost leases rather than successful delivery or recorded failures.
-Global polling remains the native scheduler's responsibility. Reliable JSON floating-point values
+Global recovery scans remain the native scheduler's responsibility; committed enqueue also wakes
+the worker independently. Reliable JSON floating-point values
 are decoded as `BigDecimal`, including non-resource event sources.
 
 ## Tenant-admin DLQ operator API
@@ -154,6 +168,18 @@ from its component scan, and registers its required mapper packages directly. Ca
 fixtures remain explicit imports. A scheduling mock in an exact-count worker test must not leak
 into other applications or be mistaken for evidence that the production scheduler ran.
 
+`OutboxCommitPrimaryPostgresIT` is an explicit owned-local PostgreSQL profile, enabled with
+`OUTBOX_COMMIT_PRIMARY_PG_IT=true` and a fresh `OUTBOX_COMMIT_PRIMARY_SCHEMA_PREFIX`.
+The runtime/database/connection guards and separate JDBC credential variables are mandatory.
+It creates retained private schemas from the current queue tables, uses private identity sequences,
+and compares the existing public queue facts before and after. The opt-in Gradle test task cannot
+reuse a cached result. Real Spring transactions, mapper SQL, commit listener, bounded executor,
+claims, consumer receipts and the production worker participate; no scheduled scanner is registered.
+Cases cover commit visibility, rollback, exact/conflicting replay, consumer-effect rollback and due
+recovery, missing signals and saturation. External plugin discovery and unused legacy webhooks are
+controlled boundaries; the transactional consumer is a test effect. This scope does not attest
+installed HTTP, customer PF4J consumers, the running application's scheduler or external ERP.
+
 The unversioned JVM-event path remains a compatibility contract: a committed `OutboxWriter`
 event preserves its public event ID, tenant, payload and result through publication; a subsequent
 poll does not republish a delivered row. PostgreSQL delivery tests, synthetic PF4J JAR discovery
@@ -164,6 +190,8 @@ others or every external ERP contract.
 
 Micrometer counter `auraboot_integration_events_total{outcome=...}` exposes enqueue, claim, receipt,
 duplicate suppression, retry, DLQ, replay, lease recovery, delivery, and lost-fence outcomes. The
+`commit_dispatch_started`, `commit_dispatch_failed` and `commit_dispatch_deferred` outcomes
+distinguish committed wakeups, worker failures and bounded-executor deferral. The
 `reliableIntegration` health contributor is DOWN for expired leases, open DLQ rows, or an
 undelivered backlog older than five minutes.
 
@@ -266,6 +294,18 @@ supports multiple operations in one transaction without reusing the first operat
 The reliable consumer reconstructs the same machine principal after verifying the original durable
 receipt and envelope. Neither path clears machine context or impersonates a human member.
 
+For completed receipts with a retained valid request PID, the current authenticated provider may
+declare exact process-only read additions through `completedReceiptProcessReadAdditions()`
+(whole new read-only models) or `completedReceiptProcessReadFieldAdditions()` (fields appended
+to an existing nonempty model read grant). The host reconstructs that single declared predecessor
+and requires the original complete command digest to match. Model/field declarations are finite,
+artifact-pinned, disjoint and non-wildcard; missing fields, duplicate read entries, empty predecessors
+and malformed declarations do not create compatibility. Existing create/update/delete grants,
+accept/result commands, other reads/settings, installation binding and request content remain pinned.
+The compatibility path may query the original result or return the original acceptance only; it never
+reruns processing or migrates accepting, accepted, failed or malformed receipts. A read repair is not
+authorization to rewrite historical data, and its actual native receipt replay requires separate evidence.
+
 ## Managed installation binding lookup
 
 An installed provider may choose `handlerParams.installedIntegration.bindingLookup`
@@ -304,3 +344,52 @@ human fallback deny-all predicate. Other unadapted SQL entry points and
 `baseRowFilter` retain machine deny-all behavior. Missing decisions, nonmatching
 root rows and legacy scopes remain denied; this adapter is not a general machine
 query permission grant.
+
+## Optional tenant-installed integrations
+
+`ReliableIntegrationAccessor.isPluginInstalled(tenantId, pluginId)` is a read-only selection
+check inside the event transaction. The tenant must match the host context. It reads the
+explicit tenant installation identity, including retired records; globally loaded JARs are
+not a selection signal. Only a missing identity returns false. Installed/enabled identities
+return true; disabled, failed, retired, unknown states and lookup failures throw. The default
+SPI implementation throws on older hosts rather than implicitly opting out.
+
+A producer adapter may omit an optional derived effect only when the owner has never been
+installed in that tenant. Once selected, missing consumers and processing failures retain
+normal reliable delivery/receipt rollback and retry behavior. This check does not authorize
+writes, broaden model scopes or retroactively enqueue facts produced before selection.
+
+## Explicit recovery of failed accepted receipts
+
+`GET /api/admin/open-platform/installations/{installation}/event-sources/{source}/events/{event}/recovery`
+returns a payload-free recovery plan for one tenant-scoped accepted receipt with a failed outbox and open dead letter.
+The current installation, scope, provider, command and machine-data declarations must still be trusted.
+The stored original envelope and binding must match their receipt hashes exactly.
+
+A tenant administrator can submit that exact plan plus a nonblank `reason` to `POST` on the same route.
+The decision includes `requestPid`, `envelopeSha256`, `bindingSha256`,
+`previousCommandSha256`, `previousProviderSha256`, `commandSha256`, `providerSha256`
+and `expectedReplayCount`. Tenant and operator identity come exclusively from the authenticated context.
+The transaction locks the outbox, compare-and-swaps the accepted receipt's command/provider hashes,
+and appends an audit row to `ab_installed_integration_recovery`. Audit failure rolls back the change.
+It does not modify the original event, payload, binding, request PID, delivery state or business records,
+and does not enqueue work. Use the existing attributed dead-letter replay operation after authorization.
+
+An identical decision by the same operator returns the same audit result, including after completion.
+A changed reason/operator, stale replay version or fingerprint, revoked grant, altered envelope/binding,
+foreign tenant or completed receipt without an existing matching decision cannot authorize recovery.
+Ordinary ingress, consumption and result reads retain their strict fingerprint checks.
+This is an internal operator surface; public provider protocols are unchanged.
+
+`InstalledIntegrationRecoveryServiceTest` covers trust, stale decisions and exact retries.
+`InstalledIntegrationRecoveryPersistenceIT` uses real PostgreSQL mappers, transactions and concurrent
+operators to prove audit rollback and serialization. Its provider/command metadata are controlled fixtures;
+HTTP role admission and actual provider business effects require target-runtime verification separately.
+
+The main-line recovery schema is installed by migration `20261123203000`.
+A copy of a test database that has already applied `20261121140000` needs a
+reviewed migration payload retaining the original applied SQL bytes. The forward
+migration checks that exact successful ledger entry and preserves the existing
+table and audit rows. Use the existing reviewed-history process for unapplied
+migrations that precede the copy's installed tip. Keep Flyway validation enabled
+and use the ordinary main-line payload for fresh installs and current main upgrades.

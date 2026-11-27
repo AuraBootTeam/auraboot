@@ -25,7 +25,7 @@ class CoreAgentProviderTenantScopeTest {
                 .providerCode("tenant-service").displayName("Tenant service").configured(true).build();
         when(factory.listConfiguredProviders(tenant)).thenReturn(List.of(provider));
         var controller = new CoreAgentController(properties, factory, execution, null,
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, null);
         MetaContext.setContext(tenant, 9L, "user-9", "Editor");
         assertThat(controller.listConfiguredProviders().getBody()).isEqualTo(List.of(provider));
         assertThat(controller.getStatus().getBody()).containsEntry("configuredProviders", 1);

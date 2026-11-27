@@ -837,3 +837,59 @@ describe('dynamic command source through the actual shared form', () => {
     },
   );
 });
+
+describe('structured addresses through native command dispatchers', () => {
+  it.each([Registry, Workbench].map((Component) => ({ name: Component.name, Component })))(
+    '$name keeps the structured default in exactly one command request',
+    async ({ Component }) => {
+      const location = {
+        province: '广东省',
+        city: '深圳市',
+        district: '宝安区',
+        detail: '工业一路28号',
+      };
+      const refresh = vi.fn().mockResolvedValue(undefined);
+      io.fetch.mockImplementation(async (url: string) => {
+        if (url === '/api/forms/case/A')
+          return {
+            code: '0',
+            data: {
+              revision: 'captured-revision',
+              inputFields: [
+                {
+                  field: 'location',
+                  label: 'Receiving address',
+                  type: 'address',
+                  required: true,
+                  defaultValue: location,
+                  props: { requireDistrict: true, detailMaxLength: 500, allowManualEntry: true },
+                },
+              ],
+            },
+          };
+        if (url === '/api/meta/commands/execute/case:close')
+          return { code: '0', data: { phaseReached: 'completed', data: {} } };
+        throw new Error('Unexpected command transport');
+      });
+      render(
+        <Root>
+          <Component refresh={refresh} remote />
+        </Root>,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Open action' }));
+      await screen.findByTestId('form-dialog');
+      expect(screen.getByRole('combobox', { name: 'Province' })).toHaveValue('广东省');
+      fireEvent.click(screen.getByTestId('form-dialog-submit'));
+      await waitFor(() => expect(io.fetch).toHaveBeenCalledTimes(2));
+      expect(io.fetch.mock.calls.map((call) => call[0])).toEqual([
+        '/api/forms/case/A',
+        '/api/meta/commands/execute/case:close',
+      ]);
+      const request = io.fetch.mock.calls[1][1].params;
+      expect(request.targetRecordPid).toBe('A');
+      expect(request.expectedVersion).toBe(7);
+      expect(request.payload).toEqual({ expectedRevision: 'captured-revision', location });
+      await waitFor(() => expect(screen.queryByTestId('form-dialog')).not.toBeInTheDocument());
+    },
+  );
+});

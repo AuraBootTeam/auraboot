@@ -1,0 +1,25 @@
+[
+  {
+    "oldPluginId": "com.auraboot.ai-employees",
+    "receiverPluginId": "com.auraboot.core-aurabot",
+    "resources": [
+      {
+        "type": "agent_definition",
+        "code": "aurabot_conductor"
+      },
+      {
+        "type": "agent_definition",
+        "code": "dex"
+      },
+      {
+        "type": "agent_definition",
+        "code": "sage"
+      },
+      {
+        "type": "agent_definition",
+        "code": "aria"
+      }
+    ],
+    "declarations": {}
+  }
+]

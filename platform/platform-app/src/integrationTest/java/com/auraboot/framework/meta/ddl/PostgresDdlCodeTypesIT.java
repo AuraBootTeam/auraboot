@@ -77,6 +77,59 @@ class PostgresDdlCodeTypesIT {
         }
     }
 
+    @Test
+    void aCharacterColumnBecomesJsonbOnlyThroughTheGeneratedUsingClause() throws Exception {
+        // Core 8a9b5b765 made multiple-file fields jsonb. Columns created before that are character
+        // types, and PostgreSQL has no assignment cast from a character type to jsonb (seen on a
+        // product database on 2026-11-23: three columns had to be cast by hand).
+        try (Connection connection = connection(); var statement = connection.createStatement()) {
+            statement.execute("CREATE TEMP TABLE ddl_using (id integer primary key, evidence character varying(255), payload jsonb)");
+            statement.executeUpdate("INSERT INTO ddl_using VALUES (1, '', NULL), (2, '[\"a\",\"b\"]', '{}'), (3, NULL, '{\"k\":1}')");
+
+            SQLException withoutUsing = assertThrows(SQLException.class,
+                    () -> statement.execute("ALTER TABLE ddl_using ALTER COLUMN evidence TYPE jsonb"));
+            assertEquals("42804", withoutUsing.getSQLState());
+
+            statement.execute("ALTER TABLE ddl_using ALTER COLUMN evidence TYPE jsonb"
+                    + dialect.getAlterColumnTypeUsing("evidence", "character varying(255)", "jsonb"));
+            statement.execute("ALTER TABLE ddl_using ALTER COLUMN payload TYPE text"
+                    + dialect.getAlterColumnTypeUsing("payload", "jsonb", "text"));
+
+            try (var result = statement.executeQuery(
+                    "SELECT evidence::text, payload, pg_typeof(evidence)::text, pg_typeof(payload)::text FROM ddl_using ORDER BY id")) {
+                assertTrue(result.next());
+                assertEquals(null, result.getString(1), "the empty string became NULL");
+                assertEquals(null, result.getString(2));
+                assertEquals("jsonb", result.getString(3));
+                assertEquals("text", result.getString(4));
+                assertTrue(result.next());
+                assertEquals("[\"a\", \"b\"]", result.getString(1));
+                assertEquals("{}", result.getString(2));
+                assertTrue(result.next());
+                assertEquals(null, result.getString(1));
+                assertEquals("{\"k\": 1}", result.getString(2));
+            }
+        }
+    }
+
+    @Test
+    void aCharacterColumnWithSomethingThatIsNotJsonStopsTheConversion() throws Exception {
+        // Nothing is guessed or dropped: one value that is not JSON makes the whole statement fail
+        // and the column keeps its type.
+        try (Connection connection = connection(); var statement = connection.createStatement()) {
+            statement.execute("CREATE TEMP TABLE ddl_using_bad (id integer primary key, evidence character varying(255))");
+            statement.executeUpdate("INSERT INTO ddl_using_bad VALUES (1, 'not json')");
+            SQLException invalid = assertThrows(SQLException.class, () -> statement.execute("ALTER TABLE ddl_using_bad ALTER COLUMN evidence TYPE jsonb"
+                    + dialect.getAlterColumnTypeUsing("evidence", "character varying(255)", "jsonb")));
+            assertEquals("22P02", invalid.getSQLState());
+            try (var result = statement.executeQuery("SELECT pg_typeof(evidence)::text, evidence FROM ddl_using_bad")) {
+                assertTrue(result.next());
+                assertEquals("character varying", result.getString(1));
+                assertEquals("not json", result.getString(2));
+            }
+        }
+    }
+
     private String type(String type, int length) {
         return dialect.mapDataType(FieldDefinition.builder()
                 .code("code").dataType(type).maxLength(length).build());

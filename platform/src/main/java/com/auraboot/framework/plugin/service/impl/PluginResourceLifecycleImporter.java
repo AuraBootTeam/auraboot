@@ -295,11 +295,12 @@ final class PluginResourceLifecycleImporter {
     /**
      * Menu codes this plugin family (same plugin_id across installs) previously imported,
      * per tenant. Scoped to ab_plugin_resource tracking and explicitly excludes
-     * authoring-managed rows, so tenant-owned and dashboard-created menus are never touched.
+     * authoring-managed, claimed, modified and unknown-protection rows. Lock both the
+     * tracking and menu rows until the importing/uninstalling transaction completes.
      */
     private List<String> trackedMenuCodes(String pluginPid, Long tenantId) {
         return jdbcTemplate.queryForList("""
-                SELECT DISTINCT r.resource_code
+                SELECT r.resource_code
                 FROM ab_plugin_resource r
                 JOIN ab_plugin p ON p.pid = r.plugin_pid
                 JOIN ab_menu m ON m.tenant_id = r.tenant_id AND m.code = r.resource_code
@@ -307,10 +308,15 @@ final class PluginResourceLifecycleImporter {
                 WHERE p.plugin_id = (SELECT plugin_id FROM ab_plugin WHERE pid = ?)
                   AND r.tenant_id = ?
                   AND r.resource_type = ?
+                  AND r.ownership_type IN ('shared', 'plugin_owned')
+                  AND r.user_modified IS FALSE
+                  AND m.plugin_pid = r.plugin_pid
                   AND COALESCE(m.extension ->> 'authoringManaged', 'false') <> 'true'
+                FOR UPDATE OF r, m
                 """, String.class, pluginPid, tenantId, ResourceType.MENU.code()).stream()
                 .filter(Objects::nonNull)
                 .filter(code -> !code.isBlank())
+                .distinct()
                 .toList();
     }
 

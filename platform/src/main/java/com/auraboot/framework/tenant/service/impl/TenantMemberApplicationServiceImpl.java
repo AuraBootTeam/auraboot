@@ -268,6 +268,14 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
                             TenantMemberOffboardingAction.SUSPEND);
                     result = tenantMemberService.suspendMember(member.getId(), reason);
                     revokeUserSessions(member);
+                    // Suspension is a per-membership decision, but the session revocation above is
+                    // already user-wide. Bump the user security version with the same blast radius
+                    // so pre-suspension tokens fail closed (401 20002) on EVERY authenticated
+                    // endpoint — including tenant-selection/my-spaces, which otherwise still
+                    // answers 200 on an onboarding-stage token whose membership filter never runs.
+                    if (member.getUserId() != null) {
+                        passwordManagementService.incrementSecurityVersion(member.getUserId());
+                    }
                     break;
                 default:
                     throw new BusinessException(ResponseCode.BadParam, "无效的状态: " + status);

@@ -3,6 +3,7 @@ import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import type { useSubTableState } from './useSubTableState';
 import type { ResolvedSubTableViewerProps } from './subTableTypes';
+import { isUnknownModelResult } from './subTableUnknownModel';
 
 type UseSubTableDataArgs = Pick<
   ReturnType<typeof useSubTableState>,
@@ -73,7 +74,14 @@ export function useSubTableData({
   }, [config.defaultValues, resolveDefaultValue]);
 
   useEffect(() => {
-    if (!parentRecordPid) return;
+    if (!parentRecordPid) {
+      // A detail page opened without a record has no parent, so nothing will ever load. The
+      // block starts in its loading state: end it here, or it stays on "loading" for good.
+      setRows([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
 
     const loadData = async () => {
       setLoading(true);
@@ -115,6 +123,8 @@ export function useSubTableData({
           });
           if (!ResultHelper.isSuccess(result)) {
             setRows([]);
+            // A sub-table for a model that is not installed has no records: an empty table.
+            if (isUnknownModelResult(result)) return;
             throw new Error(result.message || t('common.loadDataFailed'));
           }
           // Only a valid empty collection is an empty state; failures are errors.
@@ -152,6 +162,7 @@ export function useSubTableData({
 
           if (!ResultHelper.isSuccess(intermediateRes)) {
             setRows([]);
+            if (isUnknownModelResult(intermediateRes)) return;
             throw new Error(intermediateRes.message || t('common.loadDataFailed'));
           }
           const intermediateRecords = intermediateRes.data?.records;
@@ -203,6 +214,7 @@ export function useSubTableData({
 
         if (!ResultHelper.isSuccess(result)) {
           setRows([]);
+          if (isUnknownModelResult(result)) return;
           throw new Error(result.message || t('common.loadDataFailed'));
         }
         const resultRecords = result.data?.records;

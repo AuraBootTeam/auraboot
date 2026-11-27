@@ -157,7 +157,12 @@ export function useListPageRuntime({
   }, [searchParams, setSearchParams, urlViewPid]);
 
   const [filtersExpanded, setFiltersExpanded] = useState(false);
-  const [filterFormVisible, setFilterFormVisible] = useState(false);
+  const [filterFormVisible, setFilterFormVisible] = useState(
+    schemaExtension.filterFormInitiallyVisible === true,
+  );
+  useEffect(() => {
+    setFilterFormVisible(schemaExtension.filterFormInitiallyVisible === true);
+  }, [schema.pageKey, schemaExtension.filterFormInitiallyVisible]);
   const [activeViewType, setActiveViewType] = useState<ViewType>('table');
   const [startCreateViewMode, setStartCreateViewMode] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);

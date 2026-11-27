@@ -42,7 +42,7 @@ export function WorkspaceRecordSection({ block, fields, record, token, locale, t
     if (typeof value === 'object' || /^[0-9A-HJKMNP-TV-Z]{26}$/.test(String(value))) return '—';
     return String(value);
   };
-  return <section className="border-border bg-panel rounded-card border px-6 py-4" data-testid={`object-section-${block.id}`}>
+  return <section className={block.surface === 'bare' ? 'min-w-0' : 'border-border bg-panel rounded-card border px-6 py-4'} data-testid={`object-section-${block.id}`}>
     <h3 className="text-text mb-4 text-sm font-semibold">{getLocalizedText(block.title, locale, t)}</h3>
     {referenceError && <p role="alert" className="text-status-red mb-3 text-xs">{getLocalizedText({ 'zh-CN': '关联对象加载失败，请刷新重试。', en: 'Could not load the related object. Refresh to try again.' }, locale, t)}</p>}
     <dl className="grid grid-cols-1 gap-x-8 gap-y-3 md:grid-cols-2">

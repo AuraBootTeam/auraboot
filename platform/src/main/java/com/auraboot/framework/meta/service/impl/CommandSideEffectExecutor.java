@@ -161,7 +161,8 @@ public class CommandSideEffectExecutor {
                 Map<String, Object> fieldMapping = (Map<String, Object>) effect.get("fieldMapping");
                 if (fieldMapping == null) fieldMapping = (Map<String, Object>) effect.get("updateFields");
                 if (fieldMapping == null) fieldMapping = (Map<String, Object>) effect.get("fields");
-                if (targetModel == null) continue;
+                // A document_flow names its target inside documentFlow, not on the effect itself.
+                if (targetModel == null && !"document_flow".equals(flatAction)) continue;
                 switch (flatAction) {
                     case "create_record" -> executeSideEffectCreate(targetModel, fieldMapping,
                             currentRecord, tenantId, userId);
@@ -203,7 +204,7 @@ public class CommandSideEffectExecutor {
                     if (targetModel == null) targetModel = (String) actionDef.get("targetModel");
                     Map<String, Object> fieldMapping = (Map<String, Object>) actionDef.get("fields");
                     if (fieldMapping == null) fieldMapping = (Map<String, Object>) actionDef.get("fieldMapping");
-                    if (actionType == null || targetModel == null) continue;
+                    if (actionType == null || targetModel == null && !"document_flow".equals(actionType)) continue;
                     switch (actionType) {
                         case "create_record" -> executeSideEffectCreate(targetModel, fieldMapping,
                                 currentRecord, tenantId, userId);
@@ -249,7 +250,9 @@ public class CommandSideEffectExecutor {
         if (fieldMapping == null) return;
 
         Map<String, Object> data = resolveFieldMapping(fieldMapping, currentRecord);
-        data.put("tenant_id", tenantId);
+        // The data service sets tenant_id from the authenticated tenant. A payload that carries
+        // it is a caller-submitted system field, which the native field authorization refuses
+        // for a write outside the command's permit scope.
 
         try {
             dynamicDataService.create(targetModel, data);
@@ -734,7 +737,7 @@ public class CommandSideEffectExecutor {
         for (int i = 0; i < items.size(); i++) {
             Map<String, Object> item = items.get(i);
             Map<String, Object> data = resolveItemFieldMapping(fieldMapping, currentRecord, item);
-            data.put("tenant_id", tenantId);
+            // No tenant_id here either: see executeSideEffectCreate.
 
             try {
                 dynamicDataService.create(targetModel, data);

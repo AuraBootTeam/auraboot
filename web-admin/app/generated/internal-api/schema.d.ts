@@ -1,6 +1,6 @@
 /**
  * Generated from the internal OpenAPI contract. Do not edit.
- * Contract SHA-256: cd46350d176acdee4c941c3c64de43e302bfa7a6623bdac4a4ac6cd9d7790a64
+ * Contract SHA-256: 04c697056b629380f72f6a0b698ede34f7d36a08cdda6277b18f571e594bf404
  */
 export interface paths {
     "/api/activities": {
@@ -429,6 +429,22 @@ export interface paths {
         get: operations["streamLlmChunks"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/bootstrap/platform-navigation/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reconcile"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1379,6 +1395,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/open-platform/installations/{installation}/event-sources/{source}/events/{event}/recovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["plan"];
+        put?: never;
+        post: operations["authorizeReceiptRecovery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/platform-releases/{platformCode}": {
         parameters: {
             query?: never;
@@ -2086,6 +2118,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["pipelineTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agent/definitions/{agentPid}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["activateAgent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5381,7 +5429,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["observe"];
+        post: operations["observe_1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7634,54 +7682,6 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["ingest"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/dataquality/expectations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["createSuite"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/dataquality/expectations/{suitePid}/run": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["runValidation"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/dataquality/expectations/{suitePid}/runs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["listRuns_1"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -16792,6 +16792,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/notifications/wechat-subscription/observations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["observe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/wechat-subscription/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["templates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/observability/correlation/{traceId}": {
         parameters: {
             query?: never;
@@ -17232,6 +17264,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["listAudits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/open-platform/installations/{installationPid}/audits/{auditPid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["auditDetail"];
         put?: never;
         post?: never;
         delete?: never;
@@ -19334,6 +19382,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/plugins/handovers/contracts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPluginHandoverPreviewContracts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/handovers/previews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createPluginHandoverPreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/handovers/previews/{batchPid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["findPluginHandoverPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/handovers/previews/by-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["findPluginHandoverPreviewByKey"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/plugins/hotload": {
         parameters: {
             query?: never;
@@ -20410,6 +20522,22 @@ export interface paths {
         get: operations["widget"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/integration-callbacks/{tenant}/{installation}/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["receive"];
         delete?: never;
         options?: never;
         head?: never;
@@ -23878,27 +24006,6 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        AbDataQualityValidationRun: {
-            datasetName?: string;
-            deletedFlag?: boolean;
-            /** Format: int32 */
-            failed?: number;
-            /** Format: date-time */
-            finishedAt?: string;
-            /** Format: int64 */
-            id?: number;
-            /** Format: int32 */
-            passed?: number;
-            pid?: string;
-            resultsJson?: string;
-            /** Format: date-time */
-            startedAt?: string;
-            suitePid?: string;
-            /** Format: int64 */
-            tenantId?: number;
-            /** Format: int32 */
-            totalExpectations?: number;
-        };
         AbSemanticPreagg: {
             /** Format: date-time */
             createdAt?: string;
@@ -24027,6 +24134,9 @@ export interface components {
             /** Format: int64 */
             expectedVersion?: number;
             operationId?: string;
+        };
+        ActivationRequest: {
+            providerCode: string;
         };
         ActiveSessionResponse: {
             /** Format: date-time */
@@ -25164,6 +25274,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseCallAuditDetail: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["CallAuditDetail"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseCapabilityCatalog: {
             code?: string;
             context?: unknown;
@@ -25200,6 +25318,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["CascadeDictResult"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseCatalog: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["Catalog"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -27266,6 +27392,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseListPluginHandoverContractSummary: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["PluginHandoverContractSummary"][] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseListPluginImportResult: {
             code?: string;
             context?: unknown;
@@ -28485,6 +28619,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponsePlan: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["Plan"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponsePlatformAiScoreResult: {
             code?: string;
             context?: unknown;
@@ -28513,6 +28655,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["PluginGenerateResult"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponsePluginHandoverPreview: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["PluginHandoverPreview"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -28661,6 +28811,14 @@ export interface components {
             /** Format: int64 */
             timestamp?: number;
         };
+        ApiResponseRecorded: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["Recorded"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
         ApiResponseRecordShareAccessResponse: {
             code?: string;
             context?: unknown;
@@ -28753,6 +28911,14 @@ export interface components {
             code?: string;
             context?: unknown;
             data?: components["schemas"]["ResourceOwnerDTO"] | null;
+            message?: string;
+            /** Format: int64 */
+            timestamp?: number;
+        };
+        ApiResponseResult: {
+            code?: string;
+            context?: unknown;
+            data?: components["schemas"]["Result"] | null;
             message?: string;
             /** Format: int64 */
             timestamp?: number;
@@ -30186,9 +30352,25 @@ export interface components {
             /** Format: time-local */
             startTime?: string;
         };
+        CallAuditDetail: {
+            auditPid?: string;
+            captureState?: string;
+            /** Format: int64 */
+            durationMs?: number;
+            httpDetails?: components["schemas"]["JsonNode"];
+            method?: string;
+            /** Format: date-time */
+            occurredAt?: string;
+            path?: string;
+            remoteAddress?: string;
+            requestId?: string;
+            /** Format: int32 */
+            status?: number;
+        };
         CallAuditView: {
             actorKind?: string;
             applicationPid?: string;
+            auditPid?: string;
             capability?: string;
             /** Format: int64 */
             durationMs?: number;
@@ -30409,6 +30591,9 @@ export interface components {
             label?: string;
             value?: string;
         };
+        Catalog: {
+            records?: components["schemas"]["Template"][];
+        };
         Category: {
             categoryType?: string;
             code?: string;
@@ -30619,6 +30804,10 @@ export interface components {
             order?: number | null;
             scope?: string | null;
             teamId?: string | null;
+        };
+        Choice: {
+            status: string;
+            templateId: string;
         };
         ClientConfig: {
             components?: components["schemas"]["ComponentConfig"][];
@@ -32418,6 +32607,7 @@ export interface components {
         };
         /** @description Directory path and import options */
         DirectoryImportRequest: {
+            agentTemplateCodes?: string[];
             autoDeployProcesses?: boolean;
             autoPublishCommands?: boolean;
             autoPublishFields?: boolean;
@@ -34496,6 +34686,7 @@ export interface components {
             warnings?: string[];
         };
         ImportRequest: {
+            agentTemplateCodes?: string[];
             autoDeployProcesses?: boolean;
             autoPublishCommands?: boolean;
             autoPublishFields?: boolean;
@@ -36502,6 +36693,7 @@ export interface components {
             /** Format: int64 */
             id?: number;
             isRead?: boolean;
+            miniProgramPath?: string;
             priority?: string;
             /** Format: date-time */
             readAt?: string;
@@ -36524,6 +36716,7 @@ export interface components {
         NotificationQueryRequest: {
             category?: string;
             isRead?: boolean;
+            miniProgramPage?: string;
             /** Format: int32 */
             pageNum?: number;
             /** Format: int32 */
@@ -38436,6 +38629,17 @@ export interface components {
             totalRecords?: number;
             valueField?: string;
         };
+        Plan: {
+            bindingSha256?: string;
+            commandSha256?: string;
+            envelopeSha256?: string;
+            /** Format: int32 */
+            expectedReplayCount?: number;
+            previousCommandSha256?: string;
+            previousProviderSha256?: string;
+            providerSha256?: string;
+            requestPid?: string;
+        };
         PlannedOrderDto: {
             /** Format: int32 */
             leadTimeDays?: number;
@@ -38563,6 +38767,46 @@ export interface components {
             pluginName?: string;
             summary?: string;
         };
+        PluginHandoverContractSummary: {
+            capabilities?: string[];
+            contractId?: string;
+            digest?: string;
+            /** Format: int32 */
+            revision?: number;
+            sourcePluginId?: string;
+            targetPluginIds?: string[];
+        };
+        PluginHandoverPreview: {
+            batchPid?: string;
+            contractDigest?: string;
+            contractId?: string;
+            createdAt?: string;
+            executionAvailable?: boolean;
+            expired?: boolean;
+            expiresAt?: string;
+            items?: components["schemas"]["PluginHandoverPreviewItem"][];
+            limits?: string[];
+            /** Format: int32 */
+            plannedMoves?: number;
+            previewDigest?: string;
+            sourcePluginPid?: string;
+            status?: string;
+        };
+        PluginHandoverPreviewItem: {
+            action?: string;
+            code?: string;
+            ownershipType?: string;
+            resourcePid?: string;
+            targetPluginPid?: string;
+            type?: string;
+            userModified?: boolean;
+        };
+        PluginHandoverPreviewRequest: {
+            contractDigest: string;
+            contractId: string;
+            idempotencyKey: string;
+            sourcePluginPid: string;
+        };
         PluginImportRequest: {
             menus?: {
                 [key: string]: unknown;
@@ -38615,6 +38859,7 @@ export interface components {
         };
         PluginManifestExtended: {
             agentDefinitions?: components["schemas"]["AgentDefinitionDTO"][];
+            agentTemplates?: components["schemas"]["AgentDefinitionDTO"][];
             applicationModules?: string[];
             author?: string;
             automations?: components["schemas"]["AutomationDefinitionDTO"][];
@@ -39285,6 +39530,10 @@ export interface components {
             recordState?: string;
             tabs?: components["schemas"]["TabCapability"][];
         };
+        Recorded: {
+            delivered?: boolean;
+            recorded?: boolean;
+        };
         RecordShareAccessResponse: {
             canRead?: boolean;
             canUpdate?: boolean;
@@ -39740,6 +39989,18 @@ export interface components {
             suggestedDecision?: "DELETE" | "KEEP_AND_DETACH" | "SKIP";
             /** @enum {string} */
             type?: "MODEL" | "FIELD" | "MODEL_FIELD_BINDING" | "COMMAND" | "BINDING_RULE" | "PERMISSION" | "ROLE" | "ROLE_PERMISSION" | "MENU" | "PAGE" | "DASHBOARD" | "DICT" | "NAMED_QUERY" | "AGENT_DEFINITION" | "DICT_ITEM" | "SAVED_VIEW" | "NOTIFICATION_TEMPLATE" | "I18N" | "PUBLIC_RESOURCE" | "PUBLIC_QUERY";
+        };
+        Result: {
+            eventId?: string;
+            reason?: string;
+            recoveryPid?: string;
+            /** Format: int32 */
+            replayCount?: number;
+            /** Format: date-time */
+            requestedAt?: string;
+            requestedBy?: string;
+            requestPid?: string;
+            status?: string;
         };
         ResultContract: {
             actionability?: string;
@@ -41569,6 +41830,11 @@ export interface components {
             name?: string;
             status?: string;
         };
+        Template: {
+            kind?: string;
+            templateId?: string;
+            type?: string;
+        };
         TemplateDef: {
             category?: string;
             description?: string;
@@ -41961,6 +42227,8 @@ export interface components {
             targetId?: string;
             targetLabel?: string;
             targetType?: string;
+            /** Format: date-time */
+            updatedAt?: string;
         };
         UserIdentity: {
             avatar?: string | null;
@@ -42500,6 +42768,10 @@ export interface components {
             code?: string;
             displayName?: string;
             inviteCode?: string;
+        };
+        WechatSubscriptionObservationRequest: {
+            idempotencyKey: string;
+            results: components["schemas"]["Choice"][];
         };
         WindowMetrics: {
             baseline?: components["schemas"]["ArmMetrics"];
@@ -43203,6 +43475,26 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": components["schemas"]["SseEmitter"];
+                };
+            };
+        };
+    };
+    reconcile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseMapStringBoolean"];
                 };
             };
         };
@@ -44905,6 +45197,58 @@ export interface operations {
             };
         };
     };
+    plan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event: string;
+                installation: string;
+                source: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePlan"];
+                };
+            };
+        };
+    };
+    authorizeReceiptRecovery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event: string;
+                installation: string;
+                source: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Decision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseResult"];
+                };
+            };
+        };
+    };
     register_1: {
         parameters: {
             query?: never;
@@ -45983,6 +46327,32 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseMapStringObject"];
+                };
+            };
+        };
+    };
+    activateAgent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                agentPid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePublishedRelease"];
                 };
             };
         };
@@ -51082,7 +51452,7 @@ export interface operations {
             };
         };
     };
-    observe: {
+    observe_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -54554,80 +54924,6 @@ export interface operations {
                     "*/*": {
                         [key: string]: unknown;
                     };
-                };
-            };
-        };
-    };
-    createSuite: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-        };
-    };
-    runValidation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                suitePid: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-        };
-    };
-    listRuns_1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                suitePid: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["AbDataQualityValidationRun"][];
                 };
             };
         };
@@ -70949,7 +71245,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["ApiResponseVoid"];
+                    "*/*": components["schemas"]["ApiResponseMapStringBoolean"];
                 };
             };
         };
@@ -71076,6 +71372,50 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseMapStringObject"];
+                };
+            };
+        };
+    };
+    observe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WechatSubscriptionObservationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseRecorded"];
+                };
+            };
+        };
+    };
+    templates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseCatalog"];
                 };
             };
         };
@@ -71776,9 +72116,14 @@ export interface operations {
     listAudits: {
         parameters: {
             query?: {
+                keyword?: string;
                 limit?: number;
+                method?: string;
+                offset?: number;
                 requestId?: string;
                 status?: number;
+                statusClass?: string;
+                windowHours?: number;
             };
             header?: never;
             path: {
@@ -71795,6 +72140,29 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseListCallAuditView"];
+                };
+            };
+        };
+    };
+    auditDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                auditPid: string;
+                installationPid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseCallAuditDetail"];
                 };
             };
         };
@@ -75228,6 +75596,94 @@ export interface operations {
             };
         };
     };
+    listPluginHandoverPreviewContracts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseListPluginHandoverContractSummary"];
+                };
+            };
+        };
+    };
+    createPluginHandoverPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginHandoverPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePluginHandoverPreview"];
+                };
+            };
+        };
+    };
+    findPluginHandoverPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batchPid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePluginHandoverPreview"];
+                };
+            };
+        };
+    };
+    findPluginHandoverPreviewByKey: {
+        parameters: {
+            query: {
+                idempotencyKey: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePluginHandoverPreview"];
+                };
+            };
+        };
+    };
     listPlugins_1: {
         parameters: {
             query?: never;
@@ -75655,6 +76111,7 @@ export interface operations {
     executeDirect: {
         parameters: {
             query?: {
+                agentTemplateCodes?: string[];
                 autoDeployProcesses?: boolean;
                 autoPublishCommands?: boolean;
                 autoPublishFields?: boolean;
@@ -76697,6 +77154,32 @@ export interface operations {
                 };
                 content: {
                     "application/javascript": string;
+                };
+            };
+        };
+    };
+    receive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+                installation: string;
+                tenant: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

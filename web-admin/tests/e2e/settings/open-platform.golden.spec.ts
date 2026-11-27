@@ -205,7 +205,7 @@ test.describe('Dynamic resource publication journey', () => {
       }
       await page.screenshot({ path: path.join(screenshotRoot, `${id}.png`), fullPage: true });
     };
-    await page.goto('/'); await openAccountMenu(page); await page.getByTestId('open-platform-link').click();
+    await page.goto('/'); await openPlatformMenu(page); await page.getByTestId('sidebar').locator('a[href="/settings/api-docs?view=applications"]').click();
     await expect(page.getByTestId('open-platform-page')).toBeVisible();
     await expect(page.getByTestId('open-platform-publications-link')).toBeVisible();
     await snapshot('publication-entry');
@@ -714,7 +714,7 @@ test.describe('Dynamic query publication journey', () => {
       }
       await page.screenshot({ path: path.join(screenshotRoot, `${id}.png`), fullPage: true });
     };
-    await page.goto('/'); await openAccountMenu(page); await page.getByTestId('open-platform-link').click();
+    await page.goto('/'); await openPlatformMenu(page); await page.getByTestId('sidebar').locator('a[href="/settings/api-docs?view=applications"]').click();
     await expect(page.getByTestId('open-platform-page')).toBeVisible();
     await page.getByTestId('open-platform-publications-link').click();
     await expect(page.getByTestId('publication-editor')).toBeVisible();
@@ -1027,7 +1027,7 @@ test.describe('Dynamic installation authority journey', () => {
         expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
       }
       await page.screenshot({ path: path.join(screenshotRoot, `${id}.png`), fullPage: true }); };
-    await page.goto('/'); await openAccountMenu(page); await page.getByTestId('open-platform-link').click();
+    await page.goto('/'); await openPlatformMenu(page); await page.getByTestId('sidebar').locator('a[href="/settings/api-docs?view=applications"]').click();
     await expect(page.getByTestId('open-platform-page')).toBeVisible();
     const installationCard = page.getByTestId(`open-platform-installation-${installation.pid}`);
     await installationCard.getByRole('button', { name: installationText('数据授权'), exact: true }).click();
@@ -1479,13 +1479,11 @@ async function dismissToasts(page: import('@playwright/test').Page) {
   await expect(page.getByRole('alert')).toHaveCount(0);
 }
 
-async function openAccountMenu(page: import('@playwright/test').Page) {
+async function openPlatformMenu(page: import('@playwright/test').Page) {
   await expect(page.locator('header[data-hydrated]')).toHaveAttribute('data-hydrated', 'true', {
     timeout: 15_000,
   });
-  const userMenu = page.getByTestId('user-menu');
-  await userMenu.getByRole('button', { name: /User avatar/ }).click();
-  await expect(userMenu.getByTestId('user-dropdown')).toBeVisible();
+  await expect(page.getByTestId('sidebar').locator('a[href="/settings/api-docs?view=applications"]')).toBeVisible();
 }
 
 test.describe('Open Platform golden journey', () => {
@@ -1518,12 +1516,14 @@ test.describe('Open Platform golden journey', () => {
     });
     await page.goto('/');
     await expect(page).not.toHaveURL(/\/login|\/setup/);
-    await openAccountMenu(page);
-    const menuEntry = page.getByTestId('open-platform-link');
+    await openPlatformMenu(page);
+    const menuEntry = page.getByTestId('sidebar').locator('a[href="/settings/api-docs?view=applications"]');
     await expect(menuEntry).toBeVisible();
+    await page.getByTestId('user-menu').getByRole('button', { name: /User avatar/ }).click();
     await expect(page.getByTestId('user-dropdown')).toContainText('退出登录');
     await expect(page.getByTestId('user-dropdown')).not.toContainText('user.logout');
     await capture(page, 'OP-OPS-01');
+    await page.keyboard.press('Escape');
     await menuEntry.click();
     await expect(page.getByTestId('open-platform-page')).toBeVisible();
     await expect(page.getByTestId('open-platform-page')).not.toContainText(
@@ -1542,8 +1542,8 @@ test.describe('Open Platform golden journey', () => {
       });
     });
     await page.goto('/');
-    await openAccountMenu(page);
-    await page.getByTestId('open-platform-link').click();
+    await openPlatformMenu(page);
+    await page.getByTestId('sidebar').locator('a[href="/settings/api-docs?view=applications"]').click();
     await expect(page.getByTestId('open-platform-page')).toContainText('受控加载失败');
     await expect(page.getByRole('button', { name: '重试' })).toBeVisible();
     await expect(page.getByTestId('sidebar')).toBeVisible();
@@ -2835,7 +2835,7 @@ test.describe('Quick integration token journey', () => {
       expect(result.status()).toBe(status);
       if (status === 200) { const identity = await result.json(); expect(identity.applicationPid).toBe(app.pid); expect(identity.installationPid).toBe(installation.pid); }
     };
-    await page.goto('/'); await openAccountMenu(page); await page.getByTestId('open-platform-link').click();
+    await page.goto('/'); await openPlatformMenu(page); await page.getByTestId('sidebar').locator('a[href="/settings/api-docs?view=applications"]').click();
     const appCard = page.getByTestId('open-platform-application-list').locator('article').filter({ hasText: name });
     await appCard.getByTestId(`open-platform-tokens-${installation.pid}`).click();
     let panel = page.getByTestId('integration-token-panel');
@@ -2943,7 +2943,7 @@ test.describe('Public business API management journey', () => {
       await region.scrollIntoViewIfNeeded(); await expect(region).toBeVisible();
       await region.screenshot({ path: path.join(evidence, `${name}.png`) });
     };
-    await page.goto('/'); await openAccountMenu(page); await page.getByTestId('open-platform-link').click();
+    await page.goto('/'); await openPlatformMenu(page); await page.getByTestId('sidebar').locator('a[href="/settings/api-docs?view=applications"]').click();
     // The project adds Referer for APIRequestContext CSRF. A real noreferrer popup has no such forced header.
     await page.context().setExtraHTTPHeaders({});
     try {
@@ -3059,7 +3059,7 @@ test.describe('Adapted Controller endpoint management journey', () => {
       await region.screenshot({ path: path.join(evidence, `${name}.png`) });
     };
     const button = (region: import('@playwright/test').Locator, en: string, zh: string) => region.getByRole('button', { name: label(en,zh), exact: true });
-    await page.goto('/'); await openAccountMenu(page); await page.getByTestId('open-platform-link').click();
+    await page.goto('/'); await openPlatformMenu(page); await page.getByTestId('sidebar').locator('a[href="/settings/api-docs?view=applications"]').click();
     await page.getByTestId('open-platform-actions-link').click();
     await button(page.getByTestId('action-publication-editor'), 'Publish internal endpoints', '内部接口对外发布').click();
     const editor = page.getByTestId('endpoint-publication-editor'); await expect(editor).toBeVisible();

@@ -30,54 +30,64 @@ export function usePageContext() {
   return { pageContext, setPageContext: setExtraContext };
 }
 
-function deriveContextFromRoute(
+/**
+ * /p/:pageKey routes carry the PAGE key, which by convention is
+ * `{model_code}_list` on list pages (see app/routes/p.$pageKey.tsx). Scene
+ * tables (AuraBot suggestions, contributed providers) key by the bare model
+ * code — derive it by stripping the known kind suffix, keeping pageKey intact.
+ */
+function toModelCode(pageKey: string): string {
+  return pageKey.replace(/_(list|form|detail)$/, '');
+}
+
+export function deriveContextFromRoute(
   pathname: string,
   params: Record<string, string | undefined>,
 ): PageContext {
   // /p/:pageKey/view/:recordPid → detail
-  if (pathname.match(/^\/p\/[^/]+\/view\/[^/]+/)) {
+  if (pathname.match(/^\/p\/(?:c\/)?[^/]+\/view\/[^/]+/)) {
     const pageKey = params.pageKey || '';
     const recordPid = params.recordPid ?? params.recordId;
     return {
       pageType: 'detail',
       pageKey,
-      modelCode: pageKey,
+      modelCode: toModelCode(pageKey),
       recordPid,
       breadcrumb: [pageKey],
     };
   }
 
   // /p/:pageKey/edit/:recordPid → form (edit)
-  if (pathname.match(/^\/p\/[^/]+\/edit\/[^/]+/)) {
+  if (pathname.match(/^\/p\/(?:c\/)?[^/]+\/edit\/[^/]+/)) {
     const pageKey = params.pageKey || '';
     const recordPid = params.recordPid ?? params.recordId;
     return {
       pageType: 'form',
       pageKey,
-      modelCode: pageKey,
+      modelCode: toModelCode(pageKey),
       recordPid,
       breadcrumb: [pageKey],
     };
   }
 
   // /p/:pageKey/new → form (create)
-  if (pathname.match(/^\/p\/[^/]+\/new/)) {
+  if (pathname.match(/^\/p\/(?:c\/)?[^/]+\/new/)) {
     const pageKey = params.pageKey || '';
     return {
       pageType: 'form',
       pageKey,
-      modelCode: pageKey,
+      modelCode: toModelCode(pageKey),
       breadcrumb: [pageKey],
     };
   }
 
   // /p/:pageKey → list
-  if (pathname.match(/^\/p\/[^/]+$/)) {
+  if (pathname.match(/^\/p\/(?:c\/)?[^/]+$/)) {
     const pageKey = params.pageKey || '';
     return {
       pageType: 'list',
       pageKey,
-      modelCode: pageKey,
+      modelCode: toModelCode(pageKey),
       breadcrumb: [pageKey],
     };
   }

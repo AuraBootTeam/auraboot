@@ -6,6 +6,7 @@ export default function PageContent() {
   const themedShell = usePagePresentation()?.workspaceShell?.useThemeTokens === true;
   return (
     <main
+      id="main-content"
       className={`flex flex-1 flex-col overflow-y-auto ${themedShell ? 'bg-bg' : 'bg-gray-50 dark:bg-gray-900'}`}
       data-aura-scroll-container="page-content"
     >

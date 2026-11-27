@@ -105,7 +105,7 @@ class ProcurementOrderChangePublicHttpIT extends ProcurementOrderChangeNativeDbI
         Object taskService=construct("ProcurementTaskService",new Class<?>[]{DataAccessor.class},db);
         var task=(Map<?,?>)tx("qo_procurement_task_common:create",()->invoke(taskService,"create",new Class<?>[]{Object.class,String.class,Map.class},tenant,actor,Map.of("title",namespace,"connectionPid",connection)));
         taskPid=task.get("recordPid").toString();
-        tx(SYNC,()->db.update("pr_purchase_request",sourcePid,physical("source",Map.of("task_pid",taskPid,"account_id",namespace,"instance_key",connection,"external_system","KINGDEE","material_id","900","requisition_id","100","entry_id","11"))));
+        tx("qo_procurement_inquiry_request_common:process",()->db.update("pr_purchase_request",sourcePid,physical("source",Map.of("task_pid",taskPid,"account_id",namespace,"instance_key",connection,"external_system","KINGDEE","material_id","900","requisition_id","100","entry_id","11"))));
         executionPid=create("qo_procurement_execution_common:generate_orders","qo_procurement_execution_common",physical("execution",Map.of("key",namespace+"-execution","task_pid",taskPid,"supplier_pid",supplier,"state","succeeded","erp_order_id","700000001","erp_bill_no",namespace,"revision",0)));
         reference("BD_MATERIAL","900",null,"prod_product",product);
         reference("BD_Supplier","101",null,"pr_supplier_common",supplier);
@@ -117,7 +117,7 @@ class ProcurementOrderChangePublicHttpIT extends ProcurementOrderChangeNativeDbI
         Object identity=construct("ProcurementExternalReferences$Identity",new Class<?>[]{String.class,String.class,String.class,String.class,String.class,String.class,String.class},
             Long.toString(tenant),"KINGDEE",connection,namespace,form,external,entry==null?"":entry);
         Object registry=construct("ProcurementExternalReferences",new Class<?>[]{DataAccessor.class},db);
-        tx(SYNC,()->{invoke(registry,"bind",new Class<?>[]{identityClass,String.class,String.class,String.class},identity,model,local,namespace);return null;});
+        tx("qo_procurement_inquiry_request_common:process",()->{invoke(registry,"bind",new Class<?>[]{identityClass,String.class,String.class,String.class},identity,model,local,namespace);return null;});
     }
     Map<String,Object> contract(){var value=new LinkedHashMap<String,Object>();
         value.put("connectionPid",connection);value.put("accountId",namespace);value.put("formId","PUR_PurchaseOrder");value.put("supplierReferenceFormId","BD_Supplier");value.put("readMode","kingdee-po-view-v1");

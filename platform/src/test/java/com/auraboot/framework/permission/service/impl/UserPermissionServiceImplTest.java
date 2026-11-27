@@ -8,6 +8,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -16,6 +18,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -82,6 +85,7 @@ class UserPermissionServiceImplTest {
     @AfterEach
     void tearDown() {
         MetaContext.clear();
+        TransactionSynchronizationManager.clear();
     }
 
     @Test
@@ -184,6 +188,46 @@ class UserPermissionServiceImplTest {
         assertThat(service.hasPermission(200L, 2L, 9L, "xy.score.submit")).isTrue();
         verify(roleMapper, never()).findByMemberIdAndTenantId(5L, 100L);
         verify(permissionSnapshotCache, never()).getEffectivePermissionIds(100L, 1L, 5L);
+    }
+
+    /** Binds what Spring binds for a read-only repeatable-read transaction (what a read-only REST route runs in). */
+    private static void beginReadOnlySnapshotTransaction() {
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        TransactionSynchronizationManager.setCurrentTransactionReadOnly(true);
+        TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        TransactionSynchronizationManager.initSynchronization();
+    }
+
+    private void releaseReadsAreEnabled() {
+        com.auraboot.framework.rbac.entity.Role role = new com.auraboot.framework.rbac.entity.Role();
+        role.setCode("xy_teacher");
+        when(roleMapper.findByMemberIdAndTenantId(9L, 200L)).thenReturn(List.of(role));
+        when(applicationRuntimeDefinitionCatalog.permissionsForRoles(
+                200L, "aura-edu", Set.of("xy_teacher"))).thenReturn(Set.of("xy.score.submit"));
+        ReflectionTestUtils.setField(service, "defaultApplicationCode", "aura-edu");
+        ReflectionTestUtils.setField(service, "applicationRuntimePrimaryEnabled", true);
+    }
+
+    @Test
+    void roleCodesAreReadOnEveryCheckOutsideASnapshotTransaction() {
+        releaseReadsAreEnabled();
+
+        assertThat(service.hasPermission(200L, 2L, 9L, "xy.score.submit")).isTrue();
+        assertThat(service.hasPermission(200L, 2L, 9L, "xy.score.submit")).isTrue();
+        verify(roleMapper, times(2)).findByMemberIdAndTenantId(9L, 200L);
+    }
+
+    @Test
+    void roleCodesAreReadOnceInsideOneReadOnlySnapshotTransaction() {
+        releaseReadsAreEnabled();
+        beginReadOnlySnapshotTransaction();
+        try {
+            assertThat(service.hasPermission(200L, 2L, 9L, "xy.score.submit")).isTrue();
+            assertThat(service.hasPermission(200L, 2L, 9L, "xy.score.submit")).isTrue();
+        } finally {
+            TransactionSynchronizationManager.clear();
+        }
+        verify(roleMapper, times(1)).findByMemberIdAndTenantId(9L, 200L);
     }
 
     @Test

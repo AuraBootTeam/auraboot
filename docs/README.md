@@ -16,7 +16,7 @@ This directory holds engineering-facing material that ships with the repository.
 
 ## Feature requirements and target contracts
 
-- [插件定制保护与字段删除准入](system-reference/plugin-customization-and-field-deletion.md)：Page/Dashboard 安全覆盖、旧标记迁移及普通字段删除的数据/引用保护。
+- [插件定制保护与字段删除准入](system-reference/plugin-customization-and-field-deletion.md)：Page/Dashboard 安全覆盖、菜单/Agent接管恢复、退役包装保留式接管与可选模板、旧标记迁移及普通字段删除保护。
 
 | Topic | Reference | Status |
 | --- | --- | --- |
@@ -24,6 +24,7 @@ This directory holds engineering-facing material that ships with the repository.
 
 ## Conventions
 
+- User engagement: [concurrent visits, tenant ownership and persistence semantics](./system-reference/user-engagement.md).
 - Command form metadata: [dynamic input sources and dispatcher boundaries](./system-reference/command-input-form-sources.md).
 - Release tooling reference: [Core Web component inputs and explicit reuse](./system-reference/core-web-component-reuse.md).
 
@@ -46,3 +47,7 @@ This directory holds engineering-facing material that ships with the repository.
 - [WeChat code exchange and trusted client addresses](system-reference/wechat-code-exchange-and-client-address.md) — server-only contracts and caller-owned state, business authorization and ingress obligations.
 - CRUD runtime reference: [Generated CRUD default presentation](./system-reference/crud-default-presentation.md).
 - Focused browser regression: [Default CRUD regression](./system-reference/crud-regression.md), including responsive lists and the real Page Designer save/publish/runtime roundtrip.
+
+- Open Platform HTTP audit: [capture, redaction, navigation and authorization](system-reference/open-platform-http-audit.md).
+
+- [Platform console navigation ownership](system-reference/platform-console-navigation.md)

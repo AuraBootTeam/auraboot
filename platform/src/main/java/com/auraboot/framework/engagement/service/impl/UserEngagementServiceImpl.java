@@ -6,6 +6,7 @@ import com.auraboot.framework.engagement.mapper.UserEngagementMapper;
 import com.auraboot.framework.engagement.service.UserEngagementService;
 import com.auraboot.framework.exception.BusinessException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -69,6 +70,7 @@ public class UserEngagementServiceImpl implements UserEngagementService {
             entity = existing;
         } else {
             entity = new UserEngagement();
+            entity.setId(IdWorker.getId());
             entity.setUserId(userId);
             entity.setTenantId(tenantId);
             entity.setTargetType(dto.getTargetType());
@@ -81,7 +83,9 @@ public class UserEngagementServiceImpl implements UserEngagementService {
                     : nextSortOrder(userId, tenantId, dto.getEngagementType(), dto.getTargetType()));
             entity.setCreatedAt(now);
             entity.setUpdatedAt(now);
-            engagementMapper.insert(entity);
+            // The earlier read may race with another first visit. The database returns the
+            // existing identity on conflict instead of failing or changing its manual order.
+            entity = engagementMapper.insertOrRefresh(entity);
         }
 
         // Prune oldest recent_view records if over the limit
@@ -183,6 +187,7 @@ public class UserEngagementServiceImpl implements UserEngagementService {
         dto.setEngagementType(entity.getEngagementType());
         dto.setSortOrder(entity.getSortOrder());
         dto.setCreatedAt(entity.getCreatedAt());
+        dto.setUpdatedAt(entity.getUpdatedAt());
         dto.setTargetContext(entity.getTargetContext());
 
         return dto;

@@ -1,0 +1,113 @@
+{
+  "schemaVersion": "resource-handover.v2",
+  "contractId": "pcba-base-manufacturing-preview",
+  "revision": 1,
+  "mode": "tenant-scoped",
+  "capabilities": [
+    "preview"
+  ],
+  "source": {
+    "pluginId": "com.auraboot.pcba-base",
+    "version": "1.0.0"
+  },
+  "targets": [
+    {
+      "pluginId": "com.auraboot.pcba-industry",
+      "version": "1.0.0"
+    },
+    {
+      "pluginId": "com.auraboot.sales",
+      "version": "1.2.0"
+    }
+  ],
+  "resources": [
+    {
+      "type": "field",
+      "targetPluginId": "com.auraboot.pcba-industry",
+      "code": "pe_prd_lot_policy",
+      "expectedDataType": "enum",
+      "dictCode": "inv_lot_policy"
+    },
+    {
+      "type": "field",
+      "targetPluginId": "com.auraboot.pcba-industry",
+      "code": "pe_prd_lead_time_days",
+      "expectedDataType": "integer"
+    },
+    {
+      "type": "field",
+      "targetPluginId": "com.auraboot.pcba-industry",
+      "code": "pe_prd_moq",
+      "expectedDataType": "decimal"
+    },
+    {
+      "type": "field",
+      "targetPluginId": "com.auraboot.pcba-industry",
+      "code": "pe_prod_trace_level",
+      "expectedDataType": "enum",
+      "dictCode": "pe_trace_level"
+    },
+    {
+      "type": "field",
+      "targetPluginId": "com.auraboot.pcba-industry",
+      "code": "pe_prod_msl_level",
+      "expectedDataType": "enum",
+      "dictCode": "pe_msl_level"
+    },
+    {
+      "type": "model_field_binding",
+      "targetPluginId": "com.auraboot.pcba-industry",
+      "code": "prod_product.pe_prd_lot_policy",
+      "modelCode": "prod_product",
+      "fieldCode": "pe_prd_lot_policy"
+    },
+    {
+      "type": "model_field_binding",
+      "targetPluginId": "com.auraboot.pcba-industry",
+      "code": "prod_product.pe_prd_lead_time_days",
+      "modelCode": "prod_product",
+      "fieldCode": "pe_prd_lead_time_days"
+    },
+    {
+      "type": "model_field_binding",
+      "targetPluginId": "com.auraboot.pcba-industry",
+      "code": "prod_product.pe_prd_moq",
+      "modelCode": "prod_product",
+      "fieldCode": "pe_prd_moq"
+    },
+    {
+      "type": "model_field_binding",
+      "targetPluginId": "com.auraboot.pcba-industry",
+      "code": "prod_product.pe_prod_trace_level",
+      "modelCode": "prod_product",
+      "fieldCode": "pe_prod_trace_level"
+    },
+    {
+      "type": "model_field_binding",
+      "targetPluginId": "com.auraboot.pcba-industry",
+      "code": "prod_product.pe_prod_msl_level",
+      "modelCode": "prod_product",
+      "fieldCode": "pe_prod_msl_level"
+    },
+    {
+      "type": "dict",
+      "targetPluginId": "com.auraboot.pcba-industry",
+      "code": "pe_msl_level"
+    },
+    {
+      "type": "dict",
+      "targetPluginId": "com.auraboot.sales",
+      "code": "pe_trace_level"
+    }
+  ],
+  "references": [
+    {
+      "type": "dict",
+      "code": "inv_lot_policy",
+      "provider": {
+        "pluginId": "com.auraboot.inventory",
+        "version": "1.0.2"
+      }
+    }
+  ]
+}

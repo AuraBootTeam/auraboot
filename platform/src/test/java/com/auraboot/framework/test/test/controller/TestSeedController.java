@@ -117,30 +117,45 @@ public class TestSeedController {
     public ResponseEntity<SeedResult> seed(
             @RequestParam(value = "testRunId", required = false) String testRunId,
             @RequestParam(value = "identityOnly", defaultValue = "false") boolean identityOnly) {
+        return seedIdentity(testRunId, identityOnly, TEST_TENANT_NAME, TEST_USER_EMAIL);
+    }
+
+    /** Isolated test-profile identity for repeatable first-install and multi-tenant assertions. */
+    @PostMapping("/seed-isolated")
+    public ResponseEntity<SeedResult> seedIsolated(@RequestParam String testRunId) {
+        if (!testRunId.matches("[A-Za-z0-9][A-Za-z0-9_-]{2,31}")) {
+            return ResponseEntity.badRequest().build();
+        }
+        String identity = "e2e_" + testRunId.toLowerCase(java.util.Locale.ROOT);
+        return seedIdentity(testRunId, true, identity, identity + "@test.local");
+    }
+
+    private ResponseEntity<SeedResult> seedIdentity(
+            String testRunId, boolean identityOnly, String tenantName, String userEmail) {
         String runId = testRunId != null ? testRunId : generateTestRunId("api");
         log.info("Test seed requested: testRunId={}", runId);
 
         // 1. Check if test tenant already exists
-        Tenant tenant = tenantService.findByName(TEST_TENANT_NAME);
-        User user = userService.findByEmail(TEST_USER_EMAIL);
+        Tenant tenant = tenantService.findByName(tenantName);
+        User user = userService.findByEmail(userEmail);
 
         boolean tenantExists = tenant != null;
         boolean userExists = user != null;
 
         // 2. Create user if not exists
         if (!userExists) {
-            user = userService.signUp(TEST_USER_EMAIL, TEST_USER_PASSWORD, TEST_USER_DISPLAY_NAME);
-            log.info("Test user created: userId={}, email={}", user.getId(), TEST_USER_EMAIL);
+            user = userService.signUp(userEmail, TEST_USER_PASSWORD, TEST_USER_DISPLAY_NAME);
+            log.info("Test user created: userId={}, email={}", user.getId(), userEmail);
         }
 
         // 3. Create tenant if not exists
         if (!tenantExists) {
             tenant = new Tenant();
             tenant.setPid(UniqueIdGenerator.generate());
-            tenant.setName(TEST_TENANT_NAME);
+            tenant.setName(tenantName);
             tenant.setDisplayName("E2E Test Tenant");
             tenant.setStatus(StatusConstants.ACTIVE);
-            tenant.setContactEmail(TEST_USER_EMAIL);
+            tenant.setContactEmail(userEmail);
             tenant.setCreatedBy(user.getId());
             tenant.setUpdatedBy(user.getId());
             tenant = tenantService.createTenant(tenant);
@@ -182,7 +197,12 @@ public class TestSeedController {
                     """);
         } else {
             // Product browser gates need a real foreign identity, not unrelated demo plugins.
-            ensureTestAdminCanUseImportedResources(tenant, user);
+            MetaContext.setContext(tenant.getId(), user.getId(), user.getPid(), user.getEmail());
+            try {
+                ensureTestAdminCanUseImportedResources(tenant, user);
+            } finally {
+                MetaContext.clear();
+            }
         }
 
         // 5.6 Ensure a second "colleague" user exists in the test tenant so that
@@ -203,8 +223,8 @@ public class TestSeedController {
                 .tenantId(tenant.getId())
                 .userId(user.getId())
                 .jwt(jwt)
-                .email(TEST_USER_EMAIL)
-                .tenantName(TEST_TENANT_NAME)
+                .email(userEmail)
+                .tenantName(tenantName)
                 .testRunId(runId)
                 .build();
 

@@ -4,9 +4,22 @@
   "baseline_allowlist": [],
   "archive_retention_days": 60,
   "allowed_root_md": [
-    "README.md", "AGENTS.md", "CLAUDE.md", "CHANGELOG.md",
-    "ARCHITECTURE.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "SECURITY.md",
-    "CLA.md", "LICENSE-FAQ.md", "LICENSE-FAQ-en.md", "DEPLOY.md",
-    "TELEMETRY.md", "USAGE-FAQ.md"
+    "README.md",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "CHANGELOG.md",
+    "ARCHITECTURE.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md",
+    "SECURITY.md",
+    "CLA.md",
+    "LICENSE-FAQ.md",
+    "LICENSE-FAQ-en.md",
+    "DEPLOY.md",
+    "TELEMETRY.md",
+    "USAGE-FAQ.md",
+    "LICENSE-FAQ-LEGACY.md",
+    "LICENSE-FAQ-LEGACY-en.md",
+    "LICENSE-SCOPE.md"
   ]
 }

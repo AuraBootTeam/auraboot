@@ -30,6 +30,16 @@ public interface RestEndpointExtension extends ExtensionPoint {
      */
     void handle(PluginHttpRequest req, PluginHttpResponse res, PluginRequestContext ctx) throws Exception;
 
+    /**
+     * Explicit, finite raw-model reads used only to build this route's sanitized projection.
+     * The host accepts this opt-in only for authenticated read-only GET/POST routes, binds it to
+     * the current tenant/member and route permission, and never lends it to public CRUD.
+     * Models outside this set retain the caller's ordinary record/field authorization.
+     */
+    default java.util.Set<String> tenantProjectionReadModels(RestRoute route) {
+        return java.util.Set.of();
+    }
+
     /** Higher priority wins when multiple extensions match the same route. */
     default int getPriority() {
         return 0;

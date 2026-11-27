@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import {hydrateCapsuleOverrides} from './web-shell-capsule.mjs';
+import { distributionLicenseFiles, copyDistributionLicenses, copyPackageLicense } from './distribution-licenses.mjs';
 
 import { execFileSync } from 'node:child_process';
 import {createHash} from 'node:crypto';
@@ -159,7 +160,7 @@ function packPluginSdk(repoRoot, destination) {
     cpSync(resolve(sourceRoot, 'dist'), resolve(packageRoot, 'dist'), { recursive: true });
     cpSync(resolve(sourceRoot, 'src'), resolve(packageRoot, 'src'), { recursive: true });
     copyFileSync(resolve(sourceRoot, 'README.md'), resolve(packageRoot, 'README.md'));
-    copyFileSync(resolve(repoRoot, 'LICENSE.txt'), resolve(packageRoot, 'LICENSE.txt'));
+    copyPackageLicense(sourceRoot, packageRoot);
     const packageManifest = JSON.parse(readFileSync(resolve(sourceRoot, 'package.json'), 'utf8'));
     packageManifest.main = './dist/index.js';
     packageManifest.module = './dist/index.js';
@@ -218,6 +219,7 @@ function packWebShell(repoRoot, destination, version) {
     });
     for (const file of [
       'application-cli.mjs',
+      'distribution-licenses.mjs',
       'application-artifact-verifier.mjs',
       'application-contract.mjs',
       'application-graph-adapters.mjs',
@@ -239,7 +241,7 @@ function packWebShell(repoRoot, destination, version) {
       );
     }
     copyFileSync(resolve(repoRoot, 'pnpm-lock.yaml'), resolve(packageRoot, 'pnpm-lock.yaml'));
-    copyFileSync(resolve(repoRoot, 'LICENSE.txt'), resolve(packageRoot, 'LICENSE.txt'));
+    copyDistributionLicenses(repoRoot, packageRoot);
     const rootManifest = JSON.parse(readFileSync(resolve(repoRoot, 'package.json'), 'utf8'));
     const workspaceManifest = YAML.parse(readFileSync(resolve(repoRoot, 'pnpm-workspace.yaml'), 'utf8'));
     workspaceManifest.overrides = rootManifest.pnpm?.overrides ?? {};
@@ -252,6 +254,7 @@ function packWebShell(repoRoot, destination, version) {
       name: '@auraboot/web-shell',
       version,
       private: false,
+      license: 'SEE LICENSE IN LICENSE.txt',
       type: 'module',
       packageManager: rootManifest.packageManager,
       engines: { node: '>=20' },
@@ -259,7 +262,8 @@ function packWebShell(repoRoot, destination, version) {
       pnpm: rootManifest.pnpm,
       scripts: { build: 'pnpm --dir web-admin build' },
       files: [
-        'LICENSE.txt',
+        'LICENSE.txt', 'NOTICE', 'LICENSE-SCOPE.md', 'LICENSE-LEGACY-2.0.txt',
+        'platform/platform-mybatis-compat',
         'pnpm-lock.yaml',
         'pnpm-overrides.json',
         'pnpm-workspace.yaml',
@@ -299,7 +303,7 @@ function packCompiledPackage(repoRoot, destination, directory, label) {
     if (existsSync(resolve(sourceRoot, 'README.md'))) {
       copyFileSync(resolve(sourceRoot, 'README.md'), resolve(packageRoot, 'README.md'));
     }
-    copyFileSync(resolve(repoRoot, 'LICENSE.txt'), resolve(packageRoot, 'LICENSE.txt'));
+    copyPackageLicense(sourceRoot, packageRoot);
     const packageManifest = JSON.parse(readFileSync(resolve(sourceRoot, 'package.json'), 'utf8'));
     packageManifest.main = './dist/index.js';
     packageManifest.module = './dist/index.js';
@@ -342,7 +346,7 @@ function packUi(repoRoot, destination) {
     cpSync(resolve(sourceRoot, 'dist'), resolve(packageRoot, 'dist'), { recursive: true });
     cpSync(resolve(sourceRoot, 'src'), resolve(packageRoot, 'src'), { recursive: true });
     copyFileSync(resolve(sourceRoot, 'README.md'), resolve(packageRoot, 'README.md'));
-    copyFileSync(resolve(repoRoot, 'LICENSE.txt'), resolve(packageRoot, 'LICENSE.txt'));
+    copyPackageLicense(sourceRoot, packageRoot);
     const packageManifest = JSON.parse(readFileSync(resolve(sourceRoot, 'package.json'), 'utf8'));
     packageManifest.main = './dist/index.js';
     packageManifest.module = './dist/index.js';
@@ -366,7 +370,7 @@ function packSourceFacade(repoRoot, destination, directory, label) {
   try {
     cpSync(resolve(sourceRoot, 'src'), resolve(packageRoot, 'src'), { recursive: true });
     copyFileSync(resolve(sourceRoot, 'package.json'), resolve(packageRoot, 'package.json'));
-    copyFileSync(resolve(repoRoot, 'LICENSE.txt'), resolve(packageRoot, 'LICENSE.txt'));
+    copyPackageLicense(sourceRoot, packageRoot);
     const packed = run('pnpm', ['pack', '--pack-destination', destination], { cwd: packageRoot });
     return requirePath(resolve(packed.split('\n').at(-1)), `${label} tarball`);
   } finally {
@@ -479,8 +483,7 @@ async function main() {
 
   mkdirSync(output, { recursive: false });
   copyFileSync(manifestPath, resolve(output, 'app.yaml'));
-  copyFileSync(resolve(repoRoot, 'LICENSE.txt'), resolve(output, 'LICENSE.txt'));
-  copyFileSync(resolve(repoRoot, 'NOTICE'), resolve(output, 'NOTICE'));
+  copyDistributionLicenses(repoRoot, output);
   copyFileSync(resolve(repoRoot, 'distribution/application/native-install.md'), resolve(output, 'INSTALL.md'));
   mkdirSync(resolve(output, 'bin/lib'), { recursive: true });
   copyFileSync(resolve(repoRoot, 'scripts/lib/runtime-process-owner.sh'), resolve(output, 'bin/lib/runtime-process-owner.sh'));
@@ -525,6 +528,14 @@ async function main() {
   const coreOwnership = copyArtifact(
     resolve(repoRoot, 'plugins/core-ownership'),
     resolve(output, 'config/core-ownership'),
+  );
+  const coreAurabot = copyArtifact(
+    resolve(repoRoot, 'plugins/core-aurabot'),
+    resolve(output, 'config/core-aurabot'),
+  );
+  const agentControlPlane = copyArtifact(
+    resolve(repoRoot, 'plugins/agent-control-plane'),
+    resolve(output, 'config/agent-control-plane'),
   );
   const coreAnnouncement = copyArtifact(
     resolve(repoRoot, 'plugins/core-announcement'),
@@ -573,6 +584,8 @@ async function main() {
       { source: runtime, destination: '/opt/auraboot/runtime/application.jar' },
       { source: resolve(output, 'LICENSE.txt'), destination: '/opt/auraboot/LICENSE.txt' },
       { source: resolve(output, 'NOTICE'), destination: '/opt/auraboot/NOTICE' },
+      ...distributionLicenseFiles.filter((name) => !['LICENSE.txt', 'NOTICE'].includes(name))
+        .map((name) => ({ source: resolve(output, name), destination: `/opt/auraboot/${name}` })),
       { source: coreMigrations, destination: '/opt/auraboot/migrations/core' },
       { source: coreMeta, destination: '/opt/auraboot/config/core-meta' },
       { source: pageManager, destination: '/opt/auraboot/config/page-manager' },
@@ -616,6 +629,8 @@ async function main() {
     { type: 'config', id: 'platform-admin', version: JSON.parse(readFileSync(resolve(platformAdmin, 'plugin.json'), 'utf8')).version, path: platformAdmin },
     { type: 'config', id: 'org-management', version, path: orgManagement },
     { type: 'config', id: 'core-ownership', version, path: coreOwnership },
+    { type: 'config', id: 'core-aurabot', version: JSON.parse(readFileSync(resolve(repoRoot, 'plugins/core-aurabot/plugin.json'), 'utf8')).version, path: coreAurabot },
+    { type: 'config', id: 'agent-control-plane', version: JSON.parse(readFileSync(resolve(repoRoot, 'plugins/agent-control-plane/plugin.json'), 'utf8')).version, path: agentControlPlane },
     { type: 'config', id: 'core-announcement', version: JSON.parse(readFileSync(resolve(coreAnnouncement, 'plugin.json'), 'utf8')).version, path: coreAnnouncement },
     { type: 'config', id: 'core-decisionops', version: '1.0.0', path: coreDecisionops },
     { type: 'config', id: 'showcase', version: '1.0.0', path: showcase },

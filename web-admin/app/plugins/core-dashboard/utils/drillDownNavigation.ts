@@ -53,6 +53,23 @@ export function buildDrillDownTarget(
 ): string | null {
   if (!config.enabled || config.action !== 'navigate' || !config.targetPage) return null;
 
+  // A targetPage may carry {field} placeholders resolved from the clicked row's
+  // payload (and the declared exact filters) — this is how a table row jumps to
+  // a path-param detail route like /p/model/view/{pid}.
+  let targetPage = config.targetPage;
+  const placeholderRe = /\{(\w+)\}/g;
+  if (placeholderRe.test(targetPage)) {
+    const known = new Map<string, unknown>();
+    for (const filter of payload) known.set(filter.field, filter.value);
+    for (const rule of config.filters ?? []) {
+      for (const filter of materializeRule(rule, payload)) known.set(filter.fieldCode, filter.value);
+    }
+    targetPage = targetPage.replace(placeholderRe, (token, field) => {
+      const value = known.get(field);
+      return value == null || value === '' ? '' : encodeURIComponent(String(value));
+    });
+  }
+
   const params = new URLSearchParams();
   const exactFilters = (config.filters ?? []).flatMap((rule) =>
     materializeRule(rule, payload),
@@ -72,7 +89,8 @@ export function buildDrillDownTarget(
   }
 
   const query = params.toString();
-  return query ? `${config.targetPage}?${query}` : config.targetPage;
+  const resolvedTarget = targetPage.replace(/\/+$/, '');
+  return query ? `${resolvedTarget}?${query}` : resolvedTarget;
 }
 
 export function resolveDashboardRuntimeValue<T>(

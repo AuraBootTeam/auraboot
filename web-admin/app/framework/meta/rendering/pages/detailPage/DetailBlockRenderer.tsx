@@ -26,6 +26,7 @@ import { getByDataPath, readDetailRecordField } from './detailRecordRequests';
 import { extractBlockDataRows, prepareDetailRuntimeBlock } from './detailBlockValues';
 import { resolveSubTableDataSourceConfig } from './detailLayoutValues';
 import { DataPathTable } from './DataPathTable';
+import { detailSectionIsEmpty, detailSectionEmptyText } from './detailSectionEmpty';
 
 /**
  * DetailBlockRenderer - renders a single block within the detail page
@@ -198,6 +199,10 @@ export function DetailBlockRenderer({
         </section>
       );
     }
+    const sectionColumns = typeof (block as any).columns === 'number' ? (block as any).columns : 2;
+    if (!Number.isInteger(sectionColumns) || sectionColumns < 1 || sectionColumns > 4) throw new Error('Detail section columns must be between one and four');
+    const sectionGrid = ['md:grid-cols-1', 'md:grid-cols-2', 'md:grid-cols-3', 'md:grid-cols-4'][sectionColumns - 1];
+    const sectionIsEmpty = detailSectionIsEmpty(block.fields, sectionRecord);
     return (
       <section className="form-section border-border bg-panel rounded-card border p-5 shadow-sm">
         {block.title && (
@@ -205,41 +210,55 @@ export function DetailBlockRenderer({
             {getLocalizedText(block.title, locale, t)}
           </h3>
         )}
-        {block.fields && block.fields.length > 0 && (
-          <div className="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2">
-            {block.fields.map((field: FieldConfig) => {
-              const colSpan = field.layout?.colSpan || field.colSpan || (field.span === 2 ? 12 : 6);
-              const isFullWidth = colSpan >= 12 || field.span === 2;
-              const resolvedField: FieldConfig = field.label
-                ? field
-                : { ...field, label: resolveModelFieldLabel(field.field) };
-              const enrichedField = enrichField ? enrichField(resolvedField) : resolvedField;
+        {sectionIsEmpty ? (
+          // every field of this section is empty on this record: one line says so, instead of a
+          // grid of labels over dashes that reads as a broken page
+          <p
+            className="text-text-2 flex items-center gap-2 text-sm"
+            data-testid="detail-section-empty"
+          >
+            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h4m4 4H7a2 2 0 01-2-2V6a2 2 0 012-2h5.6a1 1 0 01.7.3l5.4 5.4a1 1 0 01.3.7V18a2 2 0 01-2 2z" />
+            </svg>
+            {detailSectionEmptyText(block, locale, t)}
+          </p>
+        ) : (
+          block.fields && block.fields.length > 0 && (
+            <div className={`grid grid-cols-1 gap-x-8 gap-y-4 ${sectionGrid}`}>
+              {block.fields.map((field: FieldConfig) => {
+                const colSpan = field.layout?.colSpan || field.colSpan || (field.span === 2 ? 12 : 6);
+                const isFullWidth = colSpan >= 12 || field.span === 2;
+                const resolvedField: FieldConfig = field.label
+                  ? field
+                  : { ...field, label: resolveModelFieldLabel(field.field) };
+                const enrichedField = enrichField ? enrichField(resolvedField) : resolvedField;
 
-              return (
-                <div
-                  key={field.field}
-                  data-testid={`form-field-${field.field}`}
-                  className={`${isFullWidth ? 'md:col-span-2' : ''} min-w-0`}
-                >
-                  <DynamicField
-                    field={enrichedField}
-                    value={
-                      sectionRecord ? readDetailRecordField(sectionRecord, field.field) : undefined
-                    }
-                    displayValue={
-                      sectionRecord
-                        ? readDetailRecordField(sectionRecord, `${field.field}_display`)
-                        : undefined
-                    }
-                    onChange={() => {}}
-                    readOnly={true}
-                    locale={locale}
-                    getDictItems={getDictItems}
-                  />
-                </div>
-              );
-            })}
-          </div>
+                return (
+                  <div
+                    key={field.field}
+                    data-testid={`form-field-${field.field}`}
+                    className={`${isFullWidth ? 'md:col-span-full' : ''} min-w-0`}
+                  >
+                    <DynamicField
+                      field={enrichedField}
+                      value={
+                        sectionRecord ? readDetailRecordField(sectionRecord, field.field) : undefined
+                      }
+                      displayValue={
+                        sectionRecord
+                          ? readDetailRecordField(sectionRecord, `${field.field}_display`)
+                          : undefined
+                      }
+                      onChange={() => {}}
+                      readOnly={true}
+                      locale={locale}
+                      getDictItems={getDictItems}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )
         )}
       </section>
     );
@@ -253,6 +272,7 @@ export function DetailBlockRenderer({
     const columns = ((block as any).columns || []) as any[];
     return (
       <DataPathTable
+        mobileCard={(block as any).mobileCard}
         title={block.title}
         columns={columns}
         rows={rows}

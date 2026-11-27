@@ -1,6 +1,8 @@
 package com.auraboot.framework.application.security;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.openplatform.mapper.OpenApiCallAuditMapper;
+import com.auraboot.framework.openplatform.security.OpenApiRequestIdFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.AfterEach;
@@ -14,6 +16,8 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 class ExternalMachineAuthenticationFilterTest {
 
@@ -88,6 +92,31 @@ class ExternalMachineAuthenticationFilterTest {
         assertTrue(response.getContentAsString().contains("rate_limit_exceeded"));
         assertFalse(chained.get());
         assertTrue(failureAudited.get());
+    }
+
+    @Test
+    void unauthenticatedOpenApiResponseRetainsJsonBodyWhenThereIsNoInstallationAuditTarget() throws Exception {
+        var mapper = new ObjectMapper();
+        var audit = mock(OpenApiCallAuditMapper.class);
+        var requestId = new OpenApiRequestIdFilter(mapper, audit);
+        var authenticator = new ExternalMachineAuthenticator() {
+            public boolean supports(jakarta.servlet.http.HttpServletRequest request) { return true; }
+            public MachinePrincipal authenticate(jakarta.servlet.http.HttpServletRequest request) {
+                throw new ExternalMachineAuthException(401, "invalid_token");
+            }
+        };
+        var authentication = new ExternalMachineAuthenticationFilter(List.of(authenticator), mapper);
+        var request = new MockHttpServletRequest("GET", "/api/open/v1/whoami");
+        request.addHeader("X-Request-Id", "procurement-auth-test");
+        var response = new MockHttpServletResponse();
+
+        requestId.doFilter(request, response, (req, res) ->
+                authentication.doFilter(req, res, (unusedRequest, unusedResponse) -> fail("Controller reached")));
+
+        assertEquals(401, response.getStatus());
+        assertEquals("procurement-auth-test", response.getHeader("X-Request-Id"));
+        assertEquals("invalid_token", mapper.readTree(response.getContentAsByteArray()).path("code").asText());
+        verifyNoInteractions(audit);
     }
 
     @Test

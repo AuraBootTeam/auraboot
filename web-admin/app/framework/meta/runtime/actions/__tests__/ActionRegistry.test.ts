@@ -673,6 +673,62 @@ describe('ActionRegistry command.execute inputFields (command-form sugar)', () =
 });
 
 describe('ActionRegistry dialog.confirm', () => {
+  it('evaluates localized confirmation text once and keeps business expression text literal', async () => {
+    const confirm = vi.fn().mockResolvedValue(true);
+    await actionRegistry.execute('dialog.confirm', {
+      confirm, locale: 'en-US',
+      expressionContext: createExpressionContext({ form: { label: '${record.secret}' } }),
+      args: { message: { 'zh-CN': '错误语言', en: "${fn.CONCAT('Selected: ', form.label)}" } },
+    });
+    expect(confirm).toHaveBeenCalledWith({ content: 'Selected: ${record.secret}' });
+  });
+
+  it('refuses unresolved dynamic confirmations instead of allowing a command after blank text', async () => {
+    const confirm = vi.fn().mockResolvedValue(true);
+    await expect(actionRegistry.execute('dialog.confirm', {
+      confirm, expressionContext: createExpressionContext({ form: {} }),
+      args: { message: '${form.absent}' },
+    })).rejects.toThrow();
+    await expect(actionRegistry.execute('dialog.confirm', {
+      confirm, args: { message: '${form.absent}' },
+    })).rejects.toThrow();
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it('sends the confirmed snapshot through the real flow after editable inputs change', async () => {
+    const manager = new ScopedStateManager({ locale: 'en-US', theme: 'light' } as any);
+    manager.createScope('confirmed', { form: { quantity: '1.000001', pickup: 'old-point' } });
+    const record = { pid: 'owned', rowVersion: 7, receiver: 'Old receiving address' };
+    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: { ok: true } });
+    const content: string[] = [];
+    registerConfirmDialog(async opts => {
+      content.push(opts.content);
+      manager.updateForm('confirmed', 'quantity', '999');
+      manager.updateForm('confirmed', 'pickup', 'different-point');
+      record.rowVersion = 99; record.receiver = 'Different receiving address';
+      return true;
+    });
+    try {
+      const flow = new FlowRunner({ evaluator: new ExpressionEvaluator(), actionRegistry,
+        stateManager: manager, scopeId: 'confirmed', dataSourceManager: {} as any,
+        schema: {} as any, getAllFormFields: () => [] });
+      await flow.run([
+        { action: 'form.set', args: { confirmed: {
+          target: '${record.pid}', version: '${record.rowVersion}', quantity: '${form.quantity}',
+          pickup: '${form.pickup}', receiver: '${record.receiver}',
+        } } },
+        { action: 'dialog.confirm', args: { message: "${fn.CONCAT(form.confirmed.quantity, ' / ', form.confirmed.pickup, ' / ', form.confirmed.receiver)}" } },
+        { action: 'command.execute', args: { command: 'example:ship', operationType: 'update',
+          targetRecordPid: '${form.confirmed.target}', expectedVersion: '${form.confirmed.version}',
+          payload: { quantity: '${form.confirmed.quantity}', pickup: '${form.confirmed.pickup}' } } },
+      ], { ...manager.getContext('confirmed'), record, fetchResult } as any);
+      expect(content).toEqual(['1.000001 / old-point / Old receiving address']);
+      expect(fetchResult).toHaveBeenCalledTimes(1);
+      expect(fetchResult.mock.calls[0][1].params).toMatchObject({ targetRecordPid: 'owned', expectedVersion: 7,
+        payload: { quantity: '1.000001', pickup: 'old-point' } });
+    } finally { unregisterConfirmDialog(); }
+  });
+
   it('aborts the real flow before its command and navigation when confirmation is cancelled', async () => {
     const fetchResult = vi.fn();
     const navigate = vi.fn();
@@ -864,6 +920,19 @@ describe('ActionRegistry search / reset / setState handlers', () => {
     expect(loadData).toHaveBeenCalledWith({ page: 0, filters: {} });
     const updater = setPagination.mock.calls[0][0];
     expect(updater({ current: 3, pageSize: 20 })).toEqual({ current: 1, pageSize: 20 });
+  });
+
+  it('reset clears the visible keyword before loading the unfiltered first page', async () => {
+    let keyword = 'previous supplier';
+    const setKeyword = vi.fn((value: string) => { keyword = value; });
+    const loadedKeywords: string[] = [];
+    const loadData = vi.fn(async () => { loadedKeywords.push(keyword); });
+    const setFilters = vi.fn();
+    const setPagination = vi.fn();
+    await actionRegistry.execute('reset', { loadData, setKeyword, setFilters, setPagination });
+    expect(setKeyword).toHaveBeenCalledWith('');
+    expect(loadedKeywords).toEqual(['']);
+    expect(loadData).toHaveBeenCalledWith({ page: 0, filters: {} });
   });
 
   it('setState merges args into the filter state', async () => {
@@ -1251,6 +1320,42 @@ describe('ActionRegistry form.reset / state.set handlers', () => {
     });
     expect(stateManager.updateState).toHaveBeenCalledWith('s1', 'mode', 'compact');
     expect(stateManager.updateState).toHaveBeenCalledWith('s1', 'page', 2);
+  });
+
+  it('state.set evaluates typed values once before applying any scoped updates', async () => {
+    const stateManager = { updateState: vi.fn() };
+    await actionRegistry.execute('state.set', {
+      stateManager, scopeId: 'typed-state', expressionEvaluator: new ExpressionEvaluator(),
+      expressionContext: createExpressionContext({ form: { version: 7, enabled: false, label: '${record.secret}' } }),
+      args: { version: '${form.version}', enabled: '${form.enabled}',
+        selection: { label: '${form.label}', values: ['${form.version}', null] } },
+    });
+    expect(stateManager.updateState.mock.calls).toEqual([
+      ['typed-state', 'version', 7], ['typed-state', 'enabled', false],
+      ['typed-state', 'selection', { label: '${record.secret}', values: [7, null] }],
+    ]);
+  });
+
+  it('state.set keeps numeric pagination and observed versions through the real flow into a command', async () => {
+    const manager = new ScopedStateManager({ locale: 'en-US', theme: 'light' } as any);
+    manager.createScope('paged-book', { form: {} });
+    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: { saved: true } });
+    const flow = new FlowRunner({ evaluator: new ExpressionEvaluator(), actionRegistry,
+      stateManager: manager, scopeId: 'paged-book', dataSourceManager: {} as any,
+      schema: {} as any, getAllFormFields: () => [] });
+    await flow.run([
+      { action: 'state.set', args: { page: '${dataSources.profiles.current + 1}',
+        observedVersion: '${record.version}', supplier: '${record.pid}' } },
+      { action: 'command.execute', args: { command: 'example:save', operationType: 'update',
+        targetRecordPid: '${state.supplier}', expectedVersion: '${state.observedVersion}',
+        payload: { page: '${state.page}' } } },
+    ], { ...manager.getContext('paged-book'), record: { pid: 'supplier', version: 9 },
+      dataSources: { profiles: { current: 1 } }, fetchResult } as any);
+    expect(manager.getContext('paged-book').state.page).toBe(2);
+    expect(manager.getContext('paged-book').state.observedVersion).toBe(9);
+    expect(fetchResult).toHaveBeenCalledWith('/api/meta/commands/execute/example:save', expect.objectContaining({
+      method: 'post', params: expect.objectContaining({ targetRecordPid: 'supplier', expectedVersion: 9, payload: { page: 2 } }),
+    }));
   });
 
   it('state.set logs and no-ops without stateManager, scopeId, or args', async () => {
@@ -2121,4 +2226,64 @@ describe('ActionRegistry grouped command inputs', () => {
     ).rejects.toThrow('Invalid or conflicting command input payload key');
     expect(fetchResult).not.toHaveBeenCalled();
   });
+});
+
+describe('ActionRegistry governed command choices', () => {
+  const field = { field: 'connectionPid', type: 'select', required: true,
+    dataSource: { type: 'command', commandCode: 'example:connection_options' } };
+  const items = [{ value: 'connection-a', label: 'Sandbox' }];
+  it('loads complete command choices before a cancellable form without submitting a mutation', async () => {
+    const dialog = vi.fn((event: Event) => (event as CustomEvent).detail.onCancel());
+    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: {
+      phaseReached: 'completed', data: { items, total: 1 },
+    } });
+    window.addEventListener('dialog:form', dialog);
+    try {
+      await expect(actionRegistry.execute('command.execute', { fetchResult,
+        args: { command: 'example:create', inputFields: [field] } })).rejects.toBeInstanceOf(ActionCancelledError);
+      expect(fetchResult).toHaveBeenCalledExactlyOnceWith('/api/meta/commands/execute/example%3Aconnection_options',
+        { method: 'post', params: { payload: {} } });
+      expect((dialog.mock.calls[0][0] as CustomEvent).detail.fieldOptions.connectionPid).toEqual(items);
+    } finally { window.removeEventListener('dialog:form', dialog); }
+  });
+  it.each([
+    { phaseReached: 'handler', data: { items, total: 1 } },
+    { phaseReached: 'completed', data: { items, total: 2 } },
+    { phaseReached: 'completed', data: { items } },
+    { phaseReached: 'completed', data: { items: [...items, ...items], total: 2 } },
+    { phaseReached: 'completed', data: { items: [{ value: '', label: 'Broken' }], total: 1 } },
+  ])('rejects incomplete or malformed command options before opening or mutating: %j', async (data) => {
+    const dialog = vi.fn((event: Event) => (event as CustomEvent).detail.onCancel());
+    const fetchResult = vi.fn().mockResolvedValue({ code: '0', data });
+    window.addEventListener('dialog:form', dialog);
+    try {
+      await expect(actionRegistry.execute('command.execute', { fetchResult,
+        t: key => key === 'error.data_load_failed' ? 'Choices unavailable.' : key,
+        args: { command: 'example:create', inputFields: [field] } })).rejects.toThrow('Choices unavailable.');
+      expect(dialog).not.toHaveBeenCalled();expect(fetchResult).toHaveBeenCalledTimes(1);
+    } finally { window.removeEventListener('dialog:form', dialog); }
+  });
+  it('submits only the confirmed choice to the separate business command', async () => {
+    const fetchResult = vi.fn().mockResolvedValueOnce({ code: '0', data: {
+      phaseReached: 'completed', data: { items, total: 1 },
+    } }).mockResolvedValueOnce({ code: '0', data: { phaseReached: 'completed', data: { recordPid: 'draft-a' } } });
+    const dialog = (event: Event) => (event as CustomEvent).detail.onSubmit({ connectionPid: 'connection-a' });
+    window.addEventListener('dialog:form', dialog);
+    try {
+      await actionRegistry.execute('command.execute', { fetchResult,
+        args: { command: 'example:create', inputFields: [field], payload: { title: 'Draft' } } });
+      expect(fetchResult).toHaveBeenCalledTimes(2);
+      expect(fetchResult).toHaveBeenNthCalledWith(2, '/api/meta/commands/execute/example:create',
+        expect.objectContaining({ method: 'post', params: { payload: { title: 'Draft', connectionPid: 'connection-a' } } }));
+    } finally { window.removeEventListener('dialog:form', dialog); }
+  });
+  it('fails closed when no choice-command transport is available', async () => {
+    const dialog = vi.fn((event: Event) => (event as CustomEvent).detail.onCancel());
+    window.addEventListener('dialog:form', dialog);
+    try {
+      await expect(promptInputForm([field], 'Choose', undefined)).rejects.toThrow('Could not load choices. Try again.');
+      expect(dialog).not.toHaveBeenCalled();
+    } finally { window.removeEventListener('dialog:form', dialog); }
+  });
+
 });

@@ -35,6 +35,7 @@ final class ImportedNotificationMetadataValidator {
             Map<String, String> fields = new HashMap<>();
             Map<String, JsonNode> fieldFacts = new HashMap<>();
             Set<Long> seen = new HashSet<>();
+            Set<String> aliases = new HashSet<>();
             for (JsonNode binding : graph.path("bindings")) {
                 SourceBindingTypes.require(binding.path("tenant_id").longValue() == b.tenantId() && binding.path("model_id").longValue() == model.path("id").longValue() && binding.has("deleted_flag") && !binding.path("deleted_flag").booleanValue());
                 JsonNode field = find(graph.path("fields"), "id", binding.path("field_id").asText());
@@ -47,11 +48,13 @@ final class ImportedNotificationMetadataValidator {
                     SourceBindingTypes.require(owners.contains(track.path("plugin_pid").textValue()) && track.path("tenant_id").longValue() == b.tenantId() && "model_field_binding".equals(track.path("resource_type").asText()));
                 }
                 SourceBindingTypes.require(!field.has("data_source_id") || field.path("data_source_id").isNull());
-                physicalField(field);
                 String alias = binding.path("alias_code").isNull() || binding.path("alias_code").asText().isBlank() ? field.path("code").asText() : binding.path("alias_code").asText();
                 SourceBindingTypes.code(alias);
-                SourceBindingTypes.require(fields.put(alias, field.path("data_type").asText()) == null);
-                fieldFacts.put(alias, field);
+                SourceBindingTypes.require(aliases.add(alias));
+                if (readablePhysicalField(field)) {
+                    fields.put(alias, field.path("data_type").asText());
+                    fieldFacts.put(alias, field);
+                }
             }
             SourceBindingTypes.require(graph.path("fields").size() == seen.size());
             result.put(a.modelCode(), Map.copyOf(fields));
@@ -122,31 +125,46 @@ final class ImportedNotificationMetadataValidator {
                 && reference.getExtensions() == null);
     }
 
-    private void physicalField(JsonNode field) {
+    private boolean readablePhysicalField(JsonNode field) {
         SourceBindingTypes.require(field.has("feature") && field.has("data_type"));
         SourceBindingTypes.require(!DataType.COMPUTED.getCode().equals(field.path("data_type").asText()));
+        JsonNode extension = field.path("extension");
+        if (extension.isTextual()) extension = SourceBindingCanonical.parse(extension.textValue());
+        boolean systemManaged = false;
+        // FieldDefinitionAssembler flattens at most two nested extension wrappers.
+        for (int depth = 0; depth < 3 && extension.isObject(); depth++) {
+            SourceBindingTypes.require(!nonNull(extension, "jsonbColumn") && !nonNull(extension, "jsonbPath"));
+            if (extension.path("systemManaged").isBoolean() && extension.path("systemManaged").booleanValue()) {
+                systemManaged = true;
+            }
+            extension = extension.path("extension");
+        }
+
         JsonNode feature = field.path("feature");
         if (feature.isTextual()) feature = SourceBindingCanonical.parse(feature.textValue());
         SourceBindingTypes.require(feature.isNull() || feature.isObject());
-        if (feature.isObject()) {
-            Set<String> known = new HashSet<>();
-            for (var property : FieldFeatureBean.class.getDeclaredFields()) {
-                if (!java.lang.reflect.Modifier.isStatic(property.getModifiers())) {
-                    known.add(property.getName());
-                }
+        if (feature.isNull()) return true;
+
+        Set<String> known = new HashSet<>();
+        for (var property : FieldFeatureBean.class.getDeclaredFields()) {
+            if (!java.lang.reflect.Modifier.isStatic(property.getModifiers())) {
+                known.add(property.getName());
             }
-            feature.fieldNames().forEachRemaining(name -> SourceBindingTypes.require(known.contains(name)));
-            FieldFeatureBean bean = SourceBindingCanonical.feature(feature);
-            FieldDefinition canonical = FieldDefinition.builder().virtualType(bean.getVirtualType()).computeExpression(bean.getComputeExpression()).computeDependencies(bean.getComputeDependencies()).build();
-            SourceBindingTypes.require(!canonical.isVirtual() && canonical.getComputeExpression() == null &&(canonical.getComputeDependencies() == null || canonical.getComputeDependencies().isEmpty()) && bean.getRollUp() == null);
         }
-        // FieldDefinitionAssembler flattens at most two nested extension wrappers; no virtual JSON projection is admitted.
-        JsonNode extension = field.path("extension");
-        if (extension.isTextual()) extension = SourceBindingCanonical.parse(extension.textValue());
-        for (int depth = 0; depth<3 && extension.isObject(); depth++) {
-            SourceBindingTypes.require(!nonNull(extension, "jsonbColumn") && !nonNull(extension, "jsonbPath"));
-            extension = extension.path("extension");
+        feature.fieldNames().forEachRemaining(name -> SourceBindingTypes.require(known.contains(name)));
+        FieldFeatureBean bean = SourceBindingCanonical.feature(feature);
+        FieldDefinition canonical = FieldDefinition.builder().virtualType(bean.getVirtualType())
+                .computeExpression(bean.getComputeExpression()).computeDependencies(bean.getComputeDependencies()).build();
+        SourceBindingTypes.require(bean.getRollUp() == null);
+        // An approved display enum remains part of the locked graph but cannot provide any binding facts.
+        if (systemManaged && canonical.isComputedReadonly() && DataType.ENUM.getCode().equals(field.path("data_type").asText())
+                && canonical.getComputeExpression() != null && !canonical.getComputeExpression().isBlank()
+                && canonical.getComputeDependencies() != null && !canonical.getComputeDependencies().isEmpty()) {
+            return false;
         }
+        SourceBindingTypes.require(!canonical.isVirtual() && canonical.getComputeExpression() == null
+                && (canonical.getComputeDependencies() == null || canonical.getComputeDependencies().isEmpty()));
+        return true;
     }
     private boolean nonNull(JsonNode n, String key) {
         return n.has(key) && !n.get(key).isNull();

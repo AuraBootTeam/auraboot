@@ -1,4 +1,7 @@
 import React from 'react';
+import { useTimezone } from '~/contexts/TimezoneContext';
+import { useDictWithExtras } from '~/framework/smart/hooks/useDictWithExtras';
+import { cellRendererRegistry } from '~/framework/meta/runtime/renderers/CellRendererRegistry';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -28,6 +31,10 @@ export const ArtifactTimelineBlockRenderer: React.FC<ArtifactTimelineBlockRender
   const t = context.t || ((key: string) => key);
   const dataSourceId = typeof block.dataSource === 'string' ? block.dataSource : undefined;
   const item = (block as any).item || {};
+  const { timezone, formats: dateTimeFormats } = useTimezone();
+  const { items: statusItems, loading: statusLoading } = useDictWithExtras(item.statusDictCode);
+  const downloadLabel = t('common.download') !== 'common.download' ? t('common.download')
+    : getLocalizedText({ 'zh-CN': '下载', en: 'Download' }, locale, t);
 
   useDataSourceSubscription(runtime, dataSourceId);
 
@@ -95,11 +102,16 @@ export const ArtifactTimelineBlockRenderer: React.FC<ArtifactTimelineBlockRender
                   )}
                   {status && (
                     <span className="bg-status-green-bg text-status-green rounded-pill px-2 py-0.5 text-xs">
-                      {String(status)}
+                      {item.statusDictCode
+                        ? statusLoading ? '…' : getLocalizedText(statusItems.find(entry => entry.value === String(status))?.label || '—', locale, t)
+                        : String(status)}
                     </span>
                   )}
                 </div>
-                {subtitle && <div className="text-text-2 mt-1 text-xs">{String(subtitle)}</div>}
+                {subtitle && <div className="text-text-2 mt-1 text-xs">{item.subtitleType === 'datetime'
+                  ? cellRendererRegistry.render('datetime', { value: subtitle, record: row,
+                      column: { field: item.subtitleField, timezone, dateTimeFormats }, locale, t } as any)
+                  : String(subtitle)}</div>}
                 {hash && (
                   <div className="text-text-2 mt-1 font-mono text-xs">{shortHash(hash)}</div>
                 )}
@@ -110,7 +122,7 @@ export const ArtifactTimelineBlockRenderer: React.FC<ArtifactTimelineBlockRender
                   data-testid={`artifact-timeline-download-${rowKey}`}
                   className="rounded-control border-border-strong text-text-2 hover:bg-subtle self-start border px-3 py-1.5 text-xs font-medium"
                 >
-                  {t('common.download') !== 'common.download' ? t('common.download') : 'Download'}
+                  {downloadLabel}
                 </a>
               )}
             </li>

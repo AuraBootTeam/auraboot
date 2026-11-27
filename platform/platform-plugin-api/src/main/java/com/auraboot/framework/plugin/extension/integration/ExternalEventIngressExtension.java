@@ -2,15 +2,122 @@ package com.auraboot.framework.plugin.extension.integration;
 
 import org.pf4j.ExtensionPoint;
 import java.util.Set;
+import java.util.Map;
 
 /** Declares a fixed installed-integration command surface. No client-selected commands. */
 public interface ExternalEventIngressExtension extends ExtensionPoint {
     Registration registration();
 
+    /** Optional pure adapter for this provider's fixed business contract. No IO or side effects. */
+    default java.util.Optional<BusinessRequest> prepareBusinessRequest(java.util.Map<String,Object> input) {
+        return java.util.Optional.empty();
+    }
+
+    /** Internal normalized event; no routing fields are added to the public request. */
+    record BusinessRequest(String eventType, String subjectType, String subjectPid,
+                           java.time.Instant occurredAt, java.util.Map<String,Object> payload) {
+        public BusinessRequest {
+            if(eventType==null || !eventType.matches("external\\.[a-z0-9.-]+\\.v[1-9][0-9]*")
+                    || subjectType==null || !subjectType.matches("[a-z][a-z0-9-]{1,63}")
+                    || subjectPid==null || !subjectPid.matches("[A-Za-z0-9_.:-]{1,128}")
+                    || occurredAt==null || payload==null)
+                throw new IllegalArgumentException("Invalid business request identity");
+            payload=java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(payload));
+        }
+    }
+
     /** Explicit historical event sets allowed only for terminal receipt queries/replays.
      * No command, binding, permission or provider identity compatibility is implied. */
     default Set<Set<String>> completedReceiptEventTypeSets() { return Set.of(); }
 
+
+    /** Explicit process-only model read grants added since an earlier completed receipt.
+     * The host may remove only entire read-only grants when proving the old full command digest.
+     * Accept/result commands, writes and binding identity remain pinned. Never applies to pending work.
+     */
+    default Set<String> completedReceiptProcessReadAdditions() { return Set.of(); }
+
+    /** Exact fields added only to an existing process read grant. The host may reconstruct
+     * its predecessor for completed receipt reads/replays, retaining all existing write grants
+     * and every other command/binding field in the original digest. Never migrates pending work.
+     */
+    default Map<String,Set<String>> completedReceiptProcessReadFieldAdditions() { return Map.of(); }
+
+    /** Explicit opt-in for verifying terminal receipts from before this process gained scoped secret reads.
+     * Reconstructs only the missing secret-read declaration; never executes old or unfinished work.
+     */
+    default boolean completedReceiptProcessSecretReadAddition() { return false; }
+
+    /** A precise release-local process capability predecessor, only for terminal result reads/replays.
+     * The host preserves accept/result, existing grants, all bindings and every undeclared field.
+     * This declaration never authorizes delivery or migration of accepted work.
+     */
+    default java.util.Optional<CompletedProcessCapabilityAddition> completedReceiptProcessCapabilityAddition() {
+        return java.util.Optional.empty();
+    }
+
+    record CompletedProcessCapabilityAddition(Map<String,Set<String>> createFields,
+            Set<String> secretServiceTypes,Set<String> secretFields,Set<String> readContractSettings) {
+        public CompletedProcessCapabilityAddition {
+            if(createFields==null || createFields.isEmpty() || createFields.size()>16
+                    || secretServiceTypes==null || secretServiceTypes.isEmpty() || secretServiceTypes.size()>16
+                    || secretFields==null || secretFields.isEmpty() || secretFields.size()>32
+                    || readContractSettings==null || readContractSettings.size()>4)throw new IllegalArgumentException("Invalid completed process capability declaration");
+            var copy=new java.util.LinkedHashMap<String,Set<String>>();
+            var systemFields=Set.of("pid","tenant_id","deleted_flag","created_at","created_by","updated_at","updated_by","row_version");
+            for(var entry:createFields.entrySet()) {
+                if(entry.getKey()==null || !entry.getKey().matches("[a-z][a-z0-9_]{1,99}")
+                        || entry.getValue()==null || entry.getValue().isEmpty() || entry.getValue().size()>64
+                        || entry.getValue().stream().anyMatch(field->field==null || !field.matches("[a-z][a-z0-9_]{1,127}") || systemFields.contains(field)))
+                    throw new IllegalArgumentException("Invalid completed create declaration");
+                copy.put(entry.getKey(),Set.copyOf(entry.getValue()));
+            }
+            if(java.util.stream.Stream.concat(secretServiceTypes.stream(),secretFields.stream())
+                    .anyMatch(name->name==null || !name.matches("[A-Za-z][A-Za-z0-9_]{0,63}"))
+                    || readContractSettings.stream().anyMatch(name->name==null || !name.matches("[a-z][a-zA-Z0-9]{0,49}ReadContracts")))
+                throw new IllegalArgumentException("Invalid completed process setting declaration");
+            createFields=Map.copyOf(copy);secretServiceTypes=Set.copyOf(secretServiceTypes);
+            secretFields=Set.copyOf(secretFields);readContractSettings=Set.copyOf(readContractSettings);
+        }
+    }
+
+    /** Opt-in request defaults owned by the provider, before durable acceptance. */
+    default java.util.Optional<RequestNormalizer> requestNormalizer() { return java.util.Optional.empty(); }
+
+    @FunctionalInterface
+    interface RequestNormalizer {
+        PreparedRequest normalize(java.util.Map<String, Object> request, RequestDefaults defaults);
+
+        /** Pure retry identity projection. Default retains every caller field. Providers may
+         * omit only explicitly ignored wire fields, never defaults or business facts. */
+        default java.util.Map<String,Object> fingerprintInput(java.util.Map<String,Object> request) {
+            return request;
+        }
+    }
+
+    /** Safe provider field errors discovered while resolving the installed business binding. */
+    final class RequestValidationException extends RuntimeException {
+        private final java.util.List<FieldError> errors;
+        public RequestValidationException(java.util.List<FieldError> errors) {
+            super("Installed integration business request validation failed");
+            if (errors == null || errors.isEmpty() || errors.size() > 100)
+                throw new IllegalArgumentException("Provide 1 to 100 safe field errors");
+            this.errors = java.util.List.copyOf(errors);
+        }
+        public java.util.List<FieldError> errors() { return errors; }
+    }
+
+    record RequestDefaults(String eventId, java.time.Instant receivedAt) { }
+    record FieldError(String field, String code, String message) { }
+    record PreparedRequest(java.util.Map<String, Object> envelope,
+                           java.util.Map<String, String> stableIdentities,
+                           java.util.List<FieldError> errors) {
+        public PreparedRequest {
+            envelope = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(envelope));
+            stableIdentities = java.util.Map.copyOf(stableIdentities);
+            errors = java.util.List.copyOf(errors);
+        }
+    }
 
     record Registration(String sourceCode, String capability, Set<String> eventTypes,
                         String requiredScope, String commandPermission,

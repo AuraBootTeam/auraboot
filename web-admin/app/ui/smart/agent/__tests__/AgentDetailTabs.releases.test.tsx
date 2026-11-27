@@ -39,6 +39,7 @@ const releases = [
     source_updated_at: '2026-07-29T10:00:00Z',
     published_at: '2026-07-29T10:00:01Z',
     deployed: true,
+    matches_draft: false,
   },
   {
     pid: 'RELEASE_V1',
@@ -59,7 +60,8 @@ const deploymentPolicy = {
     allowedInitiatorTypes: ['human'],
     allowedUserIds: [],
     allowedMemberIds: [],
-    allowedRoleIds: [44],
+    allowedRoleIds: ['44'],
+    subjectChoices: { allowedRoleIds: [{ id: '44', name: 'Sales team' }, { id: '55', name: 'Service team' }] },
   },
   policySnapshot: {
     invocationPolicyVersion: 'invocation-policy/v1',
@@ -100,6 +102,38 @@ describe('Agent release tab', () => {
     );
     expect(get).toHaveBeenCalledWith('/api/agent/definitions/AGENT_1/releases');
     expect(get).toHaveBeenCalledWith('/api/agent/definitions/AGENT_1/deployment-policy');
+  });
+
+  it('does not publish or fetch deployment policy before a disabled template is enabled', async () => {
+    render(<ReleasesTab agentPid="DISABLED_TEMPLATE" agentUpdatedAt="2026-07-29T10:00:00Z" readOnly={false} disabledTemplate />);
+    await screen.findByTestId('agent-release-history');
+    expect(screen.getByTestId('publish-agent-release')).toBeDisabled();
+    expect(screen.queryByTestId('agent-deployment-policy')).not.toBeInTheDocument();
+    expect(get).toHaveBeenCalledExactlyOnceWith('/api/agent/definitions/DISABLED_TEMPLATE/releases');
+    fireEvent.click(screen.getByTestId('publish-agent-release'));
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it('refreshes the initially empty release list when first activation completes', async () => {
+    get.mockImplementation((url: string) => Promise.resolve({ code: '0', data: url.endsWith('/deployment-policy') ? deploymentPolicy : [] }));
+    const { rerender } = render(<ReleasesTab agentPid="TEMPLATE" agentUpdatedAt="2026-07-29T10:00:00Z" readOnly={false} disabledTemplate />);
+    await screen.findByText('No release exists yet. Publish the draft before assigning work.');
+    get.mockImplementation((url: string) => Promise.resolve({ code: '0', data: url.endsWith('/deployment-policy') ? deploymentPolicy : releases }));
+    rerender(<ReleasesTab agentPid="TEMPLATE" agentUpdatedAt="2026-07-29T10:01:00Z" readOnly={false} disabledTemplate={false} />);
+    await screen.findByTestId('agent-release-history');
+    expect(screen.getByText('v2')).toBeVisible();
+  });
+
+  it('does not report lifecycle timestamp changes as unpublished blueprint edits or expose release identifiers', async () => {
+    get.mockImplementation((url: string) => Promise.resolve({ code: '0', data: url.endsWith('/deployment-policy') ? deploymentPolicy : [{ ...releases[0], matches_draft: true, deployment_status: 'suspended' }] }));
+    render(<ReleasesTab agentPid="AGENT_1" agentUpdatedAt="2027-01-01T00:00:00Z" readOnly={false} />);
+    await screen.findByTestId('agent-release-history');
+    expect(screen.getByTestId('agent-release-draft-state')).toHaveTextContent('Deployment matches the draft');
+    expect(screen.getByText('Current version · suspended')).toBeVisible();
+    expect(screen.queryByText(/RELEASE_V2/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/222222222222/)).not.toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Sales team' })).toBeVisible();
+    expect(screen.queryByPlaceholderText('101, 102')).not.toBeInTheDocument();
   });
 
   it('requires confirmation, publishes, and reloads release history', async () => {
@@ -189,9 +223,9 @@ describe('Agent release tab', () => {
     await screen.findByTestId('agent-deployment-policy');
     await waitFor(() => expect(screen.getByTestId('deployment-channel-web')).toBeChecked());
     fireEvent.click(screen.getByTestId('deployment-channel-schedule'));
-    fireEvent.change(screen.getByTestId('deployment-policy-allowedRoleIds'), {
-      target: { value: '44, 55' },
-    });
+    const roles = screen.getByTestId('deployment-policy-allowedRoleIds') as HTMLSelectElement;
+    Array.from(roles.options).forEach((option) => { option.selected = true; });
+    fireEvent.change(roles);
     fireEvent.click(screen.getByTestId('save-agent-deployment-policy'));
 
     await waitFor(() =>
@@ -199,7 +233,7 @@ describe('Agent release tab', () => {
         '/api/agent/definitions/AGENT_1/deployment-policy',
         expect.objectContaining({
           allowedChannels: ['web', 'schedule'],
-          allowedRoleIds: [44, 55],
+          allowedRoleIds: ['44', '55'],
         }),
       ),
     );

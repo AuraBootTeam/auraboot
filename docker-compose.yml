@@ -31,7 +31,10 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-      start_period: 10s
+      # First boot restores the atomic schema and durably checkpoints thousands
+      # of relations before the official entrypoint exposes its final TCP server.
+      # Successful probes still become healthy immediately during this grace.
+      start_period: 60s
 
   # ─── Redis 7 (optional — needed for multi-instance deployments) ────────────
   redis:

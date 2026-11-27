@@ -166,6 +166,7 @@ test.describe('BOM conversion-task soft delete real-browser golden @smoke', () =
     step = 'verify row gone from list';
     await adminPage.reload({ waitUntil: 'domcontentloaded' });
     await waitForDynamicPageLoad(adminPage, 20_000);
+    await expect(adminPage.getByTestId('dynamic-list')).toHaveAttribute('data-ready', 'true');
     await expect
       .poll(async () => (await adminPage.locator('main').innerText().catch(() => '')).includes(taskNo), {
         timeout: 15_000,
@@ -223,6 +224,8 @@ test.describe('BOM conversion-task soft delete real-browser golden @smoke', () =
     expect(String(ownAudit[0].userId), 'delete actor is traceable').toMatch(/^[1-9]\d*$/);
     expect(Number.isFinite(Date.parse(ownAudit[0].createdAt)), 'delete timestamp is retained').toBe(true);
 
+    // A loading table also lacks the deleted row; it cannot prove the terminal UI.
+    await expect(adminPage.getByTestId('dynamic-list')).toHaveAttribute('data-ready', 'true');
     await adminPage.screenshot({ path: test.info().outputPath('deleted-task-and-details.png'), fullPage: true });
 
     // 7. hard gates: no forbidden, no 500s across the whole flow

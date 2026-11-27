@@ -636,7 +636,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
     // ==================== Execution and testing ====================
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public NamedQueryTestResult testQuery(String pid, NamedQueryTestRequest request) {
         NamedQueryTestResult result = new NamedQueryTestResult();
         try {
@@ -671,7 +671,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     @Observed(name = "named_query.execute", contextualName = "named-query-execution")
     public PaginationResult<Map<String, Object>> executeQuery(String code, NamedQueryTestRequest request) {
         // 1. Get query definition
@@ -1209,7 +1209,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
     // ==================== Export ====================
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public ExportResult exportData(String code, NamedQueryDataExportRequest request) {
         Instant startTime = Instant.now();
 

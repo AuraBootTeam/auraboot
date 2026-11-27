@@ -45,6 +45,30 @@ describe('ConfirmDialog focus lifecycle', () => {
     expect(nextCancel).toHaveBeenCalledOnce();
     expect(props.onCancel).not.toHaveBeenCalled();
   });
+  it('owns pointer input while another modal has disabled outside interactions', () => {
+    const onConfirm = vi.fn();
+    const outsidePointerDown = vi.fn();
+    document.addEventListener('pointerdown', outsidePointerDown);
+    try {
+      render(
+        <ConfirmDialog
+          open
+          title="Confirm purchase"
+          content="Reserve the reviewed quantities?"
+          onConfirm={onConfirm}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.getByTestId('confirm-dialog')).toHaveClass('pointer-events-auto');
+      const confirm = screen.getByTestId('confirm-ok');
+      fireEvent.pointerDown(confirm);
+      fireEvent.click(confirm);
+      expect(outsidePointerDown).not.toHaveBeenCalled();
+      expect(onConfirm).toHaveBeenCalledOnce();
+    } finally {
+      document.removeEventListener('pointerdown', outsidePointerDown);
+    }
+  });
   it('blocks duplicate confirmation and cancellation while an atomic save is pending', () => {
     const onConfirm = vi.fn(),
       onCancel = vi.fn();

@@ -20,6 +20,33 @@ describe('deployment appearance editor', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Platform administrator required');
     expect(screen.queryByRole('button', { name: 'Save draft' })).not.toBeInTheDocument();
   });
+  // The server answers a BusinessException with the response-code label in `message` and the
+  // localized reason in `context` (a string on this endpoint, `{ error }` on command endpoints) —
+  // captured from a community deployment: 422 { code: '40000', message: 'Business error', context: '请先启用此部署的商业品牌配置。' }.
+  it("shows the server's localized reason instead of the response-code label", async () => {
+    calls.get.mockResolvedValue({ code: '40000', message: 'Business error', data: null, context: '请先启用此部署的商业品牌配置。' });
+    render(<AuthAppearanceEditor />);
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('请先启用此部署的商业品牌配置。');
+    expect(alert).not.toHaveTextContent('Business error');
+    expect(screen.queryByRole('button', { name: 'Save draft' })).not.toBeInTheDocument();
+  });
+  it('maps a reason the server could not resolve itself (bare message key) to the built-in copy', async () => {
+    calls.get.mockResolvedValue({ code: '40000', message: 'Business error', data: null, context: 'auth.appearance.commercialRequired' });
+    render(<AuthAppearanceEditor />);
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Valid commercial branding must be enabled.');
+    expect(alert).not.toHaveTextContent('Business error');
+    expect(alert).not.toHaveTextContent('auth.appearance.commercialRequired');
+  });
+  it('reads a rejected write reason nested under context.error and keeps the draft', async () => {
+    await open();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Headline display mode' }), { target: { value: 'hidden' } });
+    calls.put.mockResolvedValue({ code: '40900', message: 'Business error', data: null, context: { error: 'Another administrator updated the configuration.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Another administrator updated the configuration.');
+    expect(screen.getByRole('combobox', { name: 'Headline display mode' })).toHaveValue('hidden');
+  });
   it('edits hidden copy locally then saves the expected-version draft', async () => {
     await open();
     fireEvent.change(screen.getByRole('combobox', { name: 'Headline display mode' }), { target: { value: 'hidden' } });

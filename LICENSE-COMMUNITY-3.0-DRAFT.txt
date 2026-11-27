@@ -1,3 +1,7 @@
+HISTORICAL PROPOSAL — SUPERSEDED FOR THE 1.0 CANDIDATE BY LICENSE.txt
+This retained October proposal is not the current 1.0 license or product offer.
+Its customer-logo, annual-Standard and separate-OEM wording is superseded.
+
 AURABOOT COMMUNITY LICENSE — VERSION 3.0 DRAFT
 Prepared: 2026-10-14
 Status: Proposed terms for a future expressly identified release.

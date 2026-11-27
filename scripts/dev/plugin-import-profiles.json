@@ -81,15 +81,13 @@
     "pcba-compliance",
     "pcba-solution",
     "pcba-sales",
-    "pcba-quote",
-    "pcba-warehouse"
+    "pcba-quote"
   ],
   "enterprise-demo": [
     "core-meta",
     "page-manager",
     "platform-admin",
     "core-decisionops",
-    "platform-admin-ee",
     "org-management",
     "core-announcement",
     "core-aurabot",
@@ -98,7 +96,6 @@
     "portal",
     "connectors",
     "compliance",
-    "ai-employees",
     "req",
     "showcase",
     "asset-management",
@@ -135,15 +132,11 @@
     "pcba-sales",
     "pcba-quote",
     "pcba-manufacturing",
-    "pcba-warehouse",
     "pcba-compliance",
     "pcba-finance",
     "sales-templates",
-    "quarry-solution",
-    "d7-knowledge-wiki",
     "dev-pipeline",
-    "growth",
-    "customer-pcba-solution"
+    "growth"
   ],
   "bom-quote": [
     "core-meta",
@@ -151,5 +144,15 @@
     "core-aurabot",
     "page-manager",
     "org-management"
+  ],
+  "quarry-delivery": [
+    "org-management",
+    "project-management",
+    "quarry-industry",
+    "contract-cost",
+    "construction-process",
+    "doc-knowledge",
+    "dual-prevention",
+    "annual-plan"
   ]
 }

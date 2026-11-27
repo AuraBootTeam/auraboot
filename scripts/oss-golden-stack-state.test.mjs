@@ -26,3 +26,26 @@ for (const external of [false, true]) test(`env reads ${external ? 'external CI'
   assert.match(result.stdout, /export BACKEND_URL=http:\/\/127\.0\.0\.1:6430/);
   assert.ok(result.stdout.includes(`export AURA_EVIDENCE_ROOT=${workspace}/evidence`));
 });
+
+
+test('warm reads the same selected admin state as Playwright without falling back to tracked fixtures', () => {
+  const source = fs.readFileSync(path.join(import.meta.dirname, 'oss-golden-stack.sh'), 'utf8');
+  const warm = source.slice(source.indexOf('cmd_warm() {'));
+  const selection = warm.match(/  local admin_json[\s\S]*?(?=  local env_exports;)/)?.[0];
+  assert.ok(selection, 'Warm admin-state selection must exist');
+  const cases = [
+    [{}, '/fixture/web-admin/tests/storage/admin.json'],
+    [{ PW_STORAGE_DIR: '/private/task-auth' }, '/private/task-auth/admin.json'],
+    [{ PW_STORAGE_DIR: 'task-auth' }, '/fixture/web-admin/task-auth/admin.json'],
+    [{ PW_STORAGE_DIR: '/private/task-auth', PW_ADMIN_STORAGE_STATE: '/private/explicit.json' }, '/private/explicit.json'],
+  ];
+  for (const [overrides, expected] of cases) {
+    const env = { ...process.env };
+    delete env.PW_STORAGE_DIR; delete env.PW_ADMIN_STORAGE_STATE;
+    Object.assign(env, overrides);
+    const script = `read_state() { local fe=/fixture/web-admin;\n${selection}\nprintf '%s' "$admin_json";\n}\nread_state`;
+    const result = spawnSync('bash', ['-c', script], { env, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, expected);
+  }
+});

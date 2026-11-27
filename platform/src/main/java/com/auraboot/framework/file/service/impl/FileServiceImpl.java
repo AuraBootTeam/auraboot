@@ -90,7 +90,8 @@ public class FileServiceImpl implements FileService {
             "application/json", "application/xml",
             "application/x-yaml", "application/yaml", "text/yaml",
             "application/zip", "application/x-zip", "application/x-zip-compressed", "application/gzip",
-            "application/vnd.rar", "application/x-rar-compressed", "application/x-7z-compressed"
+            "application/vnd.rar", "application/x-rar-compressed", "application/x-7z-compressed",
+            "video/mp4", "video/quicktime"
     );
 
     /**
@@ -614,10 +615,20 @@ public class FileServiceImpl implements FileService {
                 || startsWith(head, 0xFF, 0xD8, 0xFF)               // JPEG
                 || startsWith(head, 0x47, 0x49, 0x46, 0x38)         // "GIF8"
                 || startsWith(head, 0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1)   // OLE2 (legacy Office)
+                || isMp4(head)                                     // ISO-BMFF media container (....ftyp: mp4/mov)
                 || isWebp(head)) {                                 // RIFF....WEBP
             return ContentSignature.ALLOWED;
         }
         return ContentSignature.UNKNOWN;
+    }
+
+    /** ISO-BMFF media containers (MP4/MOV/3GP): a "ftyp" box sits at byte offset 4. */
+    private static boolean isMp4(byte[] head) {
+        if (head.length < 8) {
+            return false;
+        }
+        return (head[4] & 0xFF) == 0x66 && (head[5] & 0xFF) == 0x74
+                && (head[6] & 0xFF) == 0x79 && (head[7] & 0xFF) == 0x70;  // "ftyp"
     }
 
     private static boolean isWebp(byte[] head) {

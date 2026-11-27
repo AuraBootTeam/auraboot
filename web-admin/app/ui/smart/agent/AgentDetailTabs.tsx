@@ -5,7 +5,7 @@
  * AuraBot (aurabot) renders in read-only mode.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router';
 import {
   ArrowLeftIcon,
@@ -33,6 +33,7 @@ import { get, post, put, del } from '~/shared/services/http-client';
 import { organizationService, type DepartmentTreeNode } from '~/shared/services/organizationService';
 import { ResultHelper } from '~/utils/type';
 import { useToastContext } from '~/contexts/ToastContext';
+import { usePermission } from '~/contexts/AuthContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { useTimezone } from '~/contexts/TimezoneContext';
 import { formatInTimezone } from '~/shared/services/dateTimeFormatService';
@@ -135,6 +136,8 @@ interface AgentReleaseItem {
   source_updated_at: string | null;
   published_at: string;
   deployed: boolean;
+  matches_draft?: boolean;
+  deployment_status?: string;
 }
 
 interface AgentDeploymentPolicy {
@@ -143,9 +146,10 @@ interface AgentDeploymentPolicy {
     version?: string;
     allowedChannels?: string[];
     allowedInitiatorTypes?: string[];
-    allowedUserIds?: number[];
-    allowedMemberIds?: number[];
-    allowedRoleIds?: number[];
+    allowedUserIds?: (string | number)[];
+    allowedMemberIds?: (string | number)[];
+    allowedRoleIds?: (string | number)[];
+    subjectChoices?: Record<string, { id: string; name: string | null }[]>;
   };
   policySnapshot: Record<string, unknown>;
 }
@@ -321,7 +325,7 @@ function ProfileTab({
               >
                 {AGENT_TYPES.map((type) => (
                   <option key={type} value={type}>
-                    {type}
+                    {t(`ai.colleagues.type.${type}`, undefined, 'AI colleague')}
                   </option>
                 ))}
               </select>
@@ -1960,6 +1964,200 @@ function MemoryTab({ agentPid }: { agentPid: string }) {
   );
 }
 
+export function ActivateAgentDialog({
+  agentPid,
+  onClose,
+  onSuccess,
+}: {
+  agentPid: string;
+  onClose: () => void;
+  onSuccess: () => Promise<void>;
+}) {
+  const { t } = useI18n();
+  const [providers, setProviders] = useState<{ providerCode: string; displayName: string }[]>([]);
+  const [providerCode, setProviderCode] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+  const loadProviders = useCallback(async (signal?: AbortSignal) => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      // Provider discovery intentionally returns a bare array, not ApiResponse.
+      const response = await fetch('/api/agent/providers/configured', {
+        headers: { Accept: 'application/json' },
+        signal,
+      });
+      if (!response.ok) throw new Error('Provider discovery failed');
+      const body: unknown = await response.json();
+      if (
+        !Array.isArray(body) ||
+        body.some(
+          (item) => typeof item?.providerCode !== 'string' || typeof item?.displayName !== 'string',
+        )
+      ) {
+        throw new Error('Invalid provider response');
+      }
+      if (!signal?.aborted) setProviders(body);
+    } catch {
+      if (!signal?.aborted) setLoadError(true);
+    } finally {
+      if (!signal?.aborted) setLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadProviders(controller.signal);
+    return () => controller.abort();
+  }, [loadProviders]);
+  const activate = async () => {
+    if (submittingRef.current) return;
+    if (!providerCode || !providers.some((p) => p.providerCode === providerCode)) {
+      setError(t('ai.colleagues.activation.required', undefined, 'Choose an AI service first.'));
+      return;
+    }
+    submittingRef.current = true;
+    setSubmitting(true);
+    setError('');
+    try {
+      const response = await post(`/api/agent/definitions/${agentPid}/activate`, { providerCode });
+      if (!ResultHelper.isSuccess(response)) {
+        setError(
+          response.message ||
+            t(
+              'ai.colleagues.activation.failed',
+              undefined,
+              'Activation failed. Your selection is preserved; retry after checking the AI service.',
+            ),
+        );
+        return;
+      }
+      await onSuccess();
+    } catch {
+      setError(
+        t(
+          'ai.colleagues.activation.failed',
+          undefined,
+          'Activation failed. Your selection is preserved; retry after checking the AI service.',
+        ),
+      );
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="activate-agent-title"
+        className="bg-panel border-border w-full max-w-lg rounded-xl border p-6 shadow-xl"
+      >
+        <h2 id="activate-agent-title" className="text-text text-lg font-semibold">
+          {t('ai.colleagues.activation.title', undefined, 'First enable and publish')}
+        </h2>
+        <p className="text-text-3 mt-2 text-sm">
+          {t(
+            'ai.colleagues.activation.help',
+            undefined,
+            'Choose a configured AI service. This enables the colleague and publishes its first immutable release. Enrollment is a separate step.',
+          )}
+        </p>
+        {loading ? (
+          <p role="status" className="text-text-3 mt-4">
+            {t('common.loading', undefined, 'Loading…')}
+          </p>
+        ) : loadError ? (
+          <div role="alert" className="text-status-red mt-4 text-sm">
+            <p>
+              {t(
+                'ai.colleagues.activation.loadFailed',
+                undefined,
+                'AI services could not be loaded. Retry before enabling.',
+              )}
+            </p>
+            <button type="button" onClick={() => void loadProviders()} className="mt-2 underline">
+              {t('common.retry', undefined, 'Retry')}
+            </button>
+          </div>
+        ) : providers.length === 0 ? (
+          <p role="status" className="text-text-3 mt-4 text-sm">
+            {t(
+              'ai.colleagues.activation.empty',
+              undefined,
+              'No AI service is configured. Add one in AI Settings, then return here.',
+            )}{' '}
+            <Link to="/p/c/ai_settings_hub" className="text-accent underline">
+              {t('ai.colleagues.activation.settings', undefined, 'AI Settings')}
+            </Link>
+          </p>
+        ) : (
+          <div className="mt-4">
+            <label
+              htmlFor="activation-provider"
+              className="text-text mb-2 block text-sm font-medium"
+            >
+              {t('ai.colleagues.activation.provider', undefined, 'AI service')}
+            </label>
+            <select
+              id="activation-provider"
+              autoFocus
+              value={providerCode}
+              disabled={submitting}
+              aria-invalid={!!error}
+              aria-describedby={error ? 'activation-error' : undefined}
+              onChange={(event) => {
+                setProviderCode(event.target.value);
+                setError('');
+              }}
+              data-testid="activation-provider-select"
+              className="border-border-strong bg-panel text-text w-full rounded-lg border px-3 py-2"
+            >
+              <option value="">
+                {t('ai.colleagues.activation.choose', undefined, 'Choose an AI service')}
+              </option>
+              {providers.map((provider) => (
+                <option key={provider.providerCode} value={provider.providerCode}>
+                  {provider.displayName}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        {error && (
+          <p id="activation-error" role="alert" className="text-status-red mt-3 text-sm">
+            {error}
+          </p>
+        )}
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={onClose}
+            className="border-border text-text rounded-lg border px-4 py-2 text-sm disabled:opacity-50"
+          >
+            {t('common.cancel', undefined, 'Cancel')}
+          </button>
+          <button
+            type="button"
+            onClick={() => void activate()}
+            disabled={loading || loadError || providers.length === 0 || submitting}
+            data-testid="confirm-activate-agent"
+            className="bg-accent hover:bg-accent-hover rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {submitting
+              ? t('ai.colleagues.activation.busy', undefined, 'Enabling and publishing…')
+              : t('ai.colleagues.activation.title', undefined, 'First enable and publish')}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Enroll Employee Dialog
 // ---------------------------------------------------------------------------
@@ -1978,7 +2176,7 @@ function flattenDepts(
   return result;
 }
 
-function EnrollEmployeeDialog({
+export function EnrollEmployeeDialog({
   agentPid,
   agentName,
   onClose,
@@ -2003,7 +2201,8 @@ function EnrollEmployeeDialog({
 
   // Load department tree
   useEffect(() => {
-    organizationService.getDepartmentTree()
+    organizationService
+      .getDepartmentTree()
       .then((res) => {
         if (ResultHelper.isSuccess(res) && res.data) {
           setDepartments(flattenDepts(res.data));
@@ -2045,11 +2244,15 @@ function EnrollEmployeeDialog({
       );
       return;
     }
+    if (!selectedPosPid) {
+      toast.showErrorToast(t('ai.colleagues.enroll.error.positionRequired', undefined, 'Please select a position'));
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await post(`/api/agent/definitions/${agentPid}/enroll-employee`, {
         departmentPid: selectedDeptPid,
-        positionPid: selectedPosPid || undefined,
+        positionPid: selectedPosPid,
       });
       if (ResultHelper.isSuccess(res)) {
         toast.showSuccessToast(
@@ -2065,7 +2268,7 @@ function EnrollEmployeeDialog({
           t(
             'ai.colleagues.enroll.error.failed',
             undefined,
-            'Enrollment failed. Ensure the agent has a system account.',
+            'Enrollment failed. Check the department and position, then retry.',
           ),
         );
       }
@@ -2171,9 +2374,6 @@ function EnrollEmployeeDialog({
         <div className="mb-6">
           <label className="text-text-2 dark:text-text-3 mb-1.5 block text-sm font-medium">
             {t('ai.colleagues.enroll.field.position', undefined, 'Position')} *
-            <span className="text-text-3 ml-1 text-xs">
-              {t('ai.colleagues.enroll.optional', undefined, '(optional)')}
-            </span>
           </label>
           <div className="relative">
             <select
@@ -2341,10 +2541,12 @@ export function ReleasesTab({
   agentPid,
   agentUpdatedAt,
   readOnly,
+  disabledTemplate = false,
 }: {
   agentPid: string;
   agentUpdatedAt: string;
   readOnly: boolean;
+  disabledTemplate?: boolean;
 }) {
   const { t } = useI18n();
   const { timezone, formats } = useTimezone();
@@ -2385,7 +2587,7 @@ export function ReleasesTab({
 
   useEffect(() => {
     void fetchReleases();
-  }, [fetchReleases]);
+  }, [fetchReleases, agentUpdatedAt, disabledTemplate]);
 
   const fetchDeploymentPolicy = useCallback(async () => {
     setPolicyLoading(true);
@@ -2417,8 +2619,8 @@ export function ReleasesTab({
   }, [agentPid, t]);
 
   useEffect(() => {
-    void fetchDeploymentPolicy();
-  }, [fetchDeploymentPolicy]);
+    if (!disabledTemplate) void fetchDeploymentPolicy();
+  }, [fetchDeploymentPolicy, disabledTemplate]);
 
   const updatePolicyArray = (
     field: keyof AgentDeploymentPolicy['channelPolicy'],
@@ -2440,16 +2642,6 @@ export function ReleasesTab({
       };
     });
   };
-
-  const parseIds = (value: string) =>
-    Array.from(
-      new Set(
-        value
-          .split(',')
-          .map((item) => Number(item.trim()))
-          .filter((item) => Number.isSafeInteger(item) && item > 0),
-      ),
-    );
 
   const saveDeploymentPolicy = async () => {
     if (!deploymentPolicy) return;
@@ -2542,9 +2734,7 @@ export function ReleasesTab({
   };
 
   const deployed = releases.find((release) => release.deployed);
-  const unpublishedChanges =
-    !deployed?.source_updated_at ||
-    new Date(agentUpdatedAt).getTime() > new Date(deployed.source_updated_at).getTime();
+  const unpublishedChanges = deployed ? deployed.matches_draft !== true : releases.length === 0;
 
   if (loading) {
     return (
@@ -2595,7 +2785,9 @@ export function ReleasesTab({
             }`}
             data-testid="agent-release-draft-state"
           >
-            {unpublishedChanges
+            {deployed && deployed.matches_draft == null
+              ? t('ai.colleagues.releases.unknown', undefined, 'Draft content could not be compared. Refresh to retry.')
+              : unpublishedChanges
               ? t('ai.colleagues.releases.unpublished', undefined, 'Draft changes are not deployed')
               : t('ai.colleagues.releases.current', undefined, 'Deployment matches the draft')}
           </p>
@@ -2604,7 +2796,7 @@ export function ReleasesTab({
           <button
             type="button"
             onClick={() => setConfirming(true)}
-            disabled={publishing}
+            disabled={publishing || disabledTemplate}
             className="bg-accent hover:bg-accent-hover inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             data-testid="publish-agent-release"
           >
@@ -2614,158 +2806,146 @@ export function ReleasesTab({
         )}
       </div>
 
-      <section
-        className="border-border bg-panel dark:border-border dark:bg-subtle rounded-xl border p-5"
-        data-testid="agent-deployment-policy"
-      >
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-text font-semibold dark:text-white">
-              {t('ai.colleagues.policy.title', undefined, 'Deployment invocation policy')}
-            </h2>
-            <p className="text-text-3 dark:text-text-3 mt-1 text-sm">
-              {t(
-                'ai.colleagues.policy.help',
-                undefined,
-                'Restrict where this colleague can run and which initiators may invoke it. Empty groups keep tenant-compatible access.',
-              )}
-            </p>
-          </div>
-          {deploymentPolicy?.channelPolicy.version && (
-            <span className="bg-subtle text-text-2 dark:bg-subtle dark:text-text-3 rounded-full px-2.5 py-1 font-mono text-xs">
-              {deploymentPolicy.channelPolicy.version}
-            </span>
+      {disabledTemplate && (
+        <p className="text-text-3 text-sm">
+          {t(
+            'ai.colleagues.activation.beforePublish',
+            undefined,
+            'Enable and publish this template first using the action above.',
           )}
-        </div>
-
-        {policyLoading ? (
-          <div
-            className="bg-subtle dark:bg-subtle mt-4 h-24 animate-pulse rounded-lg"
-            data-testid="agent-deployment-policy-loading"
-          />
-        ) : policyError ? (
-          <div
-            className="border-status-red bg-status-red-bg mt-4 rounded-lg border p-4"
-            role="alert"
-          >
-            <p className="text-status-red text-sm">{policyError}</p>
-            <button
-              type="button"
-              onClick={() => void fetchDeploymentPolicy()}
-              className="border-status-red text-status-red mt-2 rounded border px-3 py-1.5 text-sm"
-              data-testid="retry-agent-deployment-policy"
-            >
-              {t('common.retry', undefined, 'Retry')}
-            </button>
-          </div>
-        ) : deploymentPolicy ? (
-          <div className="mt-5 space-y-5">
-            <fieldset>
-              <legend className="text-text dark:text-text-3 text-sm font-medium">
-                {t('ai.colleagues.policy.channels', undefined, 'Allowed channels')}
-              </legend>
-              <div className="mt-2 flex flex-wrap gap-3">
-                {DEPLOYMENT_CHANNELS.map((channel) => (
-                  <label key={channel.value} className="inline-flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={(deploymentPolicy.channelPolicy.allowedChannels ?? []).includes(
-                        channel.value,
-                      )}
-                      disabled={readOnly || policySaving}
-                      onChange={(event) =>
-                        updatePolicyArray('allowedChannels', channel.value, event.target.checked)
-                      }
-                      data-testid={`deployment-channel-${channel.value}`}
-                    />
-                    {t(channel.labelKey, undefined, channel.fallback)}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-
-            <fieldset>
-              <legend className="text-text dark:text-text-3 text-sm font-medium">
-                {t('ai.colleagues.policy.initiators', undefined, 'Allowed initiator types')}
-              </legend>
-              <div className="mt-2 flex flex-wrap gap-3">
-                {DEPLOYMENT_INITIATORS.map((kind) => (
-                  <label key={kind.value} className="inline-flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={(
-                        deploymentPolicy.channelPolicy.allowedInitiatorTypes ?? []
-                      ).includes(kind.value)}
-                      disabled={readOnly || policySaving}
-                      onChange={(event) =>
-                        updatePolicyArray('allowedInitiatorTypes', kind.value, event.target.checked)
-                      }
-                      data-testid={`deployment-initiator-${kind.value}`}
-                    />
-                    {t(kind.labelKey, undefined, kind.fallback)}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-
-            <div className="grid gap-3 md:grid-cols-3">
-              {[
-                ['allowedUserIds', t('ai.colleagues.policy.allowedUserIds', undefined, 'User IDs')],
-                [
-                  'allowedMemberIds',
-                  t('ai.colleagues.policy.allowedMemberIds', undefined, 'Member IDs'),
-                ],
-                ['allowedRoleIds', t('ai.colleagues.policy.allowedRoleIds', undefined, 'Role IDs')],
-              ].map(([field, label]) => (
-                <label key={field} className="text-text-2 dark:text-text-3 text-sm">
-                  {label}
-                  <input
-                    type="text"
-                    value={
-                      (
-                        deploymentPolicy.channelPolicy[
-                          field as keyof AgentDeploymentPolicy['channelPolicy']
-                        ] as number[] | undefined
-                      )?.join(', ') ?? ''
-                    }
-                    disabled={readOnly || policySaving}
-                    onChange={(event) =>
-                      setDeploymentPolicy((current) =>
-                        current
-                          ? {
-                              ...current,
-                              channelPolicy: {
-                                ...current.channelPolicy,
-                                [field]: parseIds(event.target.value),
-                              },
-                            }
-                          : current,
-                      )
-                    }
-                    placeholder="101, 102"
-                    className="border-border-strong dark:border-border dark:bg-subtle mt-1 w-full rounded-lg border px-3 py-2"
-                    data-testid={`deployment-policy-${field}`}
-                  />
-                </label>
-              ))}
+        </p>
+      )}
+      {!disabledTemplate && (
+        <section
+          className="border-border bg-panel dark:border-border dark:bg-subtle rounded-xl border p-5"
+          data-testid="agent-deployment-policy"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-text font-semibold dark:text-white">
+                {t('ai.colleagues.policy.title', undefined, 'Deployment invocation policy')}
+              </h2>
+              <p className="text-text-3 dark:text-text-3 mt-1 text-sm">
+                {t(
+                  'ai.colleagues.policy.help',
+                  undefined,
+                  'Restrict where this colleague can run and which initiators may invoke it. Empty groups keep tenant-compatible access.',
+                )}
+              </p>
             </div>
 
-            {!readOnly && (
+          </div>
+
+          {policyLoading ? (
+            <div
+              className="bg-subtle dark:bg-subtle mt-4 h-24 animate-pulse rounded-lg"
+              data-testid="agent-deployment-policy-loading"
+            />
+          ) : policyError ? (
+            <div
+              className="border-status-red bg-status-red-bg mt-4 rounded-lg border p-4"
+              role="alert"
+            >
+              <p className="text-status-red text-sm">{policyError}</p>
               <button
                 type="button"
-                onClick={() => void saveDeploymentPolicy()}
-                disabled={policySaving}
-                className="bg-accent hover:bg-accent-hover rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                data-testid="save-agent-deployment-policy"
+                onClick={() => void fetchDeploymentPolicy()}
+                className="border-status-red text-status-red mt-2 rounded border px-3 py-1.5 text-sm"
+                data-testid="retry-agent-deployment-policy"
               >
-                {policySaving
-                  ? t('common.saving', undefined, 'Saving...')
-                  : t('common.save', undefined, 'Save policy')}
+                {t('common.retry', undefined, 'Retry')}
               </button>
-            )}
-          </div>
-        ) : null}
-      </section>
+            </div>
+          ) : deploymentPolicy ? (
+            <div className="mt-5 space-y-5">
+              <fieldset>
+                <legend className="text-text dark:text-text-3 text-sm font-medium">
+                  {t('ai.colleagues.policy.channels', undefined, 'Allowed channels')}
+                </legend>
+                <div className="mt-2 flex flex-wrap gap-3">
+                  {DEPLOYMENT_CHANNELS.map((channel) => (
+                    <label key={channel.value} className="inline-flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={(deploymentPolicy.channelPolicy.allowedChannels ?? []).includes(
+                          channel.value,
+                        )}
+                        disabled={readOnly || policySaving}
+                        onChange={(event) =>
+                          updatePolicyArray('allowedChannels', channel.value, event.target.checked)
+                        }
+                        data-testid={`deployment-channel-${channel.value}`}
+                      />
+                      {t(channel.labelKey, undefined, channel.fallback)}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              <fieldset>
+                <legend className="text-text dark:text-text-3 text-sm font-medium">
+                  {t('ai.colleagues.policy.initiators', undefined, 'Allowed initiator types')}
+                </legend>
+                <div className="mt-2 flex flex-wrap gap-3">
+                  {DEPLOYMENT_INITIATORS.map((kind) => (
+                    <label key={kind.value} className="inline-flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={(
+                          deploymentPolicy.channelPolicy.allowedInitiatorTypes ?? []
+                        ).includes(kind.value)}
+                        disabled={readOnly || policySaving}
+                        onChange={(event) =>
+                          updatePolicyArray(
+                            'allowedInitiatorTypes',
+                            kind.value,
+                            event.target.checked,
+                          )
+                        }
+                        data-testid={`deployment-initiator-${kind.value}`}
+                      />
+                      {t(kind.labelKey, undefined, kind.fallback)}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                {(['allowedUserIds', 'allowedMemberIds', 'allowedRoleIds'] as const).map((field) => {
+                  const selected = (deploymentPolicy.channelPolicy[field] ?? []).map(String);
+                  const choices = deploymentPolicy.channelPolicy.subjectChoices?.[field] ?? [];
+                  const unresolved = selected.filter((id) => !choices.some((choice) => choice.id === id));
+                  return <label key={field} className="text-text-2 text-sm">
+                    {t(`ai.colleagues.policy.subject.${field}`, undefined, 'Allowed people')}
+                    <select multiple value={selected} disabled={readOnly || policySaving} onChange={(event) => {
+                      const values = Array.from(event.target.selectedOptions, (option) => option.value);
+                      setDeploymentPolicy((current) => current ? { ...current, channelPolicy: { ...current.channelPolicy, [field]: values } } : current);
+                    }} data-testid={`deployment-policy-${field}`} className="border-border bg-panel mt-1 min-h-24 w-full rounded-lg border px-3 py-2">
+                      {choices.map((choice) => <option key={choice.id} value={choice.id}>{choice.name || t('ai.colleagues.policy.unnamed', undefined, 'Unnamed person or role')}</option>)}
+                      {unresolved.map((id, index) => <option key={id} value={id}>{t('ai.colleagues.policy.unavailable', { number: index + 1 }, `Unavailable selection ${index + 1}`)}</option>)}
+                    </select>
+                    <span className="text-text-3 mt-1 block text-xs">{t('ai.colleagues.policy.selectionHelp', undefined, 'Select names to restrict access. Clear the selection to keep tenant-compatible access.')}</span>
+                  </label>;
+                })}
+              </div>
+
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={() => void saveDeploymentPolicy()}
+                  disabled={policySaving}
+                  className="bg-accent hover:bg-accent-hover rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  data-testid="save-agent-deployment-policy"
+                >
+                  {policySaving
+                    ? t('common.saving', undefined, 'Saving...')
+                    : t('common.save', undefined, 'Save policy')}
+                </button>
+              )}
+            </div>
+          ) : null}
+        </section>
+      )}
 
       {confirming && (
         <div
@@ -2878,7 +3058,7 @@ export function ReleasesTab({
                   </span>
                   {release.deployed && (
                     <span className="bg-status-green-bg text-status-green dark:bg-status-green-bg/40 dark:text-status-green rounded-full px-2 py-0.5 text-xs font-medium">
-                      {t('ai.colleagues.releases.deployed', undefined, 'Deployed')}
+                      {release.deployment_status === 'suspended' ? t('ai.colleagues.releases.paused', undefined, 'Current version · suspended') : t('ai.colleagues.releases.deployed', undefined, 'Deployed')}
                     </span>
                   )}
                   {!release.deployed && (
@@ -2887,9 +3067,6 @@ export function ReleasesTab({
                     </span>
                   )}
                 </div>
-                <p className="text-text-3 dark:text-text-3 mt-1 font-mono text-xs">
-                  {release.release_hash.slice(0, 12)} · {release.pid}
-                </p>
               </div>
               <time className="text-text-3 dark:text-text-3 text-sm">
                 {formatInTimezone(release.published_at, formats.datetime, timezone)}
@@ -2930,6 +3107,9 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
   const [activeTab, setActiveTab] = useState<TabKey>('profile');
   const [saving, setSaving] = useState(false);
   const [showEnrollDialog, setShowEnrollDialog] = useState(false);
+  const [showActivateDialog, setShowActivateDialog] = useState(false);
+  const canManageRuntime = usePermission('acp.runtime.manage');
+  const isDisabled = agent?.status === 'disabled';
   const [showRemoveOrgDialog, setShowRemoveOrgDialog] = useState(false);
   const [lifecycleBusy, setLifecycleBusy] = useState(false);
   const isSuspended = agent?.status === 'suspended';
@@ -2982,10 +3162,10 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
   const isEnrolled = !!placement?.enrolled;
 
   const fetchPlacement = useCallback(async () => {
-    if (!agentPid) return;
+    if (!agentPid || !canManageRuntime) return;
     const res = await get<OrgPlacement>(`/api/agent/definitions/${agentPid}/org-placement`);
     if (ResultHelper.isSuccess(res) && res.data) setPlacement(res.data);
-  }, [agentPid]);
+  }, [agentPid, canManageRuntime]);
 
   useEffect(() => {
     void fetchPlacement();
@@ -3056,6 +3236,24 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
   return (
     <div className="mx-auto w-full max-w-5xl p-6">
       {/* Dialogs */}
+      {showActivateDialog && agentPid && canManageRuntime && isDisabled && (
+        <ActivateAgentDialog
+          agentPid={agentPid}
+          onClose={() => setShowActivateDialog(false)}
+          onSuccess={async () => {
+            await fetchAgent();
+            await fetchPlacement();
+            setShowActivateDialog(false);
+            toast.showSuccessToast(
+              t(
+                'ai.colleagues.activation.success',
+                undefined,
+                'Colleague enabled and first release published. You can now enroll it.',
+              ),
+            );
+          }}
+        />
+      )}
       {showEnrollDialog && agentPid && (
         <EnrollEmployeeDialog
           agentPid={agentPid}
@@ -3093,7 +3291,7 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
         <div className="flex-1">
           <h1 className="text-text text-xl font-semibold dark:text-white">{agent.name}</h1>
           <p className="text-text-3 dark:text-text-3 text-sm">
-            {agent.agent_code}
+            {t(`ai.colleagues.type.${agent.agent_type}`, undefined, 'AI colleague')}
             {isAuraBot && (
               <span className="bg-accent ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold text-white">
                 {t('ai.colleagues.badge.official', undefined, 'Official')}
@@ -3127,7 +3325,18 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
             deployment. Both engines resolve definitions with status='active', so
             suspending closes chat, dispatch and delegation at once. The backend
             could already do this; until now nothing in the interface could ask. */}
-        {!isAuraBot && (
+        {!isAuraBot && canManageRuntime && isDisabled && (
+          <button
+            type="button"
+            onClick={() => setShowActivateDialog(true)}
+            data-testid="activate-agent-btn"
+            className="bg-accent hover:bg-accent-hover inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white"
+          >
+            <RocketLaunchIcon className="h-4 w-4" />
+            {t('ai.colleagues.activation.title', undefined, 'First enable and publish')}
+          </button>
+        )}
+        {!isAuraBot && !isDisabled && canManageRuntime && (
           <div className="ml-auto flex items-center gap-2">
             <button
               onClick={handleToggleSuspend}
@@ -3155,7 +3364,7 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
         {/* Enrollment provisions the agent's backing system user on demand, so the button no
             longer waits for system_user_id — gating on it hid enrollment from every
             tenant-created agent, which never had one. */}
-        {!isAuraBot && (
+        {!isAuraBot && !isDisabled && (
           <div>
             {isEnrolled ? (
               <button
@@ -3180,6 +3389,21 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
         )}
       </div>
 
+      {isDisabled && (
+        <p className="text-text-3 mb-5 text-sm" data-testid="agent-disabled-help">
+          {canManageRuntime
+            ? t(
+                'ai.colleagues.activation.disabledHelp',
+                undefined,
+                'This template is disabled. Choose an AI service and publish its first release before enrollment.',
+              )
+            : t(
+                'ai.colleagues.activation.denied',
+                undefined,
+                'This template is disabled. Ask an administrator with runtime management permission to enable it.',
+              )}
+        </p>
+      )}
       {/* Tabs */}
       <div className="border-border dark:border-border mb-6 border-b">
         <nav className="flex gap-6" aria-label="Tabs">
@@ -3224,7 +3448,12 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
         )}
         {activeTab === 'memory' && agentPid && <MemoryTab agentPid={agentPid} />}
         {activeTab === 'releases' && agentPid && (
-          <ReleasesTab agentPid={agentPid} agentUpdatedAt={agent.updated_at} readOnly={readOnly} />
+          <ReleasesTab
+            agentPid={agentPid}
+            agentUpdatedAt={agent.updated_at}
+            readOnly={readOnly || !canManageRuntime || isSuspended}
+            disabledTemplate={isDisabled}
+          />
         )}
         {activeTab === 'runs' && agent && <RunHistoryTab agentCode={agent.agent_code} />}
         {activeTab === 'schedules' && agent && <SchedulesTab agentCode={agent.agent_code} />}

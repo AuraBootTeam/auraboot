@@ -7,6 +7,7 @@ import com.auraboot.framework.dashboard.dto.DashboardDTO;
 import com.auraboot.framework.dashboard.dto.DashboardQueryRequest;
 import com.auraboot.framework.dashboard.dto.DashboardUpdateRequest;
 import com.auraboot.framework.dashboard.dto.MountMenuRequest;
+import com.auraboot.framework.dashboard.dto.WorkbenchTemplateProvider;
 import com.auraboot.framework.dashboard.entity.Dashboard;
 import com.auraboot.framework.dashboard.mapper.DashboardMapper;
 import com.auraboot.framework.dashboard.mapper.DashboardModuleMapper;
@@ -112,6 +113,35 @@ class DashboardServiceImplTest {
         assertEquals("workbench-contribution-class_overview-student-count", workbench.getWidgets().get(0).get("id").asText());
         verify(dashboardMapper, never()).findByCode(any(), any());
         verify(dashboardMapper, never()).findWorkbenchContributions(any());
+        verify(dashboardMapper, never()).insertDashboard(any());
+        verify(dashboardMapper, never()).updateDashboard(any());
+    }
+
+    @Test
+    void existingWorkbenchOnTheOverlappingDefaultLayout_isShownOnTheCurrentRows_withoutWriting() {
+        var existing = fixture("wb", "workbench", "u-1");
+        existing.setWidgets(WorkbenchTemplateProvider.getDefaultWidgets(objectMapper));
+        // the rows of the default template as shipped from 2026-10-05 to 2026-11-25
+        ((ObjectNode) existing.getWidgets().get(1)).put("y", 1);
+        ((ObjectNode) existing.getWidgets().get(2)).put("y", 1);
+        ((ObjectNode) existing.getWidgets().get(3)).put("y", 4);
+        when(dashboardMapper.findWorkbench(10L, "u-1")).thenReturn(existing);
+        Dashboard contribution = fixture(null, "global", null);
+        contribution.setCode("team_note");
+        contribution.setStatus(StatusConstants.PUBLISHED);
+        contribution.setWidgets(objectMapper.createArrayNode().add(widget("note", 0, 2)));
+        when(dashboardMapper.findWorkbenchContributions(10L)).thenReturn(List.of(contribution));
+
+        var workbench = service.getOrCreateWorkbench();
+
+        var widgets = workbench.getWidgets();
+        assertEquals(List.of("wb-stats", "wb-inbox", "wb-shortcuts", "wb-recent"),
+                widgets.findValuesAsText("id").subList(0, 4));
+        var rows = widgets.findValuesAsText("y").subList(0, 4).stream().map(Integer::parseInt).toList();
+        assertEquals(List.of(0, 2, 2, 5), rows);
+        // the contributed widget follows the bottom of the corrected cards, not their old bottom row
+        assertEquals("workbench-contribution-team_note-note", widgets.get(4).get("id").asText());
+        assertEquals(8, widgets.get(4).get("y").asInt());
         verify(dashboardMapper, never()).insertDashboard(any());
         verify(dashboardMapper, never()).updateDashboard(any());
     }

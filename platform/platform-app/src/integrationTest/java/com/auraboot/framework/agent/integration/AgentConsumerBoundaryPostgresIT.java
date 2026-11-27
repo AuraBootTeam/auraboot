@@ -43,6 +43,9 @@ class AgentConsumerBoundaryPostgresIT {
     private SqlSessionTemplate sql;
     private long tenant;
 
+    @org.junit.jupiter.api.AfterEach
+    void clearTenantContext() { com.auraboot.framework.application.tenant.MetaContext.clear(); }
+
     @BeforeEach
     void connectOwnedDatabase() throws Exception {
         String url = System.getenv("TEST_DATABASE_URL");
@@ -71,11 +74,15 @@ class AgentConsumerBoundaryPostgresIT {
         membership = template.getMapper(com.auraboot.framework.im.mapper.ImConversationMemberMapper.class);
         conversations = new com.auraboot.framework.im.service.impl.ImConversationServiceImpl(null, membership, null, null, directory);
         tenant = ThreadLocalRandom.current().nextLong(100_000_000L, 900_000_000L);
+        com.auraboot.framework.application.tenant.MetaContext.setContext(tenant, null, null, "Agent boundary reviewer");
     }
 
     @Test
-    void importsOverwriteEvalCasesAndPreserveConflictArchiveRestoreAndTenantIsolation() {
+    void importsOverwriteEvalCasesAndPreserveConflictRecoveryAndTenantIsolation() {
         transactions.executeWithoutResult(tx -> {
+            com.auraboot.framework.application.tenant.MetaContext.setContext(tenant, null, null, "Agent boundary reviewer");
+            jdbc.update("INSERT INTO ab_plugin(pid,tenant_id,plugin_id,namespace,version,display_name,status,deleted_flag,manifest) VALUES (?,?,?,?,?,?,?,FALSE,'{}'::jsonb)",
+                    "boundary-plugin", tenant, "com.test.boundary", "boundary", "1.0.0", "Boundary test", "installed");
             var definition = definition("boundary_" + UlidGenerator.generate(), "Original", "case_a");
             var created = resources.importAgentDefinition(definition, "boundary-plugin", "first", tenant, ConflictStrategy.OVERWRITE);
             assertThat(created.getActionEnum()).isEqualTo(ResourceAction.CREATE);
@@ -101,14 +108,19 @@ class AgentConsumerBoundaryPostgresIT {
             assertThat(caseIds(definition.getAgentCode())).containsExactly("case_b");
             assertThat(jdbc.queryForObject("SELECT allowed_operations::text FROM ab_agent_definition WHERE id=?", String.class,
                     created.getResourceId())).contains("transition");
-            resources.rollback(updated);
-            sql.clearCache(); // Read the new DB state as a subsequent request would, after direct lifecycle SQL.
-            assertThat(resources.exists(tenant, definition.getAgentCode())).isFalse();
-            assertThat(caseIds(definition.getAgentCode())).isEmpty();
+            updated.setId(created.getId()); updated.setPid(created.getPid());
+            ledger.updateById(updated);
             resources.restore(updated);
             sql.clearCache();
             assertThat(resources.exists(tenant, definition.getAgentCode())).isTrue();
-            assertThat(caseIds(definition.getAgentCode())).containsExactly("case_b");
+            assertThat(caseIds(definition.getAgentCode())).containsExactly("case_a");
+            assertThat(directory.findById(created.getResourceId()).name()).isEqualTo("Original");
+            var exit = resources.importAgentDefinition(definition, "boundary-plugin", "exit", tenant, ConflictStrategy.OVERWRITE);
+            exit.setId(created.getId()); exit.setPid(created.getPid()); ledger.updateById(exit);
+            resources.rollback(exit);
+            sql.clearCache();
+            assertThat(resources.exists(tenant, definition.getAgentCode())).isFalse();
+            assertThat(caseIds(definition.getAgentCode())).isEmpty();
             assertThat(directory.findById(other.getResourceId()).name()).isEqualTo("Original");
             tx.setRollbackOnly();
         });
@@ -142,13 +154,14 @@ class AgentConsumerBoundaryPostgresIT {
             assertThat(members).extracting(m -> m.getDisplayName()).containsExactly("Human colleague", "Agent colleague");
             assertThat(members.get(1).getAgentCode()).isEqualTo(created.getResourceCode());
             assertThat(conversations.getMembers(conversation, tenant + 1)).isEmpty();
-            resources.rollback(created);
+            // Seed the archived/active states for the IM projection, not a plugin rollback contract.
+            jdbc.update("UPDATE ab_agent_definition SET deleted_flag=TRUE WHERE tenant_id=? AND pid=?", tenant, created.getResourcePid());
             sql.clearCache();
             var archived = conversations.getMembers(conversation, tenant);
             assertThat(archived).hasSize(2);
             assertThat(archived.get(0).getDisplayName()).isEqualTo("Human colleague");
             assertThat(archived.get(1).getDisplayName()).isNull();
-            resources.restore(created);
+            jdbc.update("UPDATE ab_agent_definition SET deleted_flag=FALSE WHERE tenant_id=? AND pid=?", tenant, created.getResourcePid());
             sql.clearCache();
             assertThat(conversations.getMembers(conversation, tenant).get(1).getDisplayName()).isEqualTo("Agent colleague");
             tx.setRollbackOnly();

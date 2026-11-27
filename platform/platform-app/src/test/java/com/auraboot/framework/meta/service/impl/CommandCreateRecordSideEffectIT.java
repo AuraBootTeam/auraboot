@@ -143,6 +143,15 @@ class CommandCreateRecordSideEffectIT extends BaseIntegrationTest {
         grantCommittedPermissionToTestRole(
                 "model." + assetModel + ".read", "model", assetModel, "read",
                 "Read command side-effect source records");
+        // Both creates are ordinary record writes: the seed below, and the linked record the
+        // command declares as a side effect. The native field authorization decides each one
+        // against the actor's complete grant for that model, so the read grant alone is not enough.
+        grantCommittedPermissionToTestRole(
+                "model." + assetModel + ".create", "model", assetModel, "create",
+                "Seed command side-effect source records");
+        grantCommittedPermissionToTestRole(
+                "model." + maintModel + ".create", "model", maintModel, "create",
+                "Create the record the report command declares as a side effect");
     }
 
     @Test

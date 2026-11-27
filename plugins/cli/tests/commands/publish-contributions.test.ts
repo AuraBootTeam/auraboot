@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from 'node
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadPlugin } from '../../src/utils/plugin-loader.js';
-import { buildExtendedManifest } from '../../src/commands/publish.js';
+import { buildExtendedManifest, publishCommand } from '../../src/commands/publish.js';
 import { pluginImportCommand } from '../../src/commands/plugin-import.js';
 
 const roots: string[] = [];
@@ -57,5 +57,27 @@ describe('capability declarations in CLI manifests', () => {
     const [url, options] = fetchMock.mock.calls[0];
     expect(new URL(url).pathname).toBe('/api/plugins/import/execute-direct');
     expect(JSON.parse(options.body).capabilities).toEqual([capability]);
+  });
+});
+
+describe('optional Agent recipes and safe package adoption', () => {
+  it.each([undefined, 'aria'])('publishes an explicit template selection (%s) without silently selecting defaults', async (selection) => {
+    const root = fixture();
+    writeFileSync(join(root, 'contributions.json'), '[]');
+    const manifest = JSON.parse((await import('node:fs')).readFileSync(join(root, 'plugin.json'), 'utf8'));
+    manifest.agentTemplates = [{ agentCode: 'aria', name: 'Aria', status: 'disabled' }];
+    writeFileSync(join(root, 'plugin.json'), JSON.stringify(manifest));
+    vi.stubEnv('AURA_TOKEN', 'fixture-token');
+    const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ data: { success: true } }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(process, 'exit').mockImplementation(() => { throw new Error('Unexpected CLI exit'); });
+    await publishCommand(root, { target: 'http://fixture.invalid', yes: true, conflictStrategy: 'overwrite_safe', agentTemplates: selection });
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(new URL(url).searchParams.get('conflictStrategy')).toBe('overwrite_safe');
+    expect(new URL(url).searchParams.get('agentTemplateCodes')).toBe(selection ?? null);
+    expect(JSON.parse(options.body).agentTemplates).toEqual(manifest.agentTemplates);
+    expect(JSON.parse(options.body).agentDefinitions).toBeUndefined();
+    vi.unstubAllEnvs();
   });
 });

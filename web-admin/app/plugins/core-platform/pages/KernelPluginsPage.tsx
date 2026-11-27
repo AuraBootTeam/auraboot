@@ -7,6 +7,7 @@
  * exposes a disable() method (currently only install/enable/activate).
  */
 import { useEffect, useMemo, useState } from 'react'
+import { useI18n } from '~/contexts/I18nContext'
 import { getKernel } from '~/framework/bootstrap'
 import type { PluginRecord } from '~/framework/plugins/loader'
 import type { PluginKind, PluginState } from '@auraboot/plugin-sdk'
@@ -27,18 +28,20 @@ const KIND_BADGES: Record<PluginKind, string> = {
 }
 
 function StateBadge({ state }: { state: PluginState }) {
+  const { t } = useI18n()
   const cls = STATE_COLORS[state] ?? 'bg-gray-100 text-gray-700'
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium border rounded-full ${cls}`}>
-      {state}
+    <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium whitespace-nowrap border rounded-full ${cls}`}>
+      {t(`kernelPlugins.state.${state}`, undefined, state)}
     </span>
   )
 }
 
 function KindBadge({ kind }: { kind: PluginKind }) {
+  const { t } = useI18n()
   return (
-    <span className={`inline-flex px-1.5 py-0.5 text-xs font-mono rounded ${KIND_BADGES[kind]}`}>
-      {kind}
+    <span className={`inline-flex px-1.5 py-0.5 text-xs font-mono whitespace-nowrap rounded ${KIND_BADGES[kind]}`}>
+      {t(`kernelPlugins.kind.${kind}`, undefined, kind)}
     </span>
   )
 }
@@ -54,7 +57,25 @@ function summarize(records: readonly PluginRecord[]) {
   return { byState, byKind, total: records.length }
 }
 
+function inactiveReason(reason: string, t: (key: string, params?: Record<string, string>, fallback?: string) => string) {
+  const exact: Record<string, string> = { 'application module unavailable': 'moduleUnavailable', 'circular dependency': 'circularDependency' }
+  if (exact[reason]) return t(`kernelPlugins.reason.${exact[reason]}`, undefined, reason)
+  const reasons: [string, string][] = [
+    ['dependency inactive: ', 'dependencyInactive'], ['application module unavailable: ', 'moduleUnavailableDetail'],
+    ['missing feature: ', 'missingFeature'], ['setup failed: ', 'setupFailed'],
+    ['missing dependency: ', 'missingDependency'], ['dependency not enabled: ', 'dependencyNotEnabled'],
+    ['dependency failed: ', 'dependencyFailed'],
+  ]
+  for (const [prefix, key] of reasons) {
+    if (reason.startsWith(prefix)) return t(`kernelPlugins.reason.${key}`, { detail: reason.slice(prefix.length) }, reason)
+  }
+  const phase = reason.match(/^dependency '(.+)' is in later activation phase '(.+)'$/)
+  if (phase) return t('kernelPlugins.reason.laterPhase', { dependency: phase[1], phase: phase[2] }, reason)
+  return reason
+}
+
 export default function KernelPluginsPage() {
+  const { t } = useI18n()
   const [tick, setTick] = useState(0)
   const records = useMemo(() => getKernel().pluginLoader.list(), [tick])
   const summary = useMemo(() => summarize(records), [records])
@@ -66,41 +87,41 @@ export default function KernelPluginsPage() {
   }, [])
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="w-full min-w-0 p-6 max-w-7xl mx-auto">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Kernel Plugin Manager</h1>
+        <h1 className="text-2xl font-semibold text-gray-900">{t('kernelPlugins.title', undefined, 'Kernel Plugin Manager')}</h1>
         <p className="mt-1 text-sm text-gray-600">
-          Plugins registered with the in-process PluginLoader. For backend (PF4J) plugin
-          management, see <a href="/plugins" className="text-blue-600 hover:underline">/plugins</a>.
+          {t('kernelPlugins.description', undefined, 'View registered runtime plugins and their activation status. This inventory is read-only.')} {' '}
+          <a href="/plugins" className="text-blue-600 hover:underline">{t('kernelPlugins.backendManager', undefined, 'Backend plugin management')}</a>
         </p>
       </header>
 
       <section className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-        <SummaryCard label="Total" value={summary.total} accent="bg-gray-50" />
-        <SummaryCard label="Active" value={summary.byState.active ?? 0} accent="bg-green-50" />
-        <SummaryCard label="Licensed" value={summary.byState.licensed ?? 0} accent="bg-purple-50" />
-        <SummaryCard label="Enabled" value={summary.byState.enabled ?? 0} accent="bg-amber-50" />
-        <SummaryCard label="Installed" value={summary.byState.installed ?? 0} accent="bg-blue-50" />
+        <SummaryCard label={t('kernelPlugins.summary.total', undefined, 'Total')} value={summary.total} accent="bg-gray-50" />
+        <SummaryCard label={t('kernelPlugins.summary.active', undefined, 'Active')} value={summary.byState.active ?? 0} accent="bg-green-50" />
+        <SummaryCard label={t('kernelPlugins.summary.licensed', undefined, 'Licensed')} value={summary.byState.licensed ?? 0} accent="bg-purple-50" />
+        <SummaryCard label={t('kernelPlugins.summary.enabled', undefined, 'Enabled')} value={summary.byState.enabled ?? 0} accent="bg-amber-50" />
+        <SummaryCard label={t('kernelPlugins.summary.installed', undefined, 'Installed')} value={summary.byState.installed ?? 0} accent="bg-blue-50" />
       </section>
 
-      <section className="overflow-x-auto bg-white rounded-lg border border-gray-200">
-        <table className="min-w-full text-sm">
+      <section className="min-w-0 overflow-x-auto bg-white rounded-lg border border-gray-200">
+        <table className="w-full min-w-[960px] text-sm">
           <thead className="bg-gray-50 text-gray-600 text-xs uppercase">
             <tr>
-              <th className="px-4 py-3 text-left font-semibold">Plugin</th>
-              <th className="px-3 py-3 text-left font-semibold">Kind</th>
-              <th className="px-3 py-3 text-left font-semibold">Version</th>
-              <th className="px-3 py-3 text-left font-semibold">State</th>
-              <th className="px-3 py-3 text-left font-semibold">Features</th>
-              <th className="px-3 py-3 text-left font-semibold">Dependencies</th>
-              <th className="px-3 py-3 text-left font-semibold">Inactive Reason</th>
+              <th className="px-4 py-3 text-left font-semibold">{t('kernelPlugins.column.plugin', undefined, 'Plugin')}</th>
+              <th className="px-3 py-3 text-left font-semibold">{t('kernelPlugins.column.kind', undefined, 'Kind')}</th>
+              <th className="px-3 py-3 text-left font-semibold">{t('kernelPlugins.column.version', undefined, 'Version')}</th>
+              <th className="px-3 py-3 text-left font-semibold">{t('kernelPlugins.column.state', undefined, 'State')}</th>
+              <th className="px-3 py-3 text-left font-semibold">{t('kernelPlugins.column.features', undefined, 'Features')}</th>
+              <th className="px-3 py-3 text-left font-semibold">{t('kernelPlugins.column.dependencies', undefined, 'Dependencies')}</th>
+              <th className="px-3 py-3 text-left font-semibold">{t('kernelPlugins.column.inactiveReason', undefined, 'Inactive Reason')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {records.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
-                  No plugins installed yet. Boot may still be in progress.
+                  {t('kernelPlugins.empty', undefined, 'No plugins registered yet. Startup may still be in progress.')}
                 </td>
               </tr>
             )}
@@ -111,10 +132,10 @@ export default function KernelPluginsPage() {
               return (
                 <tr key={m.code} className="hover:bg-gray-50">
                   <td className="px-4 py-3 align-top">
-                    <div className="font-medium text-gray-900">{m.name}</div>
+                    <div className="font-medium text-gray-900">{t(`plugin.${m.code}.name`, undefined, m.name)}</div>
                     <div className="text-xs text-gray-500 font-mono">{m.code}</div>
                     {m.description && (
-                      <div className="text-xs text-gray-500 mt-1 max-w-md">{m.description}</div>
+                      <div className="text-xs text-gray-500 mt-1 max-w-md">{t(`plugin.${m.code}.description`, undefined, m.description)}</div>
                     )}
                   </td>
                   <td className="px-3 py-3 align-top"><KindBadge kind={m.kind} /></td>
@@ -147,7 +168,7 @@ export default function KernelPluginsPage() {
                     )}
                   </td>
                   <td className="px-3 py-3 align-top text-xs text-red-600">
-                    {r.inactiveReason ?? <span className="text-gray-400">—</span>}
+                    {r.inactiveReason ? inactiveReason(r.inactiveReason, t) : <span className="text-gray-400">—</span>}
                   </td>
                 </tr>
               )
@@ -158,14 +179,14 @@ export default function KernelPluginsPage() {
 
       <footer className="mt-4 flex items-center justify-between text-xs text-gray-500">
         <div>
-          Kernel state lives in-memory; refresh re-reads the registry.
+          {t('kernelPlugins.registryHelp', undefined, 'Refresh reads the current runtime registry without changing plugin state.')}
         </div>
         <button
           type="button"
           onClick={() => setTick(n => n + 1)}
           className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50"
         >
-          Refresh
+          {t('kernelPlugins.refresh', undefined, 'Refresh')}
         </button>
       </footer>
     </div>

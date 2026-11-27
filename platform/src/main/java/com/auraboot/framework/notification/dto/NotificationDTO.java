@@ -25,6 +25,7 @@ public class NotificationDTO {
     private String priority;
     private String sourceType;
     private String sourceId;
+    private String miniProgramPath;
     private Boolean isRead;
     private Instant readAt;
     private Instant createdAt;

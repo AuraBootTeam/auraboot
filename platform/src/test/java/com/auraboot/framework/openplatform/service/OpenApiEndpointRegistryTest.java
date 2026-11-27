@@ -13,6 +13,8 @@ class OpenApiEndpointRegistryTest {
         @OpenApiEndpointCandidate(code="fixture.read", adapter=OpenApiEndpointKind.RESOURCE_GET, version="1", name="Read device", chineseName="读取设备")
         public void read() { }
         public void unadapted() { }
+        @OpenApiEndpointCandidate(code="installed-integration.execute", adapter=OpenApiEndpointKind.RESOURCE_GET, version="1", name="Collision", chineseName="重复")
+        public void collision() { }
         @OpenApiEndpointCandidate(code="fixture.invalid", adapter=OpenApiEndpointKind.RESOURCE_GET, version="", name="", chineseName="")
         public void invalid() { }
     }
@@ -23,7 +25,8 @@ class OpenApiEndpointRegistryTest {
     }
     @Test void actualRoutesAreInventoriedButOnlyDeveloperAdaptedMethodsAreExecutable() throws Exception {
         route("/api/devices/{recordPid}","read"); route("/api/admin/secret","unadapted"); route("/health","unadapted"); route("/api/open/v1/endpoints/{code}","unadapted");
-        var catalog = registry.candidates(null); assertThat(catalog).hasSize(2);
+        var catalog = registry.candidates(null); assertThat(catalog).hasSize(3);
+        assertThat(registry.require(OpenApiSynchronousIntegrationService.CANDIDATE).adapterCode()).isEqualTo("integration.execute");
         assertThat(catalog.getFirst().available()).isTrue(); assertThat(catalog.getFirst().internalPath()).isEqualTo("/api/devices/{recordPid}");
         assertThat(catalog.getFirst().fingerprint()).matches("[a-f0-9]{64}"); assertThat(catalog.getFirst().targetRequired()).isTrue();
         assertThat(catalog.getLast().available()).isFalse(); assertThat(catalog.getLast().reason()).isEqualTo("machine_adapter_required");
@@ -34,6 +37,10 @@ class OpenApiEndpointRegistryTest {
     @Test void ambiguousRegistrationCannotSelectTheFirstMethodByAccident() throws Exception {
         route("/api/a","read"); route("/api/b","read");
         assertThatThrownBy(() -> registry.candidates(null)).isInstanceOf(IllegalStateException.class).hasMessageContaining("exactly one");
+    }
+    @Test void controllerCannotShadowTheBuiltInIntegrationCandidateEvenUnderFilteredSearch() throws Exception {
+        route("/api/collision","collision");
+        assertThatThrownBy(() -> registry.candidates("fixture")).isInstanceOf(IllegalStateException.class).hasMessageContaining("exactly one");
     }
     @Test void declaredVersionAndLocalizedIdentityAreMandatory() throws Exception {
         route("/api/invalid","invalid"); assertThatThrownBy(() -> registry.candidates(null)).isInstanceOf(IllegalStateException.class);

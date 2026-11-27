@@ -89,6 +89,11 @@ export interface SmartNumberCardProps {
   icon?: string;
   /** Optional shorter label displayed as the metric eyebrow */
   label?: string;
+  /**
+   * Caption printed under the value next to the colour dot. Without it the caption is `title`
+   * when a separate `label` is set, and nothing when the eyebrow already says the same thing.
+   */
+  description?: string;
   /** Data source configuration */
   dataSource: ChartDataSource;
   /** Value format type */
@@ -186,6 +191,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
   title,
   icon: _icon,
   label,
+  description,
   dataSource,
   format = 'number',
   precision = 0,
@@ -219,6 +225,9 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
   const accentLine = hexToRgba(color, 0.22);
   const cardLabel = label || title;
   const isEmpty = !loading && !error && !data?.rows?.length;
+  // The caption under the value: a configured description first; else `title` only when it is not
+  // the very string the eyebrow above already shows (a KPI card used to read「已接入应用 9 已接入应用」).
+  const caption = description || (title && title !== cardLabel ? title : undefined);
 
   /**
    * Extract the metric value from the data
@@ -491,7 +500,7 @@ export const SmartNumberCard: React.FC<SmartNumberCardProps> = ({
                   style={{ backgroundColor: color }}
                   aria-hidden="true"
                 />
-                <span>{title}</span>
+                {caption ? <span>{caption}</span> : null}
               </div>
             </>
           )}

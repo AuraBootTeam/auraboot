@@ -262,6 +262,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           </span>
           <select
             data-testid="pagination-page-size"
+            aria-label={label('common.items_per_page_select', '每页条数', 'Items per page')}
             value={pageSize}
             onChange={(e) => handlePageSizeChange(Number(e.target.value))}
             className="border-border-strong min-h-11 rounded border px-2 py-1 text-sm sm:min-h-0"

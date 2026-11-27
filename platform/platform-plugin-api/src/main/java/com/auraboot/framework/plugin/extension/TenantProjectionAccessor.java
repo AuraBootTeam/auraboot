@@ -22,6 +22,11 @@ public interface TenantProjectionAccessor extends RecordReadAccessor {
     String SETTINGS_KEY = "__tenantProjectionAccessor";
     String OPT_IN_HANDLER_PARAM = "tenantProjectionRead";
 
+    /**
+     * Read a record in the bound tenant.
+     * @throws DataAccessorException with {@link DataAccessErrorCode#PERMISSION_DENIED} when the
+     *         record is unavailable in this tenant; internal record diagnostics remain in the cause
+     */
     Map<String, Object> getById(String modelCode, String recordId);
 
     /** Database-backed paging; older hosts fail closed instead of truncating a query. */

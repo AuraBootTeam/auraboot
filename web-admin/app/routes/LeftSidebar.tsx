@@ -4,7 +4,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { NavLink, useLocation, useRevalidator } from 'react-router';
 import { useRootLoaderData } from '~/root-data';
 import { useI18n } from '~/contexts/I18nContext';
-import NavigationLink from './NavigationLink';
+import NavigationLink, { matchesNavigationTarget } from './NavigationLink';
 import SidebarSubmenu, { resolveMenuLabel } from '~/routes/SidebarSubmenu';
 import { XMarkIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
@@ -180,6 +180,7 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
             data-testid="sidebar-collapse-toggle"
             aria-expanded={!collapsed}
             className={`rounded-md p-1.5 transition-colors ${tokenized ? 'text-text-3 hover:bg-hover hover:text-text' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300'}`}
+            aria-label={t(collapsed ? 'sidebar.expand' : 'sidebar.collapse')}
             title={t(collapsed ? 'sidebar.expand' : 'sidebar.collapse')}
           >
             {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
@@ -443,7 +444,7 @@ function PopoverSubmenu({
           );
         }
 
-        const isActive = location.pathname === item.path;
+        const isActive = matchesNavigationTarget(location.pathname, location.search, item.path);
         return (
           <NavigationLink
             key={item.id || index}
@@ -523,7 +524,7 @@ function PopoverGroup({
 
 function isPathInSubmenu(items: any[], pathname: string): boolean {
   for (const item of items) {
-    if (item.path === pathname) return true;
+    if (item.path.split('?')[0] === pathname) return true;
     if (item.submenu && isPathInSubmenu(item.submenu, pathname)) return true;
   }
   return false;

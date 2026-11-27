@@ -3,7 +3,7 @@ import { createWriteStream, readFileSync, statSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { test, expect } from '../../fixtures';
 import { ensureQuoteRoleUser, makeQuoteRoleUser, openQuoteRolePage, openQuoteDetailFromList,
-  seedBomPriceManualReviewQuote, seedDownloadableQuote, type QuoteRoleUser } from './quote-e2e-helpers';
+  seedBomPriceManualReviewQuote, seedQuoteForCorrectedBomUpload, seedDownloadableQuote, openPgClient, type QuoteRoleUser } from './quote-e2e-helpers';
 import { saveWorkbookDownload } from './workbook-download-evidence';
 import { validateQuoteWorkbook } from './quote-workbook-assertions';
 
@@ -344,16 +344,58 @@ test('quote sharing release gate: multiple members, role access and revocation t
     expect(foreignCapabilities.status()).toBe(200);
     const declared = (await foreignCapabilities.json()).data.flatMap((group: { capabilities: Array<{ code: string; granted: boolean; conventionDerived: boolean }> }) => group.capabilities)
       .filter((capability: { conventionDerived: boolean }) => !capability.conventionDerived);
-    const fixtureLevels = ['qo.cap.read', 'qo.cap.write'];
+    const fixtureLevels = ['crm.cap.account', 'bom.cap.read', 'bom.cap.write', 'qo.cap.read', 'qo.cap.write'];
     for (const code of fixtureLevels) expect(declared.some((capability: { code: string }) => capability.code === code), code).toBe(true);
-    // Configure only the new fixture's Quote duties. Replaying wildcard-derived
+    // Configure only the CRM/BOM/Quote duties used to create this fixture's own
+    // quote and linked project. Replaying wildcard-derived
     // capabilities from unrelated products may reference uninstalled definitions.
     const explicitRead = await foreign.page.request.put(capabilityUrl, { data: fixtureLevels });
     expect(explicitRead.status()).toBe(200);
     expect(String((await explicitRead.json()).code)).toBe('0');
+    // This identity is created after the runtime's entitlement bootstrap. Import
+    // alone does not license it. Reuse only existing golden-runtime plans for
+    // this independently seeded fixture tenant, keeping enforcement enabled.
+    const { client } = await openPgClient();
+    let licensedPlugins: string[] = [];
+    try {
+      const licensed = await client.query(`
+        INSERT INTO ab_tenant_entitlement (
+          pid, tenant_id, plugin_id, plan_pid, entitlement_source, status,
+          issued_at, activated_at, created_at, updated_at
+        )
+        SELECT substr(md5('quote-bom-golden:' || $1::text || ':' || plan.plugin_id), 1, 26),
+               $1::bigint, plan.plugin_id, plan.pid, 'admin_grant', 'active',
+               CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+          FROM ab_plugin_plan plan
+         WHERE plan.plan_code = 'golden-runtime' AND plan.plugin_id = ANY($2::text[])
+           AND $1::bigint <> $3::bigint
+           AND EXISTS (
+             SELECT 1 FROM ab_tenant_member member JOIN ab_user actor ON actor.id = member.user_id
+              WHERE member.tenant_id = $1::bigint AND actor.email = $4
+           )
+        ON CONFLICT (tenant_id, plugin_id, entitlement_source, plan_pid) DO UPDATE SET
+          status = 'active', expires_at = NULL, grace_until = NULL,
+          disabled_at = NULL, disabled_reason = NULL, updated_at = CURRENT_TIMESTAMP
+        RETURNING plugin_id`, [String(foreignMe.user.tenantId), dependencies.map(([, id]) => id),
+        String(ownerMe.user.tenantId), 'e2e@test.local']);
+      licensedPlugins = licensed.rows.map((row: { plugin_id: string }) => row.plugin_id);
+    } finally { await client.end(); }
+    expect(licensedPlugins).toEqual(expect.arrayContaining([
+      'com.auraboot.crm', 'com.auraboot.bom-standardization', 'com.auraboot.quote-core',
+    ]));
+    const entitlements = await foreign.page.request.get('/api/entitlements');
+    expect(entitlements.status()).toBe(200);
+    const entitlementSnapshot = (await entitlements.json()).data;
+    expect(entitlementSnapshot.enabled).toBe(true);
+    expect(entitlementSnapshot.entitlements
+      .filter((item: { status: string; planCode: string }) => item.status === 'active' && item.planCode === 'golden-runtime')
+      .map((item: { pluginId: string }) => item.pluginId)).toEqual(expect.arrayContaining(licensedPlugins));
+    await testInfo.attach('foreign-fixture-entitlements', { body: JSON.stringify({
+      tenantId: foreignMe.user.tenantId, licensedPlugins, snapshot: entitlementSnapshot,
+    }), contentType: 'application/json' });
     // A valid own-record read prevents an uninitialized foreign product or a
     // blanket-deny session from masquerading as tenant isolation.
-    const foreignOwned = await seedBomPriceManualReviewQuote(foreign.page);
+    const foreignOwned = await seedQuoteForCorrectedBomUpload(foreign.page);
     const ownRead = await foreign.page.request.get(`/api/dynamic/qo_quote_common/${foreignOwned.quoteId}`);
     expect(ownRead.status()).toBe(200);
     expect((await ownRead.json()).data.qo_quote_code).toBe(foreignOwned.quoteCode);

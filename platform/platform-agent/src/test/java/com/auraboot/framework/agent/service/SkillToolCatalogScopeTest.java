@@ -25,7 +25,7 @@ class SkillToolCatalogScopeTest {
         when(registry.discoverAll(any())).thenReturn(List.of());
         when(registry.getProviderCodes()).thenReturn(List.of());
         CoreAgentController controller = new CoreAgentController(null, null, null, null,
-                null, null, null, null, null, registry);
+                null, null, null, null, null, null, registry);
 
         MetaContext.setContext(7L, 9L, "user-9", "Editor");
         controller.listToolRegistry("tpm_customer");

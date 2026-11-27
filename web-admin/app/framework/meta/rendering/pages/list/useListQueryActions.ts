@@ -45,6 +45,7 @@ interface ListQueryActionsInput {
   setFilters: (
     filters: Record<string, any> | ((prev: Record<string, any>) => Record<string, any>),
   ) => void;
+  setKeyword: (keyword: string) => void;
   pagination: { current: number; pageSize: number; total: number };
   setPagination: (pagination: any) => void;
   dataSourceManager: DataSourceManager;
@@ -128,6 +129,7 @@ export function useListQueryActions(
     loadData,
     filters,
     setFilters,
+    setKeyword,
     pagination,
     setPagination,
     dataSourceManager,
@@ -562,6 +564,7 @@ export function useListQueryActions(
       loadData,
       filters,
       setFilters,
+      setKeyword,
       pagination,
       setPagination,
       dataSourceManager,
@@ -571,7 +574,7 @@ export function useListQueryActions(
       fetchResult,
       buildApiEndpoint,
     });
-  }, [loadData, navigate, tableName, dataSourceManager, locale, t, token, filters, pagination]);
+  }, [loadData, navigate, tableName, dataSourceManager, locale, t, token, filters, pagination, setKeyword]);
 
   // Handle pagination - P2-1 fix: use destructured pagination
   const handlePageChange = useCallback(
@@ -636,6 +639,10 @@ export function useListQueryActions(
       skipFirstSortFilterEffectRef.current = false;
       return;
     }
+    // Initial URL-filtered loading can still be waiting for field metadata.
+    // That load owns the requested page; a mount-time debounce must not issue
+    // page one before the first explicit query has even been scheduled.
+    if (!lastScheduledSortFilterValuesRef.current) return;
     // Explicit loads (initialization or view selection) already scheduled the
     // same query. Do not start a second request after the debounce catches up.
     if (

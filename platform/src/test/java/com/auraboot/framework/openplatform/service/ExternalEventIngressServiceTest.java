@@ -16,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -41,7 +42,7 @@ class ExternalEventIngressServiceTest {
     @BeforeEach
     void setUp() {
         service = new ExternalEventIngressService(installationMapper, idempotencyMapper,
-                accessor, codec, new ObjectMapper());
+                accessor, codec, new ObjectMapper(), new OpenApiProtocolHash(new ObjectMapper(), codec));
         ApplicationInstallation installation = new ApplicationInstallation();
         installation.setId(9L);
         installation.setTenantId(42L);
@@ -52,6 +53,87 @@ class ExternalEventIngressServiceTest {
 
     @AfterEach
     void clearTrace() { MDC.remove("requestId"); }
+
+    @Test
+    void installedProviderDefaultsReachAcceptanceAndReturnTheCompleteReceipt() {
+        var installed = mock(InstalledIntegrationService.class);
+        var normalizer = mock(ExternalIngressNormalizer.class);
+        service.setInstalledIntegrations(installed);
+        service.setNormalizer(normalizer);
+        when(installed.registered("erp")).thenReturn(true);
+        when(normalizer.supports("erp")).thenReturn(true);
+        String raw = "{\"data\":{\"amount\":10}}";
+        when(normalizer.normalize(42L, 9L, "erp", null, raw)).thenReturn(strictBody());
+        when(normalizer.canonical(any())).thenReturn(raw);
+        when(idempotencyMapper.claim(anyLong(), anyLong(), anyString(), anyString(), anyString(), any())).thenReturn(1);
+        when(idempotencyMapper.complete(anyLong(), anyLong(), anyString(), anyString(), anyString(), anyString())).thenReturn(1);
+        when(installed.accept(eq(principal), eq("erp"), any())).thenReturn(new InstalledIntegrationService.Acceptance("receipt-pid", false));
+        var result = service.accept(principal, "erp", null, raw);
+        assertEquals(java.util.Map.of("eventId", "evt-1", "recordPid", "receipt-pid", "duplicate", false), result.publicReceipt());
+        var envelope = ArgumentCaptor.forClass(IntegrationEventEnvelope.class);
+        verify(installed).accept(eq(principal), eq("erp"), envelope.capture());
+        assertEquals("external.erp.order.created.v1", envelope.getValue().eventType());
+        assertEquals(java.util.Map.of("amount", 10), envelope.getValue().payload());
+        verify(idempotencyMapper).claim(eq(42L), eq(9L), eq("external-event:erp"), eq("event:evt-1"), anyString(), any());
+        verify(installed, never()).prepareBusinessRequest(anyString(), any());
+    }
+
+    @Test
+    void providerFieldErrorsStopBeforeClaimOrEnqueue() {
+        var installed = mock(InstalledIntegrationService.class);
+        var normalizer = mock(ExternalIngressNormalizer.class);
+        service.setInstalledIntegrations(installed);
+        service.setNormalizer(normalizer);
+        when(installed.registered("erp")).thenReturn(true);
+        when(normalizer.supports("erp")).thenReturn(true);
+        var errors = java.util.List.of(new com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension.FieldError(
+                "data.orderIds", "required", "The order identities are required."));
+        when(normalizer.normalize(42L, 9L, "erp", null, "{}"))
+                .thenThrow(new ExternalEventIngressService.InvalidExternalEventException("invalid_business_request", "Correct the listed fields.", errors));
+        var failure = assertThrows(ExternalEventIngressService.InvalidExternalEventException.class,
+                () -> service.accept(principal, "erp", null, "{}"));
+        assertEquals(errors, failure.errors());
+        org.mockito.Mockito.verifyNoInteractions(idempotencyMapper, accessor);
+        verify(installed, never()).accept(any(), anyString(), any());
+    }
+
+    @Test
+    void retainedBusinessReplayIsReadOnlyBeforeCurrentNormalization() {
+        var installed = businessProvider();
+        var normalizer = mock(ExternalIngressNormalizer.class); service.setNormalizer(normalizer);
+        when(normalizer.supports("erp")).thenReturn(true);
+        String raw = businessBody().replace("{\"occurredAt\"", "{\"id\":\"retained-id\",\"occurredAt\"");
+        when(idempotencyMapper.findResponse(42L, 9L, "external-event:erp", "business:retained-id")).thenReturn(
+                new OpenApiIdempotencyMapper.StoredResponse(codec.sha256(raw), "completed", 202,
+                        "{\"eventId\":\"retained-id\",\"accepted\":true}", null, null, null, null));
+        when(installed.verifyAcceptedReplay(eq(principal), eq("erp"), any()))
+                .thenReturn(new InstalledIntegrationService.Acceptance("retained-pid", true));
+        assertEquals(java.util.Map.of("eventId", "retained-id", "recordPid", "retained-pid"),
+                service.accept(principal, "erp", null, raw).publicReceipt());
+        verify(normalizer, never()).normalize(anyLong(), anyLong(), anyString(), any(), anyString());
+        verify(idempotencyMapper, never()).claim(anyLong(), anyLong(), anyString(), anyString(), anyString(), any());
+        verify(installed, never()).accept(any(), anyString(), any());
+        verify(accessor, never()).enqueue(any());
+    }
+
+    @Test
+    void changedRetainedBusinessConflictsBeforeNormalization() {
+        var installed = businessProvider();
+        var normalizer = mock(ExternalIngressNormalizer.class); service.setNormalizer(normalizer);
+        when(normalizer.supports("erp")).thenReturn(true);
+        String raw = businessBody();
+        when(idempotencyMapper.findResponse(42L, 9L, "external-event:erp", "stable-header")).thenReturn(
+                new OpenApiIdempotencyMapper.StoredResponse("old-hash", "completed", 202,
+                        "{\"eventId\":\"retained-id\",\"accepted\":true}", null, null, null, null));
+        when(installed.verifyAcceptedReplay(eq(principal), eq("erp"), any()))
+                .thenThrow(new ExternalEventIngressService.IdempotencyConflictException());
+        when(normalizer.normalize(42L, 9L, "erp", "stable-header", raw))
+                .thenThrow(new ExternalEventIngressService.InvalidExternalEventException("invalid_business_request"));
+        assertThrows(ExternalEventIngressService.IdempotencyConflictException.class,
+                () -> service.accept(principal, "erp", "stable-header", raw));
+        verify(installed, never()).accept(any(), anyString(), any());
+        verify(accessor, never()).enqueue(any());
+    }
 
     @Test
     void claimsIdempotencyAndEnqueuesTenantBoundReliableEnvelope() {
@@ -139,6 +221,20 @@ class ExternalEventIngressServiceTest {
     }
 
     @Test
+    void installedIngressPreservesExactCallerTimeInHostOwnedTransportMetadata() {
+        var installed=mock(InstalledIntegrationService.class);service.setInstalledIntegrations(installed);
+        when(installed.registered("erp")).thenReturn(true);
+        when(installed.accept(eq(principal),eq("erp"),any())).thenReturn(new InstalledIntegrationService.Acceptance("request-pid",false));
+        when(idempotencyMapper.claim(anyLong(),anyLong(),anyString(),anyString(),anyString(),any())).thenReturn(1);
+        when(idempotencyMapper.complete(anyLong(),anyLong(),anyString(),anyString(),anyString(),anyString())).thenReturn(1);
+        String original="2026-09-14T08:00:00.123456789Z";
+        service.accept(principal,"erp","time-precision-key",strictBody().replace("2026-09-14T08:00:00Z",original));
+        var envelope=ArgumentCaptor.forClass(IntegrationEventEnvelope.class);verify(accessor).enqueue(envelope.capture());
+        assertEquals(java.time.Instant.parse(original),envelope.getValue().occurredAt());
+        assertEquals(original,envelope.getValue().headers().get(InstalledIntegrationService.ORIGINAL_OCCURRED_AT_HEADER));
+    }
+
+    @Test
     void rejectedInstalledAcceptanceCannotEnqueueAndPermanentReplayDoesNotEnqueueAgain() {
         var installed=mock(InstalledIntegrationService.class);service.setInstalledIntegrations(installed);
         when(installed.registered("erp")).thenReturn(true);
@@ -150,6 +246,139 @@ class ExternalEventIngressServiceTest {
         when(idempotencyMapper.complete(anyLong(),anyLong(),anyString(),anyString(),anyString(),anyString())).thenReturn(1);
         var response=service.accept(principal,"erp","idempotency-0001",strictBody());
         assertTrue(response.duplicate());assertEquals("original-pid",response.recordPid());verify(accessor,never()).enqueue(any());
+    }
+
+
+    private InstalledIntegrationService businessProvider() {
+        var installed=mock(InstalledIntegrationService.class);service.setInstalledIntegrations(installed);
+        when(installed.registered("erp")).thenReturn(true);
+        when(installed.prepareBusinessRequest(eq("erp"),any())).thenAnswer(call->{
+            @SuppressWarnings("unchecked") var input=(java.util.Map<String,Object>)call.getArgument(1);
+            return java.util.Optional.of(new com.auraboot.framework.plugin.extension.integration.ExternalEventIngressExtension.BusinessRequest(
+                "external.erp.order.snapshot.v2","purchase-order","300001",java.time.Instant.parse(input.get("occurredAt").toString()),
+                java.util.Map.of("snapshot",input)));
+        });
+        when(installed.accept(eq(principal),eq("erp"),any())).thenReturn(new InstalledIntegrationService.Acceptance("accepted-pid",false));
+        when(idempotencyMapper.claim(anyLong(),anyLong(),anyString(),anyString(),anyString(),any())).thenReturn(1);
+        when(idempotencyMapper.complete(anyLong(),anyLong(),anyString(),anyString(),anyString(),anyString())).thenReturn(1);
+        return installed;
+    }
+    private String businessBody(){return "{\"occurredAt\":\"2026-11-10T00:00:00Z\",\"data\":{\"order\":{\"orderId\":\"300001\"}}}";}
+    @Test void businessProviderNormalizesWithoutExternalEventIdentityOrIdempotencyHeader() {
+        businessProvider();var result=service.accept(principal,"erp",null,businessBody());
+        assertNotNull(result.eventId());
+        assertEquals(java.util.Map.of("eventId",result.eventId(),"recordPid","accepted-pid"),result.publicReceipt());
+        var envelope=ArgumentCaptor.forClass(IntegrationEventEnvelope.class);verify(accessor).enqueue(envelope.capture());
+        assertEquals("external.erp.order.snapshot.v2",envelope.getValue().eventType());
+        assertEquals(0,envelope.getValue().sequence());
+        assertEquals("purchase-order/300001",envelope.getValue().subject());
+        assertEquals(new ObjectMapper().convertValue(readBusiness(),java.util.Map.class),envelope.getValue().payload().get("snapshot"));
+    }
+    private com.fasterxml.jackson.databind.JsonNode readBusiness() {
+        try{return new ObjectMapper().readTree(businessBody());}catch(com.fasterxml.jackson.core.JsonProcessingException invalid){throw new AssertionError(invalid);}
+    }
+    @Test void optionalBusinessIdIsEchoedButBusinessDuplicateDecisionIsNotExposed() {
+        var installed=businessProvider();
+        when(installed.accept(eq(principal),eq("erp"),any())).thenReturn(new InstalledIntegrationService.Acceptance("accepted-pid",true));
+        var result=service.accept(principal,"erp",null,businessBody().replace("{\"occurredAt\"","{\"id\":\"kd-1\",\"occurredAt\""));
+        assertEquals(java.util.Map.of("recordPid","accepted-pid","eventId","kd-1"),result.publicReceipt());
+        verify(accessor,never()).enqueue(any());
+    }
+    @Test void businessClaimsIgnoreJsonFormattingAndObjectKeyOrder() throws Exception {
+        businessProvider();
+        String original=businessBody().replace("{\"occurredAt\"","{\"id\":\"kd-1\",\"occurredAt\"");
+        String reordered="{\"data\":{\"order\":{\"orderId\":\"300001\"}},\"id\":\"kd-1\",\"occurredAt\":\"2026-11-10T00:00:00Z\"}";
+        service.accept(principal,"erp",null,original);
+        service.accept(principal,"erp",null,new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(new ObjectMapper().readTree(reordered)));
+        var hashes=ArgumentCaptor.forClass(String.class);
+        verify(idempotencyMapper,org.mockito.Mockito.times(2)).claim(eq(42L),eq(9L),eq("external-event:erp"),eq("business:kd-1"),hashes.capture(),any());
+        assertEquals(hashes.getAllValues().get(0),hashes.getAllValues().get(1));
+        // Routing/orchestration assertion only; durable replay is tested through installed HTTP/PostgreSQL.
+    }
+    @Test void legacyHashMismatchRequiresExistingEventBoundReceiptAndNeverCreatesWork() {
+        var installed=businessProvider();
+        String body=businessBody().replace("{\"occurredAt\"","{\"id\":\"kd-1\",\"occurredAt\"");
+        when(idempotencyMapper.claim(anyLong(),anyLong(),anyString(),anyString(),anyString(),any())).thenReturn(0);
+        when(idempotencyMapper.findRequestHash(42L,9L,"external-event:erp","business:kd-1")).thenReturn(codec.sha256(body));
+        when(idempotencyMapper.findResponse(42L,9L,"external-event:erp","business:kd-1")).thenReturn(
+                new OpenApiIdempotencyMapper.StoredResponse(codec.sha256(body),"completed",202,"{\"eventId\":\"kd-1\",\"accepted\":true}",null,null,null,null));
+        when(installed.verifyAcceptedReplay(eq(principal),eq("erp"),any())).thenReturn(new InstalledIntegrationService.Acceptance("original-pid",true));
+        assertEquals(java.util.Map.of("eventId","kd-1","recordPid","original-pid"),service.accept(principal,"erp",null,body).publicReceipt());
+        verify(installed).verifyAcceptedReplay(eq(principal),eq("erp"),any());
+        verify(installed,never()).accept(any(),anyString(),any());
+        verify(accessor,never()).enqueue(any());
+        verify(idempotencyMapper,never()).complete(anyLong(),anyLong(),anyString(),anyString(),anyString(),anyString());
+        when(idempotencyMapper.findResponse(42L,9L,"external-event:erp","business:kd-1")).thenReturn(
+                new OpenApiIdempotencyMapper.StoredResponse(codec.sha256(body),"completed",202,"{\"eventId\":\"other-event\",\"accepted\":true}",null,null,null,null));
+        assertThrows(ExternalEventIngressService.IdempotencyConflictException.class,()->service.accept(principal,"erp",null,body));
+        when(idempotencyMapper.findResponse(42L,9L,"external-event:erp","business:kd-1")).thenReturn(null);
+        assertThrows(ExternalEventIngressService.IdempotencyConflictException.class,()->service.accept(principal,"erp",null,body));
+    }
+    @Test void businessBodiesRejectRoutingFieldsNonUtcDuplicateKeysAndTrailingTokens() {
+        businessProvider();
+        for(String body:java.util.List.of(businessBody().replace("{\"occurredAt\"","{\"sequence\":1,\"occurredAt\""),
+                businessBody().replace("2026-11-10T00:00:00Z","2026-11-10T08:00:00+08:00"),
+                businessBody()+" {}",businessBody().replace("\"orderId\":\"300001\"","\"orderId\":\"300002\",\"orderId\":\"300001\"")))
+            assertThrows(ExternalEventIngressService.InvalidExternalEventException.class,()->service.accept(principal,"erp",null,body));
+        verifyNoClaim();verify(accessor,never()).enqueue(any());
+    }
+    @Test void explicitKeyWithoutCallerIdRestoresCanonicalEventIdentity() throws Exception {
+        idlessReplayUsesOriginalIdentity(false);
+    }
+    @Test void explicitKeyWithoutCallerIdRestoresLegacyEventIdentity() throws Exception {
+        idlessReplayUsesOriginalIdentity(true);
+    }
+    private void idlessReplayUsesOriginalIdentity(boolean legacy) throws Exception {
+        var installed=businessProvider();String body=businessBody();
+        String digest=legacy?codec.sha256(body):new OpenApiProtocolHash(new ObjectMapper(),codec).fingerprint(new ObjectMapper().readTree(body),false);
+        when(idempotencyMapper.claim(anyLong(),anyLong(),anyString(),anyString(),anyString(),any())).thenReturn(0);
+        when(idempotencyMapper.findRequestHash(42L,9L,"external-event:erp","explicit-key-1")).thenReturn(digest);
+        when(idempotencyMapper.findResponse(42L,9L,"external-event:erp","explicit-key-1")).thenReturn(
+                new OpenApiIdempotencyMapper.StoredResponse(digest,"completed",202,"{\"eventId\":\"retained-event-1\",\"accepted\":true}",null,null,null,null));
+        when(installed.verifyAcceptedReplay(eq(principal),eq("erp"),any())).thenReturn(new InstalledIntegrationService.Acceptance("original-pid",true));
+        var result=service.accept(principal,"erp","explicit-key-1",body);
+        assertEquals(java.util.Map.of("eventId","retained-event-1","recordPid","original-pid"),result.publicReceipt());
+        assertEquals("retained-event-1",result.eventId());assertTrue(result.duplicate());
+        var envelope=ArgumentCaptor.forClass(IntegrationEventEnvelope.class);
+        verify(installed).verifyAcceptedReplay(eq(principal),eq("erp"),envelope.capture());
+        assertEquals("ext:inst:erp:retained-event-1",envelope.getValue().eventId());
+        assertEquals("retained-event-1",envelope.getValue().headers().get("externalEventId"));
+        verify(installed,never()).accept(any(),anyString(),any());verify(accessor,never()).enqueue(any());
+        verify(idempotencyMapper,never()).complete(anyLong(),anyLong(),anyString(),anyString(),anyString(),anyString());
+        // Call identity only; actual claim/receipt persistence is verified by the installed HTTP profile.
+    }
+    @Test void explicitKeyWithoutCallerIdCannotCreateWorkFromAnUnfinishedClaim() throws Exception {
+        var installed=businessProvider();String digest=new OpenApiProtocolHash(new ObjectMapper(),codec).fingerprint(readBusiness(),false);
+        when(idempotencyMapper.claim(anyLong(),anyLong(),anyString(),anyString(),anyString(),any())).thenReturn(0);
+        when(idempotencyMapper.findRequestHash(42L,9L,"external-event:erp","explicit-key-1")).thenReturn(digest);
+        for(var stored:java.util.List.of(
+                new OpenApiIdempotencyMapper.StoredResponse(digest,"processing",null,null,null,null,null,null),
+                new OpenApiIdempotencyMapper.StoredResponse(digest,"completed",202,"{\"eventId\":\"retained-event-1\",\"accepted\":false}",null,null,null,null),
+                new OpenApiIdempotencyMapper.StoredResponse(digest,"completed",202,"{\"eventId\":\"\",\"accepted\":true}",null,null,null,null))) {
+            when(idempotencyMapper.findResponse(42L,9L,"external-event:erp","explicit-key-1")).thenReturn(stored);
+            assertThrows(ExternalEventIngressService.IdempotencyConflictException.class,()->service.accept(principal,"erp","explicit-key-1",businessBody()));
+        }
+        verify(installed,never()).accept(any(),anyString(),any());verify(installed,never()).verifyAcceptedReplay(any(),anyString(),any());
+        verify(accessor,never()).enqueue(any());
+    }
+    @Test void simplifiedInputRequiresExplicitProviderSupportAndLegacyStillRequiresItsHeader() {
+        var installed=businessProvider();
+        when(installed.prepareBusinessRequest(eq("erp"),any())).thenReturn(java.util.Optional.empty());
+        assertEquals("business_contract_not_registered",assertThrows(ExternalEventIngressService.InvalidExternalEventException.class,
+            ()->service.accept(principal,"erp",null,businessBody())).getMessage());
+        assertEquals("invalid_idempotency_key",assertThrows(ExternalEventIngressService.InvalidExternalEventException.class,
+            ()->service.accept(principal,"erp",null,strictBody())).getMessage());
+        verifyNoClaim();verify(accessor,never()).enqueue(any());
+    }
+    @Test void missingNativeAcceptanceStopsBeforeEnqueueAndCompletion() {
+        var installed=businessProvider();when(installed.accept(eq(principal),eq("erp"),any())).thenReturn(null);
+        assertThrows(IllegalStateException.class,()->service.accept(principal,"erp",null,businessBody()));
+        verify(accessor,never()).enqueue(any());
+        verify(idempotencyMapper,never()).complete(anyLong(),anyLong(),anyString(),anyString(),anyString(),anyString());
+    }
+    @Test void missingBusinessAcceptanceRecordCannotBecomeAPublicSuccess() {
+        assertThrows(IllegalStateException.class,()->new ExternalEventIngressService.IngressResult("id",false,null,true,false).publicReceipt());
+        assertEquals(java.util.Map.of("eventId","id","duplicate",false),new ExternalEventIngressService.IngressResult("id",false).publicReceipt());
     }
 
     private String strictBody() { return body("evt-1").replace("\"data\":", "\"sequence\":0,\"data\":"); }

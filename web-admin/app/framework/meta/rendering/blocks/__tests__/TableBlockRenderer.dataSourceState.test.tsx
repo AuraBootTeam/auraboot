@@ -49,6 +49,14 @@ const block = {
 } as any;
 
 describe('TableBlockRenderer data-source states', () => {
+  it('discloses the exact long value locally without selecting a different record', () => {
+    const text='Material A\nCODE-A\n'+ 'Full specification '.repeat(12);
+    render(<TableBlockRenderer block={{...block,columns:[{field:'name',label:'Name',textPreviewLength:80,verticalAlign:'top'}]}} runtime={runtime([{pid:'row-a',name:text}],{data:[{pid:'row-a',name:text}]})} />);
+    const details=screen.getByTestId('table-text-details') as HTMLDetailsElement;
+    expect(details.open).toBe(false);fireEvent.click(screen.getByText('Full text'));expect(details.open).toBe(true);
+    expect(details.querySelector('div')?.textContent).toBe(text);
+    expect(details.closest('td')?.style.verticalAlign).toBe('top');
+  });
   it('keeps empty guidance outside the horizontally scrolling column canvas', () => {
     render(
       <TableBlockRenderer
@@ -152,4 +160,90 @@ describe('TableBlockRenderer data-source states', () => {
     );
     expect(screen.getByText('Tops')).toBeInTheDocument();
   });
+  it('searches the full navigation projection and binds the selected row including its version', () => {
+    const rows = Array.from({ length: 125 }, (_, index) => ({
+      pid: `root-${index}`,
+      name: `Category ${index}`,
+      childCount: index,
+      rowVersion: 7,
+    }));
+    const r = runtime(rows, {
+      data: { records: rows, total: rows.length },
+      loading: false,
+      error: null,
+    });
+    const context = { ...r.getContext(), state: {} as Record<string, any> };
+    const updateState = vi.fn((_scope: string, key: string, value: any) => {
+      context.state[key] = value;
+    });
+    r.getContext = () => context;
+    r.getStateManager = () => ({ getContext: () => context, updateState }) as any;
+    render(
+      <TableBlockRenderer
+        block={
+          {
+            ...block,
+            title: 'Categories',
+            table: {
+              showTitle: true,
+              selection: {
+                mode: 'single',
+                bind: 'selectedRoot',
+                presentation: 'navigation',
+                labelField: 'name',
+                countField: 'childCount',
+                searchPlaceholder: 'Search categories',
+              },
+            },
+          } as any
+        }
+        runtime={r}
+      />,
+    );
+    expect(screen.queryByRole('columnheader')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('table-server-pagination')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search categories' }), {
+      target: { value: 'Category 124' },
+    });
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Category 124' }));
+    expect(updateState).toHaveBeenLastCalledWith('scope', 'selectedRoot', rows[124]);
+    expect(screen.getByRole('button', { name: 'Category 124' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'missing' } });
+    expect(screen.getByRole('status')).toHaveTextContent('No matching items');
+    expect(context.state.selectedRoot).toEqual(rows[124]);
+  });
+
+  it.each([0, 1, 20, 21])(
+    'hides only an explicitly opted-in single-page footer with total %i',
+    (total) => {
+      const page = {
+        records: Array.from({ length: Math.min(total, 20) }, (_, i) => ({
+          pid: `row-${i}`,
+          name: `Result ${i}`,
+        })),
+        total,
+        current: 1,
+        pageSize: 20,
+      };
+      const r = runtime(page as any, { data: page, loading: false, error: null });
+      render(
+        <TableBlockRenderer
+          block={
+            {
+              ...block,
+              table: {
+                pagination: { mode: 'server', pageField: 'current', hideOnSinglePage: true },
+              },
+            } as any
+          }
+          runtime={r}
+        />,
+      );
+      expect(Boolean(screen.queryByTestId('table-server-pagination'))).toBe(total > 20);
+    },
+  );
 });

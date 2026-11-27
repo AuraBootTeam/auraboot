@@ -1,12 +1,12 @@
 ---
 type: system-reference
 status: active
-updated: 2026-10-30
+updated: 2026-11-19
 ---
 
 # 插件定制保护与字段删除准入
 
-本文定义 Page、Dashboard 的插件重导入保护，以及普通字段删除的保留数据边界。架构审查、需求和过程账本位于 Enterprise 的 `platform-business-system-foundation.md` / `2026-10-30-business-foundation-journeys.md`。本文不定义通用三方合并、破坏性迁移或自动回退。
+本文定义 Page、Dashboard、Menu、Agent 的插件重导入保护，以及普通字段删除的保留数据边界。架构审查、需求和过程账本位于 Enterprise 的 `platform-business-system-foundation.md` / `2026-10-30-business-foundation-journeys.md`。本文不定义通用三方合并、破坏性迁移或自动回退。
 
 ## 安全覆盖
 
@@ -27,6 +27,60 @@ Page 使用 `ResourceType.PAGE/page`，Dashboard 使用 `ResourceType.DASHBOARD/
 
 自动 stub 是有限例外：只有 `auto_created=true` 且 `rowVersion=1` 的未编辑 stub 允许标准定义接替。通过页面 service 保存会移除 stub 标记；历史编辑后的 stub 不再仅凭标记绕过保护。
 
+## 菜单接管、重导入与退出
+
+菜单的 `OVERWRITE_SAFE` 只同步同租户、同 plugin ID 的已跟踪且未修改资源；不同安装 PID 可以属于同一 plugin ID。既有未跟踪、已认领、已修改或属于另一插件的菜单均保留，SKIP 不转移归属或重写基线。已跟踪记录的修改标记为 NULL 或读取失败时中止导入，不能视为未修改。
+
+跨插件菜单接管需要操作者显式选择 `OVERWRITE`；它沿用既有覆盖权限与校验，不是自动迁移授权，也不提供通用资源移交或回退协议。接管保留菜单 PID，更新菜单行和 tracking 归属。旧包之后以默认安全策略重导入原声明时，不会自动抢回菜单；旧包显式选择 OVERWRITE 仍表示再次接管，因此不能把它作为安全重导入使用。
+
+声明瘦身的 prune 与插件卸载的菜单清理共用保护选择：仅选择 tracking 明确属于 shared/plugin_owned、修改标记明确为 false、菜单行与 tracking 的 plugin PID 一致、且非 authoringManaged 的本租户菜单。用户认领、修改、未知保护状态和归属不一致的菜单不自动清理。选择时锁定菜单及 tracking 行，锁持续到导入/卸载事务结束。
+
+未修改的旧菜单仍按原规则退出；被接收方接管的菜单不再属于旧包清理范围。有保留子菜单时，不能清理其父菜单；整个清理失败并保留原层次，不静默重挂父级。停用插件与卸载插件仍是不同操作。
+
+真实 PostgreSQL 回归入口：`:platform-app:test --tests '*PluginMenuHandoverIntegrationTest'`。用例覆盖用户认领/修改、显式接管、旧包原声明安全重导、瘦身、停用/卸载、同包重复更新、未知标记、authoringManaged、租户隔离和保留子菜单。它验证菜单服务与数据归属，不等同权限/UI验收，也不证明 Agent、角色等其它类型具备相同接管合同。
+
+## 已退役薄包装的保留式接管
+
+以下旧安装身份退出源码分发，已有资源交给现有安装单元；不会在启动时自动迁移或卸载。
+
+| 旧 plugin ID | 接收安装单元 | 功能提供方 |
+| --- | --- | --- |
+| `com.auraboot.platform-admin-ee` | `com.auraboot.platform-admin` | Enterprise 授权管理附加菜单 |
+| `com.auraboot.d7-knowledge-wiki` | `com.auraboot.core-aurabot` | Enterprise D7 工作台、权限和导航；私有实现/知识不进入 OSS |
+| `com.auraboot.ai-employees` | `com.auraboot.core-aurabot` | OSS Agent；四个角色改为可选模板，已有员工保留 |
+
+模块通过 `META-INF/auraboot/package-replacements/*.json` 声明确切旧身份、接收方、资源白名单和附加声明；Enterprise 合同仅随 Enterprise 制品提供。接收方沿用既有 plugin ID，不新增替代插件。接管只在显式接收方导入事务中运行；既有资源待移交时必须选择 `OVERWRITE_SAFE`，其它策略拒绝。菜单和权限的安全导入保留其它 owner 或已认领资源，角色保留现有授权；接管随后只转移资源行与 tracking 的 owner，不重建内容、不重置 claim/修改标记/基线、不更改原 importId、身份、员工关联或授权绑定。
+
+附加声明只合并其明确支持的菜单/权限/角色/i18n列表，不对整个manifest做JSON往返转换，避免DTO计算属性混入页面DSL；原页面对象及未知字段校验保持原样。Agent能力预检先于接管检查执行，缺模块时在普通资源读写前拒绝。
+
+接管检查租户、事务、完整 tracking、资源 PID、实际 owner、类型/代码白名单和非 NULL 保护状态，异常整笔回滚。旧包退出前重新校验 inventory，仍有未接收资源则拒绝。旧 plugin ID 的重导、版本升级和历史导入回滚均明确拒绝并指向接收方，不静默成功或覆盖接收方。接管成功后可从原生命周期或资源卸载入口退出旧安装记录。必须先升级 Core/Enterprise 制品，再导入接收方；旧版本运行时不具备此合同，不自动迁移生产。
+
+成功导入 receipt 记录 `packageResourcesAdopted`。含接管的导入拒绝通用 import rollback，防止退回旧插件元数据而遗留转交资源；需要恢复时保留接收方并显式审查归属，不提供自动反向接管。
+
+`core-aurabot` 的 `agentTemplates` 仅是提供方无关的配方，只有请求指定 `agentTemplateCodes` 才成为当前导入的 Agent 定义。默认不创建四个员工；模板首次创建为 disabled、不绑定模型或组织身份，由租户显式配置 provider、工具范围、启用并发布不可变版本后，再走既有入职流程。入职前检查有效部署，未发布模板明确拒绝且不创建用户/成员/员工；组织入职/退出与动态字段授权共享 REPEATABLE_READ 写事务，失败整体回滚。已有认领/修改资源仍按安全策略保留。CLI 接收：`aura plugin publish <receiver-directory> --conflict-strategy overwrite_safe --yes`；选择模板可追加 `--agent-templates aria`。Enterprise 注册表拒绝旧包名，防止跨根目录回退。
+
+原 `defaultBootstrap` 通配授权配置不转为新默授权；既有授权保留，新角色按明确权限初始化。真实 PG 合同用例为 `PluginPackageReplacementIntegrationTest`；Enterprise 声明以相同字节的测试 fixture 验证，不代表已执行 D7 页面、内部知识或授权业务的浏览器验收。
+
+首次启用使用`POST /api/agent/definitions/{agentPid}/activate`，请求显式提供`providerCode`，要求当前租户配置可用且调用者有`acp.runtime.manage`。停用定义、供应商绑定、插件定制保护标记和首版不可变发布/部署在同一事务完成，失败全部回滚；不自动入职，不增授工具、角色或模型权限。相同供应商的重复启用复用同一发布；已启用后不能用此入口更换供应商。`resume`只恢复已暂停部署；未启用模板的resume/publish返回明确业务拒绝，不再500。后续发布沿用现有publish入口；首次启用不通过通用dynamic update绕过字段writer。
+
+现有 AI 同事详情页（`/p/c/ai_colleague_detail`，`AgentDetailTabs` custom block）向具有运行管理权限的用户提供“首次启用并发布”入口。停用模板必须显式选择当前租户已配置的 AI 服务；配置为空、读取失败和未选择服务均不得提交。等待期间阻止重复提交，失败保留选择并提供错误反馈。成功后刷新定义并保留独立入职操作；停用模板不显示暂停或入职入口，版本页禁止直接发布并提示先启用。服务发现接口返回裸数组，不能经 ApiResponse 归一化客户端读取。
+
+同事列表必须区分无权限、加载失败和成功空数据，失败时不显示空列表或创建入口。版本列表的`matches_draft`由数据库使用与发布相同的`ab_agent_release_spec`内容散列比较，不使用`updated_at`推断；暂停部署仍关联当前版本，并以暂停状态展示。页面显示名称、同事类型译名、版本号与业务状态，不显示Agent技术码、发布PID/hash或内部策略版本。部署范围使用名称选择用户/组织成员/角色；既有policy响应的`channelPolicy.subjectChoices`只读补充当前租户候选，身份值为字符串避免精度丢失，保存时仍经既有标准化为内部权限列表，候选名称不写入策略快照。缺失候选以不可用原选择展示并保留原身份，不回退裸编号。
+
+## Agent 保护、接管与完整恢复
+
+Agent 的 `OVERWRITE_SAFE` 使用锁定的强类型修改状态；读取异常、已跟踪记录的 NULL 标记均拒绝写入，不能按未修改继续。已有未跟踪、用户修改/认领或其它 plugin ID 拥有的定义返回 SKIP，保持内容、评测用例、owner 和基线。同包未修改定义可同步；显式 `OVERWRITE` 仍是操作者选择的替换/接管策略，不会额外授予工具或模型权限。
+
+导入在现有 `ab_plugin_resource.previous_state/current_state` 保存 schemaVersion=1 的完整前/后像：Agent 数据库配置行（含 NULL、身份/组织关联、运行配置与授权范围）、该租户/code 的评测用例行，以及前一份 tracking。评测用例恢复保留原 ID/PID、plugin_source、删除状态和元数据；不另建历史库或向普通用户新增快照接口。Agent 对应插件的导入元数据沿用已有版本化 metadata snapshot。
+
+显式回滚只接受该插件最新成功导入、仍由该 import 拥有且资源数量相符的记录。恢复前锁定 tracking、定义和评测行，核当前数据库内容与导入后像一致；新用户修改/认领、评测变化、转给第三方、跨租户、缺失或不支持的快照均拒绝。旧快照没有完整前态时不猜默认值。原 owner 已退役/缺失也拒绝恢复，不自动重装旧包。
+
+满足条件后，在同一事务恢复配置、评测用例、原 owner/import ID、原修改/认领标记、基线及旧插件元数据。tracking 使用能恢复 NULL 并刷新 MyBatis 本地缓存的 Mapper 写入，避免后续清理读取旧列表误删已恢复记录。恢复后对完整内容复核，不完整则回滚整个事务。显式替换前已经存在的用户认领可随原快照恢复；接管后新认领仍拒绝回滚，二者不混同。
+
+资源感知的卸载调用 Agent provider，按当前 owner/后像核验后停用定义与评测行；用户认领资源继续保留。接管后旧包按安全策略重导、停用/卸载不能抢回或删除接收方定义。显式覆盖仍可能再次接管，不能当作安全重导。此合同不提供卸载后任意重新激活或通用业务数据回退；后续有新事实时需要单独处置。
+
+真实 PostgreSQL 入口：`:platform-app:test --tests '*PluginAgentHandoverIntegrationTest'`；组件/IM 投影回归为 `:platform-app:integrationTest --tests '*AgentConsumerBoundaryPostgresIT'`。前者验证公共导入、回滚、资源退出与拒绝路径，后者验证真实 Mapper/provider、IM 显示和租户边界。Hermetic 用例只保留 provider 委托合同，不能用 mock Mapper 的调用断言冒充完整恢复。未由这些用例证明 HTTP 权限、模型调用、工具执行或其它资源类型迁移安全。
+
 ## 既有安装升级
 
 两个新增 Flyway migration 负责旧记录转换：
@@ -35,6 +89,8 @@ Page 使用 `ResourceType.PAGE/page`，Dashboard 使用 `ResourceType.DASHBOARD/
 - `V20261030123000` 对旧 Page/Dashboard 记录保守设置修改标记。旧用户保存曾使用大写资源名，false 不足以证明“用户没有修改过”。
 
 **升级影响**：旧页面和看板在安全导入下可能保留，即使实际上未修改；需检查差异后显式选择 OVERWRITE。新安装/新导入在此迁移后正常形成未修改基线，后续安全升级可更新。迁移不修改页面/看板内容，不自动发布，也不需要用户重新创建页面。
+
+**已有角色的授权**：插件 `roles.json` 只在导入**新建**角色时生效；角色已存在时导入一律 SKIP，不改租户现有的授权。新版本给角色增加的权限要到达已有环境，用 `scripts/application/plugin-role-grants.mjs --plugin <插件根目录> --base-url <地址>` 补齐。它默认只演练，列出每个已有角色缺哪些授权；`--apply` 才授予，并且只走只加不减的 `PUT /api/permissions/matrix/{rolePid}/batch`，每个条目都是 `granted: true`。写完逐个角色回读：原有授权少了一条也算失败。`POST /api/roles/{pid}/permissions` 的语义是替换成提交的清单，脚本从不写它。模板里租户没有的权限、租户没有的角色都只报告，不发送、不创建。入口测试：`node --test scripts/application/plugin-role-grants.test.mjs`。
 
 ## 模块自有 seed 的重导入
 
@@ -82,3 +138,76 @@ Automation 的 pluginId/automationKey 身份保存在模块自有 ab_automation.
 - 真实 PostgreSQL：`:platform-app:integrationTest --tests '*CustomizationProtectionPostgresIT'`。必须由受管 runtime 注入 DATABASE/POSTGRES 变量，缺前提即失败，不静默跳过；fixture 使用该隔离库的真实 Flyway schema。
 
 PostgreSQL 用例是组件集成验证，实际执行 mappers、导入器、Dashboard service/Controller、资源持久化和 Schema service；无关版本历史服务及模型解析使用测试夹具。不冒充完整 HTTP 权限或浏览器旅程，也不以此声称全部平台已通过验证。原始执行、反向对照和覆盖范围随本轮提交保存在 Workspace 任务证据中。
+
+
+## V2 handover preview receipts (first implementation slice)
+
+V2 adds preview and durable preview receipts only. It does not implement ownership
+transfer, receiver preparation imports, exit, reverse handover, or readiness
+publication. Existing v1 replacement behavior is unchanged. Registering a v2 source
+does not add it to the v1 globally retired list; lightweight Base remains usable.
+
+Trusted contracts are single JSON objects under
+`META-INF/auraboot/resource-handovers/*.json`. Core provides the catalog/validator;
+Enterprise supplies `pcba-base-manufacturing-preview`, revision 1, with the sole
+capability `preview`. `resource-handover.v2` requires `tenant-scoped`, exact package
+versions, unique typed resource identities and one declared receiver per MOVE.
+Unknown properties, duplicate JSON keys/contracts/resources, wildcard versions,
+unsupported capabilities and unresolved binding/dictionary declarations fail
+closed. Requests cannot supply a contract, SQL, table names, receivers or tenant.
+
+Administrative endpoints:
+
+| Method | Path | Behavior |
+|---|---|---|
+| GET | `/api/plugins/handovers/contracts` | Trusted contract summaries and canonical SHA-256 digests |
+| POST | `/api/plugins/handovers/previews` | Validate inventory and persist a preview receipt |
+| GET | `/api/plugins/handovers/previews/{batchPid}` | Read one tenant-scoped immutable receipt |
+| GET | `/api/plugins/handovers/previews/by-key?idempotencyKey=...` | Resolve a receipt when its acknowledgement/PID was lost |
+
+The POST body has `contractId`, `contractDigest`, `sourcePluginPid` and
+`idempotencyKey`. Unknown request properties are rejected even with a lenient
+application mapper. Every service entry rechecks authenticated tenant/actor and
+both `plugin.plugin.manage` and `sys.plugin.update`; no grants are added.
+Responses contain public PIDs, contract/resource codes and explicit planned MOVE
+or VERIFY_REFERENCE entries, never entities, snapshots, raw tenant/actor IDs or
+internal row IDs. `executionAvailable` is always false.
+
+Preview validates the source's actual tracking and live owner, exact live PIDs,
+field types, model/field binding identity, field-dictionary relationships, dictionary
+items, external provider tracking and nullable protection state. Bindings have no
+entity owner column: their source ownership is checked through tracking. Missing,
+ambiguous, extra/untracked source-owned versions, foreign ownership and unknown
+protection fail without persisting a successful receipt. Known claims and modified
+content are snapshotted unchanged; preview never adopts them. Source entity
+content and dictionary items are not reconciled with receiver templates.
+
+A separate repeatable-read transaction captures metadata and writes only
+`ab_plugin_handover_batch` and `ab_plugin_handover_item`. JSONB uses the existing
+precision-preserving `JsonNodeTypeHandler` and explicit MyBatis result maps.
+Batch/item persistence is atomic; an item failure rolls back all receipt writes.
+The database only accepts PREVIEWED status in this slice. A receipt includes all
+planned receivers and references, private metadata snapshots/fingerprints and a
+15-minute expiry. Expiry is reported without updating or refreshing the old receipt.
+
+The tenant/key uniqueness constraint is authoritative. Admission uses the existing
+DistributedLock infrastructure outside the snapshot transaction. A concurrent
+uniqueness/serialization collision may resolve only an already committed, matching
+request/complete receipt in a new read transaction; it never retries creating or
+adopting resources. Same key/different request is a conflict. Retrieval verifies
+snapshot digest, header/request binding and every persisted item's integrity.
+Replays return the original snapshot, even if live metadata subsequently changes;
+they do not certify current eligibility or extend expiry.
+
+The preview observes installed version/status and manifest-content hashes. It does
+not verify deployed artifact provenance, full executable dependency closure or
+serving readiness. All are explicit limitations in the response. There are no
+execute/exit/reverse routes and no changes to import/uninstall gates for v2. The
+later transaction/lifecycle/recovery proposal remains in Workspace migration plan
+sections 6.4.17–6.4.18; its COMMITTED and later states are not implemented here.
+
+## Empty wrapper retirement entrypoints
+
+The shell importer rejects `quarry-solution` and `marketing-crm-demo` (names, plugin IDs and legacy directory arguments) before login or source-root discovery. The former uses the `quarry-delivery` profile containing its original eight dependency packages; the latter uses the Workspace Showcase marketing index and performs no plugin import. The empty marketing skeleton's tenant-admin wildcard bootstrap is not reproduced.
+
+This is source/entrypoint retirement after the owner confirmed no online consumers. It does not transfer ownership, uninstall tenant records, modify business data, add a server-side historical-artifact blacklist or change the v1/v2 handover contracts.

@@ -80,6 +80,7 @@ function mappedMetricValue(
       }
     }
   }
+  if (value && typeof value === 'object' && !Array.isArray(value) && ('en' in value || 'zh-CN' in value)) return getLocalizedText(value, locale, t);
   if (typeof value === 'boolean') {
     const fallback = value ? { 'zh-CN': '是', en: 'Yes' } : { 'zh-CN': '否', en: 'No' };
     return getLocalizedText(fallback, locale, t);
@@ -138,6 +139,7 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
   const variant = (block as any).variant || 'cards';
   const density = (block as any).density || 'default';
   const compactCards = variant === 'cards' && density === 'compact';
+  const overview = variant === 'overview';
   const configuredColumns = Number((block as any).columns);
   const cardColumns =
     Number.isFinite(configuredColumns) && configuredColumns > 0
@@ -191,9 +193,9 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
     .map((metric: any) => {
       const key = String(metric.key || metric.valueField || metric.label);
       const label = getLocalizedText(metric.label || key, locale, t);
-      const value = metric.valueField ? readPath(record, metric.valueField) : metric.value;
+      const value = metric.valueField ? readPath(record, metric.valueField) : resolveRuntimeValue(runtime, metric.value);
       const unit = metric.unitField ? readPath(record, metric.unitField) : metric.unit;
-      const subText = metric.subTextField ? readPath(record, metric.subTextField) : metric.subText;
+      const subText = metric.subTextField ? readPath(record, metric.subTextField) : resolveRuntimeValue(runtime, metric.subText);
       const displaySubText = renderMetricAuxText(subText, locale, t);
       const tone = metric.tone || 'default';
       const tk = resolveTone(tone);
@@ -260,8 +262,8 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
           }}
           disabled={!clickable}
           aria-description={compactCards && displaySubText ? displaySubText : undefined}
-          className={`rounded-card border-border bg-panel shadow-card overflow-hidden border text-left transition-shadow ${
-            compactCards ? 'h-20 p-3' : 'h-28 p-4'
+          className={`${overview ? 'min-w-0 bg-panel p-4 text-left' : 'rounded-card border-border bg-panel shadow-card overflow-hidden border text-left transition-shadow'} ${
+            overview ? 'min-h-24' : compactCards ? 'h-20 p-3' : 'h-28 p-4'
           } ${
             active ? `ring-2 ring-offset-1 ${tk.ring}` : ''
           } ${clickable ? 'hover:shadow-pop cursor-pointer' : 'cursor-default'}`}
@@ -286,14 +288,14 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
           >
             <span
               className={`text-text min-w-0 truncate font-semibold tabular-nums ${
-                compactCards ? 'text-xl leading-6' : 'text-2xl'
+                overview ? 'text-[17px] leading-6' : compactCards ? 'text-xl leading-6' : 'text-2xl'
               }`}
               data-testid={`metric-strip-value-${key}`}
               title={displayValue}
             >
               {displayValue}
             </span>
-            {unit && <span className="text-text-2 flex-shrink-0 text-xs">{String(unit)}</span>}
+            {unit && <span className="text-text-2 flex-shrink-0 text-xs">{getLocalizedText(unit,locale,t)}</span>}
             {trend && (
               <span
                 className={`ml-auto flex-shrink-0 text-xs font-medium ${trendClass[trendDirection] || trendClass.flat}`}
@@ -303,6 +305,10 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
               </span>
             )}
           </div>
+          {overview && metric.progressField && (() => {
+            const percent = Number(readPath(record, metric.progressField));
+            return Number.isFinite(percent) && percent >= 0 && percent <= 100 ? <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} className="bg-subtle my-2 h-1 max-w-[200px] overflow-hidden rounded"><div className="bg-status-green h-full" style={{width: `${percent}%`}} /></div> : null;
+          })()}
           {displaySubText && !compactCards && (
             <div
               className={`text-text-3 mt-0.5 text-xs break-words ${
@@ -323,7 +329,9 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
       {title && <h3 className="text-text-2 mb-2 text-sm font-medium">{title}</h3>}
       <div
         className={
-          variant === 'chips'
+          overview
+            ? `overflow-hidden rounded-lg border border-border bg-panel grid ${configuredCardGridClass(cardColumns || 3)}`
+            : variant === 'chips'
             ? 'flex flex-wrap gap-2'
             : cardColumns
               ? `grid items-stretch gap-3 ${configuredCardGridClass(cardColumns)}`

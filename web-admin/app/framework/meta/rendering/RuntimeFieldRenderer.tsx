@@ -27,7 +27,7 @@ import { hasMissingFieldDependency } from '~/framework/meta/rendering/fieldDepen
 export interface RuntimeFieldRendererProps {
   field: FieldConfig;
   runtime: SchemaRuntime;
-  /** A containing array form owns the value when onChange is supplied. */
+  /** An explicitly supplied value is controlled, including read-only summaries. */
   value?: unknown;
   onChange?: (value: unknown) => void;
 }
@@ -92,12 +92,14 @@ function shouldInferJsonEditor(component?: string): boolean {
  * - 自动处理表单验证和错误收集
  * - 支持复杂的 ActionFlow 流程
  */
-export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({
+export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = (props) => {
+  const {
   field,
   runtime,
   value: controlledValue,
   onChange,
-}) => {
+  } = props;
+  const controlled = Boolean(onChange) || Object.prototype.hasOwnProperty.call(props, 'value');
   // 从 runtime 获取 context
   const context = runtime.getContext();
   const locale = context.locale || 'zh-CN';
@@ -108,13 +110,13 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({
   const scopeId = runtime.getScopeId();
   const [, refreshField] = useState(0);
   useEffect(() => {
-    if (onChange || !stateManager.subscribe) return;
+    if (controlled || !stateManager.subscribe) return;
     return stateManager.subscribe(
       scopeId,
       (state) => state.form?.[field.field],
       () => refreshField((version) => version + 1),
     );
-  }, [field.field, onChange, scopeId, stateManager]);
+  }, [field.field, controlled, scopeId, stateManager]);
   const fieldMeta = stateManager.getFieldMeta(scopeId, field.field);
   const dependencyMissing = hasMissingFieldDependency(field, context);
 
@@ -126,7 +128,7 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({
   }, [fieldMeta?.hidden, field.visibleWhen, context]);
 
   // 从 SchemaRuntime 获取字段值
-  const rawValue = onChange ? controlledValue : stateManager.getFieldValue(scopeId, field.field);
+  const rawValue = controlled ? controlledValue : stateManager.getFieldValue(scopeId, field.field);
   const value = useMemo(() => {
     const component = String(field.component || '')
       .replace(/^smart/i, '')

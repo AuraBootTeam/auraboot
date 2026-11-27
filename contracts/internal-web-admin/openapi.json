@@ -1,54 +1,6 @@
 {
   "components": {
     "schemas": {
-      "AbDataQualityValidationRun": {
-        "properties": {
-          "datasetName": {
-            "type": "string"
-          },
-          "deletedFlag": {
-            "type": "boolean"
-          },
-          "failed": {
-            "format": "int32",
-            "type": "integer"
-          },
-          "finishedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "id": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "passed": {
-            "format": "int32",
-            "type": "integer"
-          },
-          "pid": {
-            "type": "string"
-          },
-          "resultsJson": {
-            "type": "string"
-          },
-          "startedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "suitePid": {
-            "type": "string"
-          },
-          "tenantId": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "totalExpectations": {
-            "format": "int32",
-            "type": "integer"
-          }
-        },
-        "type": "object"
-      },
       "AbSemanticPreagg": {
         "properties": {
           "createdAt": {
@@ -395,6 +347,19 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "ActivationRequest": {
+        "properties": {
+          "providerCode": {
+            "maxLength": 128,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "providerCode"
+        ],
         "type": "object"
       },
       "ActiveSessionResponse": {
@@ -3651,6 +3616,32 @@
         },
         "type": "object"
       },
+      "ApiResponseCallAuditDetail": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CallAuditDetail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseCapabilityCatalog": {
         "properties": {
           "code": {
@@ -3765,6 +3756,32 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/CascadeDictResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseCatalog": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Catalog"
               },
               {
                 "type": "null"
@@ -10335,6 +10352,31 @@
         },
         "type": "object"
       },
+      "ApiResponseListPluginHandoverContractSummary": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/PluginHandoverContractSummary"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseListPluginImportResult": {
         "properties": {
           "code": {
@@ -14141,6 +14183,32 @@
         },
         "type": "object"
       },
+      "ApiResponsePlan": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Plan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponsePlatformAiScoreResult": {
         "properties": {
           "code": {
@@ -14229,6 +14297,32 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/PluginGenerateResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponsePluginHandoverPreview": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PluginHandoverPreview"
               },
               {
                 "type": "null"
@@ -14765,6 +14859,32 @@
         },
         "type": "object"
       },
+      "ApiResponseRecorded": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Recorded"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "ApiResponseRedeemInstallTokenResponse": {
         "properties": {
           "code": {
@@ -15009,6 +15129,32 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ResourceOwnerDTO"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ApiResponseResult": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "context": {},
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Result"
               },
               {
                 "type": "null"
@@ -19219,12 +19365,53 @@
         },
         "type": "object"
       },
+      "CallAuditDetail": {
+        "properties": {
+          "auditPid": {
+            "type": "string"
+          },
+          "captureState": {
+            "type": "string"
+          },
+          "durationMs": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "httpDetails": {
+            "$ref": "#/components/schemas/JsonNode"
+          },
+          "method": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "remoteAddress": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "status": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "CallAuditView": {
         "properties": {
           "actorKind": {
             "type": "string"
           },
           "applicationPid": {
+            "type": "string"
+          },
+          "auditPid": {
             "type": "string"
           },
           "capability": {
@@ -19924,6 +20111,17 @@
         },
         "type": "object"
       },
+      "Catalog": {
+        "properties": {
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/Template"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "Category": {
         "properties": {
           "categoryType": {
@@ -20485,6 +20683,26 @@
             ]
           }
         },
+        "type": "object"
+      },
+      "Choice": {
+        "properties": {
+          "status": {
+            "minLength": 1,
+            "pattern": "accept|reject|ban|filter",
+            "type": "string"
+          },
+          "templateId": {
+            "maxLength": 128,
+            "minLength": 0,
+            "pattern": "[A-Za-z0-9_-]+",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "templateId"
+        ],
         "type": "object"
       },
       "ClientConfig": {
@@ -25878,6 +26096,12 @@
       "DirectoryImportRequest": {
         "description": "Directory path and import options",
         "properties": {
+          "agentTemplateCodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "autoDeployProcesses": {
             "type": "boolean"
           },
@@ -31853,6 +32077,12 @@
       },
       "ImportRequest": {
         "properties": {
+          "agentTemplateCodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "autoDeployProcesses": {
             "type": "boolean"
           },
@@ -37525,6 +37755,9 @@
           "isRead": {
             "type": "boolean"
           },
+          "miniProgramPath": {
+            "type": "string"
+          },
           "priority": {
             "type": "string"
           },
@@ -37590,6 +37823,12 @@
           },
           "isRead": {
             "type": "boolean"
+          },
+          "miniProgramPage": {
+            "maxLength": 120,
+            "minLength": 0,
+            "pattern": "pages/[a-z0-9-]+(?:/[a-z0-9-]+)+",
+            "type": "string"
           },
           "pageNum": {
             "format": "int32",
@@ -42631,6 +42870,36 @@
         },
         "type": "object"
       },
+      "Plan": {
+        "properties": {
+          "bindingSha256": {
+            "type": "string"
+          },
+          "commandSha256": {
+            "type": "string"
+          },
+          "envelopeSha256": {
+            "type": "string"
+          },
+          "expectedReplayCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "previousCommandSha256": {
+            "type": "string"
+          },
+          "previousProviderSha256": {
+            "type": "string"
+          },
+          "providerSha256": {
+            "type": "string"
+          },
+          "requestPid": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "PlannedOrderDto": {
         "properties": {
           "leadTimeDays": {
@@ -42964,6 +43233,145 @@
         },
         "type": "object"
       },
+      "PluginHandoverContractSummary": {
+        "properties": {
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "contractId": {
+            "type": "string"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "revision": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "sourcePluginId": {
+            "type": "string"
+          },
+          "targetPluginIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "PluginHandoverPreview": {
+        "properties": {
+          "batchPid": {
+            "type": "string"
+          },
+          "contractDigest": {
+            "type": "string"
+          },
+          "contractId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "executionAvailable": {
+            "type": "boolean"
+          },
+          "expired": {
+            "type": "boolean"
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PluginHandoverPreviewItem"
+            },
+            "type": "array"
+          },
+          "limits": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "plannedMoves": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "previewDigest": {
+            "type": "string"
+          },
+          "sourcePluginPid": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PluginHandoverPreviewItem": {
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "ownershipType": {
+            "type": "string"
+          },
+          "resourcePid": {
+            "type": "string"
+          },
+          "targetPluginPid": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "userModified": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "PluginHandoverPreviewRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "contractDigest": {
+            "minLength": 1,
+            "pattern": "[0-9a-f]{64}",
+            "type": "string"
+          },
+          "contractId": {
+            "maxLength": 128,
+            "minLength": 0,
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "maxLength": 128,
+            "minLength": 0,
+            "type": "string"
+          },
+          "sourcePluginPid": {
+            "maxLength": 64,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "contractDigest",
+          "contractId",
+          "idempotencyKey",
+          "sourcePluginPid"
+        ],
+        "type": "object"
+      },
       "PluginImportRequest": {
         "properties": {
           "menus": {
@@ -43100,6 +43508,12 @@
       "PluginManifestExtended": {
         "properties": {
           "agentDefinitions": {
+            "items": {
+              "$ref": "#/components/schemas/AgentDefinitionDTO"
+            },
+            "type": "array"
+          },
+          "agentTemplates": {
             "items": {
               "$ref": "#/components/schemas/AgentDefinitionDTO"
             },
@@ -45185,6 +45599,17 @@
         ],
         "type": "object"
       },
+      "Recorded": {
+        "properties": {
+          "delivered": {
+            "type": "boolean"
+          },
+          "recorded": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "RedeemInstallTokenRequest": {
         "properties": {
           "targetInstanceUrl": {
@@ -46437,6 +46862,37 @@
               "type": "object"
             },
             "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "Result": {
+        "properties": {
+          "eventId": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "recoveryPid": {
+            "type": "string"
+          },
+          "replayCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "requestPid": {
+            "type": "string"
+          },
+          "requestedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -52392,6 +52848,20 @@
         },
         "type": "object"
       },
+      "Template": {
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "templateId": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "TemplateDef": {
         "properties": {
           "category": {
@@ -53487,6 +53957,10 @@
             "type": "string"
           },
           "targetType": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
             "type": "string"
           }
         },
@@ -55244,6 +55718,29 @@
         },
         "type": "object"
       },
+      "WechatSubscriptionObservationRequest": {
+        "properties": {
+          "idempotencyKey": {
+            "maxLength": 120,
+            "minLength": 0,
+            "pattern": "[A-Za-z0-9._:-]+",
+            "type": "string"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/Choice"
+            },
+            "maxItems": 20,
+            "minItems": 0,
+            "type": "array"
+          }
+        },
+        "required": [
+          "idempotencyKey",
+          "results"
+        ],
+        "type": "object"
+      },
       "WindowMetrics": {
         "properties": {
           "baseline": {
@@ -56364,6 +56861,26 @@
         },
         "tags": [
           "automation-run-stream-controller"
+        ]
+      }
+    },
+    "/api/admin/bootstrap/platform-navigation/reconcile": {
+      "post": {
+        "operationId": "reconcile",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringBoolean"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "platform-navigation-maintenance-controller"
         ]
       }
     },
@@ -58721,6 +59238,106 @@
         ]
       }
     },
+    "/api/admin/open-platform/installations/{installation}/event-sources/{source}/events/{event}/recovery": {
+      "get": {
+        "operationId": "plan",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "installation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "source",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "event",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePlan"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "installed-integration-recovery-controller"
+        ]
+      },
+      "post": {
+        "operationId": "authorizeReceiptRecovery",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "installation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "source",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "event",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Decision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseResult"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "installed-integration-recovery-controller"
+        ]
+      }
+    },
     "/api/admin/platform-releases/{platformCode}": {
       "post": {
         "operationId": "register_1",
@@ -60281,6 +60898,46 @@
         },
         "tags": [
           "agent-runtime-controller"
+        ]
+      }
+    },
+    "/api/agent/definitions/{agentPid}/activate": {
+      "post": {
+        "operationId": "activateAgent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agentPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePublishedRelease"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "core-agent-controller"
         ]
       }
     },
@@ -67588,7 +68245,7 @@
     },
     "/api/authoring/change-sets/{changeSetPid}/sessions": {
       "post": {
-        "operationId": "observe",
+        "operationId": "observe_1",
         "parameters": [
           {
             "in": "path",
@@ -72759,102 +73416,6 @@
         },
         "tags": [
           "dbt-ingest-controller"
-        ]
-      }
-    },
-    "/api/dataquality/expectations": {
-      "post": {
-        "operationId": "createSuite",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": {},
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "additionalProperties": {},
-                  "type": "object"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "data-quality-controller"
-        ]
-      }
-    },
-    "/api/dataquality/expectations/{suitePid}/run": {
-      "post": {
-        "operationId": "runValidation",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "suitePid",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "additionalProperties": {},
-                  "type": "object"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "data-quality-controller"
-        ]
-      }
-    },
-    "/api/dataquality/expectations/{suitePid}/runs": {
-      "get": {
-        "operationId": "listRuns_1",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "suitePid",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "*/*": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/AbDataQualityValidationRun"
-                  },
-                  "type": "array"
-                }
-              }
-            },
-            "description": "OK"
-          }
-        },
-        "tags": [
-          "data-quality-controller"
         ]
       }
     },
@@ -96577,6 +97138,56 @@
         ]
       }
     },
+    "/api/notifications/wechat-subscription/observations": {
+      "post": {
+        "operationId": "observe",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WechatSubscriptionObservationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseRecorded"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "wechat-subscription-preference-controller"
+        ]
+      }
+    },
+    "/api/notifications/wechat-subscription/templates": {
+      "get": {
+        "operationId": "templates",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCatalog"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "wechat-subscription-preference-controller"
+        ]
+      }
+    },
     "/api/notifications/{id}/read": {
       "put": {
         "operationId": "markAsRead",
@@ -96596,7 +97207,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
+                  "$ref": "#/components/schemas/ApiResponseMapStringBoolean"
                 }
               }
             },
@@ -97602,6 +98213,51 @@
               "format": "int32",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "keyword",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "method",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "statusClass",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "windowHours",
+            "required": false,
+            "schema": {
+              "default": 24,
+              "format": "int32",
+              "type": "integer"
+            }
           }
         ],
         "responses": {
@@ -97610,6 +98266,44 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseListCallAuditView"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "open-platform-management-controller"
+        ]
+      }
+    },
+    "/api/open-platform/installations/{installationPid}/audits/{auditPid}": {
+      "get": {
+        "operationId": "auditDetail",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "installationPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "auditPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCallAuditDetail"
                 }
               }
             },
@@ -102436,6 +103130,116 @@
         ]
       }
     },
+    "/api/plugins/handovers/contracts": {
+      "get": {
+        "operationId": "listPluginHandoverPreviewContracts",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListPluginHandoverContractSummary"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "plugin-handover-preview-controller"
+        ]
+      }
+    },
+    "/api/plugins/handovers/previews": {
+      "post": {
+        "operationId": "createPluginHandoverPreview",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginHandoverPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePluginHandoverPreview"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "plugin-handover-preview-controller"
+        ]
+      }
+    },
+    "/api/plugins/handovers/previews/by-key": {
+      "get": {
+        "operationId": "findPluginHandoverPreviewByKey",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "idempotencyKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePluginHandoverPreview"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "plugin-handover-preview-controller"
+        ]
+      }
+    },
+    "/api/plugins/handovers/previews/{batchPid}": {
+      "get": {
+        "operationId": "findPluginHandoverPreview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batchPid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponsePluginHandoverPreview"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "plugin-handover-preview-controller"
+        ]
+      }
+    },
     "/api/plugins/hotload": {
       "get": {
         "operationId": "listPlugins_1",
@@ -102846,6 +103650,17 @@
             "schema": {
               "default": true,
               "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agentTemplateCodes",
+            "required": false,
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
             }
           },
           {
@@ -105078,6 +105893,54 @@
         },
         "tags": [
           "cs-widget-controller"
+        ]
+      }
+    },
+    "/api/public/integration-callbacks/{tenant}/{installation}/{code}": {
+      "post": {
+        "operationId": "receive",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "installation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "signed-integration-callback-controller"
         ]
       }
     },
