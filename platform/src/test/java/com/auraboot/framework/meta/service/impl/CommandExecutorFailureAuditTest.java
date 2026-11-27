@@ -296,6 +296,29 @@ class CommandExecutorFailureAuditTest {
     }
 
     @Test
+    void staleRecordVersionKeepsWireConflictAndFailureAudit() {
+        MetaContext.setContext(77L, 42L, "user_42", "Operator");
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setPayload(Map.of("_expectedVersion", 1));
+        var failure = new com.auraboot.framework.meta.exception.RecordVersionConflictException(
+                "Update failed: version conflict (expected version 1)");
+        org.mockito.Mockito.doAnswer(invocation -> {
+            CommandPipelineContext context = invocation.getArgument(0);
+            context.transitionTo("handler");
+            throw failure;
+        }).when(commandPipeline).executeGuardedPhases(any(CommandPipelineContext.class));
+
+        assertThatThrownBy(() -> commandExecutor.execute("dynamic.update.order", request))
+                .isSameAs(failure);
+        verify(effectExecutor).saveAuditLog(eq(77L), eq("dynamic.update.order"), isNull(), eq(42L),
+                any(), isNull(), eq(false), eq(failure.getMessage()), anyLong(), eq("handler"), any());
+        var response = new com.auraboot.framework.meta.exception.MetaApiExceptionHandler()
+                .handleRecordVersionConflictException(failure);
+        assertThat(response.getStatusCode().value()).isEqualTo(409);
+        assertThat(response.getBody().getCode()).isEqualTo("40900");
+    }
+
+    @Test
     void executePreservesAccessDeniedExceptionForHttp403Mapping() {
         MetaContext.setContext(77L, 42L, "user_42", "Operator");
         CommandExecuteRequest request = new CommandExecuteRequest();
