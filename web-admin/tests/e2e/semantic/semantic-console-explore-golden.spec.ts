@@ -116,8 +116,19 @@ test.beforeAll(async ({ request }) => {
     const body = await response.json();
     expect(String(body.code), JSON.stringify(body)).toBe('0');
     expect(body.data).toMatchObject({ total: rows.length, success: rows.length, failed: 0, skipped: 0, errors: [] });
-    expect(body.data.successItems).toHaveLength(rows.length);
-    expect(body.data.successItems.map((row: Record<string, unknown>) => row.e2et_order_title).sort())
+    // The public batch-create contract returns counters, not created records.
+    // Read every exact title back from persistence instead of trusting counters.
+    const persisted = await request.get('/api/dynamic/e2et_order/list', { params: {
+      pageNum: 1, pageSize: rows.length,
+      filters: JSON.stringify([{ fieldName: 'e2et_order_title', operator: 'IN',
+        value: rows.map(row => row.e2et_order_title) }]),
+    } });
+    expect(persisted.ok(), await persisted.text()).toBeTruthy();
+    const stored = await persisted.json();
+    expect(String(stored.code), JSON.stringify(stored)).toBe('0');
+    expect(stored.data.total).toBe(rows.length);
+    expect(stored.data.records).toHaveLength(rows.length);
+    expect(stored.data.records.map((row: Record<string, unknown>) => row.e2et_order_title).sort())
       .toEqual(rows.map(row => row.e2et_order_title).sort());
   }
 });
