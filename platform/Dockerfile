@@ -122,7 +122,7 @@ FROM ${RUNTIME_JRE_IMAGE}
 WORKDIR /app
 
 # Install wget for health checks
-RUN apk add --no-cache wget zlib=1.4-r0
+RUN apk add --no-cache wget zlib=1.4-r0 gnutls=3.8.14-r0
 
 # Create non-root user
 RUN addgroup -g 1000 appuser && \

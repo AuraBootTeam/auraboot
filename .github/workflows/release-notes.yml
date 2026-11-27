@@ -1,11 +1,13 @@
 name: Release notes
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
+      publish:
+        description: 'Publish release notes (requires explicit release authorization)'
+        required: true
+        type: boolean
+        default: false
       version:
         description: 'Release version, without the leading v'
         required: true
@@ -21,6 +23,7 @@ permissions:
 
 jobs:
   publish:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish == true
     name: Publish GitHub Release notes
     runs-on: ubuntu-latest
     steps:
