@@ -101,9 +101,19 @@ async function verifyPublicationDenied(page: Page, session: Session, screenshotP
           expect(artifact.status()).toBe(200); result.push(await artifact.text());
         }
       }
-      for (const kind of ['resources', 'queries']) {
+      for (const [kind, fixtureCode] of [['resources', resourceCode], ['queries', queryCode]]) {
         const grants = await adminContext.get(`${WEB_BASE_URL}/api/open-platform/installations/${installationPid}/${kind}`, { headers: sessionHeaders(admin) });
-        expect(grants.status()).toBe(200); result.push((await grants.json()).data);
+        expect(grants.status()).toBe(200);
+        const catalog = (await grants.json()).data as Array<{ code: string; policy: unknown }>;
+        expect(Array.isArray(catalog)).toBe(true);
+        expect(catalog.filter(entry => entry.code === fixtureCode)).toHaveLength(1);
+        for (const entry of catalog) expect(entry).toHaveProperty('policy');
+        // This endpoint includes every globally published definition, even when
+        // this installation has no grant. Concurrent publication journeys may
+        // add null-policy catalog entries; retain our exact fixture and ALL
+        // actual installation grants, including any unexpected added grant.
+        result.push(catalog.filter(entry => entry.code === fixtureCode || entry.policy !== null)
+          .sort((left, right) => left.code.localeCompare(right.code)));
       }
       return result;
     };
