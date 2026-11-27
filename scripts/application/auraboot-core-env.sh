@@ -236,6 +236,29 @@ stop_app() {
 }
 destroy() { stop_app; dropdb -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" --if-exists "$DB_NAME"; }
 
+# Release artifacts also use this entry without going through Workspace allocation.
+case "$ACTION" in
+  start)
+    capacity_state="$STATE_ROOT"
+    [[ "$capacity_state" = /* ]] || capacity_state="$(pwd -P)/$capacity_state"
+    physical_state="$capacity_state"
+    if [[ -d "$(dirname "$capacity_state")" ]]; then
+      physical_state="$(cd -- "$(dirname "$capacity_state")" && pwd -P)/$(basename "$capacity_state")"
+    fi
+    for location in "$(pwd -P)" "$capacity_state" "$physical_state" "$(cd -- "$ARTIFACT_ROOT" && pwd -P)"; do
+      case "$location" in
+        */.workspace/crm-stack|*/.workspace/crm-stack/*)
+          stack_root="${location%%/.workspace/crm-stack*}/.workspace/crm-stack"
+          if [[ "${AURA_CRM_STACK_GUARDED_STATE:-}" != "$capacity_state" || "${AURA_CRM_STACK_GUARD_PID:-}" != "$PPID" ]]; then
+            capacity_guard="$stack_root/../../tools/workspace-runtime/crm-stack-capacity.py"
+            [[ -f "$capacity_guard" ]] || { echo "Missing shared runtime capacity guard: $capacity_guard" >&2; exit 2; }
+            exec python3 "$capacity_guard" "$stack_root" "$capacity_state" -- "$BASH" "${BASH_SOURCE[0]}" "$ACTION" "$@"
+          fi
+          break ;;
+      esac
+    done ;;
+esac
+
 case "$ACTION" in
   preflight) preflight ;; create-db) create_db ;; migrate) migrate ;; start) start_app ;;
   init-core) init_core ;; publish) publish ;; verify) verify ;; stop) stop_app ;; destroy) destroy ;;
