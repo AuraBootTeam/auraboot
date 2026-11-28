@@ -5,6 +5,7 @@ import { createRequestKeySession, type RequestKeyIdentity } from './actions/requ
  */
 
 import type { UnifiedSchema } from '~/framework/meta/schemas/types';
+import { collectFormSections } from '~/framework/meta/schemas/formSections';
 import type { ExpressionContext, GlobalState } from '~/framework/meta/runtime/expression/context';
 import { ScopedStateManager } from '~/framework/meta/runtime/state/scoped-state';
 import { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
@@ -328,6 +329,10 @@ export class SchemaRuntime {
       if (block.fields) {
         fields.push(...block.fields);
       }
+    }
+
+    for (const section of collectFormSections(this.schema.blocks)) {
+      if (!this.schema.blocks.includes(section)) fields.push(...section.fields);
     }
 
     return fields;

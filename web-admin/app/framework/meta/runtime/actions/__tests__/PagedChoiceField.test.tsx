@@ -1,4 +1,5 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PagedChoiceField from '../PagedChoiceField';
 
@@ -13,6 +14,21 @@ const beta = { value: 'person-b', label: 'Beta member' };
 
 describe('bounded authorized choice field', () => {
   beforeEach(() => { vi.clearAllMocks(); state.user = { tenantId: 1, pid: 'publisher' }; });
+
+  it('keeps independent single choices checked when two fields use the same authorized endpoint', async () => {
+    state.fetchResult.mockResolvedValue(response([alpha, beta]));
+    function Pair() {
+      const [first, setFirst] = useState<string[]>([]), [second, setSecond] = useState<string[]>([]);
+      return <><fieldset aria-label="Source"><PagedChoiceField endpoint="/api/choices" value={first} onChange={setFirst} label="Source" multiple={false} /></fieldset>
+        <fieldset aria-label="Target"><PagedChoiceField endpoint="/api/choices" value={second} onChange={setSecond} label="Target" multiple={false} /></fieldset></>;
+    }
+    render(<Pair />);
+    const source = await within(screen.getByRole('group', { name: 'Source' })).findByRole('radio', { name: alpha.label });
+    const target = await within(screen.getByRole('group', { name: 'Target' })).findByRole('radio', { name: beta.label });
+    fireEvent.click(source); fireEvent.click(target);
+    await waitFor(() => { expect(source).toBeChecked(); expect(target).toBeChecked(); });
+    expect(source.getAttribute('name')).not.toBe(target.getAttribute('name'));
+  });
 
   it('single selection replaces the previous value while preserving bounded authorized hydration', async () => {
     state.fetchResult.mockResolvedValue(response([alpha, beta]));

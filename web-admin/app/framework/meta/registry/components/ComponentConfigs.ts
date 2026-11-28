@@ -223,9 +223,11 @@ export const FORM_COMPONENT_CONFIGS: ComponentConfig[] = [
         options: [
           { label: 'JSON', value: 'json' },
           { label: 'Schema', value: 'schema' },
+          { label: componentText('metadata.structuredForm'), value: 'structured' },
         ],
         group: 'basic',
       },
+      { key: 'structuredSchema', label: componentText('metadata.structuredFormSchema'), type: 'object', group: 'advanced' },
     ],
     tags: ['json', 'schema', 'editor', 'form'],
   },

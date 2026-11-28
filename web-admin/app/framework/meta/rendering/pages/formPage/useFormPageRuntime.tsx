@@ -1,4 +1,5 @@
 import { useMemo, useEffect } from 'react';
+import { collectFormSections } from '~/framework/meta/schemas/formSections';
 import { useUser, usePermissions } from '~/contexts/AuthContext';
 import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRuntime';
 import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
@@ -30,12 +31,12 @@ export function useFormPageRuntime({
   dirtyFieldsRef,
   setFormData,
 }: UseFormPageRuntimeArgs) {
-  // Flat field-name set from schema (form-section blocks).
+  // Same-scope field names include sections inside layout containers and steps.
   // Used for generic URL aliasing (e.g. ?modelCode=xxx → model_code) and for
   // deciding whether kind × capability validation applies to this form.
   const schemaFieldNames = useMemo(() => {
     const names = new Set<string>();
-    const blocks = (schema as any)?.blocks ?? [];
+    const blocks = collectFormSections(schema?.blocks);
     for (const b of blocks) {
       if (b?.blockType === 'form-section' && Array.isArray(b.fields)) {
         for (const f of b.fields) {
@@ -70,7 +71,7 @@ export function useFormPageRuntime({
   const schemaDefaultValues = useMemo(() => {
     if (isEditMode) return {} as Record<string, any>;
     const defaults: Record<string, any> = {};
-    const blocks = (schema as any)?.blocks ?? [];
+    const blocks = collectFormSections(schema?.blocks);
     for (const b of blocks) {
       if (b?.blockType === 'form-section' && Array.isArray(b.fields)) {
         for (const f of b.fields) {

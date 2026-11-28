@@ -1,4 +1,5 @@
 import { uploadCommandFile } from '~/framework/meta/utils/promptUpload';
+import { collectFormSections } from '~/framework/meta/schemas/formSections';
 import type { FieldMetaInfo, BomUploadReviewValueLike } from './formPageTypes';
 import { isDatetimeDataType, normalizeDateTimePayloadValue } from './formDateTime';
 import { isJsonLikeDataType, unwrapJsonLikeValue } from './formRecordValues';
@@ -26,21 +27,13 @@ export function isEmptySubmittedValue(value: any): boolean {
 export function collectSubmitPayloadFieldTypes(blocks: any[] | undefined): Record<string, string> {
   const fieldTypes: Record<string, string> = {};
 
-  const visit = (items: any[] | undefined) => {
-    for (const block of items ?? []) {
-      if (block?.blockType === 'form-section' && Array.isArray(block.fields)) {
-        for (const rawField of block.fields) {
-          const fieldCode = typeof rawField?.field === 'string' ? rawField.field : '';
-          if (!fieldCode || rawField.submitPayload !== true) continue;
-          fieldTypes[fieldCode] = String(rawField.dataType || 'string');
-        }
-      }
-      visit(block?.blocks);
-      visit(block?.tabs?.flatMap((tab: any) => tab?.blocks ?? []));
+  for (const block of collectFormSections(blocks)) {
+    for (const rawField of block.fields) {
+      const fieldCode = typeof rawField?.field === 'string' ? rawField.field : '';
+      if (!fieldCode || rawField.submitPayload !== true) continue;
+      fieldTypes[fieldCode] = String(rawField.dataType || 'string');
     }
-  };
-
-  visit(blocks);
+  }
   return fieldTypes;
 }
 

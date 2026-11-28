@@ -178,6 +178,64 @@ class PageSchemaValidatorBoundaryTest {
         assertFalse(codes(validate(manifest)).contains("S-PAGE-FORM-REQUIRED"));
     }
 
+    @ParameterizedTest
+    @CsvSource({"true,true,true,false", "false,true,true,true", "true,false,true,true", "true,true,false,true"})
+    void transientWizardFieldNeedsExplicitPayloadAndMatchingSubmitCommand(
+            boolean payload, boolean accepts, boolean modelMatches, boolean rejected) {
+        var field = Map.<String, Object>of("field", "definitionDraft", "label", "Application declaration", "submitPayload", payload);
+        var section = Map.<String, Object>of("id", "declaration", "blockType", "form-section", "fields", List.of(field));
+        var nested = Map.<String, Object>of("id", "wizard", "blockType", "form-wizard", "steps", List.of(Map.of("blocks", List.of(section))));
+        var page = page(nested); page.setKind("form");
+        page.setBlocks(List.of(nested, Map.of("id", "submit", "blockType", "form-buttons", "buttons", List.of(
+                Map.of("label", "Register application", "action", "save", "commandCode", "test:onboard"),
+                Map.of("label", "Cancel", "action", "cancel")))));
+        var manifest = manifest(page); manifest.setModelFieldBindings(List.of(binding("name", false)));
+        var command = new CommandDefinitionDTO(); command.setCode("test:onboard");
+        command.setModelCode(modelMatches ? "test_entity" : "other_entity");
+        command.setInputFields(accepts ? List.of("definitionDraft") : List.of("name"));
+        manifest.setCommands(List.of(command));
+        var findings = validate(manifest);
+        assertEquals(rejected, codes(findings).contains("S-PAGE-FIELD-REF"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false,false,false", "true,false,true", "false,true,true"})
+    void transientInputCannotEscapeIntoOtherModelsOrImplicitSubmitCommands(
+            boolean otherModel, boolean implicitSave, boolean rejected) {
+        var section = new HashMap<String, Object>(Map.of("id", "declaration", "blockType", "form-section", "fields", List.of(
+                Map.of("field", "definitionDraft", "label", "Application declaration", "submitPayload", true))));
+        if (otherModel) section.put("modelCode", "other_entity");
+        var page = page(section); page.setKind("form");
+        var buttons = new ArrayList<Object>();
+        buttons.add(Map.of("label", "Register application", "action", Map.of("type", "command", "command", "test:onboard")));
+        if (implicitSave) buttons.add(Map.of("label", "Save application", "action", "save"));
+        page.setBlocks(List.of(section, Map.of("id", "submit", "blockType", "form-buttons", "buttons", buttons)));
+        var manifest = manifest(page); var other = binding("name", false); other.setModelCode("other_entity");
+        manifest.setModelFieldBindings(List.of(binding("name", false), other));
+        var command = new CommandDefinitionDTO(); command.setCode("test:onboard"); command.setModelCode("test_entity");
+        command.setInputFields(List.of("definitionDraft")); manifest.setCommands(List.of(command));
+        assertEquals(rejected, codes(validate(manifest)).contains("S-PAGE-FIELD-REF"));
+    }
+
+    @Test
+    void nestedUnknownBlocksAndMissingIdsCannotEscapeValidation() {
+        var nested = Map.<String, Object>of("id", "wizard", "blockType", "form-wizard", "steps", List.of(
+                Map.of("blocks", List.of(Map.of("blockType", "unregistered-widget")))));
+        var findings = validate(page(nested));
+        assertTrue(codes(findings).contains("S-PAGE-BLOCK-TYPE"));
+        assertTrue(codes(findings).contains("S-PAGE-BLOCK-ID"));
+        assertTrue(findings.stream().anyMatch(message -> message.getPath().contains("steps[0].blocks[0]")));
+    }
+
+    @Test
+    void nestedTabSectionsRetainTheirModelFieldChecks() {
+        var section = Map.<String, Object>of("id", "declaration", "blockType", "form-section", "fields", List.of(
+                Map.of("field", "unbound", "label", "Unbound field")));
+        var nested = Map.<String, Object>of("id", "tabs", "blockType", "tabs", "tabs", List.of(Map.of("blocks", List.of(section))));
+        var manifest = manifest(page(nested)); manifest.setModelFieldBindings(List.of(binding("name", false)));
+        assertTrue(codes(validate(manifest)).contains("S-PAGE-FIELD-REF"));
+    }
+
     private List<PluginValidationMessage> validate(PageSchemaDTO page) { return validate(manifest(page)); }
     private List<PluginValidationMessage> validate(PluginManifestExtended manifest) { return validator.validate(PluginValidationContext.builder().manifest(manifest).build()); }
     private List<String> codes(List<PluginValidationMessage> messages) { return messages.stream().map(PluginValidationMessage::getCode).toList(); }

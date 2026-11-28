@@ -95,9 +95,10 @@ export function useFormSubmission({
   locale,
 }: UseFormSubmissionArgs) {
   const requestIdentity = useRef<CommandRequestIdentity | undefined>(undefined);
+  const actionInFlight = useRef(false);
   // In new mode, override form button commandCodes with the create command
   // so that save_draft/submit use CREATE instead of UPDATE
-  const handleFormAction = useCallback(
+  const executeFormAction = useCallback(
     async (button: { commandCode?: string; [key: string]: any }) => {
       const leaveActions = ['cancel', 'back', 'close'];
       if (
@@ -141,14 +142,13 @@ export function useFormSubmission({
         setFieldErrors({});
         setSummaryErrors([]);
         setSubmitting(true);
-        onSubmitOverride(formData)
+        return onSubmitOverride(formData)
           .catch((err) => {
             const errorMessage = err instanceof Error ? err.message : 'Submit failed';
             setError(errorMessage);
             showErrorToast(errorMessage);
           })
           .finally(() => setSubmitting(false));
-        return;
       }
       const mergedEditData = recordPid
         ? { ...(initialFormData || {}), ...formData, pid: recordPid }
@@ -318,7 +318,7 @@ export function useFormSubmission({
         );
         requestIdentity.current = request.identity;
         setSubmitting(true);
-        fetchResult(`/api/meta/commands/execute/${effectiveCommandCode}`, {
+        return fetchResult(`/api/meta/commands/execute/${effectiveCommandCode}`, {
           method: 'post',
           params: {
             ...buildCommandTargetParams(targetRecordPid),
@@ -431,7 +431,6 @@ export function useFormSubmission({
             showErrorToast(errorMessage);
           })
           .finally(() => setSubmitting(false));
-        return;
       }
 
       // MODEL form path: when no commandCode is provided, persist via dynamic CRUD API.
@@ -528,6 +527,21 @@ export function useFormSubmission({
       setSubmitting,
       setSummaryErrors,
     ],
+  );
+  const handleFormAction = useCallback(
+    async (button: { commandCode?: string; [key: string]: any }) => {
+      if (shouldBypassFormSubmit(button, resolveActionType(button.action))) {
+        return executeFormAction(button);
+      }
+      if (actionInFlight.current) return;
+      actionInFlight.current = true;
+      try {
+        return await executeFormAction(button);
+      } finally {
+        actionInFlight.current = false;
+      }
+    },
+    [executeFormAction],
   );
   return { handleFormAction };
 }

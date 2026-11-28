@@ -36,6 +36,10 @@
 #       --extra-plugin-root: repeatable explicit fallback after this checkout's OSS plugins;
 #                            sibling plugin repositories are never guessed implicitly.
 #       --source key=path: explicit owner for each external plugin root; Core binds itself.
+#       After an explicit governed primary-source migration, rebind persistent file ownership
+#       before up: node scripts/lib/golden-file-storage.mjs rebind-source <name> <new-core-root>
+#       <canonical-aura> <completed-generation> --dry-run, then the same with --expect <marker-sha>.
+#       This separate stopped-store CAS preserves bytes and paths; up never adopts another lease.
 #       --workspace-source-root: bind the immutable `workspace` source identity from this
 #                   clean frozen checkout instead of leaving the shared control root
 #                   unbound. The management entry (canonical aura CLI) is unaffected; the
