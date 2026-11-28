@@ -269,6 +269,40 @@ describe('Structured JSON field controls', () => {
     );
   });
 
+  it('selects current sibling rows and rejects references after their source changes', () => {
+    const shape: StructuredJsonSchema = {
+      ...schema,
+      properties: {
+        ...schema.properties,
+        selected: {
+          type: 'string',
+          title: 'Source',
+          'x-optionsFrom': { collection: 'repositories', valueField: 'name', labelField: 'name' },
+        },
+      },
+    };
+    const { latest } = setup({ repositories: [{ name: 'Core' }, { name: 'Quote' }] }, shape);
+    fireEvent.click(screen.getByTestId('select-trigger-draft.selected'));
+    fireEvent.click(screen.getByRole('option', { name: 'Quote' }));
+    expect(latest().selected).toBe('Quote');
+    expect(structuredJsonError(latest(), shape)).toBeUndefined();
+    fireEvent.change(screen.getAllByRole('textbox', { name: /^Repository name\*?$/ })[1], {
+      target: { value: 'Quote renamed' },
+    });
+    expect(latest().selected).toBe('Quote'); // Never silently remap an existing reference.
+    expect(structuredJsonError(latest(), shape)).toContain('Select Source again');
+    fireEvent.click(screen.getByTestId('select-trigger-draft.selected'));
+    fireEvent.click(screen.getByRole('option', { name: 'Quote renamed' }));
+    expect(latest().selected).toBe('Quote renamed');
+    expect(structuredJsonError(latest(), shape)).toBeUndefined();
+    expect(
+      structuredJsonError(
+        { ...latest(), repositories: [{ name: 'Quote renamed' }, { name: 'Quote renamed' }] },
+        shape,
+      ),
+    ).toContain('ambiguous');
+  });
+
   it('does not repair malformed existing JSON on mount', () => {
     const change = vi.fn();
     render(

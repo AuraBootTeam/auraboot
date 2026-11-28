@@ -34,6 +34,7 @@ export interface StructuredJsonSchema {
   'x-enumLabels'?: LocalizedText[];
   'x-dataSource'?: DataSourceConfig;
   'x-hidden'?: boolean;
+  'x-optionsFrom'?: { collection: string; valueField: string; labelField: string };
 }
 
 const ajv = new Ajv({ allErrors: true, strict: false, logger: false, ownProperties: true });
@@ -69,6 +70,7 @@ const KEYS = new Set([
   'x-enumLabels',
   'x-dataSource',
   'x-hidden',
+  'x-optionsFrom',
 ]);
 const RESERVED_FIELDS = new Set(['__proto__', 'prototype', 'constructor']);
 
@@ -115,6 +117,25 @@ function checkSchema(schema: StructuredJsonSchema, depth = 0, conditional = fals
       throw new StructuredJsonSchemaError('Reference values must be strings');
     if (!['api', 'static'].includes(schema['x-dataSource'].type || 'api'))
       throw new StructuredJsonSchemaError('Unsupported reference data source');
+  }
+  if (schema['x-optionsFrom']) {
+    const reference = schema['x-optionsFrom'];
+    if (
+      schema.type !== 'string' ||
+      schema.enum ||
+      schema['x-dataSource'] ||
+      Object.keys(reference).some(
+        (key) => !['collection', 'valueField', 'labelField'].includes(key),
+      ) ||
+      Object.values(reference).length !== 3 ||
+      ![reference.collection, reference.valueField, reference.labelField].every(
+        (key) =>
+          typeof key === 'string' &&
+          /^[A-Za-z][A-Za-z0-9_]*$/.test(key) &&
+          !RESERVED_FIELDS.has(key),
+      )
+    )
+      throw new StructuredJsonSchemaError('Invalid local reference collection');
   }
   if (schema['x-enumLabels'] && schema['x-enumLabels'].length !== schema.enum?.length)
     throw new StructuredJsonSchemaError('Choice labels must match values');
@@ -171,6 +192,59 @@ export function resolveStructuredSchema(
         required: [...new Set([...(schema.required || []), ...(branch.required || [])])],
       }
     : schema;
+}
+
+/** Read current sibling rows without evaluation, external requests or state mutation. */
+export function structuredJsonLocalOptions(
+  schema: StructuredJsonSchema,
+  root: unknown,
+): Array<{ value: string; label: string }> {
+  const reference = schema['x-optionsFrom'];
+  if (!reference || !root || typeof root !== 'object' || Array.isArray(root)) return [];
+  const rows = (root as Record<string, unknown>)[reference.collection];
+  if (!Array.isArray(rows)) return [];
+  const options = new Map<string, string>();
+  for (const row of rows) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) continue;
+    const value = row[reference.valueField];
+    const label = row[reference.labelField];
+    if (typeof value === 'string' && value.trim() && typeof label === 'string' && label.trim()) {
+      if (options.has(value)) return []; // Ambiguous keys cannot be selected.
+      options.set(value, label);
+    }
+  }
+  return [...options].map(([value, label]) => ({ value, label }));
+}
+
+function unresolvedLocalReference(
+  schema: StructuredJsonSchema,
+  value: unknown,
+  root: unknown,
+): StructuredJsonSchema | undefined {
+  if (value === undefined || value === null) return undefined;
+  const resolved = resolveStructuredSchema(schema, value);
+  if (
+    resolved['x-optionsFrom'] &&
+    !structuredJsonLocalOptions(resolved, root).some((option) => option.value === value)
+  )
+    return resolved;
+  if (resolved.type === 'object' && typeof value === 'object' && !Array.isArray(value)) {
+    for (const [key, child] of Object.entries(resolved.properties || {})) {
+      const missing = unresolvedLocalReference(
+        child,
+        (value as Record<string, unknown>)[key],
+        root,
+      );
+      if (missing) return missing;
+    }
+  }
+  if (resolved.type === 'array' && Array.isArray(value)) {
+    for (const row of value) {
+      const missing = unresolvedLocalReference(resolved.items!, row, root);
+      if (missing) return missing;
+    }
+  }
+  return undefined;
 }
 
 export function structuredJsonDefault(schema: StructuredJsonSchema): unknown {
@@ -248,7 +322,14 @@ export function structuredJsonError(
     return zh
       ? '内容超出可编辑范围或数字精度限制。'
       : 'The value exceeds the editable size or numeric precision limit.';
-  if (validate(parsed)) return undefined;
+  if (validate(parsed)) {
+    const reference = unresolvedLocalReference(schema, parsed, parsed);
+    if (!reference) return undefined;
+    const label = structuredJsonLabel(reference, locale) || (zh ? '此项' : 'This field');
+    return zh
+      ? `请重新选择${label}，原条目已不存在或不唯一。`
+      : `Select ${label} again; its source entry is missing or ambiguous.`;
+  }
   const error = (validate.errors || []).find((item) => item.keyword !== 'if') as
     | ErrorObject
     | undefined;

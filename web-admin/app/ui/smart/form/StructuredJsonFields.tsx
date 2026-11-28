@@ -9,6 +9,7 @@ import {
   structuredJsonDefault,
   structuredJsonError,
   structuredJsonLabel,
+  structuredJsonLocalOptions,
   structuredJsonConfigurationError,
   structuredJsonValueWithinLimits,
   type StructuredJsonSchema,
@@ -25,6 +26,7 @@ interface Props {
   readOnly?: boolean;
   required?: boolean;
   showErrors?: boolean;
+  rootValue?: unknown;
 }
 
 /** Only schema-described controls are editable; partial schemas preserve sibling data. */
@@ -37,6 +39,7 @@ function Node({
   disabled,
   readOnly,
   required,
+  rootValue,
 }: Props) {
   const schema = resolveStructuredSchema(source, value);
   const locale = context?.locale || 'en';
@@ -108,6 +111,7 @@ function Node({
             >
               <Node
                 schema={child}
+                rootValue={rootValue}
                 value={object[key]}
                 name={`${name}.${key}`}
                 context={context}
@@ -172,6 +176,7 @@ function Node({
             </div>
             <Node
               schema={schema.items!}
+              rootValue={rootValue}
               value={row}
               name={`${name}.${index}`}
               context={context}
@@ -225,6 +230,19 @@ function Node({
             throw new Error('Invalid structured choice');
           onChange(choices[index]);
         }}
+      />
+    );
+  }
+  if (schema['x-optionsFrom']) {
+    const options = structuredJsonLocalOptions(schema, rootValue);
+    return (
+      <Select
+        {...shared}
+        value={value as string | undefined}
+        options={options}
+        clearable={!required}
+        disabled={disabled || options.length === 0}
+        onChange={(next) => onChange(next || undefined)}
       />
     );
   }
@@ -305,7 +323,7 @@ export function StructuredJsonFields(props: Props) {
     );
   return (
     <div className="min-w-0 space-y-2" data-testid={`structured-json-${props.name}`}>
-      <Node {...props} value={value} />
+      <Node {...props} value={value} rootValue={value} />
       {error && props.showErrors && (
         <p role="alert" className="text-status-red text-sm">
           {error}
