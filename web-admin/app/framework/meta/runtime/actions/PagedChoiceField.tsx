@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useAuth } from '~/contexts/AuthContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { fetchResult } from '~/shared/services/http-client';
@@ -18,6 +18,7 @@ export default function PagedChoiceField({ endpoint, value, onChange, label, mul
 }
 
 function PagedChoiceSession({ identity, endpoint, value, onChange, label, multiple }: Props & { identity: string }) {
+  const radioGroup = useId();
   const { locale, t } = useI18n();
   const text = (key: keyof typeof TEXT) => getLocalizedText(TEXT[key], locale, t);
   const currentIdentity = useRef(identity); currentIdentity.current = identity;
@@ -90,7 +91,7 @@ function PagedChoiceSession({ identity, endpoint, value, onChange, label, multip
     {unavailable && <p role="alert" className="px-3 py-2 text-sm text-amber-700">{text('unavailable')}</p>}
     <div className="max-h-48 overflow-y-auto">
       {choices.map(choice => <label key={choice.value} className="flex min-h-11 cursor-pointer items-center gap-3 border-t border-gray-100 px-3 py-2 text-sm">
-        <input type={multiple ? 'checkbox' : 'radio'} name={multiple ? undefined : identity}
+        <input type={multiple ? 'checkbox' : 'radio'} name={multiple ? undefined : radioGroup}
           checked={value.includes(choice.value)} onChange={() => onChange(!multiple ? [choice.value] : value.includes(choice.value)
           ? value.filter(id => id !== choice.value) : [...value, choice.value])} />
         <span className="min-w-0 break-words">{getLocalizedText(choice.label, locale, t)}</span>

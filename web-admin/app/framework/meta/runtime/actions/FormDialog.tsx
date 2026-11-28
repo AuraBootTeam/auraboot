@@ -560,7 +560,7 @@ function FormDialogHost() {
       if (
         field.type === 'multiselect' &&
         field.props?.selectionMode === 'single' &&
-        (!Array.isArray(value) || value.length !== 1)
+        (!Array.isArray(value) || value.length > 1 || (field.required && value.length !== 1))
       ) {
         newErrors[field.field] = buildRequiredFieldMessage(
           getLocalizedText(field.label, locale, t),
