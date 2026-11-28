@@ -5,6 +5,7 @@
 
 import type { ReactNode, CSSProperties, ComponentType } from 'react';
 import type { LocalizedText } from '~/framework/meta/schemas/types';
+import type { StructuredJsonSchema } from './structured-json';
 
 // 基础组件属性
 export interface BaseSmartComponentProps {
@@ -118,7 +119,8 @@ export interface TextareaProps extends FormFieldProps {
 export interface JsonEditorProps extends TextareaProps {
   readOnly?: boolean;
   formatOnBlur?: boolean;
-  mode?: 'json' | 'schema';
+  mode?: 'json' | 'schema' | 'structured';
+  structuredSchema?: StructuredJsonSchema;
   invalidMessage?: string | LocalizedText;
 }
 

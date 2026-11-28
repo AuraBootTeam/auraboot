@@ -1,4 +1,12 @@
 {
+  "metadata.structuredForm": {
+    "zh-CN": "结构化表单",
+    "en-US": "Structured form"
+  },
+  "metadata.structuredFormSchema": {
+    "zh-CN": "结构化字段定义",
+    "en-US": "Structured field schema"
+  },
   "metadata.widthGridColumns": {
     "zh-CN": "宽度(Grid列数)",
     "en-US": "Width (grid columns)"

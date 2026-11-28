@@ -1,5 +1,9 @@
 import { useCallback } from 'react';
 import { collectFormSections } from '~/framework/meta/schemas/formSections';
+import {
+  structuredJsonConfigurationError,
+  structuredJsonError,
+} from '~/framework/smart/schema/structured-json';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { evaluateCondition } from '~/framework/meta/runtime/expression/evaluator';
 import { scrollToFormField } from '~/framework/meta/rendering/pages/form/scrollToFormField';
@@ -92,6 +96,18 @@ export function useFormValidation({
           if (jsonValueError) {
             nextFieldErrors[rawField.field] = jsonValueError;
             continue;
+          }
+          if (rawField.props?.mode === 'structured') {
+            const schema = rawField.props.structuredSchema;
+            const structuredError =
+              structuredJsonConfigurationError(schema, locale) ||
+              (value !== undefined && value !== null && value !== ''
+                ? structuredJsonError(value, schema, locale)
+                : undefined);
+            if (structuredError) {
+              nextFieldErrors[rawField.field] = structuredError;
+              continue;
+            }
           }
           for (const rule of rules) {
             if (!rule?.type) continue;

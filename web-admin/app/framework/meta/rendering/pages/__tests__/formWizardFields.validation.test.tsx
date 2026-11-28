@@ -90,6 +90,66 @@ describe('Wizard fields retain the native form contract', () => {
     expect(result.current.validateFormBeforeSubmit().fieldErrors.futureValue).toBeTruthy();
   });
 
+  it('blocks Next and final submission for syntactically valid JSON with missing nested fields', () => {
+    const current = {
+      ...section,
+      fields: [
+        {
+          field: 'definitionDraft',
+          dataType: 'jsonb',
+          required: true,
+          submitPayload: true,
+          props: {
+            mode: 'structured',
+            structuredSchema: {
+              type: 'object',
+              required: ['repositories'],
+              properties: {
+                repositories: {
+                  type: 'array',
+                  minItems: 1,
+                  items: {
+                    type: 'object',
+                    required: ['name'],
+                    properties: {
+                      name: { type: 'string', title: 'Repository name', minLength: 1 },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      ],
+    };
+    const { result, rerender } = renderHook(
+      ({ value }: { value: string }) =>
+        useFormValidation({
+          schema: { blocks: [{ ...wizard, steps: [{ blocks: [current] }] }] },
+          recordPid: null,
+          initialFormData: {},
+          formData: { definitionDraft: value },
+          pageContext: { form: {} },
+          modelFields: {},
+          t: (key: string) => key,
+          locale: 'en',
+          hasModelCodeAndKindFields: false,
+          kindCapabilities: null,
+          showErrorToast: vi.fn(),
+        } as any),
+      { initialProps: { value: '{"repositories":[{}]}' } },
+    );
+    expect(
+      result.current.validateFormBeforeSubmit([current]).fieldErrors.definitionDraft,
+    ).toContain('Repository name');
+    expect(result.current.validateFormBeforeSubmit().fieldErrors.definitionDraft).toContain(
+      'Repository name',
+    );
+    rerender({ value: '{"repositories":[{"name":"Core"}]}' });
+    expect(result.current.validateFormBeforeSubmit([current]).fieldErrors).toEqual({});
+    expect(result.current.validateFormBeforeSubmit().fieldErrors).toEqual({});
+  });
+
   it('walks nested tabs and steps without flattening child-form and row fields', () => {
     const child = {
       ...section,

@@ -14,6 +14,8 @@ import {
   fieldVariantStyles,
 } from '~/ui/ui/field-styles';
 import { sanitizeSmartDomProps } from './domProps';
+import { StructuredJsonFields } from './StructuredJsonFields';
+import type { StructuredJsonSchema } from '~/framework/smart/schema/structured-json';
 
 type JsonValidationState =
   | { valid: true; parsed?: unknown }
@@ -78,6 +80,7 @@ export const JsonEditor = forwardRef<HTMLTextAreaElement, JsonEditorProps>(
       readOnly = false,
       formatOnBlur = false,
       mode = 'json',
+      structuredSchema,
       invalidMessage,
       ...restProps
     },
@@ -167,6 +170,33 @@ export const JsonEditor = forwardRef<HTMLTextAreaElement, JsonEditorProps>(
 
     if (!isVisible) {
       return null;
+    }
+
+    if (mode === 'structured') {
+      return (
+        <FieldBase
+          id={name}
+          label={labelText}
+          required={requiredValue}
+          error={requiredError}
+          className={clsx('space-y-1', className)}
+        >
+          <StructuredJsonFields
+            name={name || 'structured-field'}
+            schema={structuredSchema as StructuredJsonSchema}
+            value={draft}
+            required={requiredValue}
+            disabled={isDisabled}
+            readOnly={readOnly}
+            context={context}
+            showErrors={jsonTouched || externalMeta.showError}
+            onChange={(next) => {
+              setJsonTouched(true);
+              emitChange(next === undefined ? '' : JSON.stringify(next));
+            }}
+          />
+        </FieldBase>
+      );
     }
 
     return (

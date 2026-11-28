@@ -188,6 +188,8 @@ public class PageSchemaValidator implements PluginValidator {
                 }
             }
 
+            Set<String> commandInputs = formCommandInputs(page, manifest);
+
             // Validate blocks (on DTO directly)
             List<Object> blocks = page.getBlocks();
             if (blocks == null || blocks.isEmpty()) {
@@ -199,13 +201,6 @@ public class PageSchemaValidator implements PluginValidator {
                         ? colsNum.intValue() : 12;
                 for (int j = 0; j < blocks.size(); j++) {
                     if (blocks.get(j) instanceof Map<?, ?> block) {
-                        Object blockType = block.get("blockType");
-                        if (blockType != null && !blockTypesFor(page).contains(blockType.toString())) {
-                            messages.add(error("S-PAGE-BLOCK-TYPE", category(),
-                                    path + ".blocks[" + j + "].blockType",
-                                    "Page '" + pageKey + "' has unknown blockType: '" +
-                                            blockType + "'"));
-                        }
                         // v4 grid blocks must fit within the page grid width (col + colSpan <= cols).
                         if (block.get("layout") instanceof Map<?, ?> bl && bl.get("col") instanceof Number colNum) {
                             int col = colNum.intValue();
@@ -218,8 +213,10 @@ public class PageSchemaValidator implements PluginValidator {
                                                 + ". v4 grid blocks must satisfy col + colSpan <= cols."));
                             }
                         }
-                        validateBlockContract(page, path, pageKey, j, (Map<String, Object>) block,
-                                modelIndex, messages);
+                        validateBlockContract(page, path + ".blocks[" + j + "]", pageKey, (Map<String, Object>) block,
+                                modelIndex, commandInputs, messages);
+                        validateNestedBlocks(page, path + ".blocks[" + j + "]", pageKey, block,
+                                modelIndex, commandInputs, messages);
                     }
                 }
             }
@@ -231,14 +228,91 @@ public class PageSchemaValidator implements PluginValidator {
         return messages;
     }
 
+    /** Transient fields are accepted only by every explicit submit command of this form. */
+    private Set<String> formCommandInputs(PageSchemaDTO page, PluginManifestExtended manifest) {
+        if (!"form".equals(page.getKind()) || manifest.getCommands() == null) return Set.of();
+        Set<String> codes = new LinkedHashSet<>();
+        collectFormCommands(page.getBlocks(), codes);
+        if (codes.isEmpty()) return Set.of();
+        Set<String> inputs = null;
+        for (String code : codes) {
+            var matches = manifest.getCommands().stream().filter(Objects::nonNull)
+                    .filter(command -> code.equals(command.getCode())).toList();
+            if (matches.size() != 1) return Set.of();
+            var command = matches.get(0);
+            if (!Objects.equals(command.getModelCode(), page.getModelCode()) || command.getInputFields() == null)
+                return Set.of();
+            if (command.getInputFields().stream().anyMatch(Objects::isNull)) return Set.of();
+            if (inputs == null) inputs = new LinkedHashSet<>(command.getInputFields());
+            else inputs.retainAll(command.getInputFields());
+        }
+        return inputs == null ? Set.of() : Set.copyOf(inputs);
+    }
+
+    private void collectFormCommands(List<?> blocks, Set<String> codes) {
+        if (blocks == null) return;
+        for (Object raw : blocks) {
+            if (!(raw instanceof Map<?, ?> block)) continue;
+            if ("form-buttons".equals(block.get("blockType")) && block.get("buttons") instanceof List<?> buttons) {
+                for (Object item : buttons) {
+                    if (!(item instanceof Map<?, ?> button) || "cancel".equals(button.get("action"))) continue;
+                    String code = stringValue(button.get("commandCode"));
+                    if (isBlank(code) && button.get("action") instanceof Map<?, ?> action
+                            && "command".equals(action.get("type"))) code = stringValue(action.get("command"));
+                    // An implicit save may resolve to a different model command at runtime.
+                    codes.add(isBlank(code) ? "" : code);
+                }
+            }
+            if (Set.of("subform", "sub-table", "repeater").contains(Objects.toString(block.get("blockType"), ""))) continue;
+            if (block.get("blocks") instanceof List<?> children) collectFormCommands(children, codes);
+            for (String containers : List.of("steps", "tabs")) {
+                if (block.get(containers) instanceof List<?> entries) {
+                    for (Object item : entries) if (item instanceof Map<?, ?> entry
+                            && entry.get("blocks") instanceof List<?> children) collectFormCommands(children, codes);
+                }
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void validateNestedBlocks(PageSchemaDTO page, String path, String pageKey, Map<?, ?> block,
+                                     PageModelIndex index, Set<String> commandInputs,
+                                     List<PluginValidationMessage> messages) {
+        Set<String> inputs = Set.of("subform", "sub-table", "repeater").contains(Objects.toString(block.get("blockType"), ""))
+                ? Set.of() : commandInputs;
+        if (block.get("blocks") instanceof List<?> children)
+            validateChildBlocks(page, path + ".blocks", pageKey, children, index, inputs, messages);
+        for (String key : List.of("steps", "tabs")) {
+            if (block.get(key) instanceof List<?> entries) {
+                for (int i = 0; i < entries.size(); i++) {
+                    if (entries.get(i) instanceof Map<?, ?> entry && entry.get("blocks") instanceof List<?> children)
+                        validateChildBlocks(page, path + "." + key + "[" + i + "].blocks", pageKey,
+                                children, index, inputs, messages);
+                }
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void validateChildBlocks(PageSchemaDTO page, String path, String pageKey, List<?> children,
+                                     PageModelIndex index, Set<String> commandInputs,
+                                     List<PluginValidationMessage> messages) {
+        for (int i = 0; i < children.size(); i++) {
+            if (children.get(i) instanceof Map<?, ?> child) {
+                String childPath = path + "[" + i + "]";
+                validateBlockContract(page, childPath, pageKey, (Map<String, Object>) child, index, commandInputs, messages);
+                validateNestedBlocks(page, childPath, pageKey, child, index, commandInputs, messages);
+            }
+        }
+    }
+
     private void validateBlockContract(PageSchemaDTO page,
-                                       String pagePath,
+                                       String blockPath,
                                        String pageKey,
-                                       int blockIndex,
                                        Map<String, Object> block,
                                        PageModelIndex modelIndex,
+                                       Set<String> commandInputs,
                                        List<PluginValidationMessage> messages) {
-        String blockPath = pagePath + ".blocks[" + blockIndex + "]";
 
         String blockId = stringValue(block.get("id"));
         if (isBlank(blockId)) {
@@ -249,6 +323,8 @@ public class PageSchemaValidator implements PluginValidator {
 
         String blockType = stringValue(block.get("blockType"));
         if (isBlank(blockType) || !blockTypesFor(page).contains(blockType)) {
+            messages.add(error("S-PAGE-BLOCK-TYPE", category(), blockPath + ".blockType",
+                    "Page '" + pageKey + "' has unsupported blockType: '" + blockType + "'."));
             return;
         }
 
@@ -286,7 +362,8 @@ public class PageSchemaValidator implements PluginValidator {
         }
 
         if (FORM_FIELD_BLOCK_TYPES.contains(blockType)) {
-            validateFormSectionBlock(pageKey, blockPath, block, page.getKind(), effectiveModelCode, modelIndex, messages);
+            validateFormSectionBlock(pageKey, blockPath, block, page.getKind(), effectiveModelCode, modelIndex,
+                    Objects.equals(effectiveModelCode, page.getModelCode()) ? commandInputs : Set.of(), messages);
             return;
         }
 
@@ -397,6 +474,7 @@ public class PageSchemaValidator implements PluginValidator {
                                           String pageKind,
                                           String modelCode,
                                           PageModelIndex modelIndex,
+                                          Set<String> commandInputs,
                                           List<PluginValidationMessage> messages) {
         Object fieldsObj = block.get("fields");
         if (!(fieldsObj instanceof List<?> fields) || fields.isEmpty()) {
@@ -412,8 +490,12 @@ public class PageSchemaValidator implements PluginValidator {
             }
             Map<String, Object> field = (Map<String, Object>) fieldRaw;
             String fieldPath = blockPath + ".fields[" + i + "]";
-            String fieldCode = validateFieldReference(pageKey, fieldPath + ".field", field.get("field"),
-                    modelCode, modelIndex, messages);
+            String inputCode = stringValue(field.get("field"));
+            boolean commandInput = "form".equals(pageKind) && Boolean.TRUE.equals(field.get("submitPayload"))
+                    && !isBlank(inputCode) && commandInputs.contains(inputCode);
+            String fieldCode = commandInput ? inputCode
+                    : validateFieldReference(pageKey, fieldPath + ".field", field.get("field"),
+                            modelCode, modelIndex, messages);
             validateRawLabelIfPresent(pageKey, fieldPath + ".label", field.get("label"), field, messages);
             if ("form".equals(pageKind)) {
                 validateRequiredFieldProjection(pageKey, fieldPath, fieldCode, field, modelCode, modelIndex, messages);
