@@ -105,6 +105,40 @@ describe('Structured JSON field controls', () => {
     expect(latest()).toEqual({ visible: 'After', hidden: 'retained' });
   });
 
+  it('shows schema guidance on text, number, switch and reference controls, including readonly review', () => {
+    setup(
+      { title: 'Package', port: 8080, required: true, kind: 'archive' },
+      {
+        type: 'object',
+        required: ['title', 'port', 'required', 'kind'],
+        properties: {
+          title: { type: 'string', title: 'Title', 'x-helpText': { en: 'Text guidance' } },
+          port: { type: 'integer', title: 'Port', 'x-helpText': { en: 'Port guidance' } },
+          required: {
+            type: 'boolean',
+            title: 'Required',
+            'x-helpText': { en: 'Required guidance' },
+          },
+          kind: {
+            type: 'string',
+            title: 'Kind',
+            enum: ['archive'],
+            'x-helpText': { en: 'Package inheritance guidance' },
+          },
+        },
+      },
+      { readOnly: true },
+    );
+    for (const text of [
+      'Text guidance',
+      'Port guidance',
+      'Required guidance',
+      'Package inheritance guidance',
+    ]) {
+      expect(screen.getByText(text)).toBeVisible();
+    }
+  });
+
   it('preserves sibling-step data and exact remaining row values after removal', () => {
     const initial = {
       repositories: [{ name: 'Core' }, { name: 'Quote' }],

@@ -212,6 +212,12 @@ function Node({
     readOnly: locked,
     context,
     helpText: schema['x-helpText'] || schema.description,
+    expressions: {
+      helpText:
+        schema['x-helpText'] || schema.description
+          ? getLocalizedText(schema['x-helpText'] || schema.description, locale)
+          : undefined,
+    },
     placeholder: schema['x-placeholder']
       ? getLocalizedText(schema['x-placeholder'], locale)
       : undefined,
