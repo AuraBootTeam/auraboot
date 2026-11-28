@@ -86,6 +86,25 @@ describe('Structured JSON field controls', () => {
     expect(changes).toEqual([]);
   });
 
+  it('keeps hidden properties out of the grid while retaining their data', () => {
+    const { latest } = setup(
+      { visible: 'Before', hidden: 'retained' },
+      {
+        type: 'object',
+        required: ['visible', 'hidden'],
+        properties: {
+          visible: { type: 'string', title: 'Visible' },
+          hidden: { type: 'string', title: 'Hidden', 'x-hidden': true },
+        },
+      },
+    );
+    const field = screen.getByRole('textbox', { name: /^Visible\*?$/ });
+    const grid = field.closest('fieldset')!.querySelector('.grid')!;
+    expect(grid.children).toHaveLength(1);
+    fireEvent.change(field, { target: { value: 'After' } });
+    expect(latest()).toEqual({ visible: 'After', hidden: 'retained' });
+  });
+
   it('preserves sibling-step data and exact remaining row values after removal', () => {
     const initial = {
       repositories: [{ name: 'Core' }, { name: 'Quote' }],

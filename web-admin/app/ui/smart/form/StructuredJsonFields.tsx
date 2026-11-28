@@ -102,31 +102,35 @@ function Node({
           <p className="text-text-3 text-sm">{getLocalizedText(schema['x-helpText'], locale)}</p>
         )}
         <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-          {Object.entries(schema.properties || {}).map(([key, child]) => (
-            <div
-              key={key}
-              className={
-                ['object', 'array'].includes(child.type || '') ? 'min-w-0 sm:col-span-2' : 'min-w-0'
-              }
-            >
-              <Node
-                schema={child}
-                rootValue={rootValue}
-                value={object[key]}
-                name={`${name}.${key}`}
-                context={context}
-                required={schema.required?.includes(key)}
-                disabled={disabled}
-                readOnly={locked}
-                onChange={(next) => {
-                  const updated = { ...object };
-                  if (next === undefined) delete updated[key];
-                  else updated[key] = next;
-                  onChange(updated);
-                }}
-              />
-            </div>
-          ))}
+          {Object.entries(schema.properties || {})
+            .filter(([, child]) => !child['x-hidden'])
+            .map(([key, child]) => (
+              <div
+                key={key}
+                className={
+                  ['object', 'array'].includes(child.type || '')
+                    ? 'min-w-0 sm:col-span-2'
+                    : 'min-w-0'
+                }
+              >
+                <Node
+                  schema={child}
+                  rootValue={rootValue}
+                  value={object[key]}
+                  name={`${name}.${key}`}
+                  context={context}
+                  required={schema.required?.includes(key)}
+                  disabled={disabled}
+                  readOnly={locked}
+                  onChange={(next) => {
+                    const updated = { ...object };
+                    if (next === undefined) delete updated[key];
+                    else updated[key] = next;
+                    onChange(updated);
+                  }}
+                />
+              </div>
+            ))}
         </div>
         {!locked && !required && (
           <button
