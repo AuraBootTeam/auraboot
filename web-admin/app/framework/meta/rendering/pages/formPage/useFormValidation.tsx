@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { collectFormSections } from '~/framework/meta/schemas/formSections';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { evaluateCondition } from '~/framework/meta/runtime/expression/evaluator';
 import { scrollToFormField } from '~/framework/meta/rendering/pages/form/scrollToFormField';
@@ -29,6 +30,8 @@ type UseFormValidationArgs = Pick<
   > &
   Pick<ReturnType<typeof useFormMetadata>, 'modelFields'>;
 
+type ValidateForm = (stepBlocks?: readonly unknown[]) => FormValidationResult;
+
 export function useFormValidation({
   schema,
   recordPid,
@@ -42,194 +45,200 @@ export function useFormValidation({
   kindCapabilities,
   showErrorToast,
 }: UseFormValidationArgs) {
-  const validateFormBeforeSubmit = useCallback((): FormValidationResult => {
-    if (!schema?.blocks) {
-      return { fieldErrors: {}, summaryErrors: [] };
-    }
-    const nextFieldErrors: Record<string, string> = {};
-    const nextSummaryErrors: string[] = [];
-    const submissionData = recordPid ? { ...(initialFormData || {}), ...formData } : formData;
-    const blocks = schema.blocks;
-    const formSectionBlocks = blocks.filter((b: any) => b.blockType === 'form-section');
-
-    for (const block of formSectionBlocks) {
-      if (block.visibleWhen && !evaluateCondition(block.visibleWhen, pageContext)) {
-        continue;
+  const validateFormBeforeSubmit = useCallback<ValidateForm>(
+    (stepBlocks) => {
+      if (!schema?.blocks) {
+        return { fieldErrors: {}, summaryErrors: [] };
       }
-      const fields = Array.isArray(block.fields) ? block.fields : [];
-      for (const rawField of fields) {
-        const meta = modelFields[rawField.field];
-        const rules = mergeFieldValidationRules(rawField, meta, t, locale);
-        const label =
-          getLocalizedText(rawField.label, locale, t) || meta?.displayName || rawField.field;
+      const nextFieldErrors: Record<string, string> = {};
+      const nextSummaryErrors: string[] = [];
+      const submissionData = recordPid ? { ...(initialFormData || {}), ...formData } : formData;
+      const blocks = stepBlocks ?? schema.blocks;
+      const formSectionBlocks = collectFormSections(blocks, (condition) =>
+        evaluateCondition(condition, pageContext),
+      );
 
-        if (rawField.visibleWhen && !evaluateCondition(rawField.visibleWhen, pageContext)) {
+      for (const block of formSectionBlocks) {
+        if (block.visibleWhen && !evaluateCondition(block.visibleWhen, pageContext)) {
           continue;
         }
+        const fields = Array.isArray(block.fields) ? block.fields : [];
+        for (const rawField of fields) {
+          const meta = modelFields[rawField.field];
+          const rules = mergeFieldValidationRules(rawField, meta, t, locale);
+          const label =
+            getLocalizedText(rawField.label, locale, t) || meta?.displayName || rawField.field;
 
-        const value = submissionData[rawField.field];
-        const reviewError = getBomUploadReviewError(
-          value,
-          locale.startsWith('zh')
-            ? '请确认 BOM 识别列，并且只选择一个单套用量列。'
-            : 'Review the BOM columns and select exactly one quantity column.',
-        );
-        if (reviewError) {
-          nextFieldErrors[rawField.field] = reviewError;
-          continue;
-        }
-        const jsonValueError = getJsonFormValueError(
-          value,
-          rawField.dataType || meta?.dataType,
-          label,
-        );
-        if (jsonValueError) {
-          nextFieldErrors[rawField.field] = jsonValueError;
-          continue;
-        }
-        for (const rule of rules) {
-          if (!rule?.type) continue;
-          if (rule.type === 'required') {
-            const empty =
-              value === undefined ||
-              value === null ||
-              value === '' ||
-              (Array.isArray(value) && value.length === 0);
-            if (empty) {
-              nextFieldErrors[rawField.field] =
-                rule.message ||
-                buildRequiredFieldMessage(label, {
-                  dataType: meta?.dataType,
-                  component: rawField.component,
-                  locale,
-                  t,
-                });
-              break;
-            }
+          if (rawField.visibleWhen && !evaluateCondition(rawField.visibleWhen, pageContext)) {
+            continue;
           }
-          if (
-            rule.type === 'maxLength' &&
-            typeof value === 'string' &&
-            Number.isFinite(rule.maxLength)
-          ) {
-            if (value.length > Number(rule.maxLength)) {
-              nextFieldErrors[rawField.field] = buildConstraintFieldMessage(
-                label,
-                { type: 'maxLength', maxLength: Number(rule.maxLength) },
-                { locale, t },
-              );
-              break;
-            }
+
+          const value = submissionData[rawField.field];
+          const reviewError = getBomUploadReviewError(
+            value,
+            locale.startsWith('zh')
+              ? '请确认 BOM 识别列，并且只选择一个单套用量列。'
+              : 'Review the BOM columns and select exactly one quantity column.',
+          );
+          if (reviewError) {
+            nextFieldErrors[rawField.field] = reviewError;
+            continue;
           }
-          if (
-            rule.type === 'minLength' &&
-            typeof value === 'string' &&
-            Number.isFinite(rule.minLength)
-          ) {
-            if (value.length < Number(rule.minLength)) {
-              nextFieldErrors[rawField.field] =
-                `${label} is shorter than min length ${rule.minLength}`;
-              break;
-            }
+          const jsonValueError = getJsonFormValueError(
+            value,
+            rawField.dataType || meta?.dataType,
+            label,
+          );
+          if (jsonValueError) {
+            nextFieldErrors[rawField.field] = jsonValueError;
+            continue;
           }
-          if (rule.type === 'pattern' && typeof value === 'string' && rule.pattern) {
-            try {
-              const regex = new RegExp(rule.pattern);
-              if (!regex.test(value)) {
+          for (const rule of rules) {
+            if (!rule?.type) continue;
+            if (rule.type === 'required') {
+              const empty =
+                value === undefined ||
+                value === null ||
+                value === '' ||
+                (Array.isArray(value) && value.length === 0);
+              if (empty) {
+                nextFieldErrors[rawField.field] =
+                  rule.message ||
+                  buildRequiredFieldMessage(label, {
+                    dataType: meta?.dataType,
+                    component: rawField.component,
+                    locale,
+                    t,
+                  });
+                break;
+              }
+            }
+            if (
+              rule.type === 'maxLength' &&
+              typeof value === 'string' &&
+              Number.isFinite(rule.maxLength)
+            ) {
+              if (value.length > Number(rule.maxLength)) {
                 nextFieldErrors[rawField.field] = buildConstraintFieldMessage(
                   label,
-                  { type: 'pattern' },
+                  { type: 'maxLength', maxLength: Number(rule.maxLength) },
                   { locale, t },
                 );
                 break;
               }
-            } catch (error) {
-              // Ignore invalid regex rule configuration.
- console.warn('[useFormValidation] previously-silent catch', error);            }
-          }
-          if (rule.type === 'minValue' && Number.isFinite(rule.minValue)) {
-            const num = Number(value);
-            if (Number.isFinite(num) && num < rule.minValue!) {
-              nextFieldErrors[rawField.field] = buildConstraintFieldMessage(
-                label,
-                { type: 'minValue', minValue: rule.minValue },
-                { locale, t },
-              );
-              break;
             }
-          }
-          if (rule.type === 'maxValue' && Number.isFinite(rule.maxValue)) {
-            const num = Number(value);
-            if (Number.isFinite(num) && num > rule.maxValue!) {
-              nextFieldErrors[rawField.field] = buildConstraintFieldMessage(
-                label,
-                { type: 'maxValue', maxValue: rule.maxValue },
-                { locale, t },
-              );
-              break;
+            if (
+              rule.type === 'minLength' &&
+              typeof value === 'string' &&
+              Number.isFinite(rule.minLength)
+            ) {
+              if (value.length < Number(rule.minLength)) {
+                nextFieldErrors[rawField.field] =
+                  `${label} is shorter than min length ${rule.minLength}`;
+                break;
+              }
+            }
+            if (rule.type === 'pattern' && typeof value === 'string' && rule.pattern) {
+              try {
+                const regex = new RegExp(rule.pattern);
+                if (!regex.test(value)) {
+                  nextFieldErrors[rawField.field] = buildConstraintFieldMessage(
+                    label,
+                    { type: 'pattern' },
+                    { locale, t },
+                  );
+                  break;
+                }
+              } catch (error) {
+                // Ignore invalid regex rule configuration.
+                console.warn('[useFormValidation] previously-silent catch', error);
+              }
+            }
+            if (rule.type === 'minValue' && Number.isFinite(rule.minValue)) {
+              const num = Number(value);
+              if (Number.isFinite(num) && num < rule.minValue!) {
+                nextFieldErrors[rawField.field] = buildConstraintFieldMessage(
+                  label,
+                  { type: 'minValue', minValue: rule.minValue },
+                  { locale, t },
+                );
+                break;
+              }
+            }
+            if (rule.type === 'maxValue' && Number.isFinite(rule.maxValue)) {
+              const num = Number(value);
+              if (Number.isFinite(num) && num > rule.maxValue!) {
+                nextFieldErrors[rawField.field] = buildConstraintFieldMessage(
+                  label,
+                  { type: 'maxValue', maxValue: rule.maxValue },
+                  { locale, t },
+                );
+                break;
+              }
             }
           }
         }
       }
-    }
 
-    // Kind × ModelCapabilities validation (P2B-T2).
-    // When this form binds both `model_code` and `kind`, block submit if the
-    // selected kind is not supported by the selected model's capabilities.
-    if (hasModelCodeAndKindFields) {
-      const selectedKind =
-        typeof submissionData.kind === 'string' ? submissionData.kind : undefined;
-      const selectedModelCode =
-        typeof submissionData.model_code === 'string' ? submissionData.model_code : undefined;
-      if (selectedKind && selectedModelCode && kindCapabilities) {
-        const compat = checkKindCompatibility(selectedKind, kindCapabilities);
-        if (!compat.compatible) {
-          pushUniqueMessage(
-            nextSummaryErrors,
-            compat.reason
-              ? `Kind "${selectedKind}" is not supported by model "${selectedModelCode}": ${compat.reason}`
-              : `Kind "${selectedKind}" is not supported by model "${selectedModelCode}"`,
-          );
-        }
-      }
-    }
-
-    // Cross-field validation rules (from model-level rules + command overrides)
-    if (schema?.rules && schema.rules.length > 0) {
-      const finalRules = crossFieldMergeRules(schema.rules, schema.ruleOverrides ?? []);
-      for (const rule of finalRules) {
-        if (rule.when) {
-          if (!crossFieldEvalCondition(rule.when, submissionData)) continue;
-        }
-        const result = crossFieldEvalAssert(rule.assert, submissionData);
-        if (!result.skipped && !result.passed) {
-          if (rule.severity !== 'warning') {
-            const msg = rule.message?.replace(/\{(\w+)\}/g, (_, k: string) =>
-              String(submissionData[k] ?? k),
+      // Kind × ModelCapabilities validation (P2B-T2).
+      // When this form binds both `model_code` and `kind`, block submit if the
+      // selected kind is not supported by the selected model's capabilities.
+      if (!stepBlocks && hasModelCodeAndKindFields) {
+        const selectedKind =
+          typeof submissionData.kind === 'string' ? submissionData.kind : undefined;
+        const selectedModelCode =
+          typeof submissionData.model_code === 'string' ? submissionData.model_code : undefined;
+        if (selectedKind && selectedModelCode && kindCapabilities) {
+          const compat = checkKindCompatibility(selectedKind, kindCapabilities);
+          if (!compat.compatible) {
+            pushUniqueMessage(
+              nextSummaryErrors,
+              compat.reason
+                ? `Kind "${selectedKind}" is not supported by model "${selectedModelCode}": ${compat.reason}`
+                : `Kind "${selectedKind}" is not supported by model "${selectedModelCode}"`,
             );
-            const finalMessage = msg || `Validation failed: ${rule.id}`;
-            if (rule.targetField && !nextFieldErrors[rule.targetField]) {
-              nextFieldErrors[rule.targetField] = finalMessage;
-            }
-            pushUniqueMessage(nextSummaryErrors, finalMessage);
           }
         }
       }
-    }
 
-    return { fieldErrors: nextFieldErrors, summaryErrors: nextSummaryErrors };
-  }, [
-    schema,
-    pageContext,
-    modelFields,
-    t,
-    locale,
-    formData,
-    initialFormData,
-    recordPid,
-    hasModelCodeAndKindFields,
-    kindCapabilities,
-  ]);
+      // Cross-field validation rules (from model-level rules + command overrides)
+      if (!stepBlocks && schema?.rules && schema.rules.length > 0) {
+        const finalRules = crossFieldMergeRules(schema.rules, schema.ruleOverrides ?? []);
+        for (const rule of finalRules) {
+          if (rule.when) {
+            if (!crossFieldEvalCondition(rule.when, submissionData)) continue;
+          }
+          const result = crossFieldEvalAssert(rule.assert, submissionData);
+          if (!result.skipped && !result.passed) {
+            if (rule.severity !== 'warning') {
+              const msg = rule.message?.replace(/\{(\w+)\}/g, (_, k: string) =>
+                String(submissionData[k] ?? k),
+              );
+              const finalMessage = msg || `Validation failed: ${rule.id}`;
+              if (rule.targetField && !nextFieldErrors[rule.targetField]) {
+                nextFieldErrors[rule.targetField] = finalMessage;
+              }
+              pushUniqueMessage(nextSummaryErrors, finalMessage);
+            }
+          }
+        }
+      }
+
+      return { fieldErrors: nextFieldErrors, summaryErrors: nextSummaryErrors };
+    },
+    [
+      schema,
+      pageContext,
+      modelFields,
+      t,
+      locale,
+      formData,
+      initialFormData,
+      recordPid,
+      hasModelCodeAndKindFields,
+      kindCapabilities,
+    ],
+  );
 
   const notifyValidationFailure = useCallback(
     (validationResult: FormValidationResult) => {

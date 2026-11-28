@@ -11,16 +11,17 @@
  * { "blockType": "form-wizard", "steps": [...] }
  */
 
-import React, { useState, useCallback } from 'react';
-import type { BlockConfig } from '~/framework/meta/schemas/types';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import type { BlockConfig, LocalizedText } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
-import { BlockRenderer } from '@auraboot/runtime-kernel';
+import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
+import { useNativeFormWizard } from '../NativeFormWizardContext';
 
 interface WizardStep {
   key: string;
-  label: string;
+  label: LocalizedText;
   blocks: BlockConfig[];
-  description?: string;
+  description?: LocalizedText;
 }
 
 interface FormWizardBlockRendererProps {
@@ -33,16 +34,34 @@ export const FormWizardBlockRenderer: React.FC<FormWizardBlockRendererProps> = (
   runtime,
 }) => {
   const steps: WizardStep[] = (block as any).steps || [];
+  const host = useNativeFormWizard();
+  const context = runtime.getContext();
+  const locale = context.locale || 'zh-CN';
+  const text = (zh: string, en: string) => getLocalizedText({ 'zh-CN': zh, en }, locale, context.t);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const advancing = useRef(false);
   const currentStep = steps[currentStepIndex];
   const isFirst = currentStepIndex === 0;
   const isLast = currentStepIndex === steps.length - 1;
+  const navigationDisabled = !host || !host.ready || host.submitting;
+  const reportStep = host?.reportStep;
+
+  useEffect(() => {
+    advancing.current = false;
+    reportStep?.(block.id, isLast && steps.length > 0);
+  }, [block.id, currentStepIndex, isLast, reportStep, steps.length]);
+
+  useEffect(() => () => reportStep?.(block.id, false), [block.id, reportStep]);
 
   const handleNext = useCallback(() => {
-    if (!isLast) {
-      setCurrentStepIndex((prev) => prev + 1);
+    if (isLast || navigationDisabled || advancing.current || !host || !currentStep) return;
+    advancing.current = true;
+    if (!host.validateStep(currentStep.blocks)) {
+      advancing.current = false;
+      return;
     }
-  }, [isLast]);
+    setCurrentStepIndex(currentStepIndex + 1);
+  }, [isLast, navigationDisabled, host, currentStep, currentStepIndex]);
 
   const handlePrevious = useCallback(() => {
     if (!isFirst) {
@@ -62,17 +81,27 @@ export const FormWizardBlockRenderer: React.FC<FormWizardBlockRendererProps> = (
 
   if (steps.length === 0) {
     return (
-      <div className="bg-status-amber-bg rounded border border-status-amber p-4">
-        <p className="text-status-amber">Form wizard has no steps configured</p>
+      <div className="bg-status-amber-bg border-status-amber rounded border p-4">
+        <p role="alert" className="text-status-amber">
+          {text('尚未配置表单步骤。', 'No form steps have been configured.')}
+        </p>
       </div>
+    );
+  }
+
+  if (!host || !block.id) {
+    return (
+      <p role="alert" className="text-status-amber">
+        {text('此分步表单需要在表单页面中使用。', 'This wizard requires a form page.')}
+      </p>
     );
   }
 
   return (
     <div className="space-y-6">
       {/* Step progress indicator */}
-      <nav className="flex items-center justify-center" aria-label="Progress">
-        <ol className="flex items-center space-x-2">
+      <nav className="flex items-center justify-center" aria-label={text('表单步骤', 'Form steps')}>
+        <ol className="flex flex-wrap items-center gap-2">
           {steps.map((step, index) => {
             const isCompleted = index < currentStepIndex;
             const isCurrent = index === currentStepIndex;
@@ -80,13 +109,13 @@ export const FormWizardBlockRenderer: React.FC<FormWizardBlockRendererProps> = (
             return (
               <li key={step.key} className="flex items-center">
                 {index > 0 && (
-                  <div
-                    className={`mx-2 h-0.5 w-12 ${isCompleted ? 'bg-accent' : 'bg-border'}`}
-                  />
+                  <div className={`mx-2 h-0.5 w-12 ${isCompleted ? 'bg-accent' : 'bg-border'}`} />
                 )}
                 <button
+                  type="button"
                   onClick={() => handleStepClick(index)}
-                  disabled={index > currentStepIndex}
+                  disabled={navigationDisabled || index > currentStepIndex}
+                  aria-current={isCurrent ? 'step' : undefined}
                   className={`flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
                     isCurrent
                       ? 'bg-accent text-white'
@@ -116,7 +145,7 @@ export const FormWizardBlockRenderer: React.FC<FormWizardBlockRendererProps> = (
                       index + 1
                     )}
                   </span>
-                  <span className="hidden sm:inline">{step.label}</span>
+                  <span>{getLocalizedText(step.label, locale, context.t)}</span>
                 </button>
               </li>
             );
@@ -128,55 +157,44 @@ export const FormWizardBlockRenderer: React.FC<FormWizardBlockRendererProps> = (
       {currentStep && (
         <div className="min-h-[200px]">
           {currentStep.description && (
-            <p className="text-text-2 mb-4 text-sm">{currentStep.description}</p>
+            <p className="text-text-2 mb-4 text-sm">
+              {getLocalizedText(currentStep.description, locale, context.t)}
+            </p>
           )}
-          <div className="space-y-4">
-            {currentStep.blocks.map((childBlock, index) => (
-              <BlockRenderer
-                key={childBlock.id || `wizard-${currentStep.key}-${index}`}
-                block={childBlock}
-                runtime={runtime}
-                areaId={`wizard-${currentStep.key}`}
-              />
-            ))}
-          </div>
+          <div className="space-y-4">{host.renderStep(currentStep.blocks)}</div>
         </div>
       )}
 
       {/* Navigation buttons */}
       <div className="border-border flex items-center justify-between border-t pt-4">
         <button
+          type="button"
           onClick={handlePrevious}
-          disabled={isFirst}
+          disabled={isFirst || navigationDisabled}
           className={`rounded-control px-4 py-2 text-sm font-medium transition-colors ${
             isFirst ? 'text-text-3 cursor-not-allowed' : 'bg-hover text-text-2 hover:bg-hover'
           }`}
         >
-          Previous
+          {text('上一步', 'Previous')}
         </button>
 
         <span className="text-text-2 text-sm">
-          Step {currentStepIndex + 1} of {steps.length}
+          {text(
+            `第 ${currentStepIndex + 1} 步，共 ${steps.length} 步`,
+            `Step ${currentStepIndex + 1} of ${steps.length}`,
+          )}
         </span>
 
         {!isLast ? (
           <button
+            type="button"
             onClick={handleNext}
+            disabled={navigationDisabled}
             className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-sm font-medium text-white transition-colors"
           >
-            Next
+            {text('校验并继续', 'Next')}
           </button>
-        ) : (
-          <button
-            onClick={() => {
-              // Trigger the runtime's submit handler
-              // The actual submit is handled by the form buttons block
-            }}
-            className="rounded-control bg-status-green-bg text-status-green border-status-green px-4 py-2 text-sm font-medium border transition-colors hover:bg-hover"
-          >
-            Submit
-          </button>
-        )}
+        ) : null}
       </div>
     </div>
   );

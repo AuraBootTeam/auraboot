@@ -61,4 +61,50 @@ describe('unchanged dynamic CRUD form submission', () => {
     expect(args.showSuccessToast).toHaveBeenCalled();
     expect(args.showInfoToast).not.toHaveBeenCalled();
   });
+
+  it.each(['dynamic', 'command', 'override'])(
+    'does not reenter a pending %s submission',
+    async (path) => {
+      vi.mocked(fetchResult).mockClear();
+      let finish!: (value: any) => void;
+      const pending = new Promise<any>((resolve) => {
+        finish = resolve;
+      });
+      vi.mocked(fetchResult).mockReturnValue(pending);
+      const override = vi.fn(() => pending);
+      const args = {
+        ...fixture('Revised'),
+        ...(path === 'override' ? { onSubmitOverride: override } : {}),
+      };
+      const button = {
+        code: 'submit',
+        action: 'save',
+        ...(path === 'command' ? { commandCode: 'delivery:save' } : {}),
+      };
+      const { result } = renderHook(() => useFormSubmission(args as any));
+      let first!: Promise<unknown>;
+      let second!: Promise<unknown>;
+      await act(async () => {
+        first = result.current.handleFormAction(button);
+        second = result.current.handleFormAction(button);
+      });
+      const pendingCalls =
+        path === 'override' ? override.mock.calls.length : vi.mocked(fetchResult).mock.calls.length;
+      finish({ code: '0', data: { pid: 'record-1' } });
+      await act(async () => {
+        await Promise.all([first, second]);
+      });
+      expect(pendingCalls).toBe(1);
+      if (path === 'override') {
+        expect(override).toHaveBeenCalledTimes(1);
+        expect(fetchResult).not.toHaveBeenCalled();
+      } else {
+        expect(fetchResult).toHaveBeenCalledTimes(1);
+      }
+      await act(async () => {
+        await result.current.handleFormAction(button);
+      });
+      expect(path === 'override' ? override : fetchResult).toHaveBeenCalledTimes(2);
+    },
+  );
 });

@@ -279,6 +279,15 @@ export function FormPageContent(props: PageContentProps) {
     setSubTableData,
     sidebarWidth,
     handleFormAction,
+    validateWizardStep: (blocks) => {
+      const validation = validateFormBeforeSubmit(blocks);
+      setFieldErrors(validation.fieldErrors);
+      setSummaryErrors(validation.summaryErrors);
+      const valid =
+        Object.keys(validation.fieldErrors).length === 0 && validation.summaryErrors.length === 0;
+      if (!valid) notifyValidationFailure(validation);
+      return valid;
+    },
     loading,
     submitting,
   });

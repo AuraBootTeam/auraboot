@@ -1,4 +1,5 @@
 import type { FieldMetaInfo } from './formPageTypes';
+import { collectFormSections } from '~/framework/meta/schemas/formSections';
 import { isDatetimeDataType, normalizeDateTimeFormValue } from './formDateTime';
 
 export function mergeLoadedRecordWithDirtyFields(
@@ -43,9 +44,8 @@ export function collectFormFieldDataTypes(
   modelFields: Record<string, Pick<FieldMetaInfo, 'dataType'>> = {},
 ): Record<string, string> {
   const types: Record<string, string> = {};
-  const formBlocks = Array.isArray(blocks) ? blocks : [];
+  const formBlocks = collectFormSections(blocks);
   for (const block of formBlocks) {
-    if (block?.blockType !== 'form-section' || !Array.isArray(block.fields)) continue;
     for (const rawField of block.fields) {
       if (!rawField?.field) continue;
       const fieldCode = String(rawField.field);
